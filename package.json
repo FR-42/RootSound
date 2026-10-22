@@ -1,0 +1,19 @@
+{
+  "name": "rootsound",
+  "private": true,
+  "version": "0.1.0",
+  "description": "RootSound —— 面向普通人创作音乐的工作站（架构重建验证）",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "check": "tsc --noEmit",
+    "test": "npm run test:workstation",
+    "test:workstation": "node --test src/workstation/modules/materials/library.test.ts src/workstation/modules/sound-runtime/browser.test.ts tests/workstation.flow.test.ts tests/workstation.boundaries.test.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.5",
+    "typescript": "^5.6.0",
+    "vite": "^7.0.0"
+  }
+}
