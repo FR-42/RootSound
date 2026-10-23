@@ -1,0 +1,22 @@
+.reference-navigation { display: flex; align-items: center; gap: 20px; margin: 0 0 22px; padding: 13px 16px; border: 1px solid #c5c39418; border-radius: 9px; background: #c5c39406; }
+.reference-back { flex-shrink: 0; padding: 8px 0; color: #d4cda9; }
+.reference-description { min-width: 0; }
+.reference-path { margin: 0; color: #bdc8b2; font-size: 12px; line-height: 1.6; overflow-wrap: anywhere; }
+.reference-hint { margin: 3px 0 0; color: #829477; font-size: 11px; line-height: 1.6; }
+.reference-actions-dialog { width: 380px; }
+.reference-action-choices { display: flex; gap: 12px; flex-wrap: wrap; margin: 24px 0 12px; }
+.reference-locations-dialog { width: 560px; max-height: 85vh; overflow: auto; }
+.reference-location-groups { max-height: 42vh; overflow-y: auto; scrollbar-width: thin; margin-top: 22px; }
+.reference-location-group { border-top: 1px solid #ffffff10; padding: 10px 0; }
+.reference-location-group > summary { padding: 9px 0; color: #c3ccba; font-size: 12px; cursor: pointer; }
+.reference-location { display: flex; align-items: center; gap: 12px; padding: 12px 8px; border-radius: 7px; cursor: pointer; }
+.reference-location:hover { background: #ffffff04; }
+.reference-location input { accent-color: #d1bf88; width: 16px; height: 16px; flex-shrink: 0; }
+.reference-location-description { display: flex; flex-direction: column; gap: 5px; flex: 1; min-width: 0; }
+.reference-location-label { color: #d0d8c5; font-size: 12px; line-height: 1.6; overflow-wrap: anywhere; }
+.reference-location-detail { color: #85957a; font-size: 11px; line-height: 1.6; overflow-wrap: anywhere; }
+.reference-current { font-size: 10px; white-space: nowrap; color: #d5c48d; }
+.reference-selection-tools { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 14px; }
+.reference-selection-count { color: #aab69e; font-size: 12px; margin-right: auto; }
+.reference-selection-tools .quiet { font-size: 11px; padding: 8px 0; }
+@media(max-width:700px) { .reference-navigation { align-items: flex-start; flex-direction: column; gap: 8px; } .reference-locations-dialog { padding: 22px; } }

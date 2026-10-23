@@ -1,0 +1,8 @@
+.save-controls { display: inline-flex; align-items: center; gap: 6px; }
+.save-controls .save-controls-more { min-width: 34px; padding: 7px 9px; border: 0; border-radius: 6px; background: transparent; font-size: 20px; line-height: 1; color: #97a08f; }
+.save-controls .save-controls-more:hover { background: #ffffff07; color: #f3e6c8; }
+.save-controls-popup { position: fixed; inset: auto; margin: 0; min-width: min(176px, calc(100vw - 16px)); max-width: calc(100vw - 16px); max-height: calc(100dvh - 16px); overflow: auto; padding: 5px; background: #252d26; color: #dce2d5; border: 1px solid #ffffff20; border-radius: 8px; box-shadow: 0 8px 28px #0006; }
+.save-controls-popup:popover-open { display: grid; gap: 2px; }
+.save-controls-popup .save-controls-option { width: 100%; padding: 10px 12px; border: 0; border-radius: 5px; background: transparent; color: inherit; font: inherit; font-size: 12px; text-align: left; line-height: 1.5; }
+.save-controls-popup .save-controls-option:hover { background: #ffffff0b; color: #f3e6c8; }
+.save-controls-popup .save-controls-option:focus-visible { outline-offset: -2px; background: #ffffff0b; }

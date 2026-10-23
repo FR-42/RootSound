@@ -1,0 +1,15 @@
+/bluetooth-recorder/.builds/
+/bluetooth-recorder/.current
+/bluetooth-recorder/.current.*
+/蓝牙录音.exe
+/蓝牙录音.*.tmp
+/sample-editor/.builds/
+/sample-editor/.current
+/sample-editor/.current.*
+/采样编辑.exe
+/采样编辑.*.tmp
+/timbre-lab/.builds/
+/timbre-lab/.current
+/timbre-lab/.current.*
+/音色打磨.exe
+/音色打磨.*.tmp

@@ -1,0 +1,55 @@
+.sample-timbre-studio { height: 100svh; min-height: 0; overflow: hidden; }
+.sample-timbre-workspace { width: 100%; margin: 0; padding: 10px 12px; flex: 1; min-width: 0; min-height: 0; overflow: auto; display: flex; flex-direction: column; gap: 7px; }
+.sample-timbre-workspace > div:empty { display: none; }
+.sample-timbre-card { flex: 1; min-height: 570px; display: grid; grid-template-columns: minmax(240px, .85fr) minmax(0, 1.4fr); grid-template-rows: auto auto minmax(200px, 1fr) auto auto; border-radius: 8px; box-shadow: none; }
+.sample-timbre-card > .sound-card-header { grid-column: 1 / -1; padding: 12px 20px 8px; border-bottom: 0; }
+.sample-timbre-card .sound-name { font-size: 18px; }
+.sample-timbre-card .save-state { margin-top: 3px; font-size: 10px; }
+.sample-timbre-source { grid-column: 1 / -1; display: flex; gap: 12px; align-items: center; min-width: 0; padding: 0 20px 8px; }
+.sample-timbre-source > p { overflow-wrap: anywhere; margin: 0; font-size: 11px; color: #a2b196; }
+.sample-timbre-source .sample-timbre-source-state { color: #72846a; font-size: 10px; white-space: nowrap; }
+.sample-timbre-source-state:empty { display: none; }
+.sample-timbre-trim, .sample-timbre-tuning, .sample-timbre-contour { padding: 14px 20px; min-width: 0; }
+.sample-timbre-trim { grid-column: 1 / -1; display: flex; flex-direction: column; min-height: 0; border-top: 1px solid #ffffff09; }
+.sample-timbre-tuning, .sample-timbre-contour { border-top: 1px solid #ffffff09; }
+.sample-timbre-contour { border-left: 1px solid #ffffff09; }
+.sample-timbre-card h2 { font-size: 12px; font-weight: 500; color: #c1ccb7; margin: 0 0 8px; }
+.sample-timbre-wave { position: relative; flex: 1; margin: 12px 10px; min-height: 125px; border-block: 1px solid #ffffff0b; touch-action: none; }
+.sample-timbre-wave > svg { width: 100%; height: 100%; position: absolute; inset: 0; display: block; fill: #b8c59980; pointer-events: none; }
+.sample-trim-shade { position: absolute; pointer-events: none; top: 0; bottom: 0; background: #101610a3; }
+.sample-trim-shade.is-left { left: 0; }
+.sample-trim-shade.is-right { right: 0; }
+.sample-trim-selection { position: absolute; top: 0; bottom: 0; border-block: 1px solid #bcc8915c; background: #bdc48d07; pointer-events: none; }
+.sample-trim-handle { position: absolute; top: -8px; bottom: -8px; width: 26px; padding: 0; transform: translateX(-50%); border: 0; background: transparent; font-size: 9px; color: #d8deb9; touch-action: none; cursor: ew-resize; }
+.sample-trim-handle::after { content: ''; position: absolute; top: 10px; bottom: 10px; left: 12px; width: 2px; background: #c8cc95; }
+.sample-trim-handle.is-start { text-align: left; transform: translateX(-100%); }
+.sample-trim-handle.is-end { text-align: right; transform: none; }
+.sample-trim-handle.is-start::after { left: auto; right: 0; }
+.sample-trim-handle.is-end::after { left: 0; }
+.sample-timbre-times { display: flex; align-items: center; flex-wrap: wrap; gap: 16px; }
+.sample-time-field, .sample-timbre-precise label { display: flex; align-items: center; gap: 8px; color: #8c9d81; font-size: 11px; }
+.sample-timbre-times input, .sample-timbre-precise input { width: 103px; border: 1px solid #ffffff13; border-radius: 5px; padding: 5px 7px; color: #c5d0ba; background: #141b1480; font-size: 12px; }
+.sample-trim-duration { margin: 0 0 0 auto; font-size: 11px; color: #839978; }
+.sample-root-picker { margin-top: 2px; background: #192219; color: #c8d3ba; border: 1px solid #ffffff18; border-radius: 5px; padding: 6px 12px; min-width: 130px; }
+.sample-timbre-precise { margin-top: 10px; font-size: 11px; color: #809471; }
+.sample-timbre-precise summary { cursor: pointer; }
+.sample-timbre-precise label { margin-top: 10px; }
+.sample-timbre-audition { display: flex; align-items: center; gap: 8px; margin-top: 16px; flex-wrap: wrap; }
+.sample-timbre-audition .secondary, .sample-timbre-audition .preview-button { font-size: 12px; padding: 8px 14px; border-radius: 6px; min-width: 72px; }
+.sample-timbre-audition [aria-pressed=true] { outline: 1px solid #d7d6a7; outline-offset: 3px; }
+.sample-timbre-contour .envelope-graph { height: 100px; margin-top: 4px; }
+.sample-timbre-contour .envelope-sliders { margin-top: 6px; gap: 24px; }
+.sample-timbre-contour .slider-field { gap: 10px; }
+.sample-timbre-card > .sound-card-footer { grid-column: 1 / -1; padding: 11px 20px; border-radius: 0 0 8px 8px; }
+.sample-timbre-card .save-actions .primary { padding: 8px 20px; border-radius: 6px; font-size: 12px; }
+.sample-timbre-card .save-actions .quiet { padding: 7px 8px; font-size: 11px; }
+.sample-timbre-workspace > .studio-notice { margin: 0; min-height: 17px; font-size: 10px; flex-shrink: 0; }
+.sample-timbre-workspace > .studio-notice:empty { display: none; }
+.sample-looping { margin-top: 14px; font-size: 11px; color: #91a381; }
+.sample-looping > summary { cursor: pointer; }
+.sample-looping > label { display: inline-flex; align-items: center; gap: 8px; margin: 12px 14px 0 0; }
+.sample-looping input[type=number] { width: 95px; background: #182019; color: #d4dccb; border: 1px solid #ffffff18; padding: 5px; border-radius: 4px; }
+.sample-timbre-workspace .reference-navigation { margin: 0; }
+.sample-timbre-workspace [hidden], .sample-timbre-studio .toolbar-tools [hidden] { display: none; }
+@media(max-width: 900px) { .sample-timbre-card { grid-template-columns: minmax(200px, .8fr) minmax(0, 1fr); } .sample-timbre-trim, .sample-timbre-tuning, .sample-timbre-contour { padding-inline: 14px; } .sample-timbre-contour .envelope-sliders { gap: 14px; } }
+@media(max-width: 700px), (max-height: 500px) { .sample-timbre-studio { height: auto; min-height: 100svh; overflow: visible; } .sample-timbre-workspace { padding: 8px; overflow: visible; } .sample-timbre-card { display: flex; flex-direction: column; min-height: 0; } .sample-timbre-trim { min-height: 260px; } .sample-timbre-contour { border-left: 0; } .sample-timbre-contour .envelope-sliders { grid-template-columns: 1fr 1fr; } .sample-timbre-contour .slider-field { flex-direction: row; gap: 8px; } .sample-timbre-times { gap: 10px; } .sample-trim-duration { width: 100%; margin-left: 0; } .sample-timbre-card .volume-control { width: 180px; } .sample-timbre-card .save-actions { width: auto; margin-left: auto; } }

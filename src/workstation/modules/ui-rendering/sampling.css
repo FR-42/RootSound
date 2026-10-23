@@ -1,0 +1,73 @@
+.sampling-studio .studio-toolbar { height: auto; min-height: 64px; flex-wrap: wrap; padding-top: 12px; padding-bottom: 12px; }
+.sampling-studio .toolbar-tools { flex-wrap: wrap; justify-content: flex-end; }
+.sampling-workspace { flex: 1; width: min(960px, calc(100% - 64px)); margin: 40px auto 30px; }
+.sampling-heading h1 { color: #e7e7dc; margin: 0; font-size: clamp(27px, 3vw, 34px); font-weight: 400; letter-spacing: 1px; }
+.sampling-heading > p { margin: 13px 0 26px; color: #929e88; font-size: 13px; line-height: 1.8; }
+.sampling-acquire { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+.sampling-acquire > button { font-size: 13px; padding: 12px 21px; }
+.sampling-limits { flex-basis: 100%; margin: 3px 0 26px; font-size: 10px; color: #73816b; line-height: 1.9; }
+.sampling-recording { display: flex; justify-content: space-between; align-items: center; gap: 25px; padding: 20px 24px; margin-bottom: 20px; background: #b9b98408; border: 1px solid #bab98529; border-radius: 12px; }
+.sampling-recording-info { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px; flex: 1; }
+.sampling-phase { color: #c7ccba; margin: 0; font-size: 13px; }
+.sampling-recording.is-recording .sampling-phase::before { content: ''; display: inline-block; width: 7px; height: 7px; margin-right: 10px; border-radius: 50%; background: #d49983; }
+.sampling-timer { color: #b6bfaa; font-size: 12px; font-variant-numeric: tabular-nums; }
+.sampling-level { height: 5px; width: 125px; background: #ffffff0c; overflow: hidden; border-radius: 3px; }
+.sampling-level-fill { height: 100%; display: block; width: 0; background: #bac994; transition: width .08s; }
+.sampling-recording-actions { display: flex; align-items: center; gap: 12px; }
+.sampling-recording-actions > button { font-size: 12px; padding: 10px 14px; white-space: nowrap; }
+.sampling-audio { overflow: hidden; background: #202620; border: 1px solid #ffffff10; border-radius: 15px; }
+.sampling-audio-header { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 23px 27px 10px; }
+.sampling-name-field { display: flex; min-width: 0; flex: 1; flex-direction: column; align-items: flex-start; }
+.sampling-name-field > span { color: #8a9a7e; font-size: 10px; }
+.sampling-name { display: block; color: #e3e5d8; width: min(100%, 560px); background: transparent; border: 1px solid transparent; border-bottom-color: #ffffff10; border-radius: 3px; padding: 7px 0; font-size: 20px; margin-top: 5px; }
+.sampling-name:focus { border-bottom-color: #b9bf8a; outline: none; }
+.sampling-save-state { min-height: 15px; color: #7b8c72; font-size: 10px; margin: 7px 0 0; }
+.sampling-waveform { display: block; width: calc(100% - 54px); height: 156px; margin: 10px 27px 17px; }
+.sampling-waveform-center { fill: none; stroke: #c9ccad26; stroke-width: 1; }
+.sampling-waveform-shape { fill: #b8c49965; stroke: #c1cda88c; stroke-width: 1; vector-effect: non-scaling-stroke; }
+.sampling-audio-footer { padding: 18px 27px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 18px; background: #00000010; border-top: 1px solid #ffffff09; }
+.sampling-metadata { margin: 0; color: #87987b; font-size: 11px; font-variant-numeric: tabular-nums; }
+.sampling-audio-footer .primary { padding: 11px 18px; font-size: 12px; }
+.sampling-melody { margin-top: 18px; padding: 22px 25px; border: 1px solid #b7c18c25; border-radius: 13px; background: #b5c38905; }
+.sampling-melody-heading { display: flex; justify-content: space-between; align-items: center; gap: 22px; }
+.sampling-melody-heading h2 { color: #d0d8c3; font-weight: 400; font-size: 17px; margin: 0; }
+.sampling-melody-scope { color: #849879; font-size: 10px; margin: 10px 0 0; }
+.sampling-melody-heading > button { font-size: 12px; padding: 11px 16px; flex-shrink: 0; }
+.sampling-melody-help { font-size: 11px; color: #8a9b7e; line-height: 1.9; margin: 16px 0 0; }
+.sampling-melody-limit, .sampling-melody-problem { color: #d8ad92; font-size: 12px; line-height: 1.9; margin: 15px 0 0; }
+.sampling-analysis-progress { display: flex; align-items: center; gap: 22px; margin-top: 20px; padding-top: 17px; border-top: 1px solid #ffffff09; }
+.sampling-analysis-info { flex: 1; }
+.sampling-analysis-label { color: #b7c4aa; font-size: 12px; margin: 0 0 11px; font-variant-numeric: tabular-nums; }
+.sampling-analysis-bar { display: block; width: 100%; height: 5px; border: 0; border-radius: 3px; accent-color: #bdc594; overflow: hidden; }
+.sampling-analysis-bar::-webkit-progress-bar { background: #ffffff0b; }
+.sampling-analysis-bar::-webkit-progress-value { background: #bdc594; }
+.sampling-analysis-progress > button { flex-shrink: 0; font-size: 12px; }
+.sampling-melody-result { margin-top: 20px; padding-top: 18px; border-top: 1px solid #ffffff0b; }
+.sampling-melody-summary { color: #c7d1b9; font-size: 14px; margin: 0; }
+.sampling-melody-timing { color: #899c7b; font-size: 11px; line-height: 1.8; margin: 9px 0 0; }
+.sampling-melody-warnings { padding-left: 18px; margin: 13px 0 0; color: #b5ae8e; font-size: 11px; line-height: 1.9; }
+.sampling-melody-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 11px; margin-top: 18px; }
+.sampling-melody-actions > button { font-size: 12px; padding: 10px 16px; }
+.sampling-melody-actions > button[aria-pressed=true] { color: #e0dbb8; border-color: #c6c18d66; background: #c6c18d15; }
+.sampling-melody-save-hint { color: #798b6e; font-size: 10px; line-height: 1.8; margin: 14px 0 0; }
+.sampling-empty { padding: 28px 22px 31px; text-align: center; background: #ffffff02; border: 1px dashed #ffffff12; border-radius: 13px; }
+.sampling-empty-mark { font-size: 43px; font-weight: 300; color: #6c7b61; }
+.sampling-empty p { color: #85917b; font-size: 12px; line-height: 1.8; margin: 9px 0 0; }
+.sampling-library { margin-top: 34px; }
+.sampling-library-heading { display: flex; align-items: baseline; gap: 12px; margin-bottom: 15px; }
+.sampling-library-heading h2 { margin: 0; color: #c6d0bb; font-size: 16px; font-weight: 400; }
+.sampling-saved-count { color: #6e7f63; font-size: 11px; }
+.sampling-saved-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.sampling-saved { display: flex; align-items: center; justify-content: space-between; min-width: 0; gap: 18px; padding: 15px 17px; border: 1px solid #ffffff0c; background: #ffffff02; border-radius: 9px; }
+.sampling-saved.is-current { border-color: #b7bd893d; background: #bbc08b06; }
+.sampling-saved-info { min-width: 0; }
+.sampling-saved-info h3 { color: #bdc8b2; font-size: 13px; font-weight: 400; margin: 0; overflow-wrap: anywhere; }
+.sampling-saved-info p { color: #728269; font-size: 10px; margin: 7px 0 0; }
+.sampling-saved .quiet { font-size: 12px; flex-shrink: 0; padding: 8px 11px; }
+.sampling-library-empty { color: #73836a; font-size: 12px; margin: 8px 0; }
+.sampling-workspace > .studio-notice { margin-left: 0; margin-right: 0; }
+.sampling-dialog-error { color: #e5a99b; font-size: 12px; min-height: 20px; }
+.sampling-workspace [hidden] { display: none; }
+.sampling-studio button:disabled { cursor: default; }
+@media(max-width:900px) { .sampling-workspace { width: calc(100% - 40px); margin-top: 28px; } }
+@media(max-width:640px) { .sampling-workspace { width: calc(100% - 32px); } .sampling-recording { align-items: stretch; flex-direction: column; padding: 19px; gap: 18px; } .sampling-recording-actions { justify-content: flex-end; } .sampling-audio-header { padding: 20px 19px 9px; } .sampling-name { font-size: 17px; } .sampling-audio-footer { padding: 17px 19px; } .sampling-waveform { width: calc(100% - 38px); margin: 7px 19px 14px; height: 130px; } .sampling-saved-list { grid-template-columns: 1fr; } .sampling-metadata { width: 100%; } .sampling-audio-footer > button { margin-left: auto; } .sampling-melody { padding: 20px 18px; } .sampling-melody-heading { align-items: flex-start; flex-direction: column; gap: 17px; } }

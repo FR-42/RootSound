@@ -3,14 +3,8 @@ title RootSound
 
 cd /d "%~dp0"
 
-if exist node_modules goto run
-call npm install
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\Start-Desktop.ps1"
 if errorlevel 1 goto fail
-
-:run
-start "RootSound server" cmd /k "npx vite --port 5173 --strictPort"
-ping -n 4 127.0.0.1 >nul
-start "" http://localhost:5173
 exit /b 0
 
 :fail

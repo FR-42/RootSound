@@ -7,6 +7,15 @@ dist/
 # 旧项目与旧 Git 的本地恢复档案，独立于新仓库历史
 /legacy/
 
+# 本机桌面依赖、构建、测试与创作数据
+/.cache/
+/.test-output/
+/data/
+/RootSound.exe
+/RootSound.*.tmp
+bin/
+obj/
+
 # 系统垃圾
 Thumbs.db
 .DS_Store

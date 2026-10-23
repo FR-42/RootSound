@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import type { MaterialStorage, SaveResult } from '../src/workstation/contracts/content.ts';
-import type { SoundPlan } from '../src/workstation/contracts/sound.ts';
+import type { PlayableNotePlan } from '../src/workstation/contracts/sound.ts';
 import { createMaterialLibrary } from '../src/workstation/modules/materials/public.ts';
 import { createTimbreEditor } from '../src/workstation/modules/timbre/public.ts';
 
@@ -16,8 +16,9 @@ function saved(result: SaveResult) {
   return result;
 }
 
-function playable(plan: SoundPlan): void {
+function playable(plan: PlayableNotePlan): asserts plan is Extract<PlayableNotePlan, { kind: 'basic-synth' }> {
   assert.equal(plan.kind, 'basic-synth');
+  if (plan.kind !== 'basic-synth') throw new Error('Expected basic synthesized sound');
   assert.ok(plan.sources.length > 0);
   assert.ok(plan.sources.every(source => Number.isFinite(source.frequencyRatio) && source.frequencyRatio > 0));
   assert.ok(plan.sources.every(source => Number.isFinite(source.level) && source.level >= 0));
@@ -48,6 +49,7 @@ test('creating and editing a sound changes its preview through the public editor
   editor.create();
   assert.notEqual(editor.read().draft.id, previousDraftId);
   const initial = editor.previewPlan();
+  playable(initial);
   editor.rename('  清晨的铃声  ');
   editor.setCharacter('clear');
   editor.setEnvelope(0.3, 1.4);
@@ -55,7 +57,9 @@ test('creating and editing a sound changes its preview through the public editor
   const changed = editor.previewPlan();
   playable(changed);
   assert.equal(editor.read().draft.name, '清晨的铃声');
-  assert.equal(editor.read().body.character, 'clear');
+  const body = editor.read().body; assert.equal(body.model, 'basic-synth');
+  if (body.model !== 'basic-synth') throw new Error('Expected basic synthesized sound');
+  assert.equal(body.character, 'clear');
   assert.notDeepEqual(changed.sources, initial.sources);
   assert.deepEqual(changed.envelope, { attackSeconds: 0.3, releaseSeconds: 1.4 });
   assert.equal(changed.level, 0.42);

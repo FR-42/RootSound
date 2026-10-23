@@ -9,7 +9,7 @@ import ts from 'typescript';
 const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const workstationRoot = resolve(projectRoot, 'src/workstation');
 const modulesRoot = resolve(workstationRoot, 'modules');
-const requiredModules = ['materials', 'sound-runtime', 'timbre', 'ui-rendering'];
+const requiredModules = ['materials', 'sound-runtime', 'timbre', 'phrase', 'song', 'co-creation', 'sampling', 'melody-recognition', 'ui-rendering'];
 const sourceExtensions = new Set(['.ts', '.tsx', '.js', '.jsx', '.mts', '.mjs', '.cts', '.cjs']);
 
 function sourceFiles(directory: string): string[] {
