@@ -3,6 +3,8 @@ import { MAX_SOUND_FILE_BYTES, type AudioFilesPort, type ProjectFilesPort, type 
 import { audioBase64, audioFileName, checkAudioBytes } from './audio-bytes.ts';
 import { projectFileName, projectText } from './project-text.ts';
 import { createDesktopSampleFiles, type NativeSampleBridge } from './sample-files.ts';
+import type { ProjectDirectoriesPort } from '../../contracts/project-directory.ts';
+import { createDesktopProjectDirectories, type NativeProjectDirectoriesBridge } from './project-directories.ts';
 
 export const DESKTOP_ORIGIN = 'https://rootsound.local';
 
@@ -11,6 +13,8 @@ export interface DesktopBridge {
   storage: {
     Read(): unknown;
     Write(value: string): unknown;
+    WriteScoped?(value: string, scope: string): unknown;
+    WriteScopedCheckpoint?(value: string, scope: string): unknown;
   };
   files: {
     Open(): Promise<unknown>;
@@ -19,6 +23,7 @@ export interface DesktopBridge {
   audioFiles: { Save(base64: string, suggestedName: string): Promise<unknown> };
   projectFiles?: { Open(): Promise<unknown>; Save(text: string, suggestedName: string): Promise<unknown> };
   sampleFiles?: NativeSampleBridge;
+  projectDirectories?: NativeProjectDirectoriesBridge;
 }
 
 export function isDesktopOrigin(origin = typeof location === 'undefined' ? '' : location.origin): boolean {
@@ -43,7 +48,7 @@ function responseError(value: Record<string, unknown>, key: 'error' | 'message')
 function hostBridge(): DesktopBridge {
   if (!isDesktopOrigin()) fail('当前页面不是受信任的桌面界面。');
   const host = (globalThis as typeof globalThis & {
-    chrome?: { webview?: { hostObjects?: { sync?: { storage?: DesktopBridge['storage'] }; files?: DesktopBridge['files']; audioFiles?: DesktopBridge['audioFiles']; projectFiles?: DesktopBridge['projectFiles']; sampleFiles?: DesktopBridge['sampleFiles'] } } };
+    chrome?: { webview?: { hostObjects?: { sync?: { storage?: DesktopBridge['storage'] }; files?: DesktopBridge['files']; audioFiles?: DesktopBridge['audioFiles']; projectFiles?: DesktopBridge['projectFiles']; sampleFiles?: DesktopBridge['sampleFiles']; projectDirectories?: NativeProjectDirectoriesBridge } } };
   }).chrome?.webview?.hostObjects;
   const storage = host?.sync?.storage;
   const files = host?.files;
@@ -53,7 +58,9 @@ function hostBridge(): DesktopBridge {
   try { projectFiles = host?.projectFiles; } catch { /* An older native host may reject unknown optional capabilities. */ }
   let sampleFiles: DesktopBridge['sampleFiles'];
   try { sampleFiles = host?.sampleFiles; } catch { /* Optional on older hosts; unrelated music remains usable. */ }
-  return { storage, files, audioFiles, projectFiles, sampleFiles };
+  let projectDirectories: DesktopBridge['projectDirectories'];
+  try { projectDirectories = host?.projectDirectories; } catch { /* Older hosts cannot create managed project folders. */ }
+  return { storage, files, audioFiles, projectFiles, sampleFiles, projectDirectories };
 }
 
 function checkSize(text: string): void {
@@ -71,8 +78,11 @@ export function createDesktopPlatform(bridge: DesktopBridge = hostBridge()): {
   audioFiles: AudioFilesPort;
   projectFiles: ProjectFilesPort;
   sampleFiles: SampleFilesPort;
+  projectDirectories?: ProjectDirectoriesPort;
 } {
+  let storageScope: string | undefined;
   return {
+    ...(bridge.projectDirectories ? { projectDirectories: createDesktopProjectDirectories(bridge.projectDirectories) } : {}),
     sampleFiles: createDesktopSampleFiles(bridge.sampleFiles),
     projectFiles: {
       async open() {
@@ -100,12 +110,25 @@ export function createDesktopPlatform(bridge: DesktopBridge = hostBridge()): {
         if (result.ok !== true || (result.value !== null && typeof result.value !== 'string')) {
           fail('素材库读取结果无效，尚未覆盖原有数据。');
         }
+        if (result.scope !== undefined) {
+          if (typeof result.scope !== 'string' || !result.scope || storageScope !== undefined && storageScope !== result.scope)
+            fail('项目已切换，请重新打开界面后继续。');
+          storageScope = result.scope;
+        } else if (bridge.projectDirectories) fail('项目存储缺少隔离标识，请关闭旧窗口后重新打开 RootSound。');
         return result.value as string | null;
       },
       write(value) {
-        const result = response(bridge.storage.Write(value));
+        if (storageScope !== undefined && !bridge.storage.WriteScoped) fail('当前窗口缺少项目隔离保存，请重新打开 RootSound。');
+        const result = response(storageScope === undefined ? bridge.storage.Write(value) : bridge.storage.WriteScoped!(value, storageScope));
         if (result.ok === false) responseError(result, 'error');
         if (result.ok !== true) fail('素材库写入结果无效，无法确认保存成功。');
+      },
+      writePermanent(value) {
+        if (storageScope === undefined || !bridge.storage.WriteScopedCheckpoint)
+          fail('当前窗口尚不支持永久删除，请关闭旧窗口后重新打开 RootSound。');
+        const result = response(bridge.storage.WriteScopedCheckpoint(value, storageScope));
+        if (result.ok === false) responseError(result, 'error');
+        if (result.ok !== true) fail('永久删除的保存结果无效，无法确认操作成功。');
       },
     },
     audioFiles: {

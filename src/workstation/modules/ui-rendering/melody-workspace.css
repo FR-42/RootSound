@@ -1,0 +1,83 @@
+.melody-workspace { display: flex; flex-direction: column; width: 100%; height: 100%; min-width: 0; min-height: 0; color: #283b4c; background: #fafbfd; position: relative; }
+.melody-main { display: grid; grid-template-columns: 132px minmax(0, 1fr); flex: 1; min-width: 0; min-height: 0; }
+.melody-shelf { display: flex; flex-direction: column; gap: 6px; padding: 9px; background: #f0f2f5; border-right: 1px solid #c3cbd4; min-height: 0; overflow-y: auto; }
+.melody-tone-entry { display: flex; align-items: center; flex-shrink: 0; min-width: 0; position: relative; }
+.melody-tone, .melody-add-tone { width: 100%; min-height: 34px; padding: 5px 7px; flex-shrink: 0; border: 1px solid #b8c3cd; border-left: 4px solid var(--tone-color, #7895b1); border-radius: 4px; background: #fff; color: #30465b; font-size: 11px; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.melody-tone { padding-right: 27px; }
+.melody-tone.is-selected { outline: 2px solid #5b7c99; outline-offset: -1px; background: #eaf0f6; }
+.melody-tone.is-unassigned { border-left-color: #a7afb8; color: #77838e; }
+.melody-tone-preview { position: absolute; right: 3px; top: 50%; transform: translateY(-50%); width: 24px; height: 26px; padding: 0; border: 0; border-radius: 3px; background: transparent; color: #526e85; font-size: 11px; }
+.melody-tone-preview:hover:enabled { background: #e4ebf2; }
+.melody-tone-preview:disabled { opacity: .3; cursor: default; }
+.melody-add-tone { margin-top: auto; border: 1px solid #b8c3cd; text-align: center; font-size: 24px; font-weight: 300; color: #607c94; }
+.melody-roll { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+.melody-editor { display: flex; flex: 1; min-width: 0; min-height: 0; }
+.melody-extend, .melody-extend-cap { flex: 0 0 40px; width: 40px; border: 0; border-left: 1px solid #bac6d1; border-radius: 0; background: #edf0f4; }
+.melody-extend { padding: 0; color: #536c81; font-size: 24px; font-weight: 300; }
+.melody-extend:hover:enabled { background: #e1e8f0; color: #304e69; }
+.melody-extend:disabled { opacity: .4; cursor: default; }
+.melody-ruler-row { flex: 0 0 24px; min-height: 24px; display: flex; background: #edf0f4; border-bottom: 1px solid #bac6d1; }
+.melody-ruler-spacer { flex: 0 0 64px; border-right: 1px solid #aebdca; }
+.melody-ruler { position: relative; min-width: 0; flex: 1; overflow: hidden; touch-action: none; cursor: pointer; }
+.melody-head-handle { position: absolute; top: 3px; width: 15px; height: 20px; transform: translateX(-7px); clip-path: polygon(0 0,100% 0,100% 65%,50% 100%,0 65%); background: #ba4b48; border: 0; padding: 0; cursor: ew-resize; }
+.melody-scroll { position: relative; flex: 1; min-width: 0; min-height: 0; overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; touch-action: none; outline: none; scrollbar-width: thin; }
+.melody-world { position: relative; min-height: 100%; }
+.melody-keys { position: absolute; left: 0; top: 0; width: 64px; bottom: 0; border-right: 1px solid #aebdca; z-index: 4; }
+.melody-key { position: absolute; left: 0; width: 100%; border: 0; border-bottom: 1px solid #b9c5d0; border-radius: 0; background: #f9fbfd; color: #536c81; font: 10px ui-monospace, monospace; text-align: right; padding: 0 8px; user-select: none; }
+.melody-key.is-accidental { background: #ced6de; color: #405569; }
+.melody-key.is-entry-range { box-shadow: inset 4px 0 #497eae; }
+.melody-key:hover { background: #b9cfdf; }
+.melody-canvas { position: absolute; top: 0; left: 64px; right: 0; bottom: 0; overflow: hidden; }
+.melody-pitch-row { position: absolute; left: 0; right: 0; border-bottom: 1px solid #dbe2e8; pointer-events: none; }
+.melody-pitch-row.is-accidental { background: #536c8107; }
+.melody-grid-line { position: absolute; top: 0; bottom: 0; width: 1px; background: #55718d14; pointer-events: none; }
+.melody-grid-line.is-beat { background: #55718d35; }
+.melody-grid-line.is-bar { background: #55718d66; }
+.melody-after-end { position: absolute; top: 0; bottom: 0; right: 0; background: #e7ebf0; border-left: 2px solid #9cabba; pointer-events: none; z-index: 4; }
+.melody-note { position: absolute; box-sizing: border-box; padding: 0; min-width: 0; border: 0; box-shadow: inset 0 0 0 1px #35536d55; border-radius: 2px; background: var(--tone-color); color: #142a3e; cursor: grab; touch-action: none; user-select: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; font-size: 10px; z-index: 2; }
+.melody-note.is-dim { opacity: .16; }
+.melody-note.is-selected { box-shadow: inset 0 0 0 1px #355f82, inset 0 0 0 2px #fff; z-index: 3; }
+.melody-note.is-dragging { cursor: grabbing; will-change: left, top, width; }
+.melody-note-resize { position: absolute; right: 0; top: 0; bottom: 0; width: min(7px, 25%); cursor: ew-resize; }
+.melody-playhead { position: absolute; top: 0; bottom: 0; width: 1px; background: #ba4b48; pointer-events: none; z-index: 5; }
+.melody-console { flex: 0 0 auto; min-height: 92px; padding: 12px 18px; display: flex; align-items: center; gap: 20px; border-top: 1px solid #bac6d1; background: #f4f6f8; overflow-x: auto; }
+.melody-console[hidden] { display: none; }
+.melody-console-name { min-width: 85px; max-width: 150px; font-size: 12px; font-weight: 500; overflow-wrap: anywhere; flex-shrink: 0; }
+.melody-delete-tone-notes { border: 1px solid #d1b0b4; border-radius: 3px; background: #fff; color: #9e4b52; font-size: 11px; padding: 5px 9px; }
+.melody-delete-tone-notes.is-armed { border-color: #b44e59; background: #fae9ec; }
+.melody-change-timbre { border: 1px solid #b7c5d0; border-radius: 3px; background: #fff; color: #405e75; font-size: 11px; padding: 5px 9px; white-space: nowrap; }
+.melody-change-timbre:hover { background: #e8eef4; }
+.melody-field { display: flex; flex-direction: column; gap: 5px; flex-shrink: 0; min-width: 74px; color: #586b7d; font-size: 10px; }
+.melody-field-head { display: flex; justify-content: space-between; gap: 8px; }
+.melody-field input, .melody-field select { width: 90px; padding: 3px 4px; color: #314e65; border: 1px solid #b7c5d0; border-radius: 3px; background: #fff; font-size: 11px; }
+.melody-field input[type=range] { padding: 0; accent-color: #577c9d; }
+.melody-notice { position: absolute; right: 16px; bottom: 105px; max-width: min(480px, calc(100% - 184px)); padding: 7px 10px; background: #fff; border: 1px solid #c59ba1; border-radius: 4px; color: #a03c46; font-size: 12px; z-index: 12; pointer-events: none; }
+.melody-notice[hidden] { display: none; }
+.melody-tone-library { width: min(540px, calc(100vw - 48px)); padding: 16px; border: 1px solid #b9c6d1; border-radius: 7px; color: #30485e; background: #fafbfd; box-shadow: 0 12px 60px #25374c33; }
+.melody-tone-library::backdrop { background: #263b4d30; }
+.melody-library-heading { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+.melody-library-heading h2 { margin: 0; font-size: 15px; font-weight: 500; }
+.melody-library-close { border: 0; background: transparent; color: #657e92; font-size: 22px; }
+.melody-library-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 7px; max-height: 55vh; overflow-y: auto; }
+.melody-library-card { position: relative; min-width: 0; cursor: grab; }
+.melody-library-tone { width: 100%; height: 36px; padding: 5px 28px 5px 7px; border: 1px solid #b9c6d1; border-radius: 4px; background: #fff; color: #3f596e; font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; }
+.melody-library-tone.is-on-shelf { border-color: #6c8fab; background: #e9f0f6; box-shadow: inset 0 -2px #6c8fab; }
+.melody-tone-trash { position: fixed; right: 20px; top: 20px; z-index: 40; width: 68px; height: 68px; display: grid; place-items: center; color: #52677a; background: transparent; isolation: isolate; }
+.melody-tone-trash::before { content: ''; position: absolute; inset: -40px; z-index: -1; background: radial-gradient(ellipse closest-side, #fffffff2 10%, #ffffffbf 36%, #ffffff5c 62%, #ffffff00 100%); filter: blur(6px); pointer-events: none; }
+.melody-tone-trash[hidden] { display: none; }
+.melody-tone-trash svg { width: 34px; height: 34px; pointer-events: none; }
+.melody-tone-trash.is-over { color: #aa3441; }
+.melody-library-error { font-size: 12px; color: #a03c46; margin: 12px 0 0; }
+@media (max-width: 760px) { .melody-main { grid-template-columns: 112px minmax(0, 1fr); } .melody-shelf { padding: 8px; } .melody-console { padding: 10px; gap: 14px; } }
+.rhythm-workspace .melody-shelf { position: relative; display: block; padding: 0; overflow: hidden; }
+.rhythm-workspace .melody-shelf::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 24px; background: #edf0f4; border-bottom: 1px solid #bac6d1; z-index: 3; }
+.rhythm-workspace .melody-tone-entry { position: absolute; left: 0; right: 0; width: 100%; }
+.rhythm-workspace .melody-tone { width: 100%; min-height: 0; margin: 0; border: 0; border-left: 4px solid var(--tone-color); border-bottom: 1px solid #c3cbd4; border-radius: 0; padding: 6px 29px 6px 9px; background: #f0f2f5; }
+.rhythm-workspace .melody-tone.is-unassigned { border-left-color: #a7afb8; }
+.rhythm-workspace .melody-tone.is-selected { background: #e2eaf2; outline-offset: -2px; }
+.rhythm-workspace .melody-add-tone { position: absolute; left: 0; right: 0; bottom: 0; height: 44px; min-height: 44px; margin: 0; border-radius: 0; background: #fff; z-index: 3; }
+.rhythm-workspace .melody-ruler-spacer, .rhythm-workspace .melody-keys { display: none; }
+.rhythm-workspace .melody-canvas { left: 0; }
+.rhythm-workspace .rhythm-tone-row { border-bottom-color: #bac6d1; background: #f8fafc; }
+.rhythm-workspace .rhythm-tone-row:nth-child(even) { background: #f0f4f8; }
+.rhythm-workspace .melody-note { border-radius: 3px; }

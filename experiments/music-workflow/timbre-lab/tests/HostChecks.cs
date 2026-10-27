@@ -109,7 +109,7 @@ internal static class HostChecks
         return groups;
     }
 
-    private static void CheckUnshownFormInitialization()
+    internal static void CheckUnshownFormInitialization()
     {
         Exception? error = null;
         var thread = new Thread(() =>
@@ -132,6 +132,15 @@ internal static class HostChecks
                 Require(count > 60, "Expected the complete editor control tree to be initialized.");
                 form.Size = form.MinimumSize;
                 form.PerformLayout();
+                void LayoutTree(Control control)
+                { control.PerformLayout(); foreach (Control child in control.Controls) LayoutTree(child); }
+                LayoutTree(form);
+                foreach (string field in new[] { "_play", "_stop", "_zoomIn", "_zoomOut", "_fit", "_pan", "_pianoMode", "_sampleMode", "_lowerKeys", "_middleKeys", "_higherKeys", "_keyPitch", "_keys" })
+                {
+                    var control = (Control)typeof(MainForm).GetField(field, System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!.GetValue(form)!;
+                    Require(control.Parent is not null && control.Right <= control.Parent.ClientSize.Width && control.Bottom <= control.Parent.ClientSize.Height,
+                        $"Compact graph control is clipped at minimum size: {field}; control={control.Bounds}; parent={control.Parent?.ClientSize}; parentBounds={control.Parent?.Bounds}");
+                }
                 Require(!form.Visible && !form.IsHandleCreated, "Minimum-size layout must remain offscreen.");
             }
             catch (Exception ex) { error = ex; }
@@ -280,7 +289,8 @@ internal static class HostChecks
         public TaskCompletionSource DisposeStarted { get; } = NewCompletion();
         public void Play() { if (FailPlay) throw new InvalidOperationException("fixture play failure"); Snapshot = Snapshot with { IsPlaying = true }; }
         public void Pause() => Snapshot = Snapshot with { IsPlaying = false };
-        public void Seek(double frame) => Snapshot = Snapshot with { PositionFrames = frame };
+        public long Seek(double frame)
+        { Snapshot = Snapshot with { PositionFrames = frame, SeekRevision = Snapshot.SeekRevision + 1 }; return Snapshot.SeekRevision; }
         public async ValueTask DisposeAsync()
         {
             DisposeStarted.TrySetResult();

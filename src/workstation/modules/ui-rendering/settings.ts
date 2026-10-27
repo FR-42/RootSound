@@ -2,10 +2,14 @@ import type { WorkspaceId, WorkspacePreferencesPort } from '../../contracts/work
 import { visibleWorkspace } from './visible-workspaces.ts';
 import './workspace.css';
 
-export function showWorkspaceSettings(root: HTMLElement, preferences: WorkspacePreferencesPort): void {
-  const current = preferences.read(); const dialog = document.createElement('dialog'); dialog.className = 'settings-dialog';
-  const heading = document.createElement('h2'); heading.textContent = '启动设置';
+export function showWorkspaceSettings(root: HTMLElement, preferences: WorkspacePreferencesPort, onClose?: () => void): void {
+  if (root.querySelector('.settings-dialog')) return;
+  const current = preferences.read(); const dialog = document.createElement('dialog'); dialog.className = 'settings-dialog workspace-settings-dialog';
+  dialog.setAttribute('aria-label', '设置');
+  const heading = document.createElement('h2'); heading.textContent = '设置';
   const form = document.createElement('form');
+  const performance = document.createElement('input'); performance.type = 'checkbox'; performance.checked = current.keyboardPerformance; performance.setAttribute('aria-label', '键盘演奏');
+  const performanceLabel = document.createElement('label'); performanceLabel.className = 'settings-check'; performanceLabel.append(performance, document.createTextNode('键盘演奏')); form.append(performanceLabel);
   const welcome = document.createElement('input'); welcome.type = 'checkbox'; welcome.checked = current.welcomeEnabled;
   const welcomeLabel = document.createElement('label'); welcomeLabel.className = 'settings-check'; welcomeLabel.append(welcome, document.createTextNode('打开时显示欢迎页')); form.append(welcomeLabel);
   const label = document.createElement('label'); label.className = 'settings-field'; label.textContent = '直接进入创作时，打开';
@@ -18,8 +22,8 @@ export function showWorkspaceSettings(root: HTMLElement, preferences: WorkspaceP
   const save = document.createElement('button'); save.type = 'submit'; save.className = 'primary'; save.textContent = '保存设置'; actions.append(cancel, save); form.append(actions);
   form.addEventListener('submit', event => {
     event.preventDefault();
-    try { preferences.update({ welcomeEnabled: welcome.checked, startWorkspace: select.value as 'last' | WorkspaceId }); dialog.close(); }
+    try { preferences.update({ keyboardPerformance: performance.checked, welcomeEnabled: welcome.checked, startWorkspace: select.value as 'last' | WorkspaceId }); dialog.close(); }
     catch (problem) { error.textContent = problem instanceof Error ? problem.message : String(problem); }
   });
-  dialog.append(heading, form); dialog.addEventListener('close', () => dialog.remove(), { once: true }); root.append(dialog); dialog.showModal();
+  dialog.append(heading, form); dialog.addEventListener('close', () => { dialog.remove(); onClose?.(); }, { once: true }); root.append(dialog); dialog.showModal();
 }

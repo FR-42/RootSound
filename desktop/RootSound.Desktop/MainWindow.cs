@@ -7,12 +7,12 @@ internal sealed class MainWindow : Form
 {
     private const string Origin = "https://rootsound.local";
     private readonly WebView2 view = new() { Dock = DockStyle.Fill, DefaultBackgroundColor = Color.FromArgb(20, 23, 21) };
-    private readonly AtomicTextStore store;
+    private readonly ProjectDirectoryManager projects;
     private readonly string dataDirectory;
 
-    public MainWindow(AtomicTextStore store, string dataDirectory)
+    public MainWindow(ProjectDirectoryManager projects, string dataDirectory)
     {
-        this.store = store;
+        this.projects = projects;
         this.dataDirectory = dataDirectory;
         Text = "RootSound";
         ClientSize = new Size(1180, 800);
@@ -37,7 +37,8 @@ internal sealed class MainWindow : Form
             core.Settings.IsStatusBarEnabled = false;
             core.Settings.AreDefaultContextMenusEnabled = false;
             core.SetVirtualHostNameToFolderMapping("rootsound.local", uiDirectory, CoreWebView2HostResourceAccessKind.DenyCors);
-            core.AddHostObjectToScript("storage", new NativeStorage(store));
+            core.AddHostObjectToScript("storage", new NativeStorage(projects));
+            core.AddHostObjectToScript("projectDirectories", new NativeProjectDirectories(this, projects));
             core.AddHostObjectToScript("files", new NativeSoundFiles(this));
             core.AddHostObjectToScript("audioFiles", new NativeAudioFiles(this));
             core.AddHostObjectToScript("projectFiles", new NativeProjectFiles(this));

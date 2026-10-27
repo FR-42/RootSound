@@ -3,8 +3,9 @@ import type { SaveConfirmation, SaveResult } from '../../contracts/content.ts';
 import type { TimbreEditorPort } from '../../contracts/timbre.ts';
 import type { SoundFilesPort, AudioFilesPort, ProjectFilesPort } from '../../contracts/files.ts';
 import type { ProjectPackagesPort } from '../../contracts/project.ts';
-import type { PhraseEditorPort } from '../../contracts/phrase.ts';
-import type { SongEditorPort } from '../../contracts/song.ts';
+import type { ProjectSetupPort } from '../../contracts/project-directory.ts';
+import type { PhraseEditorPort, PhraseSection } from '../../contracts/phrase.ts';
+import type { SongClipRef, SongEditorPort } from '../../contracts/song.ts';
 import type { MaterialCatalogPort } from '../../contracts/catalog.ts';
 import type { CreativeEntity, ProjectEntitiesPort } from '../../contracts/entities.ts';
 import type { CoCreationPort } from '../../contracts/co-creation.ts';
@@ -13,7 +14,8 @@ import type { MelodyRecognitionPort } from '../../contracts/melody-recognition.t
 import type { ContentRecord, Draft } from '../../contracts/content.ts';
 import type { WorkspaceId, WorkspacePreferencesPort } from '../../contracts/workspace.ts';
 import type { ReferenceApplyResult, ReferenceEditingPort, ReferenceSession } from '../../contracts/references.ts';
-import { mountPhraseWorkspace } from './phrase-workspace.ts';
+import { mountPhraseComposition } from './phrase-composition.ts';
+import { savePhraseInPlace } from './phrase-save.ts';
 import { mountSongWorkspace } from './song-workspace.ts';
 import { mountCatalogWorkspace } from './catalog-workspace.ts';
 import { mountCoCreationWorkspace } from './co-creation-workspace.ts';
@@ -26,6 +28,10 @@ import { createProjectTransfer } from './project-transfer.ts';
 import { beginOrResumeReferenceEdit, pendingReferenceEdits } from './reference-activity.ts';
 import { createEntityRail } from './entity-rail.ts';
 import { mountSynthWorkspace } from './synth-workspace.ts';
+import { mountProjectStart } from './project-start.ts';
+import { showProjectSaveAs } from './project-save-as.ts';
+import { showProjectExit } from './project-exit.ts';
+import { mountProjectLibrary } from './project-library.ts';
 import { timbrePresets, previewTimbrePreset } from '../timbre/public.ts';
 import { visibleWorkspace } from './visible-workspaces.ts';
 import './studio.css';
@@ -38,6 +44,23 @@ export interface StudioOptions {
   audioFiles?: AudioFilesPort;
   projectFiles?: ProjectFilesPort;
   projects?: ProjectPackagesPort;
+  projectSetup?: ProjectSetupPort;
+  projectName?: string;
+  doubleClickIntervalMs?: number;
+  onNewPhrase?(timbreId?: string): void;
+  onCopyPhrase?(): void;
+  onPrepareMelody?(): void | Promise<void>;
+  projectTimbres?(): Array<{ id: string; name: string }>;
+  onAddPhraseTimbre?(id: string, section?: PhraseSection): string;
+  onCreateNoteGroup?(id: string): string;
+  onChangeNoteGroupTimbre?(partId: string, timbreId: string): void;
+  onRemovePhraseTimbre?(id: string, section?: PhraseSection): void;
+  onKeepPhrases?(ids: string[]): void;
+  phraseInfo?(id: string): { id: string; name: string; tempoBpm: number; durationSeconds: number };
+  projectPhrases?(): Array<{ id: string; name: string; tempoBpm: number; durationSeconds: number }>;
+  onDeletePhrase?(id: string): void | Promise<void>;
+  onRenamePhrase?(id: string, name: string, ref?: SongClipRef): { id: string } | void;
+  onRenameProject?(name: string): void;
   phrase?: PhraseEditorPort;
   song?: SongEditorPort;
   catalog?: MaterialCatalogPort;
@@ -49,6 +72,7 @@ export interface StudioOptions {
   references?: ReferenceEditingPort;
   previewContent?(contentId: string, signal?: AbortSignal): Promise<PlaybackSession>;
   initialWorkspace?: WorkspaceId;
+  initialEntry?: 'welcome' | WorkspaceId;
   onWorkspaceChange?(workspace: WorkspaceId): void;
 }
 
@@ -76,9 +100,8 @@ export function mountStudio(root: HTMLElement, options: StudioOptions): { dispos
   let timbreEditorMounted = false; let workspaceGeneration = 0;
   const preference = options.preferences?.read();
   let workspace: WorkspaceId = visibleWorkspace(preference?.lastWorkspace ?? options.initialWorkspace ?? 'sound');
-  let hasEnteredWorkspace = false;
   type CreativeWorkspace = 'sound' | 'phrase' | 'song';
-  const scopes = new Map<string, { ids: string[]; token: string }>();
+  const scopes = new Map<string, { ids: string[]; token: string; reuseIfAllSelected?: boolean }>();
   const projectTransfer = options.projects && options.projectFiles && options.song
     ? createProjectTransfer(options.projects, options.projectFiles, options.references) : undefined;
 
@@ -155,11 +178,12 @@ export function mountStudio(root: HTMLElement, options: StudioOptions): { dispos
       showWorkspace(target);
     } else if (options.catalog) showCatalog(); else showWorkspace(workspaceFor(session.targetKind));
   }
-  function applySession(target: CreativeWorkspace, selected?: { ids: string[]; token: string }, deferNavigation = false): void {
+  function applySession(target: CreativeWorkspace, selected?: { ids: string[]; token: string; reuseIfAllSelected?: boolean }, deferNavigation = false): void {
     const session = ensureSession(target);
     const captured = activeReferenceEditors();
     const selection = selected ?? scopes.get(session.draftId);
-    const result = options.references!.apply(session.draftId, selection ? { locationIds: selection.ids, expectedToken: selection.token } : undefined);
+    const result = options.references!.apply(session.draftId, selection ? { locationIds: selection.ids, expectedToken: selection.token,
+      ...(selection.reuseIfAllSelected ? { reuseIfAllSelected: true } : {}) } : undefined);
     if (result.status !== 'applied') throw new Error(result.status === 'conflict' ? result.reason : result.message);
     repairReferenceEditors(captured);
     const finish = () => returnFromSession(session, result);
@@ -246,6 +270,7 @@ export function mountStudio(root: HTMLElement, options: StudioOptions): { dispos
     if (target !== 'song' && view.draft.sourceId && options.references) { ensureSession(target); applySession(target); return; }
     const result = editor.save(view.draft.sourceId ? 'overwrite' : 'new');
     if (result.status !== 'saved') throw new Error(result.status === 'conflict' ? result.reason : result.status === 'storage-error' ? result.message : '这份内容还有其他使用位置，请选择应用范围。');
+    if (target === 'phrase') options.onKeepPhrases?.([result.content.id]);
     refreshWorkspace(target);
   }
   function refreshWorkspace(target: CreativeWorkspace): void {
@@ -299,7 +324,6 @@ export function mountStudio(root: HTMLElement, options: StudioOptions): { dispos
   function stopSound(): void { sound.stopAll(); }
   function remember(target: WorkspaceId): void {
     workspace = target;
-    hasEnteredWorkspace = true;
     try { options.preferences?.update({ lastWorkspace: target }); } catch { /* Entry preferences must not interrupt musical editing. */ }
     options.onWorkspaceChange?.(target);
   }
@@ -312,7 +336,7 @@ export function mountStudio(root: HTMLElement, options: StudioOptions): { dispos
     else if (target === 'sampling' && options.sampling) showSampling();
     else showEditor();
   }
-  function settings(): void { if (options.preferences) showWorkspaceSettings(root, options.preferences); }
+  function settings(): void { if (options.preferences) showWorkspaceSettings(root, options.preferences, () => { if (!disposed) phraseWorkspace?.refresh?.(); }); }
   function problem(message: string): void {
     showMessage('暂时无法完成这个操作', message);
   }
@@ -421,36 +445,131 @@ export function mountStudio(root: HTMLElement, options: StudioOptions): { dispos
       },
     });
   }
-  function showPhrase(): void {
+  function closeCleanPhraseSession(session: ReferenceSession | undefined, changed: boolean): void {
+    if (!session || !options.references || changed || session.pendingApplyCount
+      || pendingReferenceEdits(options.references, session.draftId).length) return;
+    const captured = activeReferenceEditors();
+    const cancelled = options.references.cancel(session.draftId);
+    if (cancelled.status !== 'done') throw new Error(cancelled.status === 'conflict' ? cancelled.reason : cancelled.message);
+    scopes.delete(session.draftId); repairReferenceEditors(captured);
+  }
+  let phraseSection: 'overview' | PhraseSection = 'overview';
+  function showPhrase(section: 'overview' | PhraseSection = 'overview'): void {
     if (!options.phrase) return;
+    phraseSection = section;
+    if (!options.phrase.read().draft && options.onNewPhrase) {
+      try { options.onNewPhrase(); } catch (error) { problem(error instanceof Error ? error.message : String(error)); }
+    }
     remember('phrase');
     stopSound(); leavePhrase();
     notice = undefined;
-    phraseWorkspace = mountPhraseWorkspace(root, { phrase: options.phrase, sound, onSound: showEditor, onWelcome: showWelcome,
-      renderEntities: options.entities ? renderEntities : undefined,
-      onSampling: options.sampling ? () => showSampling() : undefined,
-      onCoCreation: options.coCreation ? showCoCreation : undefined,
-      onSong: options.song ? showSong : undefined, onLibrary: options.catalog ? showCatalog : undefined,
-      onSettings: options.preferences ? settings : undefined, onExport: options.audioFiles ? exportAudio : undefined,
-      referenceContext: options.references ? referenceContext('phrase') : undefined,
-      onSave: options.references ? () => saveStandalone('phrase') : undefined,
-      onApplyElsewhere: options.references && options.phrase.read().draft?.sourceId ? () => chooseLocations('phrase') : undefined,
-      onEditSound: options.references ? (partId, choose) => beginReference('phrase', [partId], 'sound', choose) : undefined });
+    phraseWorkspace = mountPhraseComposition(root, { phrase: options.phrase, sound,
+      onSettings: options.preferences ? settings : undefined,
+      readPerformanceMode: () => options.preferences?.read().keyboardPerformance ?? false,
+      initialSection: section, onSectionChange: value => { phraseSection = value; },
+      onPrepareMelody: options.onPrepareMelody,
+      listTimbres: options.projectTimbres,
+      onAddTimbre: options.onAddPhraseTimbre,
+      onCreateNoteGroup: options.onCreateNoteGroup,
+      onChangeNoteGroupTimbre: options.onChangeNoteGroupTimbre,
+      onRemoveTimbre: options.onRemovePhraseTimbre,
+      onRename: name => options.phrase!.rename(name),
+      onExit: () => {
+        closeCleanPhraseSession(currentSession('phrase'), options.phrase!.read().changed);
+        if (options.song) showSong(); else showWelcome();
+      },
+      onSave: () => {
+        const oldSession = currentSession('phrase'); const captured = activeReferenceEditors();
+        let continued: ReferenceSession | undefined;
+        try {
+          savePhraseInPlace({ phrase: options.phrase!, references: options.references,
+            selection: oldSession ? scopes.get(oldSession.draftId) : undefined,
+            onKeep: options.onKeepPhrases,
+            onContinuation(result) {
+              continued = result.session;
+              if (oldSession) scopes.delete(oldSession.draftId);
+              if (result.session && result.selection) scopes.set(result.session.draftId, result.selection);
+            } });
+        } finally {
+          try { repairReferenceEditors(captured); }
+          catch { problem('编辑器暂时无法恢复，请重新打开项目后继续。'); }
+          if (continued && options.references) {
+            const selection = scopes.get(continued.draftId);
+            if (selection) {
+              const fresh = options.references.locations(continued.draftId);
+              const currentIds = new Set(fresh.locations.map(location => location.id));
+              scopes.set(continued.draftId, { ...selection, ids: selection.ids.filter(id => currentIds.has(id)), token: fresh.token });
+            }
+          }
+        }
+      },
+      onSaveAs: options.onCopyPhrase ? () => {
+        const session = currentSession('phrase'); const changed = options.phrase!.read().changed;
+        options.onCopyPhrase!();
+        let cleanupError: unknown;
+        try { closeCleanPhraseSession(session, changed); } catch (error) { cleanupError = error; }
+        showPhrase(phraseSection);
+        if (cleanupError) phraseWorkspace?.notify?.(`已另存新乐句，原编辑状态仍保留：${cleanupError instanceof Error ? cleanupError.message : String(cleanupError)}`, true);
+      } : undefined });
   }
   function showSong(): void {
     if (!options.song) return;
+    if (options.song.read().body?.tempoMode === 'song') options.song.setTempoMode('source');
     remember('song'); stopSound(); leavePhrase(); notice = undefined;
     phraseWorkspace = mountSongWorkspace(root, { song: options.song, sound, onSound: showEditor, onPhrase: showProjectPhrase, onWelcome: showWelcome,
-      renderEntities: options.entities ? renderEntities : undefined,
+      projectName: () => options.song!.read().draft?.name ?? options.projectName ?? '我的歌曲',
+      onRenameProject: options.onRenameProject ?? (name => options.song!.rename(name)),
+      onRenamePhrase: options.onRenamePhrase,
+      onPreviewPhrase: options.previewContent,
+      doubleClickIntervalMs: options.doubleClickIntervalMs,
+      onDeletePhrase: options.onDeletePhrase ? async id => {
+        const captured = activeReferenceEditors();
+        await options.onDeletePhrase!(id);
+        try { repairReferenceEditors(captured); }
+        catch { problem('乐句已删除。编辑器暂时无法恢复，请重新打开项目后继续。'); }
+      } : undefined,
+      phrases: options.projectPhrases ?? (options.entities ? () => {
+        const view = options.entities!.read();
+        return [...new Map([...view.current, ...view.available].filter(item => item.kind === 'rootsound.phrase')
+          .map(item => [item.id, options.phraseInfo?.(item.id) ?? { id: item.id, name: item.name }])).values()];
+      } : undefined),
+      onNewPhrase: options.onNewPhrase ? () => {
+        try { options.onNewPhrase!(); showPhrase(); } catch (error) { problem(error instanceof Error ? error.message : String(error)); }
+      } : showProjectPhrase,
+      onKeepPhrases: options.onKeepPhrases,
       onSampling: options.sampling ? () => showSampling() : undefined,
       onCoCreation: options.coCreation ? showCoCreation : undefined,
       onLibrary: options.catalog ? showCatalog : undefined, onSettings: options.preferences ? settings : undefined,
       onExport: options.audioFiles ? exportAudio : undefined,
       onOpenProject: projectTransfer ? openProjectFile : undefined,
-      onSaveProject: projectTransfer ? saveProjectFile : undefined,
+      onSaveProject: options.projectSetup?.save ? async () => {
+        await options.projectSetup!.save!(); phraseWorkspace?.notify?.('已保存');
+      } : projectTransfer ? saveProjectFile : undefined,
+      onSaveProjectAs: options.projectSetup?.saveAs ? () => showProjectSaveAs(root, options.projectSetup!, options.song!.read().draft?.name ?? options.projectName ?? '我的歌曲') : undefined,
+      onExit: options.projectSetup ? () => showProjectExit(root, options.projectSetup!) : undefined,
       referenceContext: options.references ? referenceContext('song') : undefined,
       onSave: options.references ? () => saveStandalone('song') : undefined,
-      onEditPhrase: options.references ? (ref, choose) => beginReference('song', [ref.clipId], 'phrase', choose) : undefined });
+      onEditPhrase: options.references ? (ref, choose) => beginReference('song', [ref.clipId], 'phrase', choose) : undefined,
+      onOpenPhrase: options.phrase ? openShelfPhrase : undefined });
+  }
+  function openShelfPhrase(id: string): void {
+    if (!options.phrase) return;
+    const project = options.song?.read();
+    const first = project?.body?.tracks.flatMap(track => track.clips).find(clip => clip.phraseId === id);
+    if (first && project?.draft && options.references) {
+      const session = beginOrResumeReferenceEdit(options.references, { root: { type: 'draft', id: project.draft.id }, path: [first.id] });
+      const locations = options.references.locations(session.draftId);
+      const ids = locations.locations.filter(location => location.root.type === 'draft' && location.root.id === project.draft!.id).map(location => location.id);
+      if (!ids.length) throw new Error('乐句使用位置已变化，请重新选择。');
+      scopes.set(session.draftId, { ids, token: locations.token, reuseIfAllSelected: true });
+      options.phrase.openDraft(session.draftId); showPhrase();
+    } else {
+      const phrase = options.phrase.read();
+      const pending = phrase.draft?.sourceId === id ? phrase.draft : phrase.unfinishedDrafts.find(draft => draft.sourceId === id);
+      if (options.references) options.phrase.openDraft(options.references.beginLibrary(id, pending?.id).draftId);
+      else options.phrase.open(id);
+      showPhrase();
+    }
   }
   function showCatalog(): void {
     if (!options.catalog) return;
@@ -518,14 +637,28 @@ export function mountStudio(root: HTMLElement, options: StudioOptions): { dispos
     const page = element('main', 'welcome');
     page.append(element('div', 'wordmark', 'RootSound'));
     const invitation = element('section', 'invitation');
-    invitation.append(element('h1', '', '你好，\n你想创作什么？'));
-    invitation.append(button('开始创作', 'primary journey', showEditor));
-    if (options.hasPrevious || hasEnteredWorkspace) invitation.append(button('继续创作', 'quiet continue', () => showWorkspace(workspace)));
-    if (projectTransfer) invitation.append(button('打开工程…', 'quiet welcome-open-project', () => { void openProjectFile(); }));
+    invitation.append(element('h1', '', '你好，你想创作什么？'));
+    const actions = element('div', 'welcome-actions');
+    invitation.append(actions);
+    let library: ReturnType<typeof mountProjectLibrary> | undefined;
+    const start = button('开始', 'primary', () => library?.open());
+    actions.append(start);
     page.append(invitation);
-    page.append(button('直接进入创作  →', 'quiet skip', () => showWorkspace(configuredEntry())));
-    if (options.preferences) page.append(button('设置', 'quiet welcome-settings', settings));
     root.append(page);
+    library = mountProjectLibrary(root, start, options.projectSetup ?? {
+      list: async () => [],
+      open: async () => {
+        if (!projectTransfer) throw new Error('请使用 RootSound 桌面版打开歌曲项目文件。');
+        await openProjectFile();
+      },
+    }, showProjectStart, options.doubleClickIntervalMs);
+    phraseWorkspace = library;
+  }
+  function showProjectStart(): void {
+    leavePhrase();
+    stopSound();
+    notice = undefined;
+    phraseWorkspace = mountProjectStart(root, options.projectSetup, stopSound, showWelcome);
   }
 
   function save(mode: 'overwrite' | 'new', confirmation?: SaveConfirmation): void {
@@ -634,6 +767,8 @@ export function mountStudio(root: HTMLElement, options: StudioOptions): { dispos
     timbreEditorMounted = true;
   }
 
-  if (preference?.welcomeEnabled === false) showWorkspace(configuredEntry()); else showWelcome();
+  if (options.initialEntry === 'welcome') showWelcome();
+  else if (options.initialEntry) showWorkspace(options.initialEntry);
+  else if (preference?.welcomeEnabled === false) showWorkspace(configuredEntry()); else showWelcome();
   return { dispose() { disposed = true; stopSound(); leavePhrase(); root.replaceChildren(); } };
 }

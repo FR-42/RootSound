@@ -26,6 +26,7 @@ interface ActiveVoice {
   readonly gains: GainNode[];
   readonly panners: StereoPannerNode[];
   outputBuses?: GainNode[];
+  filters?: BiquadFilterNode[];
   completion: ConstantSourceNode | null;
   remaining: number;
   generation: number;
@@ -34,6 +35,9 @@ interface ActiveVoice {
   preview?: ScheduledPreview;
   startTimes: Map<AudioScheduledSourceNode, number>;
   readonly retiring: Set<{ resources: GraphResources; clock: ConstantSourceNode; until: number }>;
+  originSeconds: number;
+  clockFloorSeconds?: number;
+  pausedElapsed?: number;
 }
 
 interface AuditionVoice {
@@ -72,7 +76,7 @@ export function createBrowserSoundRuntime(): SoundRuntimePort {
   let terminalPosition: { id: string; seconds: number } | null = null;
 
   function elapsed(voice: ActiveVoice): number {
-    return Math.max(0, Math.min(voice.session.durationSeconds!, (context?.currentTime ?? voice.session.startedAtSeconds) - voice.session.startedAtSeconds));
+    return Math.max(0, Math.min(voice.session.durationSeconds!, Math.max(voice.clockFloorSeconds ?? 0, voice.pausedElapsed ?? (context?.currentTime ?? voice.originSeconds) - voice.originSeconds)));
   }
 
   function send(listener: (event: SoundRuntimeEvent) => void, event: SoundRuntimeEvent): void {
@@ -135,16 +139,7 @@ export function createBrowserSoundRuntime(): SoundRuntimePort {
     if (auditionVoice) releaseAudition(auditionVoice);
   }
 
-  function finish(voice: ActiveVoice, status: Exclude<PlaybackStatus, 'playing'>, error?: string): void {
-    if (voice.session.status !== 'playing') return;
-    terminalPosition = { id: voice.session.id, seconds: status === 'ended' ? voice.session.durationSeconds! : elapsed(voice) };
-    voice.session = Object.freeze({
-      ...voice.session,
-      status,
-      endedAtSeconds: context?.currentTime ?? voice.session.startedAtSeconds,
-      ...(error === undefined ? {} : { error }),
-    });
-    if (active === voice) active = null;
+  function clearVoice(voice: ActiveVoice): void {
     if (voice.audioSource) {
       voice.audioSource.onended = null;
       try { voice.audioSource.stop(); } catch { /* The sample may already have ended. */ }
@@ -163,6 +158,18 @@ export function createBrowserSoundRuntime(): SoundRuntimePort {
       releaseGraph(retiring.resources);
     }
     voice.retiring.clear();
+    voice.completion = null;
+    voice.oscillators.length = 0; voice.samples.length = 0; voice.gains.length = 0; voice.panners.length = 0;
+    voice.outputBuses = undefined; voice.filters = undefined; voice.fadeGains = []; voice.startTimes.clear();
+  }
+
+  function finish(voice: ActiveVoice, status: Exclude<PlaybackStatus, 'playing' | 'paused'>, error?: string): void {
+    if (voice.session.status !== 'playing' && voice.session.status !== 'paused') return;
+    terminalPosition = { id: voice.session.id, seconds: status === 'ended' ? voice.session.durationSeconds! : elapsed(voice) };
+    voice.session = Object.freeze({ ...voice.session, status, endedAtSeconds: context?.currentTime ?? voice.session.startedAtSeconds,
+      ...(error === undefined ? {} : { error }) });
+    if (active === voice) active = null;
+    clearVoice(voice);
     emit({ type: 'session', session: voice.session });
   }
 
@@ -224,7 +231,10 @@ export function createBrowserSoundRuntime(): SoundRuntimePort {
 
   async function preview(input: PlayableNotePlan | SoundSequencePlan): Promise<PlaybackSession> {
     if (disposed) throw new Error('声音运行已关闭。');
-    const preview = readPreview(input, { previous: active?.preview });
+    const preview = readPreview(input, { previous: active?.preview,
+      // The playlist deliberately retains its clock through an empty song or
+      // an empty phrase. Ordinary note/phrase auditions still reject silence.
+      allowEmptySequence: input.kind === 'sequence' && input.transport !== undefined });
     cancelAudition();
     const request = ++requestSequence;
     cancelPendingResumes();
@@ -246,6 +256,7 @@ export function createBrowserSoundRuntime(): SoundRuntimePort {
     const voice: ActiveVoice = {
       session, oscillators: [], samples: [], bufferReleases: [], gains: [], panners: [], remaining: 0,
       completion: null, retiring: new Set(), generation: 0, fadeGains: [], fingerprint: previewFingerprint(preview), preview, startTimes: new Map(),
+      originSeconds: session.startedAtSeconds,
     };
     try {
       if (preview.sequence) voice.completion = audio.createConstantSource();
@@ -263,6 +274,7 @@ export function createBrowserSoundRuntime(): SoundRuntimePort {
       const start = audio.currentTime + lead;
       session = Object.freeze({ ...session, startedAtSeconds: start });
       voice.session = session;
+      voice.originSeconds = start;
       scheduleGraph(graph, preview.normalization, start);
       if (audio.currentTime >= start) throw new Error('当前乐句的声音调度未能及时完成，请减少同时使用的声音后重试。');
       voice.remaining = voice.oscillators.length + voice.samples.length;
@@ -315,7 +327,7 @@ export function createBrowserSoundRuntime(): SoundRuntimePort {
       const session: PlaybackSession = Object.freeze({ id: `preview-${runtimeId}-${++sequence}`, status: 'playing',
         startedAtSeconds: audio.currentTime + 0.005, durationSeconds: buffer.length / buffer.sampleRate });
       voice = { session, audioSource: source, oscillators: [], samples: [], bufferReleases: [], gains: [], panners: [], completion: null,
-        remaining: 0, generation: 0, fadeGains: [], fingerprint: 'acquired-audio', startTimes: new Map(), retiring: new Set() };
+        remaining: 0, generation: 0, fadeGains: [], fingerprint: 'acquired-audio', startTimes: new Map(), retiring: new Set(), originSeconds: session.startedAtSeconds };
       const current = voice;
       source.onended = () => { if (active === current) finish(current, 'ended'); };
       active = voice; source.start(session.startedAtSeconds);
@@ -369,19 +381,24 @@ export function createBrowserSoundRuntime(): SoundRuntimePort {
     if (voice.audioSource) throw new Error('采样试听暂不支持乐句计划更新，请重新试听。');
     // An ended event can still be queued while the UI handles a pointer event.
     // Editing that stale session must not extend it into another playback.
-    if (audio.currentTime >= voice.session.startedAtSeconds + voice.session.durationSeconds! + 0.001) {
+    if (audio.currentTime >= voice.originSeconds + voice.session.durationSeconds! + 0.001) {
       finish(voice, 'ended');
       return undefined;
     }
-    const preview = readPreview(input, { allowEmptySequence: true, previous: voice.preview });
+    const preview = readPreview(input, { allowEmptySequence: true, previous: voice.preview, transportElapsed: elapsed(voice) });
     validateFrequency(preview, audio.sampleRate);
     const fingerprint = previewFingerprint(preview);
-    if (voice.fingerprint === fingerprint && samePreviewSamples(voice.preview, preview)) return voice.session;
+    if (voice.fingerprint === fingerprint && samePreviewSamples(voice.preview, preview)) {
+      // The head may have changed speed during a long sustained tail without
+      // changing today's audible graph. Retain that history for later edits.
+      voice.preview = preview;
+      return voice.session;
+    }
     if (audio.state !== 'running') throw new Error('声音设备当前不可用，请重新点击试听。');
     const resources: GraphResources = { oscillators: [], samples: [], bufferReleases: [], gains: [], panners: [] };
     let completion: ConstantSourceNode | null = null;
     let retiringClock: ConstantSourceNode | null = null;
-    const origin = voice.session.startedAtSeconds;
+    const origin = voice.originSeconds;
     try {
       const position = Math.max(0, audio.currentTime - origin);
       const remaining = {
@@ -421,7 +438,7 @@ export function createBrowserSoundRuntime(): SoundRuntimePort {
       // All replacement nodes are ready before touching the audible graph. An
       // invalid plan or allocation failure therefore leaves the old music intact.
       const retired = {
-        resources: { oscillators: [...voice.oscillators], samples: [...voice.samples], bufferReleases: [...voice.bufferReleases], gains: [...voice.gains], panners: [...voice.panners], outputBuses: [...(voice.outputBuses ?? [])] },
+        resources: { oscillators: [...voice.oscillators], samples: [...voice.samples], bufferReleases: [...voice.bufferReleases], gains: [...voice.gains], panners: [...voice.panners], outputBuses: [...(voice.outputBuses ?? [])], filters: [...(voice.filters ?? [])] },
         clock: retiringClock, until,
       };
       for (const gain of voice.fadeGains) {
@@ -452,6 +469,7 @@ export function createBrowserSoundRuntime(): SoundRuntimePort {
       voice.gains.splice(0, voice.gains.length, ...resources.gains);
       voice.panners.splice(0, voice.panners.length, ...resources.panners);
       voice.outputBuses = resources.outputBuses;
+      voice.filters = resources.filters;
       voice.completion = completion;
       voice.generation += 1;
       voice.fadeGains = graph.envelopes.map(envelope => envelope.node);
@@ -474,12 +492,69 @@ export function createBrowserSoundRuntime(): SoundRuntimePort {
     }
   }
 
+  function pause(sessionId: string): PlaybackSession | undefined {
+    const voice = active;
+    if (!voice || voice.session.id !== sessionId || !voice.preview?.sequence) return undefined;
+    if (voice.session.status === 'paused') return voice.session;
+    if (voice.session.status !== 'playing') return undefined;
+    if (elapsed(voice) >= voice.session.durationSeconds!) { finish(voice, 'ended'); return undefined; }
+    voice.pausedElapsed = elapsed(voice);
+    voice.generation++;
+    clearVoice(voice);
+    voice.session = Object.freeze({ ...voice.session, status: 'paused' });
+    emit({ type: 'session', session: voice.session });
+    return voice.session;
+  }
+
+  async function resume(sessionId: string, input?: SoundSequencePlan): Promise<PlaybackSession> {
+    const voice = active;
+    if (disposed || !voice || voice.session.id !== sessionId || voice.session.status !== 'paused' || !voice.preview) throw new Error('这次暂停的试听已经结束。');
+    const request = ++requestSequence;
+    const fromSeconds = voice.pausedElapsed!;
+    // Validate before touching the retained paused session. Invalid edits leave it resumable.
+    const preview = input ? readPreview(input, { allowEmptySequence: true, previous: voice.preview, transportElapsed: fromSeconds }) : voice.preview;
+    cancelPendingResumes();
+    const audio = await ready();
+    if (disposed || request !== requestSequence || active !== voice || voice.session.status !== 'paused') throw new Error('这次试听已取消。');
+    validateFrequency(preview, audio.sampleRate);
+    const resources: GraphResources = { oscillators: [], samples: [], bufferReleases: [], gains: [], panners: [] };
+    let completion: ConstantSourceNode | null = null;
+    try {
+      const remaining = { ...preview, events: preview.events.filter(event => event.atSeconds + noteDuration(event.sound) > fromSeconds) };
+      const graph = allocateGraph(audio, remaining, resources, undefined, mainMix ?? audio.destination);
+      completion = audio.createConstantSource();
+      const start = audio.currentTime + .01 + graph.starts.length * .00004 + graph.envelopes.length * .00002;
+      const origin = start - fromSeconds;
+      scheduleGraph(graph, preview.normalization, origin, fromSeconds, LIVE_TRANSITION_SECONDS);
+      completion.offset.setValueAtTime(0, start); completion.connect(audio.destination);
+      completion.start(start); completion.stop(Math.max(start, origin + preview.durationSeconds) + .001);
+      const clock = completion;
+      completion.onended = () => { if (active === voice && voice.completion === clock) finish(voice, 'ended'); };
+      const starts = new Map<AudioScheduledSourceNode, number>();
+      for (const scheduled of graph.starts) { const time = startGraphSource(scheduled, origin, fromSeconds); if (time !== undefined) starts.set(scheduled.node, time); }
+      if (audio.currentTime >= start) throw new Error('当前声音续播未能及时完成，请减少同时使用的声音后重试。');
+      voice.oscillators.push(...resources.oscillators); voice.samples.push(...resources.samples);
+      voice.bufferReleases.push(...resources.bufferReleases); voice.gains.push(...resources.gains); voice.panners.push(...resources.panners);
+      voice.outputBuses = resources.outputBuses; voice.filters = resources.filters; voice.completion = completion;
+      voice.fadeGains = graph.envelopes.map(item => item.node); voice.startTimes = starts;
+      voice.preview = preview; voice.fingerprint = previewFingerprint(preview); voice.originSeconds = origin; voice.clockFloorSeconds = fromSeconds; voice.pausedElapsed = undefined;
+      voice.session = Object.freeze({ ...voice.session, status: 'playing', durationSeconds: preview.durationSeconds });
+      emit({ type: 'session', session: voice.session }); return voice.session;
+    } catch (error) {
+      if (completion) { completion.onended = null; try { completion.stop(); } catch { /* Allocation may have failed before start. */ } completion.disconnect(); }
+      releaseGraph(resources);
+      throw new Error(`声音续播失败：${message(error)}`);
+    }
+  }
+
   return {
     preview,
     previewAudio,
     audition,
     cancelAudition,
     update,
+    pause,
+    resume,
     async render(plan, options = {}) {
       if (disposed) return Promise.reject(new Error('声音运行已关闭。'));
       const controller = new AbortController();

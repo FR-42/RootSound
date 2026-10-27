@@ -1,0 +1,35 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net9.0-windows10.0.19041.0</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AssemblyName>RootSound.ReferenceStudio</AssemblyName>
+    <RootNamespace>RootSound.ReferenceStudio</RootNamespace>
+    <PlatformTarget>x64</PlatformTarget>
+    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+    <NuGetAudit>false</NuGetAudit>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Remove="tests/**/*.cs;Launcher/**/*.cs;analysis/**/*.cs;.builds/**/*.cs" />
+    <Compile Include="../sample-editor/Audio/**/*.cs" Link="SharedAudio/%(RecursiveDir)%(Filename)%(Extension)" />
+    <Compile Include="../sample-editor/Playback/**/*.cs" Link="SharedPlayback/%(RecursiveDir)%(Filename)%(Extension)" />
+    <Compile Include="../sample-editor/Core/IAudioFrameSource.cs" Link="SharedAudio/IAudioFrameSource.cs" />
+    <Compile Include="../timbre-lab/Core/Models.cs" Link="SharedInstrument/Models.cs" />
+    <Compile Include="../timbre-lab/Instrument/AtomicFile.cs" Link="SharedInstrument/AtomicFile.cs" />
+    <Compile Include="../timbre-lab/Instrument/InstrumentRenderer.cs" Link="SharedInstrument/InstrumentRenderer.cs" />
+    <Compile Include="../timbre-lab/Instrument/InstrumentValidation.cs" Link="SharedInstrument/InstrumentValidation.cs" />
+    <Compile Include="../timbre-lab/Instrument/LoopFinder.cs" Link="SharedInstrument/LoopFinder.cs" />
+    <Compile Include="../timbre-lab/Instrument/PcmWaveExporter.cs" Link="SharedInstrument/PcmWaveExporter.cs" />
+    <Compile Include="../timbre-lab/Instrument/TimbreArchive.cs" Link="SharedInstrument/TimbreArchive.cs" />
+    <Compile Include="../phrase-studio/Core/**/*.cs" Link="SharedPhrase/%(RecursiveDir)%(Filename)%(Extension)" />
+    <Compile Include="../phrase-studio/Persistence/DocumentFormat.cs" Link="SharedPhrase/DocumentFormat.cs" />
+    <Compile Include="../phrase-studio/Persistence/PhraseArchive.cs" Link="SharedPhrase/PhraseArchive.cs" />
+    <Compile Include="../phrase-studio/Audio/InstrumentVoice.cs" Link="SharedPhrase/InstrumentVoice.cs" />
+    <Compile Include="../phrase-studio/Controls/**/*.cs" Link="SharedPhrase/%(RecursiveDir)%(Filename)%(Extension)" />
+    <Compile Include="../phrase-studio/Editing/**/*.cs" Link="SharedPhrase/Editing/%(RecursiveDir)%(Filename)%(Extension)" />
+    <InternalsVisibleTo Include="RootSound.ReferenceStudio.Tests" />
+  </ItemGroup>
+</Project>

@@ -16,12 +16,15 @@ export type SampleSourceSnapshot = SampleSoundPlan['source'] & {
 export type ScheduledSound = SoundPlan | (Omit<SampleSoundPlan, 'source'> & { source: SampleSourceSnapshot });
 
 export interface ScheduledPreview {
-  readonly events: readonly { atSeconds: number; sound: ScheduledSound; pan?: number }[];
+  readonly events: readonly { atSeconds: number; sound: ScheduledSound; pan?: number; songAtSeconds?: number }[];
   readonly durationSeconds: number;
   readonly normalization: number;
   readonly sequence: boolean;
   readonly samples: readonly SampleSourceSnapshot[];
   readonly output?: OutputProcessingPlan;
+  readonly transport?: { readonly positionSeconds: number; readonly rate: number };
+  /** Piecewise head clock, retained even when an edit temporarily removes every note. */
+  readonly transportClock?: readonly { positionSeconds: number; elapsedSeconds: number; rate: number }[];
 }
 
 function object(value: unknown, label: string): Record<string, unknown> {
@@ -180,7 +183,7 @@ function samplePeak(sound: Extract<ScheduledSound, { kind: 'sample' }>, pan = 0)
   return sound.source.peak * channels;
 }
 
-export function readPreview(value: unknown, options: { allowEmptySequence?: boolean; previous?: ScheduledPreview } = {}): ScheduledPreview {
+export function readPreview(value: unknown, options: { allowEmptySequence?: boolean; previous?: ScheduledPreview; transportElapsed?: number } = {}): ScheduledPreview {
   const input = object(value, '声音执行计划');
   const sampleReader = sourceReader(options.previous);
   if (input.kind !== 'sequence') {
@@ -194,7 +197,7 @@ export function readPreview(value: unknown, options: { allowEmptySequence?: bool
     };
   }
   if (input.version !== 1) throw new Error('当前声音运行仅支持第 1 版乐句试听计划。');
-  fields(input, ['kind', 'version', 'durationSeconds', 'events', 'output'], '乐句试听计划');
+  fields(input, ['kind', 'version', 'durationSeconds', 'events', 'output', 'transport'], '乐句试听计划');
   let output: OutputProcessingPlan | undefined;
   if (input.output !== undefined) {
     const settings = object(input.output, '输出处理'); fields(settings, ['level', 'fadeInSeconds', 'fadeOutSeconds'], '输出处理');
@@ -202,16 +205,39 @@ export function readPreview(value: unknown, options: { allowEmptySequence?: bool
       fadeOutSeconds: number(settings.fadeOutSeconds, '淡出秒数', 0, 30) };
   }
   const duration = number(input.durationSeconds, '乐句时长（秒）', 0.0001, 600);
+  let transport: ScheduledPreview['transport'];
+  if (input.transport !== undefined) {
+    const settings = object(input.transport, '播放头设置'); fields(settings, ['positionSeconds', 'rate'], '播放头设置');
+    transport = { positionSeconds: number(settings.positionSeconds, '播放头位置', 0, duration), rate: number(settings.rate, '播放头速度', .25, 4) };
+  }
   if (!Array.isArray(input.events) || (input.events.length < 1 && !options.allowEmptySequence) || input.events.length > MAX_EVENTS) {
     throw new Error(`乐句试听需要 1 至 ${MAX_EVENTS} 个音符，空乐句暂时无法试听。`);
   }
-  let durationSeconds = duration;
+  const elapsed = options.transportElapsed ?? 0;
+  let durationSeconds = transport ? elapsed + (duration - transport.positionSeconds) / transport.rate : duration;
+  const transportClock = transport ? [...(options.previous?.transportClock ?? [])] : undefined;
+  if (transportClock && transport) {
+    const last = transportClock.at(-1);
+    if (!last || last.rate !== transport.rate || Math.abs(last.positionSeconds + (elapsed - last.elapsedSeconds) * last.rate - transport.positionSeconds) > 1e-8) {
+      transportClock.push({ ...transport, elapsedSeconds: elapsed });
+    }
+  }
   const boundaries: { time: number; amplitude: number; sources: number }[] = [];
   const scheduled = Array.from(input.events, (raw: unknown) => {
     const event = object(raw, '乐句音符');
     fields(event, ['atSeconds', 'sound', 'pan'], '乐句音符');
-    const atSeconds = number(event.atSeconds, '音符开始时间（秒）', 0, duration);
-    if (atSeconds >= duration) throw new Error('音符必须在乐句结束前开始。');
+    const songAtSeconds = number(event.atSeconds, '音符开始时间（秒）', 0, duration);
+    if (songAtSeconds >= duration) throw new Error('音符必须在乐句结束前开始。');
+    let atSeconds = songAtSeconds;
+    if (transport) {
+      // Already-triggered notes retain their physical onset across speed changes,
+      // pauses and live edits. Only future triggers follow the new head speed.
+      let segment = transportClock![0]!;
+      for (let i = transportClock!.length - 1; i >= 0; i--) {
+        if (transportClock![i]!.positionSeconds <= songAtSeconds) { segment = transportClock![i]!; break; }
+      }
+      atSeconds = segment.elapsedSeconds + (songAtSeconds - segment.positionSeconds) / segment.rate;
+    }
     const sound = readPlan(event.sound, sampleReader.read);
     const pan = event.pan === undefined ? undefined : number(event.pan, '左右位置', -1, 1);
     const end = atSeconds + noteDuration(sound);
@@ -220,7 +246,7 @@ export function readPreview(value: unknown, options: { allowEmptySequence?: bool
     const sourceCount = sound.kind === 'sample' ? 1 : sound.sources.length;
     boundaries.push({ time: atSeconds, amplitude, sources: sourceCount });
     boundaries.push({ time: end, amplitude: -amplitude, sources: -sourceCount });
-    return { atSeconds, sound, ...(pan === undefined ? {} : { pan }) };
+    return { atSeconds, sound, ...(pan === undefined ? {} : { pan }), ...(transport ? { songAtSeconds } : {}) };
   });
   // Treat sub-nanosecond rounding differences as simultaneous only for the peak bound;
   // actual note scheduling keeps the full input precision on the device clock.
@@ -236,7 +262,7 @@ export function readPreview(value: unknown, options: { allowEmptySequence?: bool
       throw new Error(`当前试听最多同时运行 ${MAX_SIMULTANEOUS_SOURCES} 个波形声源，请减少同时发声的音符。`);
     }
   }
-  return { events: scheduled, durationSeconds, normalization: 1 / peak, sequence: true, samples: sampleReader.sources, ...(output ? { output } : {}) };
+  return { events: scheduled, durationSeconds, normalization: 1 / peak, sequence: true, samples: sampleReader.sources, ...(output ? { output } : {}), ...(transport ? { transport, transportClock } : {}) };
 }
 
 

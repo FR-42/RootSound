@@ -1,0 +1,4911 @@
+{
+  "status": "Low-family audit; root octave, source ownership and actual musical notes remain unconfirmed",
+  "evidence": {
+    "accepted07": {
+      "path": "D:\\RootSound\\experiments\\music-workflow\\reference-studio\\cases\\phone-recording-20261023-233819\\试听\\07-普通分轨基线.wav",
+      "sha256": "db79615e148120d8183bca8cddf7e4d881beefb09999b45ee9e215b24c672fac",
+      "contextCropOffsetSeconds": 0,
+      "sampleRate": 48000,
+      "method": "Sum of L and R powers; arithmetic mono averaging deliberately avoided.",
+      "windows": [
+        {
+          "relativeSeconds": [
+            0.1,
+            0.4
+          ],
+          "originalSeconds": [
+            45.1,
+            45.4
+          ],
+          "possibleMissingFundamentalHz": 46.249,
+          "strongLowPeaks": [
+            {
+              "frequencyHz": 185.302734375,
+              "dbRelativeToStrongestFullSpectrumPeak": 0.0
+            },
+            {
+              "frequencyHz": 92.28515625,
+              "dbRelativeToStrongestFullSpectrumPeak": -0.4962406555207366
+            },
+            {
+              "frequencyHz": 138.427734375,
+              "dbRelativeToStrongestFullSpectrumPeak": -5.7727208558943355
+            },
+            {
+              "frequencyHz": 279.052734375,
+              "dbRelativeToStrongestFullSpectrumPeak": -14.49471637381031
+            },
+            {
+              "frequencyHz": 232.177734375,
+              "dbRelativeToStrongestFullSpectrumPeak": -16.87024613090379
+            },
+            {
+              "frequencyHz": 119.384765625,
+              "dbRelativeToStrongestFullSpectrumPeak": -19.434194920941337
+            },
+            {
+              "frequencyHz": 104.00390625,
+              "dbRelativeToStrongestFullSpectrumPeak": -19.66467748072141
+            }
+          ],
+          "harmonicAndStereoMeasurements": [
+            {
+              "harmonicIfMissingFundamentalHypothesis": 1,
+              "frequencyHz": 46.249,
+              "meanStereoPower": 8.510251442160718e-07,
+              "sideEnergyFraction": 0.10502598259635437,
+              "lrCoherency": 0.7905440103524479,
+              "lrPhaseDegrees": -1.2670189940039631
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 2,
+              "frequencyHz": 92.498,
+              "meanStereoPower": 0.0007809452712433958,
+              "sideEnergyFraction": 0.6176565962901727,
+              "lrCoherency": 0.4416367429649786,
+              "lrPhaseDegrees": 151.285536726606
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 3,
+              "frequencyHz": 138.747,
+              "meanStereoPower": 0.0002205967180943618,
+              "sideEnergyFraction": 0.8249733835957316,
+              "lrCoherency": 0.8360212589090545,
+              "lrPhaseDegrees": -141.03000789451633
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 4,
+              "frequencyHz": 184.996,
+              "meanStereoPower": 0.0010832642700884403,
+              "sideEnergyFraction": 0.3491281386262046,
+              "lrCoherency": 0.8830362411603182,
+              "lrPhaseDegrees": -58.751690286391145
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 5,
+              "frequencyHz": 231.245,
+              "meanStereoPower": 1.4498698091908196e-05,
+              "sideEnergyFraction": 0.5190676143223939,
+              "lrCoherency": 0.19639653858836276,
+              "lrPhaseDegrees": -105.27688579697818
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 6,
+              "frequencyHz": 277.494,
+              "meanStereoPower": 5.975965759477851e-05,
+              "sideEnergyFraction": 0.7724678571023412,
+              "lrCoherency": 0.5682487333237163,
+              "lrPhaseDegrees": 163.5348972339604
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 8,
+              "frequencyHz": 369.992,
+              "meanStereoPower": 8.118072871299285e-06,
+              "sideEnergyFraction": 0.16600313417893045,
+              "lrCoherency": 0.6899940020507154,
+              "lrPhaseDegrees": -7.389497089770927
+            }
+          ]
+        },
+        {
+          "relativeSeconds": [
+            1.15,
+            1.45
+          ],
+          "originalSeconds": [
+            46.15,
+            46.45
+          ],
+          "possibleMissingFundamentalHz": 46.249,
+          "strongLowPeaks": [
+            {
+              "frequencyHz": 184.5703125,
+              "dbRelativeToStrongestFullSpectrumPeak": 0.0
+            },
+            {
+              "frequencyHz": 93.017578125,
+              "dbRelativeToStrongestFullSpectrumPeak": -6.888039792068886
+            },
+            {
+              "frequencyHz": 138.427734375,
+              "dbRelativeToStrongestFullSpectrumPeak": -10.612139939059464
+            },
+            {
+              "frequencyHz": 262.939453125,
+              "dbRelativeToStrongestFullSpectrumPeak": -13.375220893506018
+            },
+            {
+              "frequencyHz": 276.123046875,
+              "dbRelativeToStrongestFullSpectrumPeak": -16.490956222987894
+            },
+            {
+              "frequencyHz": 206.54296875,
+              "dbRelativeToStrongestFullSpectrumPeak": -17.84214945252387
+            },
+            {
+              "frequencyHz": 229.98046875,
+              "dbRelativeToStrongestFullSpectrumPeak": -20.24529176005811
+            }
+          ],
+          "harmonicAndStereoMeasurements": [
+            {
+              "harmonicIfMissingFundamentalHypothesis": 1,
+              "frequencyHz": 46.249,
+              "meanStereoPower": 4.7581294343662336e-07,
+              "sideEnergyFraction": 0.13953118434673828,
+              "lrCoherency": 0.8369555100227172,
+              "lrPhaseDegrees": 29.354699401242073
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 2,
+              "frequencyHz": 92.498,
+              "meanStereoPower": 0.0003303144003386229,
+              "sideEnergyFraction": 0.3221466752128054,
+              "lrCoherency": 0.3870600017933103,
+              "lrPhaseDegrees": -10.450329101044641
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 3,
+              "frequencyHz": 138.747,
+              "meanStereoPower": 0.0001597659812998843,
+              "sideEnergyFraction": 0.7305121506781863,
+              "lrCoherency": 0.8178496806805764,
+              "lrPhaseDegrees": 130.52641818591647
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 4,
+              "frequencyHz": 184.996,
+              "meanStereoPower": 0.0012775832752523267,
+              "sideEnergyFraction": 0.5586728302003181,
+              "lrCoherency": 0.9648302884014034,
+              "lrPhaseDegrees": -98.25008135117595
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 5,
+              "frequencyHz": 231.245,
+              "meanStereoPower": 1.7284702364212166e-05,
+              "sideEnergyFraction": 0.5746985924960496,
+              "lrCoherency": 0.17668979260832912,
+              "lrPhaseDegrees": 150.3611043659491
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 6,
+              "frequencyHz": 277.494,
+              "meanStereoPower": 3.285791827597943e-05,
+              "sideEnergyFraction": 0.2438950130744017,
+              "lrCoherency": 0.9004178627023187,
+              "lrPhaseDegrees": 52.19402739032825
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 8,
+              "frequencyHz": 369.992,
+              "meanStereoPower": 9.19621041156403e-06,
+              "sideEnergyFraction": 0.646373001180413,
+              "lrCoherency": 0.7210938123031612,
+              "lrPhaseDegrees": 113.95370730866128
+            }
+          ]
+        },
+        {
+          "relativeSeconds": [
+            2.3,
+            2.6
+          ],
+          "originalSeconds": [
+            47.3,
+            47.6
+          ],
+          "possibleMissingFundamentalHz": 46.249,
+          "strongLowPeaks": [
+            {
+              "frequencyHz": 92.28515625,
+              "dbRelativeToStrongestFullSpectrumPeak": 0.0
+            },
+            {
+              "frequencyHz": 137.6953125,
+              "dbRelativeToStrongestFullSpectrumPeak": -0.6051583575119529
+            },
+            {
+              "frequencyHz": 232.91015625,
+              "dbRelativeToStrongestFullSpectrumPeak": -2.5194686266200024
+            },
+            {
+              "frequencyHz": 188.232421875,
+              "dbRelativeToStrongestFullSpectrumPeak": -5.886334648768531
+            },
+            {
+              "frequencyHz": 276.85546875,
+              "dbRelativeToStrongestFullSpectrumPeak": -7.540862400706299
+            },
+            {
+              "frequencyHz": 205.810546875,
+              "dbRelativeToStrongestFullSpectrumPeak": -17.454222699488586
+            },
+            {
+              "frequencyHz": 175.048828125,
+              "dbRelativeToStrongestFullSpectrumPeak": -20.12074109987769
+            }
+          ],
+          "harmonicAndStereoMeasurements": [
+            {
+              "harmonicIfMissingFundamentalHypothesis": 1,
+              "frequencyHz": 46.249,
+              "meanStereoPower": 5.924461327634184e-07,
+              "sideEnergyFraction": 0.118444551101724,
+              "lrCoherency": 0.9445757466526397,
+              "lrPhaseDegrees": 33.65572795222987
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 2,
+              "frequencyHz": 92.498,
+              "meanStereoPower": 0.00044204410675403383,
+              "sideEnergyFraction": 0.03967101876098267,
+              "lrCoherency": 0.9923690536953433,
+              "lrPhaseDegrees": 8.409058282830223
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 3,
+              "frequencyHz": 138.747,
+              "meanStereoPower": 0.00032271828286068816,
+              "sideEnergyFraction": 0.6851747100668637,
+              "lrCoherency": 0.7818510049192045,
+              "lrPhaseDegrees": 121.84128713017769
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 4,
+              "frequencyHz": 184.996,
+              "meanStereoPower": 0.00022675615907858366,
+              "sideEnergyFraction": 0.555509291070745,
+              "lrCoherency": 0.6394867796826021,
+              "lrPhaseDegrees": -102.04974713050751
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 5,
+              "frequencyHz": 231.245,
+              "meanStereoPower": 0.00020501472145562874,
+              "sideEnergyFraction": 0.6220996310324053,
+              "lrCoherency": 0.5714127201500935,
+              "lrPhaseDegrees": -115.86328700645328
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 6,
+              "frequencyHz": 277.494,
+              "meanStereoPower": 5.9834111545762166e-05,
+              "sideEnergyFraction": 0.722520316461789,
+              "lrCoherency": 0.9091087222428,
+              "lrPhaseDegrees": 136.3886377880596
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 8,
+              "frequencyHz": 369.992,
+              "meanStereoPower": 1.5197776650168748e-05,
+              "sideEnergyFraction": 0.7130144109310059,
+              "lrCoherency": 0.8473961705579457,
+              "lrPhaseDegrees": -120.46269534535722
+            }
+          ]
+        },
+        {
+          "relativeSeconds": [
+            3.3,
+            3.6
+          ],
+          "originalSeconds": [
+            48.3,
+            48.6
+          ],
+          "possibleMissingFundamentalHz": 43.654,
+          "strongLowPeaks": [
+            {
+              "frequencyHz": 175.048828125,
+              "dbRelativeToStrongestFullSpectrumPeak": 0.0
+            },
+            {
+              "frequencyHz": 208.0078125,
+              "dbRelativeToStrongestFullSpectrumPeak": -20.3191415562474
+            },
+            {
+              "frequencyHz": 276.85546875,
+              "dbRelativeToStrongestFullSpectrumPeak": -22.354009244347605
+            },
+            {
+              "frequencyHz": 84.228515625,
+              "dbRelativeToStrongestFullSpectrumPeak": -22.460750768084715
+            },
+            {
+              "frequencyHz": 128.173828125,
+              "dbRelativeToStrongestFullSpectrumPeak": -22.6879353752966
+            },
+            {
+              "frequencyHz": 186.03515625,
+              "dbRelativeToStrongestFullSpectrumPeak": -22.755199482945685
+            },
+            {
+              "frequencyHz": 230.712890625,
+              "dbRelativeToStrongestFullSpectrumPeak": -25.774081633744967
+            }
+          ],
+          "harmonicAndStereoMeasurements": [
+            {
+              "harmonicIfMissingFundamentalHypothesis": 1,
+              "frequencyHz": 43.654,
+              "meanStereoPower": 2.106396860060778e-07,
+              "sideEnergyFraction": 0.02719990606762138,
+              "lrCoherency": 0.9600014986447873,
+              "lrPhaseDegrees": -8.328663344326669
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 2,
+              "frequencyHz": 87.308,
+              "meanStereoPower": 0.0001288824779178355,
+              "sideEnergyFraction": 0.8212259386366324,
+              "lrCoherency": 0.7436641883430575,
+              "lrPhaseDegrees": -177.42442685275228
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 3,
+              "frequencyHz": 130.96200000000002,
+              "meanStereoPower": 0.00011202715133608839,
+              "sideEnergyFraction": 0.8885445798432601,
+              "lrCoherency": 0.83944967195996,
+              "lrPhaseDegrees": 157.860971032943
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 4,
+              "frequencyHz": 174.616,
+              "meanStereoPower": 0.00497807275357147,
+              "sideEnergyFraction": 0.21469267383784446,
+              "lrCoherency": 0.9574696598276198,
+              "lrPhaseDegrees": -51.483504476005926
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 5,
+              "frequencyHz": 218.27,
+              "meanStereoPower": 9.706267501009541e-06,
+              "sideEnergyFraction": 0.5172820264957765,
+              "lrCoherency": 0.6425238959862958,
+              "lrPhaseDegrees": -93.59580517954377
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 6,
+              "frequencyHz": 261.92400000000004,
+              "meanStereoPower": 1.0352981517775723e-05,
+              "sideEnergyFraction": 0.46328006858561005,
+              "lrCoherency": 0.1747229730124178,
+              "lrPhaseDegrees": -62.293575235891
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 8,
+              "frequencyHz": 349.232,
+              "meanStereoPower": 3.445314166577737e-05,
+              "sideEnergyFraction": 0.19677720954485792,
+              "lrCoherency": 0.7663831267717369,
+              "lrPhaseDegrees": 10.461724067325665
+            }
+          ]
+        },
+        {
+          "relativeSeconds": [
+            4.6,
+            4.9
+          ],
+          "originalSeconds": [
+            49.6,
+            49.9
+          ],
+          "possibleMissingFundamentalHz": 38.891,
+          "strongLowPeaks": [
+            {
+              "frequencyHz": 156.73828125,
+              "dbRelativeToStrongestFullSpectrumPeak": 0.0
+            },
+            {
+              "frequencyHz": 115.72265625,
+              "dbRelativeToStrongestFullSpectrumPeak": -5.724402907906562
+            },
+            {
+              "frequencyHz": 233.642578125,
+              "dbRelativeToStrongestFullSpectrumPeak": -10.764046810005755
+            },
+            {
+              "frequencyHz": 175.048828125,
+              "dbRelativeToStrongestFullSpectrumPeak": -11.538819251284586
+            },
+            {
+              "frequencyHz": 87.158203125,
+              "dbRelativeToStrongestFullSpectrumPeak": -14.38417640864565
+            },
+            {
+              "frequencyHz": 184.5703125,
+              "dbRelativeToStrongestFullSpectrumPeak": -16.36059563856972
+            },
+            {
+              "frequencyHz": 78.369140625,
+              "dbRelativeToStrongestFullSpectrumPeak": -16.576526838703693
+            }
+          ],
+          "harmonicAndStereoMeasurements": [
+            {
+              "harmonicIfMissingFundamentalHypothesis": 1,
+              "frequencyHz": 38.891,
+              "meanStereoPower": 9.940908470836832e-08,
+              "sideEnergyFraction": 0.18087269825746782,
+              "lrCoherency": 0.6430123321629708,
+              "lrPhaseDegrees": -6.2137071545555145
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 2,
+              "frequencyHz": 77.782,
+              "meanStereoPower": 7.734331073166432e-05,
+              "sideEnergyFraction": 0.34293943554424294,
+              "lrCoherency": 0.5397708915451535,
+              "lrPhaseDegrees": 33.352287588711114
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 3,
+              "frequencyHz": 116.673,
+              "meanStereoPower": 0.00026055995007689216,
+              "sideEnergyFraction": 0.7330968442379442,
+              "lrCoherency": 0.8192609951852817,
+              "lrPhaseDegrees": -131.06841317780533
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 4,
+              "frequencyHz": 155.564,
+              "meanStereoPower": 0.0014199499548270336,
+              "sideEnergyFraction": 0.2503098813960289,
+              "lrCoherency": 0.8121717422871577,
+              "lrPhaseDegrees": 18.68361220827447
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 5,
+              "frequencyHz": 194.45499999999998,
+              "meanStereoPower": 1.8309140419785815e-05,
+              "sideEnergyFraction": 0.7363331517191546,
+              "lrCoherency": 0.5295669242505407,
+              "lrPhaseDegrees": 153.4892721134343
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 6,
+              "frequencyHz": 233.346,
+              "meanStereoPower": 0.0001060809885518343,
+              "sideEnergyFraction": 0.3963299546477921,
+              "lrCoherency": 0.7900967840406888,
+              "lrPhaseDegrees": -69.36802169605463
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 8,
+              "frequencyHz": 311.128,
+              "meanStereoPower": 3.117813045749425e-05,
+              "sideEnergyFraction": 0.25178924838704175,
+              "lrCoherency": 0.739187128022684,
+              "lrPhaseDegrees": -30.763349327185136
+            }
+          ]
+        },
+        {
+          "relativeSeconds": [
+            5.5,
+            5.8
+          ],
+          "originalSeconds": [
+            50.5,
+            50.8
+          ],
+          "possibleMissingFundamentalHz": 38.891,
+          "strongLowPeaks": [
+            {
+              "frequencyHz": 155.2734375,
+              "dbRelativeToStrongestFullSpectrumPeak": 0.0
+            },
+            {
+              "frequencyHz": 116.455078125,
+              "dbRelativeToStrongestFullSpectrumPeak": -19.186336367434397
+            },
+            {
+              "frequencyHz": 278.3203125,
+              "dbRelativeToStrongestFullSpectrumPeak": -19.462089737706446
+            },
+            {
+              "frequencyHz": 77.63671875,
+              "dbRelativeToStrongestFullSpectrumPeak": -20.265691052824515
+            },
+            {
+              "frequencyHz": 232.91015625,
+              "dbRelativeToStrongestFullSpectrumPeak": -21.683122765806473
+            },
+            {
+              "frequencyHz": 312.01171875,
+              "dbRelativeToStrongestFullSpectrumPeak": -22.224121158899585
+            },
+            {
+              "frequencyHz": 186.03515625,
+              "dbRelativeToStrongestFullSpectrumPeak": -25.096397506978946
+            }
+          ],
+          "harmonicAndStereoMeasurements": [
+            {
+              "harmonicIfMissingFundamentalHypothesis": 1,
+              "frequencyHz": 38.891,
+              "meanStereoPower": 4.528023198664963e-07,
+              "sideEnergyFraction": 0.6483393847037834,
+              "lrCoherency": 0.682104751628912,
+              "lrPhaseDegrees": -116.31978566278511
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 2,
+              "frequencyHz": 77.782,
+              "meanStereoPower": 5.544923843510202e-05,
+              "sideEnergyFraction": 0.8366621633902686,
+              "lrCoherency": 0.6811421356083684,
+              "lrPhaseDegrees": -177.4645382725337
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 3,
+              "frequencyHz": 116.673,
+              "meanStereoPower": 4.6960141074481576e-05,
+              "sideEnergyFraction": 0.5398127418359958,
+              "lrCoherency": 0.6894879124813499,
+              "lrPhaseDegrees": 96.63643537882368
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 4,
+              "frequencyHz": 155.564,
+              "meanStereoPower": 0.003124152974287051,
+              "sideEnergyFraction": 0.5383029966728714,
+              "lrCoherency": 0.693440904496269,
+              "lrPhaseDegrees": -101.17277317723136
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 5,
+              "frequencyHz": 194.45499999999998,
+              "meanStereoPower": 9.986805759212135e-06,
+              "sideEnergyFraction": 0.7050143065504266,
+              "lrCoherency": 0.7159363460115301,
+              "lrPhaseDegrees": 124.97937151069524
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 6,
+              "frequencyHz": 233.346,
+              "meanStereoPower": 3.9564689435795396e-05,
+              "sideEnergyFraction": 0.23531469028486876,
+              "lrCoherency": 0.6982006473357566,
+              "lrPhaseDegrees": -40.21887577382479
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 8,
+              "frequencyHz": 311.128,
+              "meanStereoPower": 3.6393886183377435e-05,
+              "sideEnergyFraction": 0.38120703778619985,
+              "lrCoherency": 0.4053583397575777,
+              "lrPhaseDegrees": -46.34162499451256
+            }
+          ]
+        },
+        {
+          "relativeSeconds": [
+            6.3,
+            6.6
+          ],
+          "originalSeconds": [
+            51.3,
+            51.6
+          ],
+          "possibleMissingFundamentalHz": 38.891,
+          "strongLowPeaks": [
+            {
+              "frequencyHz": 155.2734375,
+              "dbRelativeToStrongestFullSpectrumPeak": 0.0
+            },
+            {
+              "frequencyHz": 274.658203125,
+              "dbRelativeToStrongestFullSpectrumPeak": -16.63520203336463
+            },
+            {
+              "frequencyHz": 77.63671875,
+              "dbRelativeToStrongestFullSpectrumPeak": -16.87083127304794
+            },
+            {
+              "frequencyHz": 232.177734375,
+              "dbRelativeToStrongestFullSpectrumPeak": -17.184555664286176
+            },
+            {
+              "frequencyHz": 310.546875,
+              "dbRelativeToStrongestFullSpectrumPeak": -17.46530991710395
+            },
+            {
+              "frequencyHz": 114.2578125,
+              "dbRelativeToStrongestFullSpectrumPeak": -19.234399510553256
+            },
+            {
+              "frequencyHz": 169.189453125,
+              "dbRelativeToStrongestFullSpectrumPeak": -24.040863622238334
+            }
+          ],
+          "harmonicAndStereoMeasurements": [
+            {
+              "harmonicIfMissingFundamentalHypothesis": 1,
+              "frequencyHz": 38.891,
+              "meanStereoPower": 2.2174460276414322e-07,
+              "sideEnergyFraction": 0.44967782856752714,
+              "lrCoherency": 0.2888226055261309,
+              "lrPhaseDegrees": 64.91737448627275
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 2,
+              "frequencyHz": 77.782,
+              "meanStereoPower": 5.522590764963537e-05,
+              "sideEnergyFraction": 0.1312888942517528,
+              "lrCoherency": 0.8096654641372597,
+              "lrPhaseDegrees": 17.736063389938742
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 3,
+              "frequencyHz": 116.673,
+              "meanStereoPower": 7.317015247064091e-05,
+              "sideEnergyFraction": 0.6146483445568957,
+              "lrCoherency": 0.3055447611873357,
+              "lrPhaseDegrees": -141.01975851912988
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 4,
+              "frequencyHz": 155.564,
+              "meanStereoPower": 0.002579177080403321,
+              "sideEnergyFraction": 0.8334175513572417,
+              "lrCoherency": 0.9868321812670785,
+              "lrPhaseDegrees": -133.17687450233055
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 5,
+              "frequencyHz": 194.45499999999998,
+              "meanStereoPower": 1.2396636522366998e-05,
+              "sideEnergyFraction": 0.5944943151737043,
+              "lrCoherency": 0.9093507616316286,
+              "lrPhaseDegrees": 102.41256897783087
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 6,
+              "frequencyHz": 233.346,
+              "meanStereoPower": 7.272687779567887e-05,
+              "sideEnergyFraction": 0.14761395497080013,
+              "lrCoherency": 0.9156141608840608,
+              "lrPhaseDegrees": -39.64812365459645
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 8,
+              "frequencyHz": 311.128,
+              "meanStereoPower": 4.0006928855669195e-05,
+              "sideEnergyFraction": 0.7313754558348107,
+              "lrCoherency": 0.899555956928556,
+              "lrPhaseDegrees": -142.4261879395998
+            }
+          ]
+        },
+        {
+          "relativeSeconds": [
+            7,
+            7.3
+          ],
+          "originalSeconds": [
+            52,
+            52.3
+          ],
+          "possibleMissingFundamentalHz": 43.654,
+          "strongLowPeaks": [
+            {
+              "frequencyHz": 175.048828125,
+              "dbRelativeToStrongestFullSpectrumPeak": 0.0
+            },
+            {
+              "frequencyHz": 86.42578125,
+              "dbRelativeToStrongestFullSpectrumPeak": -6.468022127108818
+            },
+            {
+              "frequencyHz": 262.20703125,
+              "dbRelativeToStrongestFullSpectrumPeak": -8.033781144261225
+            },
+            {
+              "frequencyHz": 153.80859375,
+              "dbRelativeToStrongestFullSpectrumPeak": -16.445105269150133
+            },
+            {
+              "frequencyHz": 133.30078125,
+              "dbRelativeToStrongestFullSpectrumPeak": -17.252297622910035
+            },
+            {
+              "frequencyHz": 254.150390625,
+              "dbRelativeToStrongestFullSpectrumPeak": -20.484867717616922
+            },
+            {
+              "frequencyHz": 310.546875,
+              "dbRelativeToStrongestFullSpectrumPeak": -21.196974297516267
+            }
+          ],
+          "harmonicAndStereoMeasurements": [
+            {
+              "harmonicIfMissingFundamentalHypothesis": 1,
+              "frequencyHz": 43.654,
+              "meanStereoPower": 1.9731085454590181e-07,
+              "sideEnergyFraction": 0.16023616200690988,
+              "lrCoherency": 0.7490706742243156,
+              "lrPhaseDegrees": 20.484319519658765
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 2,
+              "frequencyHz": 87.308,
+              "meanStereoPower": 0.00018610519400029984,
+              "sideEnergyFraction": 0.21003350047508765,
+              "lrCoherency": 0.7698242376095953,
+              "lrPhaseDegrees": -1.601098973694818
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 3,
+              "frequencyHz": 130.96200000000002,
+              "meanStereoPower": 5.1995903883972375e-05,
+              "sideEnergyFraction": 0.2938001787307312,
+              "lrCoherency": 0.7082487231550056,
+              "lrPhaseDegrees": 53.05738124115367
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 4,
+              "frequencyHz": 174.616,
+              "meanStereoPower": 0.0009154787557364993,
+              "sideEnergyFraction": 0.8848288813905546,
+              "lrCoherency": 0.9374065705431622,
+              "lrPhaseDegrees": 166.72129739531326
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 5,
+              "frequencyHz": 218.27,
+              "meanStereoPower": 2.716341376469341e-06,
+              "sideEnergyFraction": 0.6374542669062933,
+              "lrCoherency": 0.7727135105757005,
+              "lrPhaseDegrees": -111.35495476676589
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 6,
+              "frequencyHz": 261.92400000000004,
+              "meanStereoPower": 0.00017268386486467356,
+              "sideEnergyFraction": 0.5620427567132112,
+              "lrCoherency": 0.5935050957592145,
+              "lrPhaseDegrees": 103.24183448495789
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 8,
+              "frequencyHz": 349.232,
+              "meanStereoPower": 0.0001412386570967979,
+              "sideEnergyFraction": 0.9466140232423921,
+              "lrCoherency": 0.9286727782236652,
+              "lrPhaseDegrees": 168.68631419776165
+            }
+          ]
+        }
+      ],
+      "dominantUpperBassAnchorRuns": [
+        {
+          "fromSeconds": 0.0,
+          "toSeconds": 3.1950000000000003,
+          "dominantLowFamilyAnchorHz": 184.997
+        },
+        {
+          "fromSeconds": 3.2,
+          "toSeconds": 4.475,
+          "dominantLowFamilyAnchorHz": 174.614
+        },
+        {
+          "fromSeconds": 4.59,
+          "toSeconds": 6.925,
+          "dominantLowFamilyAnchorHz": 155.563
+        },
+        {
+          "fromSeconds": 6.93,
+          "toSeconds": 7.999999999999999,
+          "dominantLowFamilyAnchorHz": 174.614
+        }
+      ]
+    },
+    "original": {
+      "path": "D:\\RootSound\\experiments\\music-workflow\\reference-studio\\cases\\phone-recording-20261023-233819\\input\\original-45-53.wav",
+      "sha256": "9839a75db1eeb1bf4c8cef409ffe631e7885dceea577d58c6189566928fe9847",
+      "contextCropOffsetSeconds": 0,
+      "sampleRate": 48000,
+      "method": "Sum of L and R powers; arithmetic mono averaging deliberately avoided.",
+      "windows": [
+        {
+          "relativeSeconds": [
+            0.1,
+            0.4
+          ],
+          "originalSeconds": [
+            45.1,
+            45.4
+          ],
+          "possibleMissingFundamentalHz": 46.249,
+          "strongLowPeaks": [
+            {
+              "frequencyHz": 92.28515625,
+              "dbRelativeToStrongestFullSpectrumPeak": 0.0
+            },
+            {
+              "frequencyHz": 185.302734375,
+              "dbRelativeToStrongestFullSpectrumPeak": -2.350371702479927
+            },
+            {
+              "frequencyHz": 139.16015625,
+              "dbRelativeToStrongestFullSpectrumPeak": -7.391687423520711
+            },
+            {
+              "frequencyHz": 111.328125,
+              "dbRelativeToStrongestFullSpectrumPeak": -8.639431741491489
+            },
+            {
+              "frequencyHz": 101.806640625,
+              "dbRelativeToStrongestFullSpectrumPeak": -8.739444174484618
+            },
+            {
+              "frequencyHz": 82.763671875,
+              "dbRelativeToStrongestFullSpectrumPeak": -9.031244420044807
+            },
+            {
+              "frequencyHz": 68.115234375,
+              "dbRelativeToStrongestFullSpectrumPeak": -12.234042075904334
+            }
+          ],
+          "harmonicAndStereoMeasurements": [
+            {
+              "harmonicIfMissingFundamentalHypothesis": 1,
+              "frequencyHz": 46.249,
+              "meanStereoPower": 7.0744325628771676e-06,
+              "sideEnergyFraction": 0.0007192149417686574,
+              "lrCoherency": 0.9989639897837741,
+              "lrPhaseDegrees": 0.032629098528677215
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 2,
+              "frequencyHz": 92.498,
+              "meanStereoPower": 0.002690853464660068,
+              "sideEnergyFraction": 0.2072307263463252,
+              "lrCoherency": 0.8157562278195933,
+              "lrPhaseDegrees": 10.975732834880864
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 3,
+              "frequencyHz": 138.747,
+              "meanStereoPower": 0.0004751442038321461,
+              "sideEnergyFraction": 0.4299753761568572,
+              "lrCoherency": 0.7437904023145135,
+              "lrPhaseDegrees": -79.04391779278367
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 4,
+              "frequencyHz": 184.996,
+              "meanStereoPower": 0.001979659081728403,
+              "sideEnergyFraction": 0.2039868307315556,
+              "lrCoherency": 0.9513685255343649,
+              "lrPhaseDegrees": -40.78781267249255
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 5,
+              "frequencyHz": 231.245,
+              "meanStereoPower": 6.24526289313171e-05,
+              "sideEnergyFraction": 0.17643892955738363,
+              "lrCoherency": 0.7907378549361546,
+              "lrPhaseDegrees": -28.30851316876177
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 6,
+              "frequencyHz": 277.494,
+              "meanStereoPower": 6.837831903806338e-05,
+              "sideEnergyFraction": 0.7365847790109447,
+              "lrCoherency": 0.544897645301673,
+              "lrPhaseDegrees": 150.27277045222795
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 8,
+              "frequencyHz": 369.992,
+              "meanStereoPower": 1.319539024043002e-05,
+              "sideEnergyFraction": 0.13822014849154216,
+              "lrCoherency": 0.7497126514790269,
+              "lrPhaseDegrees": -7.77657005523573
+            }
+          ]
+        },
+        {
+          "relativeSeconds": [
+            1.15,
+            1.45
+          ],
+          "originalSeconds": [
+            46.15,
+            46.45
+          ],
+          "possibleMissingFundamentalHz": 46.249,
+          "strongLowPeaks": [
+            {
+              "frequencyHz": 184.5703125,
+              "dbRelativeToStrongestFullSpectrumPeak": 0.0
+            },
+            {
+              "frequencyHz": 93.017578125,
+              "dbRelativeToStrongestFullSpectrumPeak": -0.3871462316145638
+            },
+            {
+              "frequencyHz": 137.6953125,
+              "dbRelativeToStrongestFullSpectrumPeak": -6.5292886982340725
+            },
+            {
+              "frequencyHz": 262.939453125,
+              "dbRelativeToStrongestFullSpectrumPeak": -14.008529911852962
+            },
+            {
+              "frequencyHz": 276.123046875,
+              "dbRelativeToStrongestFullSpectrumPeak": -14.210630008312483
+            },
+            {
+              "frequencyHz": 145.751953125,
+              "dbRelativeToStrongestFullSpectrumPeak": -15.656776061333883
+            },
+            {
+              "frequencyHz": 206.54296875,
+              "dbRelativeToStrongestFullSpectrumPeak": -17.067421084237257
+            }
+          ],
+          "harmonicAndStereoMeasurements": [
+            {
+              "harmonicIfMissingFundamentalHypothesis": 1,
+              "frequencyHz": 46.249,
+              "meanStereoPower": 1.392292928001534e-06,
+              "sideEnergyFraction": 0.004517846376191043,
+              "lrCoherency": 0.9942332817028022,
+              "lrPhaseDegrees": 1.651224405621445
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 2,
+              "frequencyHz": 92.498,
+              "meanStereoPower": 0.0018857619986410769,
+              "sideEnergyFraction": 0.10061567573664251,
+              "lrCoherency": 0.8471221448684089,
+              "lrPhaseDegrees": -0.6895383952629627
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 3,
+              "frequencyHz": 138.747,
+              "meanStereoPower": 0.000592040233514336,
+              "sideEnergyFraction": 0.21751927087025377,
+              "lrCoherency": 0.6290491397350163,
+              "lrPhaseDegrees": 7.814800029455716
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 4,
+              "frequencyHz": 184.996,
+              "meanStereoPower": 0.001978394327760176,
+              "sideEnergyFraction": 0.3722797713470557,
+              "lrCoherency": 0.9481736373016482,
+              "lrPhaseDegrees": -72.1826009956083
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 5,
+              "frequencyHz": 231.245,
+              "meanStereoPower": 2.9927987623857635e-05,
+              "sideEnergyFraction": 0.48221653467763426,
+              "lrCoherency": 0.30116781203770104,
+              "lrPhaseDegrees": 83.20920826464663
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 6,
+              "frequencyHz": 277.494,
+              "meanStereoPower": 7.165209147369031e-05,
+              "sideEnergyFraction": 0.1427267905534915,
+              "lrCoherency": 0.9018977971973611,
+              "lrPhaseDegrees": 33.98395710215145
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 8,
+              "frequencyHz": 369.992,
+              "meanStereoPower": 1.4546894563646953e-05,
+              "sideEnergyFraction": 0.5491376603825201,
+              "lrCoherency": 0.6943904706393719,
+              "lrPhaseDegrees": 98.13799155260071
+            }
+          ]
+        },
+        {
+          "relativeSeconds": [
+            2.3,
+            2.6
+          ],
+          "originalSeconds": [
+            47.3,
+            47.6
+          ],
+          "possibleMissingFundamentalHz": 46.249,
+          "strongLowPeaks": [
+            {
+              "frequencyHz": 91.552734375,
+              "dbRelativeToStrongestFullSpectrumPeak": 0.0
+            },
+            {
+              "frequencyHz": 137.6953125,
+              "dbRelativeToStrongestFullSpectrumPeak": -10.439715848057489
+            },
+            {
+              "frequencyHz": 232.91015625,
+              "dbRelativeToStrongestFullSpectrumPeak": -12.594577921619035
+            },
+            {
+              "frequencyHz": 183.10546875,
+              "dbRelativeToStrongestFullSpectrumPeak": -13.948722919757486
+            },
+            {
+              "frequencyHz": 276.85546875,
+              "dbRelativeToStrongestFullSpectrumPeak": -16.921338357483467
+            },
+            {
+              "frequencyHz": 205.810546875,
+              "dbRelativeToStrongestFullSpectrumPeak": -25.7462125361194
+            },
+            {
+              "frequencyHz": 175.048828125,
+              "dbRelativeToStrongestFullSpectrumPeak": -28.029879552731913
+            }
+          ],
+          "harmonicAndStereoMeasurements": [
+            {
+              "harmonicIfMissingFundamentalHypothesis": 1,
+              "frequencyHz": 46.249,
+              "meanStereoPower": 1.6250015433380046e-06,
+              "sideEnergyFraction": 0.0022870429034509815,
+              "lrCoherency": 0.9955240310005288,
+              "lrPhaseDegrees": 0.7456408457699295
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 2,
+              "frequencyHz": 92.498,
+              "meanStereoPower": 0.0030442147280039626,
+              "sideEnergyFraction": 0.017903491434334493,
+              "lrCoherency": 0.9903042284296556,
+              "lrPhaseDegrees": 5.469800746293284
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 3,
+              "frequencyHz": 138.747,
+              "meanStereoPower": 0.0004813257183269458,
+              "sideEnergyFraction": 0.5035177729346298,
+              "lrCoherency": 0.5228144186426773,
+              "lrPhaseDegrees": 90.82399942064298
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 4,
+              "frequencyHz": 184.996,
+              "meanStereoPower": 0.000385608516834148,
+              "sideEnergyFraction": 0.35694712095072384,
+              "lrCoherency": 0.806508489806861,
+              "lrPhaseDegrees": -59.32062967436318
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 5,
+              "frequencyHz": 231.245,
+              "meanStereoPower": 0.00022386807075665843,
+              "sideEnergyFraction": 0.6065136569130153,
+              "lrCoherency": 0.5042149312785068,
+              "lrPhaseDegrees": -115.19365521612012
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 6,
+              "frequencyHz": 277.494,
+              "meanStereoPower": 7.263706538592027e-05,
+              "sideEnergyFraction": 0.6575210190958867,
+              "lrCoherency": 0.8269573758485067,
+              "lrPhaseDegrees": 135.86427792483465
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 8,
+              "frequencyHz": 369.992,
+              "meanStereoPower": 1.8358989228310868e-05,
+              "sideEnergyFraction": 0.6288414280907214,
+              "lrCoherency": 0.8045588095120748,
+              "lrPhaseDegrees": -109.08711519224298
+            }
+          ]
+        },
+        {
+          "relativeSeconds": [
+            3.3,
+            3.6
+          ],
+          "originalSeconds": [
+            48.3,
+            48.6
+          ],
+          "possibleMissingFundamentalHz": 43.654,
+          "strongLowPeaks": [
+            {
+              "frequencyHz": 175.048828125,
+              "dbRelativeToStrongestFullSpectrumPeak": 0.0
+            },
+            {
+              "frequencyHz": 130.37109375,
+              "dbRelativeToStrongestFullSpectrumPeak": -14.825312757486685
+            },
+            {
+              "frequencyHz": 90.087890625,
+              "dbRelativeToStrongestFullSpectrumPeak": -15.567995436308246
+            },
+            {
+              "frequencyHz": 229.98046875,
+              "dbRelativeToStrongestFullSpectrumPeak": -19.1467621578011
+            },
+            {
+              "frequencyHz": 208.0078125,
+              "dbRelativeToStrongestFullSpectrumPeak": -19.72410911042212
+            },
+            {
+              "frequencyHz": 186.03515625,
+              "dbRelativeToStrongestFullSpectrumPeak": -21.14368720582972
+            },
+            {
+              "frequencyHz": 276.85546875,
+              "dbRelativeToStrongestFullSpectrumPeak": -22.06339916707618
+            }
+          ],
+          "harmonicAndStereoMeasurements": [
+            {
+              "harmonicIfMissingFundamentalHypothesis": 1,
+              "frequencyHz": 43.654,
+              "meanStereoPower": 2.498281248153689e-06,
+              "sideEnergyFraction": 0.001691781059952322,
+              "lrCoherency": 0.9975625978635617,
+              "lrPhaseDegrees": 0.23362354595908813
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 2,
+              "frequencyHz": 87.308,
+              "meanStereoPower": 0.0003087234514655044,
+              "sideEnergyFraction": 0.495292689250065,
+              "lrCoherency": 0.15864254328491784,
+              "lrPhaseDegrees": -86.5319218170258
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 3,
+              "frequencyHz": 130.96200000000002,
+              "meanStereoPower": 0.00032456221954873425,
+              "sideEnergyFraction": 0.41454280557072554,
+              "lrCoherency": 0.24531889269577667,
+              "lrPhaseDegrees": 45.41912639992904
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 4,
+              "frequencyHz": 174.616,
+              "meanStereoPower": 0.005540533652923217,
+              "sideEnergyFraction": 0.1926274377294366,
+              "lrCoherency": 0.9590009032200849,
+              "lrPhaseDegrees": -48.564780352980854
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 5,
+              "frequencyHz": 218.27,
+              "meanStereoPower": 3.020676535885727e-05,
+              "sideEnergyFraction": 0.2630930700073469,
+              "lrCoherency": 0.7730259398007909,
+              "lrPhaseDegrees": -47.18791826638051
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 6,
+              "frequencyHz": 261.92400000000004,
+              "meanStereoPower": 2.0159606789493365e-05,
+              "sideEnergyFraction": 0.4004963800960119,
+              "lrCoherency": 0.2354339094247401,
+              "lrPhaseDegrees": -25.25280174932904
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 8,
+              "frequencyHz": 349.232,
+              "meanStereoPower": 4.0510905896089395e-05,
+              "sideEnergyFraction": 0.18581865573933595,
+              "lrCoherency": 0.7723799217573833,
+              "lrPhaseDegrees": 6.7931543902248235
+            }
+          ]
+        },
+        {
+          "relativeSeconds": [
+            4.6,
+            4.9
+          ],
+          "originalSeconds": [
+            49.6,
+            49.9
+          ],
+          "possibleMissingFundamentalHz": 38.891,
+          "strongLowPeaks": [
+            {
+              "frequencyHz": 77.63671875,
+              "dbRelativeToStrongestFullSpectrumPeak": 0.0
+            },
+            {
+              "frequencyHz": 156.73828125,
+              "dbRelativeToStrongestFullSpectrumPeak": -0.3159999272521255
+            },
+            {
+              "frequencyHz": 115.72265625,
+              "dbRelativeToStrongestFullSpectrumPeak": -3.072645398575975
+            },
+            {
+              "frequencyHz": 233.642578125,
+              "dbRelativeToStrongestFullSpectrumPeak": -7.214607087346905
+            },
+            {
+              "frequencyHz": 175.048828125,
+              "dbRelativeToStrongestFullSpectrumPeak": -10.98539692800922
+            },
+            {
+              "frequencyHz": 86.42578125,
+              "dbRelativeToStrongestFullSpectrumPeak": -13.801276497102624
+            },
+            {
+              "frequencyHz": 194.091796875,
+              "dbRelativeToStrongestFullSpectrumPeak": -15.790220710892239
+            }
+          ],
+          "harmonicAndStereoMeasurements": [
+            {
+              "harmonicIfMissingFundamentalHypothesis": 1,
+              "frequencyHz": 38.891,
+              "meanStereoPower": 1.423450891249287e-07,
+              "sideEnergyFraction": 0.010336231838254158,
+              "lrCoherency": 0.9835421081213276,
+              "lrPhaseDegrees": -1.1618921721433513
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 2,
+              "frequencyHz": 77.782,
+              "meanStereoPower": 0.0014315957548864666,
+              "sideEnergyFraction": 0.06803958327253987,
+              "lrCoherency": 0.9560772590995753,
+              "lrPhaseDegrees": 16.562596969947048
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 3,
+              "frequencyHz": 116.673,
+              "meanStereoPower": 0.0006375840626564041,
+              "sideEnergyFraction": 0.6308661632556769,
+              "lrCoherency": 0.7949751690415469,
+              "lrPhaseDegrees": -111.76246608900327
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 4,
+              "frequencyHz": 155.564,
+              "meanStereoPower": 0.0016612395358546756,
+              "sideEnergyFraction": 0.22897452375955912,
+              "lrCoherency": 0.8105798611372145,
+              "lrPhaseDegrees": 12.100155928982526
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 5,
+              "frequencyHz": 194.45499999999998,
+              "meanStereoPower": 4.2803755606914653e-05,
+              "sideEnergyFraction": 0.6456054729840468,
+              "lrCoherency": 0.7224078104736726,
+              "lrPhaseDegrees": 114.31641625685832
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 6,
+              "frequencyHz": 233.346,
+              "meanStereoPower": 0.00024171206269150508,
+              "sideEnergyFraction": 0.25096607783215263,
+              "lrCoherency": 0.7941874659159792,
+              "lrPhaseDegrees": -44.408187120610485
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 8,
+              "frequencyHz": 311.128,
+              "meanStereoPower": 3.7771196057059044e-05,
+              "sideEnergyFraction": 0.25737165623256153,
+              "lrCoherency": 0.7190267608386735,
+              "lrPhaseDegrees": -28.921998939076776
+            }
+          ]
+        },
+        {
+          "relativeSeconds": [
+            5.5,
+            5.8
+          ],
+          "originalSeconds": [
+            50.5,
+            50.8
+          ],
+          "possibleMissingFundamentalHz": 38.891,
+          "strongLowPeaks": [
+            {
+              "frequencyHz": 155.2734375,
+              "dbRelativeToStrongestFullSpectrumPeak": 0.0
+            },
+            {
+              "frequencyHz": 115.72265625,
+              "dbRelativeToStrongestFullSpectrumPeak": -3.8518193090133295
+            },
+            {
+              "frequencyHz": 76.171875,
+              "dbRelativeToStrongestFullSpectrumPeak": -4.73661882632387
+            },
+            {
+              "frequencyHz": 95.947265625,
+              "dbRelativeToStrongestFullSpectrumPeak": -10.918240119813621
+            },
+            {
+              "frequencyHz": 107.666015625,
+              "dbRelativeToStrongestFullSpectrumPeak": -11.944050496085518
+            },
+            {
+              "frequencyHz": 123.779296875,
+              "dbRelativeToStrongestFullSpectrumPeak": -12.710175628516772
+            },
+            {
+              "frequencyHz": 144.287109375,
+              "dbRelativeToStrongestFullSpectrumPeak": -14.863743936289604
+            }
+          ],
+          "harmonicAndStereoMeasurements": [
+            {
+              "harmonicIfMissingFundamentalHypothesis": 1,
+              "frequencyHz": 38.891,
+              "meanStereoPower": 6.79537906295025e-08,
+              "sideEnergyFraction": 0.03434527238902973,
+              "lrCoherency": 0.9325771751077669,
+              "lrPhaseDegrees": -0.13261310037190133
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 2,
+              "frequencyHz": 77.782,
+              "meanStereoPower": 0.0012311227567491261,
+              "sideEnergyFraction": 0.29262647019224125,
+              "lrCoherency": 0.6984053634845648,
+              "lrPhaseDegrees": 48.32037808170823
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 3,
+              "frequencyHz": 116.673,
+              "meanStereoPower": 0.0012485136803509953,
+              "sideEnergyFraction": 0.05974058391833134,
+              "lrCoherency": 0.9704258126712891,
+              "lrPhaseDegrees": 24.822877342318694
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 4,
+              "frequencyHz": 155.564,
+              "meanStereoPower": 0.003882665026731221,
+              "sideEnergyFraction": 0.43574806635013874,
+              "lrCoherency": 0.7901081480454921,
+              "lrPhaseDegrees": -74.97623034848029
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 5,
+              "frequencyHz": 194.45499999999998,
+              "meanStereoPower": 6.425734883763176e-05,
+              "sideEnergyFraction": 0.32936205016026315,
+              "lrCoherency": 0.8669034777961405,
+              "lrPhaseDegrees": 64.66578776500494
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 6,
+              "frequencyHz": 233.346,
+              "meanStereoPower": 6.504164960518432e-05,
+              "sideEnergyFraction": 0.1570794448567921,
+              "lrCoherency": 0.7448419861210911,
+              "lrPhaseDegrees": -22.90429134390193
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 8,
+              "frequencyHz": 311.128,
+              "meanStereoPower": 4.37214217985241e-05,
+              "sideEnergyFraction": 0.3502791702691365,
+              "lrCoherency": 0.41417895817046385,
+              "lrPhaseDegrees": -32.24678691299134
+            }
+          ]
+        },
+        {
+          "relativeSeconds": [
+            6.3,
+            6.6
+          ],
+          "originalSeconds": [
+            51.3,
+            51.6
+          ],
+          "possibleMissingFundamentalHz": 38.891,
+          "strongLowPeaks": [
+            {
+              "frequencyHz": 155.2734375,
+              "dbRelativeToStrongestFullSpectrumPeak": 0.0
+            },
+            {
+              "frequencyHz": 76.171875,
+              "dbRelativeToStrongestFullSpectrumPeak": -3.961666278131048
+            },
+            {
+              "frequencyHz": 116.455078125,
+              "dbRelativeToStrongestFullSpectrumPeak": -7.147959532550927
+            },
+            {
+              "frequencyHz": 104.736328125,
+              "dbRelativeToStrongestFullSpectrumPeak": -7.705584350613424
+            },
+            {
+              "frequencyHz": 84.9609375,
+              "dbRelativeToStrongestFullSpectrumPeak": -8.90221950798242
+            },
+            {
+              "frequencyHz": 147.216796875,
+              "dbRelativeToStrongestFullSpectrumPeak": -12.453647435938965
+            },
+            {
+              "frequencyHz": 232.177734375,
+              "dbRelativeToStrongestFullSpectrumPeak": -13.83301632594067
+            }
+          ],
+          "harmonicAndStereoMeasurements": [
+            {
+              "harmonicIfMissingFundamentalHypothesis": 1,
+              "frequencyHz": 38.891,
+              "meanStereoPower": 1.0585061401477469e-07,
+              "sideEnergyFraction": 0.01923690429018535,
+              "lrCoherency": 0.9620698521578518,
+              "lrPhaseDegrees": -0.5153442751191059
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 2,
+              "frequencyHz": 77.782,
+              "meanStereoPower": 0.001108843204152766,
+              "sideEnergyFraction": 0.10419096700561081,
+              "lrCoherency": 0.8315176382914334,
+              "lrPhaseDegrees": -16.51229612663684
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 3,
+              "frequencyHz": 116.673,
+              "meanStereoPower": 0.000647543428135794,
+              "sideEnergyFraction": 0.16878120651692646,
+              "lrCoherency": 0.7340657448144783,
+              "lrPhaseDegrees": 14.044987314371195
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 4,
+              "frequencyHz": 155.564,
+              "meanStereoPower": 0.002735351147558272,
+              "sideEnergyFraction": 0.827691650602414,
+              "lrCoherency": 0.9557838834797749,
+              "lrPhaseDegrees": -135.1118496380204
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 5,
+              "frequencyHz": 194.45499999999998,
+              "meanStereoPower": 5.72842537657667e-05,
+              "sideEnergyFraction": 0.5654502274755923,
+              "lrCoherency": 0.4625808245313993,
+              "lrPhaseDegrees": 109.90610603561355
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 6,
+              "frequencyHz": 233.346,
+              "meanStereoPower": 0.00014517677745134783,
+              "sideEnergyFraction": 0.0931011879557333,
+              "lrCoherency": 0.9373841377132671,
+              "lrPhaseDegrees": -29.41946712350046
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 8,
+              "frequencyHz": 311.128,
+              "meanStereoPower": 5.01249605421601e-05,
+              "sideEnergyFraction": 0.6759344752385555,
+              "lrCoherency": 0.7053810272332562,
+              "lrPhaseDegrees": -148.7375415917991
+            }
+          ]
+        },
+        {
+          "relativeSeconds": [
+            7,
+            7.3
+          ],
+          "originalSeconds": [
+            52,
+            52.3
+          ],
+          "possibleMissingFundamentalHz": 43.654,
+          "strongLowPeaks": [
+            {
+              "frequencyHz": 87.158203125,
+              "dbRelativeToStrongestFullSpectrumPeak": 0.0
+            },
+            {
+              "frequencyHz": 175.78125,
+              "dbRelativeToStrongestFullSpectrumPeak": -0.6020668788982706
+            },
+            {
+              "frequencyHz": 130.37109375,
+              "dbRelativeToStrongestFullSpectrumPeak": -3.4973493177912034
+            },
+            {
+              "frequencyHz": 261.474609375,
+              "dbRelativeToStrongestFullSpectrumPeak": -8.531969739457754
+            },
+            {
+              "frequencyHz": 116.455078125,
+              "dbRelativeToStrongestFullSpectrumPeak": -11.977327318559926
+            },
+            {
+              "frequencyHz": 98.14453125,
+              "dbRelativeToStrongestFullSpectrumPeak": -12.89947984018144
+            },
+            {
+              "frequencyHz": 153.80859375,
+              "dbRelativeToStrongestFullSpectrumPeak": -14.081189688581837
+            }
+          ],
+          "harmonicAndStereoMeasurements": [
+            {
+              "harmonicIfMissingFundamentalHypothesis": 1,
+              "frequencyHz": 43.654,
+              "meanStereoPower": 1.6432771963538538e-06,
+              "sideEnergyFraction": 0.00036383096499767106,
+              "lrCoherency": 0.9993546645726906,
+              "lrPhaseDegrees": -0.6338062531663563
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 2,
+              "frequencyHz": 87.308,
+              "meanStereoPower": 0.0007146683472307688,
+              "sideEnergyFraction": 0.10480546723508252,
+              "lrCoherency": 0.8534401335337829,
+              "lrPhaseDegrees": 13.433070539214166
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 3,
+              "frequencyHz": 130.96200000000002,
+              "meanStereoPower": 0.0005698903856897392,
+              "sideEnergyFraction": 0.11675235323002998,
+              "lrCoherency": 0.7666673924374192,
+              "lrPhaseDegrees": -0.9883176609173978
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 4,
+              "frequencyHz": 174.616,
+              "meanStereoPower": 0.0009520115793707918,
+              "sideEnergyFraction": 0.8631155494312385,
+              "lrCoherency": 0.892124029588983,
+              "lrPhaseDegrees": 160.6528004698223
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 5,
+              "frequencyHz": 218.27,
+              "meanStereoPower": 2.698098128417151e-05,
+              "sideEnergyFraction": 0.2714079890135098,
+              "lrCoherency": 0.742103926433912,
+              "lrPhaseDegrees": -51.571201616871434
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 6,
+              "frequencyHz": 261.92400000000004,
+              "meanStereoPower": 0.00018490584739894937,
+              "sideEnergyFraction": 0.5726844717827734,
+              "lrCoherency": 0.5792015647965638,
+              "lrPhaseDegrees": 106.13511818742177
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 8,
+              "frequencyHz": 349.232,
+              "meanStereoPower": 0.00015377932475383664,
+              "sideEnergyFraction": 0.9435572343627738,
+              "lrCoherency": 0.9233614984799074,
+              "lrPhaseDegrees": 168.57024543570134
+            }
+          ]
+        }
+      ]
+    },
+    "hdemucsBass": {
+      "path": "D:\\RootSound\\experiments\\music-workflow\\reference-studio\\cases\\phone-recording-20261023-233819\\hdemucs\\target-45-53\\bass-estimate.wav",
+      "sha256": "d6e01604dba3b3933e2dfccf16127b192daa7a18f1bdb4b248dda4dde4031701",
+      "contextCropOffsetSeconds": 0,
+      "sampleRate": 48000,
+      "method": "Sum of L and R powers; arithmetic mono averaging deliberately avoided.",
+      "windows": [
+        {
+          "relativeSeconds": [
+            0.1,
+            0.4
+          ],
+          "originalSeconds": [
+            45.1,
+            45.4
+          ],
+          "possibleMissingFundamentalHz": 46.249,
+          "strongLowPeaks": [
+            {
+              "frequencyHz": 93.017578125,
+              "dbRelativeToStrongestFullSpectrumPeak": 0.0
+            },
+            {
+              "frequencyHz": 186.03515625,
+              "dbRelativeToStrongestFullSpectrumPeak": -3.520723721961831
+            },
+            {
+              "frequencyHz": 139.16015625,
+              "dbRelativeToStrongestFullSpectrumPeak": -18.02781045422038
+            },
+            {
+              "frequencyHz": 112.79296875,
+              "dbRelativeToStrongestFullSpectrumPeak": -20.447738954147606
+            },
+            {
+              "frequencyHz": 77.63671875,
+              "dbRelativeToStrongestFullSpectrumPeak": -20.953860338594147
+            },
+            {
+              "frequencyHz": 170.654296875,
+              "dbRelativeToStrongestFullSpectrumPeak": -22.11871616756961
+            },
+            {
+              "frequencyHz": 276.85546875,
+              "dbRelativeToStrongestFullSpectrumPeak": -24.776891379053797
+            }
+          ],
+          "harmonicAndStereoMeasurements": [
+            {
+              "harmonicIfMissingFundamentalHypothesis": 1,
+              "frequencyHz": 46.249,
+              "meanStereoPower": 7.453427342709241e-07,
+              "sideEnergyFraction": 0.24780308536226922,
+              "lrCoherency": 0.5682137298113888,
+              "lrPhaseDegrees": 2.187073677950996
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 2,
+              "frequencyHz": 92.498,
+              "meanStereoPower": 0.0003760196394959662,
+              "sideEnergyFraction": 0.021470865241726707,
+              "lrCoherency": 0.9756460348352691,
+              "lrPhaseDegrees": -2.019815383197493
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 3,
+              "frequencyHz": 138.747,
+              "meanStereoPower": 1.1015046246735652e-05,
+              "sideEnergyFraction": 0.09156932072437612,
+              "lrCoherency": 0.8782064013089873,
+              "lrPhaseDegrees": -18.15557671705967
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 4,
+              "frequencyHz": 184.996,
+              "meanStereoPower": 0.00014400676088951076,
+              "sideEnergyFraction": 0.012598532092873552,
+              "lrCoherency": 0.9903695447063111,
+              "lrPhaseDegrees": -9.25300650156225
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 5,
+              "frequencyHz": 231.245,
+              "meanStereoPower": 2.5705508487747463e-06,
+              "sideEnergyFraction": 0.012376573293606329,
+              "lrCoherency": 0.9786868215834216,
+              "lrPhaseDegrees": -4.607618330555288
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 6,
+              "frequencyHz": 277.494,
+              "meanStereoPower": 1.0115213553674044e-06,
+              "sideEnergyFraction": 0.027799699272864062,
+              "lrCoherency": 0.9522926129204898,
+              "lrPhaseDegrees": 7.300080799853778
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 8,
+              "frequencyHz": 369.992,
+              "meanStereoPower": 1.7869659458455285e-07,
+              "sideEnergyFraction": 0.21675452567461276,
+              "lrCoherency": 0.6005002615860984,
+              "lrPhaseDegrees": 13.773045259954618
+            }
+          ]
+        },
+        {
+          "relativeSeconds": [
+            1.15,
+            1.45
+          ],
+          "originalSeconds": [
+            46.15,
+            46.45
+          ],
+          "possibleMissingFundamentalHz": 46.249,
+          "strongLowPeaks": [
+            {
+              "frequencyHz": 93.017578125,
+              "dbRelativeToStrongestFullSpectrumPeak": 0.0
+            },
+            {
+              "frequencyHz": 138.427734375,
+              "dbRelativeToStrongestFullSpectrumPeak": -6.581861332123884
+            },
+            {
+              "frequencyHz": 184.5703125,
+              "dbRelativeToStrongestFullSpectrumPeak": -8.777324490970372
+            },
+            {
+              "frequencyHz": 104.00390625,
+              "dbRelativeToStrongestFullSpectrumPeak": -15.889801652023747
+            },
+            {
+              "frequencyHz": 276.85546875,
+              "dbRelativeToStrongestFullSpectrumPeak": -19.4512273074558
+            },
+            {
+              "frequencyHz": 164.0625,
+              "dbRelativeToStrongestFullSpectrumPeak": -21.862076540887916
+            },
+            {
+              "frequencyHz": 62.98828125,
+              "dbRelativeToStrongestFullSpectrumPeak": -22.731483307129757
+            }
+          ],
+          "harmonicAndStereoMeasurements": [
+            {
+              "harmonicIfMissingFundamentalHypothesis": 1,
+              "frequencyHz": 46.249,
+              "meanStereoPower": 8.62243381959849e-07,
+              "sideEnergyFraction": 0.13025509639928579,
+              "lrCoherency": 0.8735143857270641,
+              "lrPhaseDegrees": 25.69966904709177
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 2,
+              "frequencyHz": 92.498,
+              "meanStereoPower": 0.0007087411910224317,
+              "sideEnergyFraction": 0.014378782252640691,
+              "lrCoherency": 0.9739507679699725,
+              "lrPhaseDegrees": -1.2943043621373391
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 3,
+              "frequencyHz": 138.747,
+              "meanStereoPower": 0.00027997044309903624,
+              "sideEnergyFraction": 0.009721580251120042,
+              "lrCoherency": 0.9986088106660873,
+              "lrPhaseDegrees": -5.598375713873235
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 4,
+              "frequencyHz": 184.996,
+              "meanStereoPower": 0.00017628430969813483,
+              "sideEnergyFraction": 0.008887662899056775,
+              "lrCoherency": 0.9933244346043005,
+              "lrPhaseDegrees": -7.1458959985097295
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 5,
+              "frequencyHz": 231.245,
+              "meanStereoPower": 3.1065310395700196e-06,
+              "sideEnergyFraction": 0.01544005427470779,
+              "lrCoherency": 0.9743533358712851,
+              "lrPhaseDegrees": 5.5914067049843315
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 6,
+              "frequencyHz": 277.494,
+              "meanStereoPower": 8.325985773523823e-06,
+              "sideEnergyFraction": 0.009443327508422906,
+              "lrCoherency": 0.9820938734113757,
+              "lrPhaseDegrees": -0.31897172949608754
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 8,
+              "frequencyHz": 369.992,
+              "meanStereoPower": 3.252374566713038e-07,
+              "sideEnergyFraction": 0.06522131682936223,
+              "lrCoherency": 0.8778036112052139,
+              "lrPhaseDegrees": 7.850762907560826
+            }
+          ]
+        },
+        {
+          "relativeSeconds": [
+            2.3,
+            2.6
+          ],
+          "originalSeconds": [
+            47.3,
+            47.6
+          ],
+          "possibleMissingFundamentalHz": 46.249,
+          "strongLowPeaks": [
+            {
+              "frequencyHz": 91.552734375,
+              "dbRelativeToStrongestFullSpectrumPeak": 0.0
+            },
+            {
+              "frequencyHz": 183.837890625,
+              "dbRelativeToStrongestFullSpectrumPeak": -11.327334443412433
+            },
+            {
+              "frequencyHz": 82.763671875,
+              "dbRelativeToStrongestFullSpectrumPeak": -25.142881869665672
+            },
+            {
+              "frequencyHz": 135.498046875,
+              "dbRelativeToStrongestFullSpectrumPeak": -26.989329747689432
+            },
+            {
+              "frequencyHz": 278.3203125,
+              "dbRelativeToStrongestFullSpectrumPeak": -27.712528846337626
+            },
+            {
+              "frequencyHz": 175.048828125,
+              "dbRelativeToStrongestFullSpectrumPeak": -29.793283241613672
+            },
+            {
+              "frequencyHz": 101.07421875,
+              "dbRelativeToStrongestFullSpectrumPeak": -30.943067863640962
+            }
+          ],
+          "harmonicAndStereoMeasurements": [
+            {
+              "harmonicIfMissingFundamentalHypothesis": 1,
+              "frequencyHz": 46.249,
+              "meanStereoPower": 6.565775707287664e-07,
+              "sideEnergyFraction": 0.1778795291074286,
+              "lrCoherency": 0.8880625922652087,
+              "lrPhaseDegrees": -43.410937556244996
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 2,
+              "frequencyHz": 92.498,
+              "meanStereoPower": 0.0012503154522686532,
+              "sideEnergyFraction": 0.005565585889937276,
+              "lrCoherency": 0.9943110781861523,
+              "lrPhaseDegrees": 3.343435590245619
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 3,
+              "frequencyHz": 138.747,
+              "meanStereoPower": 4.36714052631029e-05,
+              "sideEnergyFraction": 0.024815703802856137,
+              "lrCoherency": 0.9563166204722283,
+              "lrPhaseDegrees": 2.012135004459322
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 4,
+              "frequencyHz": 184.996,
+              "meanStereoPower": 9.899301333367946e-05,
+              "sideEnergyFraction": 0.004033608464039583,
+              "lrCoherency": 0.9919577114588726,
+              "lrPhaseDegrees": 0.29316289797483597
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 5,
+              "frequencyHz": 231.245,
+              "meanStereoPower": 9.793448345803595e-07,
+              "sideEnergyFraction": 0.04495967354579549,
+              "lrCoherency": 0.932269402645451,
+              "lrPhaseDegrees": -5.4781113183953885
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 6,
+              "frequencyHz": 277.494,
+              "meanStereoPower": 2.116243216157649e-06,
+              "sideEnergyFraction": 0.0068506939290516955,
+              "lrCoherency": 0.9881422520089191,
+              "lrPhaseDegrees": 0.482348881179499
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 8,
+              "frequencyHz": 369.992,
+              "meanStereoPower": 2.396844709364412e-07,
+              "sideEnergyFraction": 0.021433634572168694,
+              "lrCoherency": 0.961471909540392,
+              "lrPhaseDegrees": -3.539020328901626
+            }
+          ]
+        },
+        {
+          "relativeSeconds": [
+            3.3,
+            3.6
+          ],
+          "originalSeconds": [
+            48.3,
+            48.6
+          ],
+          "possibleMissingFundamentalHz": 43.654,
+          "strongLowPeaks": [
+            {
+              "frequencyHz": 91.552734375,
+              "dbRelativeToStrongestFullSpectrumPeak": 0.0
+            },
+            {
+              "frequencyHz": 131.103515625,
+              "dbRelativeToStrongestFullSpectrumPeak": -0.380073814081888
+            },
+            {
+              "frequencyHz": 77.63671875,
+              "dbRelativeToStrongestFullSpectrumPeak": -6.5150443004105245
+            },
+            {
+              "frequencyHz": 175.78125,
+              "dbRelativeToStrongestFullSpectrumPeak": -9.203105874170376
+            },
+            {
+              "frequencyHz": 112.060546875,
+              "dbRelativeToStrongestFullSpectrumPeak": -11.416996335932293
+            },
+            {
+              "frequencyHz": 63.720703125,
+              "dbRelativeToStrongestFullSpectrumPeak": -13.609146616453797
+            },
+            {
+              "frequencyHz": 186.767578125,
+              "dbRelativeToStrongestFullSpectrumPeak": -16.244774951555314
+            }
+          ],
+          "harmonicAndStereoMeasurements": [
+            {
+              "harmonicIfMissingFundamentalHypothesis": 1,
+              "frequencyHz": 43.654,
+              "meanStereoPower": 3.371611155634692e-07,
+              "sideEnergyFraction": 0.04721244723108647,
+              "lrCoherency": 0.9131067696733107,
+              "lrPhaseDegrees": -2.3947858280616
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 2,
+              "frequencyHz": 87.308,
+              "meanStereoPower": 0.00012449489342958938,
+              "sideEnergyFraction": 0.01388391614318702,
+              "lrCoherency": 0.974732598629112,
+              "lrPhaseDegrees": -3.3298925022048813
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 3,
+              "frequencyHz": 130.96200000000002,
+              "meanStereoPower": 0.0001190480883762345,
+              "sideEnergyFraction": 0.009810987184706304,
+              "lrCoherency": 0.9810494748203058,
+              "lrPhaseDegrees": 1.254755146863966
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 4,
+              "frequencyHz": 174.616,
+              "meanStereoPower": 1.6264263401253254e-05,
+              "sideEnergyFraction": 0.004436354480919319,
+              "lrCoherency": 0.9950654978191393,
+              "lrPhaseDegrees": -4.793299383833706
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 5,
+              "frequencyHz": 218.27,
+              "meanStereoPower": 1.8175744565562197e-06,
+              "sideEnergyFraction": 0.013990154263610003,
+              "lrCoherency": 0.983351622008038,
+              "lrPhaseDegrees": -7.800479448078221
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 6,
+              "frequencyHz": 261.92400000000004,
+              "meanStereoPower": 5.281130709463084e-07,
+              "sideEnergyFraction": 0.0793847010327256,
+              "lrCoherency": 0.8505668816989608,
+              "lrPhaseDegrees": 0.7030256509121413
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 8,
+              "frequencyHz": 349.232,
+              "meanStereoPower": 1.0118599757259215e-07,
+              "sideEnergyFraction": 0.020539992845456916,
+              "lrCoherency": 0.9609255934539424,
+              "lrPhaseDegrees": -2.9450046643529664
+            }
+          ]
+        },
+        {
+          "relativeSeconds": [
+            4.6,
+            4.9
+          ],
+          "originalSeconds": [
+            49.6,
+            49.9
+          ],
+          "possibleMissingFundamentalHz": 38.891,
+          "strongLowPeaks": [
+            {
+              "frequencyHz": 77.63671875,
+              "dbRelativeToStrongestFullSpectrumPeak": 0.0
+            },
+            {
+              "frequencyHz": 115.72265625,
+              "dbRelativeToStrongestFullSpectrumPeak": -10.459995188538525
+            },
+            {
+              "frequencyHz": 155.2734375,
+              "dbRelativeToStrongestFullSpectrumPeak": -16.108404922133477
+            },
+            {
+              "frequencyHz": 194.091796875,
+              "dbRelativeToStrongestFullSpectrumPeak": -26.139477020461012
+            },
+            {
+              "frequencyHz": 107.666015625,
+              "dbRelativeToStrongestFullSpectrumPeak": -26.338690454010496
+            },
+            {
+              "frequencyHz": 233.642578125,
+              "dbRelativeToStrongestFullSpectrumPeak": -26.63817309647589
+            },
+            {
+              "frequencyHz": 90.087890625,
+              "dbRelativeToStrongestFullSpectrumPeak": -27.1502506282526
+            }
+          ],
+          "harmonicAndStereoMeasurements": [
+            {
+              "harmonicIfMissingFundamentalHypothesis": 1,
+              "frequencyHz": 38.891,
+              "meanStereoPower": 1.8623798715283617e-07,
+              "sideEnergyFraction": 0.497511528614313,
+              "lrCoherency": 0.4158756736264171,
+              "lrPhaseDegrees": 89.25375198404252
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 2,
+              "frequencyHz": 77.782,
+              "meanStereoPower": 0.0011124648503819186,
+              "sideEnergyFraction": 0.038117303944275066,
+              "lrCoherency": 0.9899183775622622,
+              "lrPhaseDegrees": 14.964262830090913
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 3,
+              "frequencyHz": 116.673,
+              "meanStereoPower": 0.00014520173180716762,
+              "sideEnergyFraction": 0.49689821819235613,
+              "lrCoherency": 0.7625112114955295,
+              "lrPhaseDegrees": -89.51845660320751
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 4,
+              "frequencyHz": 155.564,
+              "meanStereoPower": 3.584345734167398e-05,
+              "sideEnergyFraction": 0.04203223078541047,
+              "lrCoherency": 0.9369224240811254,
+              "lrPhaseDegrees": -3.179629667508857
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 5,
+              "frequencyHz": 194.45499999999998,
+              "meanStereoPower": 5.266206452311705e-06,
+              "sideEnergyFraction": 0.13630110915287677,
+              "lrCoherency": 0.9467257384820319,
+              "lrPhaseDegrees": 36.477777998545186
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 6,
+              "frequencyHz": 233.346,
+              "meanStereoPower": 4.334503717303591e-06,
+              "sideEnergyFraction": 0.18113226484512515,
+              "lrCoherency": 0.8562867407685203,
+              "lrPhaseDegrees": -25.446643012048604
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 8,
+              "frequencyHz": 311.128,
+              "meanStereoPower": 6.338729161213326e-07,
+              "sideEnergyFraction": 0.2456340648539284,
+              "lrCoherency": 0.7332517987600057,
+              "lrPhaseDegrees": -20.958039450953667
+            }
+          ]
+        },
+        {
+          "relativeSeconds": [
+            5.5,
+            5.8
+          ],
+          "originalSeconds": [
+            50.5,
+            50.8
+          ],
+          "possibleMissingFundamentalHz": 38.891,
+          "strongLowPeaks": [
+            {
+              "frequencyHz": 76.904296875,
+              "dbRelativeToStrongestFullSpectrumPeak": 0.0
+            },
+            {
+              "frequencyHz": 115.72265625,
+              "dbRelativeToStrongestFullSpectrumPeak": -2.2274519649037448
+            },
+            {
+              "frequencyHz": 154.541015625,
+              "dbRelativeToStrongestFullSpectrumPeak": -13.424713701821869
+            },
+            {
+              "frequencyHz": 193.359375,
+              "dbRelativeToStrongestFullSpectrumPeak": -17.80475913051373
+            },
+            {
+              "frequencyHz": 123.779296875,
+              "dbRelativeToStrongestFullSpectrumPeak": -25.03624001252017
+            },
+            {
+              "frequencyHz": 277.587890625,
+              "dbRelativeToStrongestFullSpectrumPeak": -26.052754838353387
+            },
+            {
+              "frequencyHz": 232.91015625,
+              "dbRelativeToStrongestFullSpectrumPeak": -26.111027294862996
+            }
+          ],
+          "harmonicAndStereoMeasurements": [
+            {
+              "harmonicIfMissingFundamentalHypothesis": 1,
+              "frequencyHz": 38.891,
+              "meanStereoPower": 6.913182706476062e-07,
+              "sideEnergyFraction": 0.6485766841229145,
+              "lrCoherency": 0.6023628879014449,
+              "lrPhaseDegrees": -119.79061907491104
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 2,
+              "frequencyHz": 77.782,
+              "meanStereoPower": 0.0006075946410689069,
+              "sideEnergyFraction": 0.18072362176030046,
+              "lrCoherency": 0.9090472510720249,
+              "lrPhaseDegrees": 27.73217165741134
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 3,
+              "frequencyHz": 116.673,
+              "meanStereoPower": 0.00040941687196755525,
+              "sideEnergyFraction": 0.01999725496585788,
+              "lrCoherency": 0.9949354377497898,
+              "lrPhaseDegrees": 14.051181428151502
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 4,
+              "frequencyHz": 155.564,
+              "meanStereoPower": 5.324105797182891e-05,
+              "sideEnergyFraction": 0.018616799119987898,
+              "lrCoherency": 0.9856689862158934,
+              "lrPhaseDegrees": -11.899943850441321
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 5,
+              "frequencyHz": 194.45499999999998,
+              "meanStereoPower": 1.3731716062837945e-05,
+              "sideEnergyFraction": 0.021690170301785695,
+              "lrCoherency": 0.9823979966083705,
+              "lrPhaseDegrees": 13.15447367087501
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 6,
+              "frequencyHz": 233.346,
+              "meanStereoPower": 1.697325056873645e-06,
+              "sideEnergyFraction": 0.08244596709743646,
+              "lrCoherency": 0.9690709237905926,
+              "lrPhaseDegrees": 28.777527679077117
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 8,
+              "frequencyHz": 311.128,
+              "meanStereoPower": 5.154886602183581e-07,
+              "sideEnergyFraction": 0.20659968286319763,
+              "lrCoherency": 0.8162347162718905,
+              "lrPhaseDegrees": -38.554248567417666
+            }
+          ]
+        },
+        {
+          "relativeSeconds": [
+            6.3,
+            6.6
+          ],
+          "originalSeconds": [
+            51.3,
+            51.6
+          ],
+          "possibleMissingFundamentalHz": 38.891,
+          "strongLowPeaks": [
+            {
+              "frequencyHz": 76.171875,
+              "dbRelativeToStrongestFullSpectrumPeak": 0.0
+            },
+            {
+              "frequencyHz": 116.455078125,
+              "dbRelativeToStrongestFullSpectrumPeak": -2.1703644275773093
+            },
+            {
+              "frequencyHz": 156.005859375,
+              "dbRelativeToStrongestFullSpectrumPeak": -10.23185045182285
+            },
+            {
+              "frequencyHz": 192.626953125,
+              "dbRelativeToStrongestFullSpectrumPeak": -11.905054302887264
+            },
+            {
+              "frequencyHz": 62.255859375,
+              "dbRelativeToStrongestFullSpectrumPeak": -13.863219588256117
+            },
+            {
+              "frequencyHz": 139.892578125,
+              "dbRelativeToStrongestFullSpectrumPeak": -17.817597169715683
+            },
+            {
+              "frequencyHz": 101.07421875,
+              "dbRelativeToStrongestFullSpectrumPeak": -19.08351093738967
+            }
+          ],
+          "harmonicAndStereoMeasurements": [
+            {
+              "harmonicIfMissingFundamentalHypothesis": 1,
+              "frequencyHz": 38.891,
+              "meanStereoPower": 4.280962149738355e-07,
+              "sideEnergyFraction": 0.8071830459583251,
+              "lrCoherency": 0.6414587831886096,
+              "lrPhaseDegrees": -168.80037292420047
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 2,
+              "frequencyHz": 77.782,
+              "meanStereoPower": 0.00034300513759366163,
+              "sideEnergyFraction": 0.1750104043183775,
+              "lrCoherency": 0.7495645790690212,
+              "lrPhaseDegrees": -24.15107378163911
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 3,
+              "frequencyHz": 116.673,
+              "meanStereoPower": 0.00020569172261783038,
+              "sideEnergyFraction": 0.06101497435392422,
+              "lrCoherency": 0.9891458823137615,
+              "lrPhaseDegrees": 23.196939356827126
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 4,
+              "frequencyHz": 155.564,
+              "meanStereoPower": 2.6875824316951035e-05,
+              "sideEnergyFraction": 0.4246695073890471,
+              "lrCoherency": 0.7271561856644883,
+              "lrPhaseDegrees": -74.21832075779398
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 5,
+              "frequencyHz": 194.45499999999998,
+              "meanStereoPower": 1.3992865085777204e-05,
+              "sideEnergyFraction": 0.14767705178569726,
+              "lrCoherency": 0.9558644760570476,
+              "lrPhaseDegrees": 32.87005448406828
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 6,
+              "frequencyHz": 233.346,
+              "meanStereoPower": 1.3232171809203095e-06,
+              "sideEnergyFraction": 0.14658084191707704,
+              "lrCoherency": 0.8322391601877418,
+              "lrPhaseDegrees": 26.246467122622047
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 8,
+              "frequencyHz": 311.128,
+              "meanStereoPower": 2.8121764114758934e-07,
+              "sideEnergyFraction": 0.3588404276503918,
+              "lrCoherency": 0.6488447755118733,
+              "lrPhaseDegrees": -61.66757554837823
+            }
+          ]
+        },
+        {
+          "relativeSeconds": [
+            7,
+            7.3
+          ],
+          "originalSeconds": [
+            52,
+            52.3
+          ],
+          "possibleMissingFundamentalHz": 43.654,
+          "strongLowPeaks": [
+            {
+              "frequencyHz": 89.35546875,
+              "dbRelativeToStrongestFullSpectrumPeak": 0.0
+            },
+            {
+              "frequencyHz": 130.37109375,
+              "dbRelativeToStrongestFullSpectrumPeak": -0.7090703367703594
+            },
+            {
+              "frequencyHz": 117.1875,
+              "dbRelativeToStrongestFullSpectrumPeak": -8.881083795286438
+            },
+            {
+              "frequencyHz": 98.14453125,
+              "dbRelativeToStrongestFullSpectrumPeak": -10.052584306931507
+            },
+            {
+              "frequencyHz": 171.38671875,
+              "dbRelativeToStrongestFullSpectrumPeak": -13.390654175062197
+            },
+            {
+              "frequencyHz": 76.904296875,
+              "dbRelativeToStrongestFullSpectrumPeak": -13.870777342335854
+            },
+            {
+              "frequencyHz": 58.59375,
+              "dbRelativeToStrongestFullSpectrumPeak": -20.36121444196119
+            }
+          ],
+          "harmonicAndStereoMeasurements": [
+            {
+              "harmonicIfMissingFundamentalHypothesis": 1,
+              "frequencyHz": 43.654,
+              "meanStereoPower": 4.045593358792416e-07,
+              "sideEnergyFraction": 0.019798445139653963,
+              "lrCoherency": 0.9699033016455795,
+              "lrPhaseDegrees": -0.42259715852123914
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 2,
+              "frequencyHz": 87.308,
+              "meanStereoPower": 0.000333389216138043,
+              "sideEnergyFraction": 0.018156860192662834,
+              "lrCoherency": 0.9695281363109399,
+              "lrPhaseDegrees": 6.221685439792622
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 3,
+              "frequencyHz": 130.96200000000002,
+              "meanStereoPower": 0.0003316482187994893,
+              "sideEnergyFraction": 0.03772534167509828,
+              "lrCoherency": 0.928749620366616,
+              "lrPhaseDegrees": -5.189791789282613
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 4,
+              "frequencyHz": 174.616,
+              "meanStereoPower": 1.3712350979916476e-05,
+              "sideEnergyFraction": 0.03817931729687029,
+              "lrCoherency": 0.9606591755173539,
+              "lrPhaseDegrees": 13.00780957546962
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 5,
+              "frequencyHz": 218.27,
+              "meanStereoPower": 4.095128758540254e-06,
+              "sideEnergyFraction": 0.02301825947986147,
+              "lrCoherency": 0.9886599668484986,
+              "lrPhaseDegrees": -9.236408226702029
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 6,
+              "frequencyHz": 261.92400000000004,
+              "meanStereoPower": 1.9096229600306046e-07,
+              "sideEnergyFraction": 0.6034018908832087,
+              "lrCoherency": 0.8632249684664483,
+              "lrPhaseDegrees": 104.18510266295523
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 8,
+              "frequencyHz": 349.232,
+              "meanStereoPower": 7.970677075506965e-08,
+              "sideEnergyFraction": 0.72410158356104,
+              "lrCoherency": 0.4924493674233384,
+              "lrPhaseDegrees": -175.9073391568139
+            }
+          ]
+        }
+      ]
+    },
+    "mus3dBassStem": {
+      "path": "D:\\RootSound\\experiments\\music-workflow\\reference-studio\\cases\\phone-recording-20261023-233819\\mus3d\\stem-context-44-54\\03-bass.wav",
+      "sha256": "b90249a0c2bb37103355aa640ca5dd07da2a55a2d4201c8cf704a667d26effb5",
+      "contextCropOffsetSeconds": 1,
+      "sampleRate": 44100,
+      "method": "Sum of L and R powers; arithmetic mono averaging deliberately avoided.",
+      "windows": [
+        {
+          "relativeSeconds": [
+            0.1,
+            0.4
+          ],
+          "originalSeconds": [
+            45.1,
+            45.4
+          ],
+          "possibleMissingFundamentalHz": 46.249,
+          "strongLowPeaks": [
+            {
+              "frequencyHz": 92.8619384765625,
+              "dbRelativeToStrongestFullSpectrumPeak": 0.0
+            },
+            {
+              "frequencyHz": 185.723876953125,
+              "dbRelativeToStrongestFullSpectrumPeak": -0.23093603665339593
+            },
+            {
+              "frequencyHz": 138.6199951171875,
+              "dbRelativeToStrongestFullSpectrumPeak": -9.03768093266342
+            },
+            {
+              "frequencyHz": 119.10552978515625,
+              "dbRelativeToStrongestFullSpectrumPeak": -21.1821381451932
+            },
+            {
+              "frequencyHz": 102.95562744140625,
+              "dbRelativeToStrongestFullSpectrumPeak": -21.336857168085942
+            },
+            {
+              "frequencyHz": 276.56707763671875,
+              "dbRelativeToStrongestFullSpectrumPeak": -21.448275147883678
+            },
+            {
+              "frequencyHz": 84.7869873046875,
+              "dbRelativeToStrongestFullSpectrumPeak": -21.612897786159234
+            }
+          ],
+          "harmonicAndStereoMeasurements": [
+            {
+              "harmonicIfMissingFundamentalHypothesis": 1,
+              "frequencyHz": 46.249,
+              "meanStereoPower": 1.4778521599873148e-06,
+              "sideEnergyFraction": 0.08267865969429629,
+              "lrCoherency": 0.9107228064136669,
+              "lrPhaseDegrees": 12.887438256850205
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 2,
+              "frequencyHz": 92.498,
+              "meanStereoPower": 0.001685214047224064,
+              "sideEnergyFraction": 0.3399739974253027,
+              "lrCoherency": 0.5466911953747833,
+              "lrPhaseDegrees": 13.252037159269443
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 3,
+              "frequencyHz": 138.747,
+              "meanStereoPower": 0.00020055578826459476,
+              "sideEnergyFraction": 0.7548469016523778,
+              "lrCoherency": 0.7875164723430325,
+              "lrPhaseDegrees": -130.5927193144065
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 4,
+              "frequencyHz": 184.996,
+              "meanStereoPower": 0.0016246734942799391,
+              "sideEnergyFraction": 0.2459601071749397,
+              "lrCoherency": 0.9560923731802704,
+              "lrPhaseDegrees": -46.317603018485045
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 5,
+              "frequencyHz": 231.245,
+              "meanStereoPower": 5.768497433577712e-06,
+              "sideEnergyFraction": 0.7271133121730489,
+              "lrCoherency": 0.6732773725201218,
+              "lrPhaseDegrees": -136.40138650095054
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 6,
+              "frequencyHz": 277.494,
+              "meanStereoPower": 2.1372240455705062e-05,
+              "sideEnergyFraction": 0.553896635737574,
+              "lrCoherency": 0.44971490578670353,
+              "lrPhaseDegrees": -104.03580434891846
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 8,
+              "frequencyHz": 369.992,
+              "meanStereoPower": 2.017125575208516e-07,
+              "sideEnergyFraction": 0.1628084116600065,
+              "lrCoherency": 0.747139496308987,
+              "lrPhaseDegrees": -21.02601271528926
+            }
+          ]
+        },
+        {
+          "relativeSeconds": [
+            1.15,
+            1.45
+          ],
+          "originalSeconds": [
+            46.15,
+            46.45
+          ],
+          "possibleMissingFundamentalHz": 46.249,
+          "strongLowPeaks": [
+            {
+              "frequencyHz": 92.8619384765625,
+              "dbRelativeToStrongestFullSpectrumPeak": 0.0
+            },
+            {
+              "frequencyHz": 185.05096435546875,
+              "dbRelativeToStrongestFullSpectrumPeak": -0.11850545956912761
+            },
+            {
+              "frequencyHz": 137.94708251953125,
+              "dbRelativeToStrongestFullSpectrumPeak": -7.074766469490125
+            },
+            {
+              "frequencyHz": 154.09698486328125,
+              "dbRelativeToStrongestFullSpectrumPeak": -19.153201441914604
+            },
+            {
+              "frequencyHz": 104.30145263671875,
+              "dbRelativeToStrongestFullSpectrumPeak": -20.784035549898825
+            },
+            {
+              "frequencyHz": 277.239990234375,
+              "dbRelativeToStrongestFullSpectrumPeak": -22.375840873854504
+            },
+            {
+              "frequencyHz": 206.58416748046875,
+              "dbRelativeToStrongestFullSpectrumPeak": -22.47381909412728
+            }
+          ],
+          "harmonicAndStereoMeasurements": [
+            {
+              "harmonicIfMissingFundamentalHypothesis": 1,
+              "frequencyHz": 46.249,
+              "meanStereoPower": 1.2515351567650923e-06,
+              "sideEnergyFraction": 0.030818785753138966,
+              "lrCoherency": 0.9393250502723213,
+              "lrPhaseDegrees": 2.026663948093401
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 2,
+              "frequencyHz": 92.498,
+              "meanStereoPower": 0.0018331053339698416,
+              "sideEnergyFraction": 0.10454926664493193,
+              "lrCoherency": 0.8418289877634705,
+              "lrPhaseDegrees": -2.760829908471282
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 3,
+              "frequencyHz": 138.747,
+              "meanStereoPower": 0.00044517723752456593,
+              "sideEnergyFraction": 0.18449144199708686,
+              "lrCoherency": 0.6994967752347011,
+              "lrPhaseDegrees": -1.5456785031154314
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 4,
+              "frequencyHz": 184.996,
+              "meanStereoPower": 0.0017015546730698803,
+              "sideEnergyFraction": 0.3848108813047556,
+              "lrCoherency": 0.9625144515195851,
+              "lrPhaseDegrees": -73.92037518841232
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 5,
+              "frequencyHz": 231.245,
+              "meanStereoPower": 6.952658810191116e-06,
+              "sideEnergyFraction": 0.6191697062364776,
+              "lrCoherency": 0.3205223223358457,
+              "lrPhaseDegrees": 169.76576977346357
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 6,
+              "frequencyHz": 277.494,
+              "meanStereoPower": 8.814956860688866e-06,
+              "sideEnergyFraction": 0.09049778377568705,
+              "lrCoherency": 0.9183631307219953,
+              "lrPhaseDegrees": 7.808073933413757
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 8,
+              "frequencyHz": 369.992,
+              "meanStereoPower": 3.6148006035681484e-07,
+              "sideEnergyFraction": 0.3629772726626931,
+              "lrCoherency": 0.6608928524442151,
+              "lrPhaseDegrees": 60.17355266514567
+            }
+          ]
+        },
+        {
+          "relativeSeconds": [
+            2.3,
+            2.6
+          ],
+          "originalSeconds": [
+            47.3,
+            47.6
+          ],
+          "possibleMissingFundamentalHz": 46.249,
+          "strongLowPeaks": [
+            {
+              "frequencyHz": 92.18902587890625,
+              "dbRelativeToStrongestFullSpectrumPeak": 0.0
+            },
+            {
+              "frequencyHz": 137.94708251953125,
+              "dbRelativeToStrongestFullSpectrumPeak": -11.40275104790156
+            },
+            {
+              "frequencyHz": 183.0322265625,
+              "dbRelativeToStrongestFullSpectrumPeak": -13.940153914601204
+            },
+            {
+              "frequencyHz": 233.50067138671875,
+              "dbRelativeToStrongestFullSpectrumPeak": -21.21116682512904
+            },
+            {
+              "frequencyHz": 276.56707763671875,
+              "dbRelativeToStrongestFullSpectrumPeak": -24.457413948801786
+            },
+            {
+              "frequencyHz": 174.957275390625,
+              "dbRelativeToStrongestFullSpectrumPeak": -28.228592613264695
+            },
+            {
+              "frequencyHz": 77.38494873046875,
+              "dbRelativeToStrongestFullSpectrumPeak": -29.735475939540198
+            }
+          ],
+          "harmonicAndStereoMeasurements": [
+            {
+              "harmonicIfMissingFundamentalHypothesis": 1,
+              "frequencyHz": 46.249,
+              "meanStereoPower": 1.357354791399379e-06,
+              "sideEnergyFraction": 0.01359738049521021,
+              "lrCoherency": 0.9773175842263154,
+              "lrPhaseDegrees": 5.130536470381556
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 2,
+              "frequencyHz": 92.498,
+              "meanStereoPower": 0.0031466269872043495,
+              "sideEnergyFraction": 0.01656879571742356,
+              "lrCoherency": 0.9920513766448021,
+              "lrPhaseDegrees": 4.648467683272268
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 3,
+              "frequencyHz": 138.747,
+              "meanStereoPower": 0.0003790934496993158,
+              "sideEnergyFraction": 0.4819304628658203,
+              "lrCoherency": 0.47812813125101683,
+              "lrPhaseDegrees": 85.20730217815012
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 4,
+              "frequencyHz": 184.996,
+              "meanStereoPower": 0.00030586154445012484,
+              "sideEnergyFraction": 0.32158086331684194,
+              "lrCoherency": 0.8482870611189319,
+              "lrPhaseDegrees": -56.695426483135
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 5,
+              "frequencyHz": 231.245,
+              "meanStereoPower": 2.759117599311585e-05,
+              "sideEnergyFraction": 0.8598423973063638,
+              "lrCoherency": 0.9402396219673308,
+              "lrPhaseDegrees": -140.71682742330154
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 6,
+              "frequencyHz": 277.494,
+              "meanStereoPower": 1.4593848485322256e-05,
+              "sideEnergyFraction": 0.6094684605337181,
+              "lrCoherency": 0.608818910862093,
+              "lrPhaseDegrees": 170.25989430644333
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 8,
+              "frequencyHz": 369.992,
+              "meanStereoPower": 4.949455015432342e-07,
+              "sideEnergyFraction": 0.5021580705499235,
+              "lrCoherency": 0.8591228975330184,
+              "lrPhaseDegrees": -90.35223350591689
+            }
+          ]
+        },
+        {
+          "relativeSeconds": [
+            3.3,
+            3.6
+          ],
+          "originalSeconds": [
+            48.3,
+            48.6
+          ],
+          "possibleMissingFundamentalHz": 43.654,
+          "strongLowPeaks": [
+            {
+              "frequencyHz": 174.957275390625,
+              "dbRelativeToStrongestFullSpectrumPeak": 0.0
+            },
+            {
+              "frequencyHz": 130.5450439453125,
+              "dbRelativeToStrongestFullSpectrumPeak": -14.190184131743713
+            },
+            {
+              "frequencyHz": 90.1702880859375,
+              "dbRelativeToStrongestFullSpectrumPeak": -14.952664042442802
+            },
+            {
+              "frequencyHz": 77.38494873046875,
+              "dbRelativeToStrongestFullSpectrumPeak": -22.260758392155733
+            },
+            {
+              "frequencyHz": 185.723876953125,
+              "dbRelativeToStrongestFullSpectrumPeak": -23.227499140373546
+            },
+            {
+              "frequencyHz": 208.6029052734375,
+              "dbRelativeToStrongestFullSpectrumPeak": -23.4400713380047
+            },
+            {
+              "frequencyHz": 140.63873291015625,
+              "dbRelativeToStrongestFullSpectrumPeak": -23.490102334283147
+            }
+          ],
+          "harmonicAndStereoMeasurements": [
+            {
+              "harmonicIfMissingFundamentalHypothesis": 1,
+              "frequencyHz": 43.654,
+              "meanStereoPower": 7.018337603183537e-07,
+              "sideEnergyFraction": 0.07762019010142061,
+              "lrCoherency": 0.8590767037849741,
+              "lrPhaseDegrees": 10.430832003139665
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 2,
+              "frequencyHz": 87.308,
+              "meanStereoPower": 0.00027497249617021874,
+              "sideEnergyFraction": 0.49345871804582275,
+              "lrCoherency": 0.15101168381773805,
+              "lrPhaseDegrees": -84.93529899949516
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 3,
+              "frequencyHz": 130.96200000000002,
+              "meanStereoPower": 0.00029417774676004005,
+              "sideEnergyFraction": 0.3788061413877547,
+              "lrCoherency": 0.29405104571060525,
+              "lrPhaseDegrees": 33.75790087705252
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 4,
+              "frequencyHz": 174.616,
+              "meanStereoPower": 0.004551937288151028,
+              "sideEnergyFraction": 0.21075836262741504,
+              "lrCoherency": 0.9651106920969621,
+              "lrPhaseDegrees": -51.24200092550687
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 5,
+              "frequencyHz": 218.27,
+              "meanStereoPower": 8.499326930166249e-06,
+              "sideEnergyFraction": 0.4495986820785907,
+              "lrCoherency": 0.8081920979074018,
+              "lrPhaseDegrees": -80.51003659634878
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 6,
+              "frequencyHz": 261.92400000000004,
+              "meanStereoPower": 4.815102404834938e-06,
+              "sideEnergyFraction": 0.5379897530754971,
+              "lrCoherency": 0.4720945852946606,
+              "lrPhaseDegrees": -99.62885769711187
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 8,
+              "frequencyHz": 349.232,
+              "meanStereoPower": 4.754526376663573e-06,
+              "sideEnergyFraction": 0.12252465733357316,
+              "lrCoherency": 0.8510923641091377,
+              "lrPhaseDegrees": -12.408126344999548
+            }
+          ]
+        },
+        {
+          "relativeSeconds": [
+            4.6,
+            4.9
+          ],
+          "originalSeconds": [
+            49.6,
+            49.9
+          ],
+          "possibleMissingFundamentalHz": 38.891,
+          "strongLowPeaks": [
+            {
+              "frequencyHz": 77.38494873046875,
+              "dbRelativeToStrongestFullSpectrumPeak": 0.0
+            },
+            {
+              "frequencyHz": 156.78863525390625,
+              "dbRelativeToStrongestFullSpectrumPeak": -0.2223768134607072
+            },
+            {
+              "frequencyHz": 115.740966796875,
+              "dbRelativeToStrongestFullSpectrumPeak": -3.160925931962522
+            },
+            {
+              "frequencyHz": 86.1328125,
+              "dbRelativeToStrongestFullSpectrumPeak": -14.89761477954733
+            },
+            {
+              "frequencyHz": 174.28436279296875,
+              "dbRelativeToStrongestFullSpectrumPeak": -16.540649654235267
+            },
+            {
+              "frequencyHz": 233.50067138671875,
+              "dbRelativeToStrongestFullSpectrumPeak": -19.13573107177777
+            },
+            {
+              "frequencyHz": 193.798828125,
+              "dbRelativeToStrongestFullSpectrumPeak": -19.47535316201779
+            }
+          ],
+          "harmonicAndStereoMeasurements": [
+            {
+              "harmonicIfMissingFundamentalHypothesis": 1,
+              "frequencyHz": 38.891,
+              "meanStereoPower": 1.0696336775821457e-07,
+              "sideEnergyFraction": 0.45956929299842175,
+              "lrCoherency": 0.11613035333268736,
+              "lrPhaseDegrees": 45.6486539068865
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 2,
+              "frequencyHz": 77.782,
+              "meanStereoPower": 0.0011654950517652298,
+              "sideEnergyFraction": 0.08076222529836496,
+              "lrCoherency": 0.9519836648046988,
+              "lrPhaseDegrees": 18.799975534404723
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 3,
+              "frequencyHz": 116.673,
+              "meanStereoPower": 0.0005900993507240734,
+              "sideEnergyFraction": 0.6256129011729621,
+              "lrCoherency": 0.8025743626753742,
+              "lrPhaseDegrees": -110.98415943076706
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 4,
+              "frequencyHz": 155.564,
+              "meanStereoPower": 0.0015347282856861654,
+              "sideEnergyFraction": 0.21579577777546954,
+              "lrCoherency": 0.8538526830984952,
+              "lrPhaseDegrees": 8.122463360924199
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 5,
+              "frequencyHz": 194.45499999999998,
+              "meanStereoPower": 1.5684797391239105e-05,
+              "sideEnergyFraction": 0.7648660910300878,
+              "lrCoherency": 0.7997755921114675,
+              "lrPhaseDegrees": 132.54122103424226
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 6,
+              "frequencyHz": 233.346,
+              "meanStereoPower": 2.4015802284922653e-05,
+              "sideEnergyFraction": 0.5691682260043296,
+              "lrCoherency": 0.8188720247704253,
+              "lrPhaseDegrees": -101.17752981944919
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 8,
+              "frequencyHz": 311.128,
+              "meanStereoPower": 4.535568903582632e-06,
+              "sideEnergyFraction": 0.27334112804640526,
+              "lrCoherency": 0.8066019386236797,
+              "lrPhaseDegrees": -25.71613539835775
+            }
+          ]
+        },
+        {
+          "relativeSeconds": [
+            5.5,
+            5.8
+          ],
+          "originalSeconds": [
+            50.5,
+            50.8
+          ],
+          "possibleMissingFundamentalHz": 38.891,
+          "strongLowPeaks": [
+            {
+              "frequencyHz": 155.44281005859375,
+              "dbRelativeToStrongestFullSpectrumPeak": 0.0
+            },
+            {
+              "frequencyHz": 76.7120361328125,
+              "dbRelativeToStrongestFullSpectrumPeak": -4.905490193849921
+            },
+            {
+              "frequencyHz": 115.740966796875,
+              "dbRelativeToStrongestFullSpectrumPeak": -7.560933608692727
+            },
+            {
+              "frequencyHz": 193.12591552734375,
+              "dbRelativeToStrongestFullSpectrumPeak": -20.2406227451942
+            },
+            {
+              "frequencyHz": 233.50067138671875,
+              "dbRelativeToStrongestFullSpectrumPeak": -21.517590059316927
+            },
+            {
+              "frequencyHz": 129.19921875,
+              "dbRelativeToStrongestFullSpectrumPeak": -25.151492672759378
+            },
+            {
+              "frequencyHz": 144.0032958984375,
+              "dbRelativeToStrongestFullSpectrumPeak": -25.644565454987674
+            }
+          ],
+          "harmonicAndStereoMeasurements": [
+            {
+              "harmonicIfMissingFundamentalHypothesis": 1,
+              "frequencyHz": 38.891,
+              "meanStereoPower": 4.866488651746906e-07,
+              "sideEnergyFraction": 0.6985811203892701,
+              "lrCoherency": 0.7011830690995544,
+              "lrPhaseDegrees": 124.50429753364061
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 2,
+              "frequencyHz": 77.782,
+              "meanStereoPower": 0.0008211757700131067,
+              "sideEnergyFraction": 0.4337171274248406,
+              "lrCoherency": 0.5970048399160662,
+              "lrPhaseDegrees": 68.1480969143948
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 3,
+              "frequencyHz": 116.673,
+              "meanStereoPower": 0.0004485862942943405,
+              "sideEnergyFraction": 0.1539517834202892,
+              "lrCoherency": 0.9583004668623578,
+              "lrPhaseDegrees": 43.46156643105673
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 4,
+              "frequencyHz": 155.564,
+              "meanStereoPower": 0.003370934135857332,
+              "sideEnergyFraction": 0.4793129832090861,
+              "lrCoherency": 0.7743133709492312,
+              "lrPhaseDegrees": -84.77506911490713
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 5,
+              "frequencyHz": 194.45499999999998,
+              "meanStereoPower": 2.9261002809636682e-05,
+              "sideEnergyFraction": 0.493008987908945,
+              "lrCoherency": 0.9068366597711114,
+              "lrPhaseDegrees": 89.10959817069227
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 6,
+              "frequencyHz": 233.346,
+              "meanStereoPower": 3.3487928408359976e-05,
+              "sideEnergyFraction": 0.16969510616621514,
+              "lrCoherency": 0.825542595908373,
+              "lrPhaseDegrees": -28.85348241903975
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 8,
+              "frequencyHz": 311.128,
+              "meanStereoPower": 9.387620273349952e-06,
+              "sideEnergyFraction": 0.284134269924666,
+              "lrCoherency": 0.7788702875676223,
+              "lrPhaseDegrees": -37.64373602322861
+            }
+          ]
+        },
+        {
+          "relativeSeconds": [
+            6.3,
+            6.6
+          ],
+          "originalSeconds": [
+            51.3,
+            51.6
+          ],
+          "possibleMissingFundamentalHz": 38.891,
+          "strongLowPeaks": [
+            {
+              "frequencyHz": 154.7698974609375,
+              "dbRelativeToStrongestFullSpectrumPeak": 0.0
+            },
+            {
+              "frequencyHz": 76.03912353515625,
+              "dbRelativeToStrongestFullSpectrumPeak": -8.639219784471756
+            },
+            {
+              "frequencyHz": 115.740966796875,
+              "dbRelativeToStrongestFullSpectrumPeak": -12.423047647943854
+            },
+            {
+              "frequencyHz": 232.8277587890625,
+              "dbRelativeToStrongestFullSpectrumPeak": -20.425056660758862
+            },
+            {
+              "frequencyHz": 193.12591552734375,
+              "dbRelativeToStrongestFullSpectrumPeak": -21.54342423541658
+            },
+            {
+              "frequencyHz": 273.87542724609375,
+              "dbRelativeToStrongestFullSpectrumPeak": -22.237785435781767
+            },
+            {
+              "frequencyHz": 176.97601318359375,
+              "dbRelativeToStrongestFullSpectrumPeak": -22.764806893097326
+            }
+          ],
+          "harmonicAndStereoMeasurements": [
+            {
+              "harmonicIfMissingFundamentalHypothesis": 1,
+              "frequencyHz": 38.891,
+              "meanStereoPower": 5.818282154466793e-07,
+              "sideEnergyFraction": 0.4585419902262067,
+              "lrCoherency": 0.37551220952009895,
+              "lrPhaseDegrees": 75.92519303646536
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 2,
+              "frequencyHz": 77.782,
+              "meanStereoPower": 0.0004999447152761661,
+              "sideEnergyFraction": 0.20225180247088465,
+              "lrCoherency": 0.6103509739230061,
+              "lrPhaseDegrees": -12.388141909384858
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 3,
+              "frequencyHz": 116.673,
+              "meanStereoPower": 0.00031842336952524197,
+              "sideEnergyFraction": 0.2330182264989401,
+              "lrCoherency": 0.6793334112776572,
+              "lrPhaseDegrees": 34.545893431895784
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 4,
+              "frequencyHz": 155.564,
+              "meanStereoPower": 0.00272741575931292,
+              "sideEnergyFraction": 0.7872819699666621,
+              "lrCoherency": 0.9803138677874028,
+              "lrPhaseDegrees": -126.8371800907591
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 5,
+              "frequencyHz": 194.45499999999998,
+              "meanStereoPower": 2.2714755939187762e-05,
+              "sideEnergyFraction": 0.6706451028618146,
+              "lrCoherency": 0.7148208404182418,
+              "lrPhaseDegrees": 119.96267962157754
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 6,
+              "frequencyHz": 233.346,
+              "meanStereoPower": 3.418629664280008e-05,
+              "sideEnergyFraction": 0.19829978837989515,
+              "lrCoherency": 0.952645112142086,
+              "lrPhaseDegrees": -49.81328875547421
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 8,
+              "frequencyHz": 311.128,
+              "meanStereoPower": 4.1123669266857175e-06,
+              "sideEnergyFraction": 0.6209571462335073,
+              "lrCoherency": 0.684866713282638,
+              "lrPhaseDegrees": -115.95679141873627
+            }
+          ]
+        },
+        {
+          "relativeSeconds": [
+            7,
+            7.3
+          ],
+          "originalSeconds": [
+            52,
+            52.3
+          ],
+          "possibleMissingFundamentalHz": 43.654,
+          "strongLowPeaks": [
+            {
+              "frequencyHz": 87.4786376953125,
+              "dbRelativeToStrongestFullSpectrumPeak": 0.0
+            },
+            {
+              "frequencyHz": 175.63018798828125,
+              "dbRelativeToStrongestFullSpectrumPeak": -3.0593722326697086
+            },
+            {
+              "frequencyHz": 130.5450439453125,
+              "dbRelativeToStrongestFullSpectrumPeak": -3.6292798578154057
+            },
+            {
+              "frequencyHz": 117.0867919921875,
+              "dbRelativeToStrongestFullSpectrumPeak": -12.245043996130157
+            },
+            {
+              "frequencyHz": 97.57232666015625,
+              "dbRelativeToStrongestFullSpectrumPeak": -13.078610187618608
+            },
+            {
+              "frequencyHz": 153.424072265625,
+              "dbRelativeToStrongestFullSpectrumPeak": -15.531679586102879
+            },
+            {
+              "frequencyHz": 261.76300048828125,
+              "dbRelativeToStrongestFullSpectrumPeak": -15.579344691974821
+            }
+          ],
+          "harmonicAndStereoMeasurements": [
+            {
+              "harmonicIfMissingFundamentalHypothesis": 1,
+              "frequencyHz": 43.654,
+              "meanStereoPower": 4.771193802452357e-07,
+              "sideEnergyFraction": 0.12879875290923654,
+              "lrCoherency": 0.9202161306987146,
+              "lrPhaseDegrees": 36.216851574226006
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 2,
+              "frequencyHz": 87.308,
+              "meanStereoPower": 0.000630764958748857,
+              "sideEnergyFraction": 0.10905749447679877,
+              "lrCoherency": 0.8369089508176798,
+              "lrPhaseDegrees": 12.474716573161036
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 3,
+              "frequencyHz": 130.96200000000002,
+              "meanStereoPower": 0.0005004601163200655,
+              "sideEnergyFraction": 0.09945940488772369,
+              "lrCoherency": 0.8025409441580358,
+              "lrPhaseDegrees": -3.4540324306362495
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 4,
+              "frequencyHz": 174.616,
+              "meanStereoPower": 0.0005204390728031389,
+              "sideEnergyFraction": 0.8527710937703024,
+              "lrCoherency": 0.887438896542103,
+              "lrPhaseDegrees": 163.73331030268182
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 5,
+              "frequencyHz": 218.27,
+              "meanStereoPower": 7.348303687163392e-06,
+              "sideEnergyFraction": 0.4966600810719721,
+              "lrCoherency": 0.40361941553377073,
+              "lrPhaseDegrees": -88.98835509685095
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 6,
+              "frequencyHz": 261.92400000000004,
+              "meanStereoPower": 3.062220585664124e-05,
+              "sideEnergyFraction": 0.5996812639807683,
+              "lrCoherency": 0.6736019188408405,
+              "lrPhaseDegrees": 108.57446220134557
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 8,
+              "frequencyHz": 349.232,
+              "meanStereoPower": 3.5481013530379785e-06,
+              "sideEnergyFraction": 0.8300014274213517,
+              "lrCoherency": 0.9069808199629522,
+              "lrPhaseDegrees": 138.18643959052795
+            }
+          ]
+        }
+      ]
+    },
+    "mus3dBassGuitar04": {
+      "path": "D:\\RootSound\\experiments\\music-workflow\\reference-studio\\cases\\phone-recording-20261023-233819\\mus3d\\context-44-54\\04-bass_guitar.wav",
+      "sha256": "b5e5f87932a43f861dd5ff74749bd21dfbd4becd980212488f4bd5f67037b8e9",
+      "contextCropOffsetSeconds": 1,
+      "sampleRate": 44100,
+      "method": "Sum of L and R powers; arithmetic mono averaging deliberately avoided.",
+      "windows": [
+        {
+          "relativeSeconds": [
+            0.1,
+            0.4
+          ],
+          "originalSeconds": [
+            45.1,
+            45.4
+          ],
+          "possibleMissingFundamentalHz": 46.249,
+          "strongLowPeaks": [
+            {
+              "frequencyHz": 92.8619384765625,
+              "dbRelativeToStrongestFullSpectrumPeak": 0.0
+            },
+            {
+              "frequencyHz": 139.29290771484375,
+              "dbRelativeToStrongestFullSpectrumPeak": -16.51885959910074
+            },
+            {
+              "frequencyHz": 102.95562744140625,
+              "dbRelativeToStrongestFullSpectrumPeak": -21.941030875040614
+            },
+            {
+              "frequencyHz": 119.7784423828125,
+              "dbRelativeToStrongestFullSpectrumPeak": -23.432160980320855
+            },
+            {
+              "frequencyHz": 77.38494873046875,
+              "dbRelativeToStrongestFullSpectrumPeak": -24.982662777006148
+            },
+            {
+              "frequencyHz": 185.05096435546875,
+              "dbRelativeToStrongestFullSpectrumPeak": -25.586652874124454
+            },
+            {
+              "frequencyHz": 264.45465087890625,
+              "dbRelativeToStrongestFullSpectrumPeak": -26.529195619956543
+            }
+          ],
+          "harmonicAndStereoMeasurements": [
+            {
+              "harmonicIfMissingFundamentalHypothesis": 1,
+              "frequencyHz": 46.249,
+              "meanStereoPower": 1.4326472333412088e-06,
+              "sideEnergyFraction": 0.1831112900186823,
+              "lrCoherency": 0.7498643308953207,
+              "lrPhaseDegrees": -16.412415996542315
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 2,
+              "frequencyHz": 92.498,
+              "meanStereoPower": 0.0012426592954811392,
+              "sideEnergyFraction": 0.2655436212463408,
+              "lrCoherency": 0.7193701336707617,
+              "lrPhaseDegrees": 12.735977777379215
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 3,
+              "frequencyHz": 138.747,
+              "meanStereoPower": 2.6962925693754184e-05,
+              "sideEnergyFraction": 0.494818829235855,
+              "lrCoherency": 0.5173101796986231,
+              "lrPhaseDegrees": -88.8494163877939
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 4,
+              "frequencyHz": 184.996,
+              "meanStereoPower": 5.635410745638616e-06,
+              "sideEnergyFraction": 0.17209492129729023,
+              "lrCoherency": 0.8912687322507167,
+              "lrPhaseDegrees": 42.4636041094787
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 5,
+              "frequencyHz": 231.245,
+              "meanStereoPower": 1.298809541833684e-06,
+              "sideEnergyFraction": 0.1217574751615904,
+              "lrCoherency": 0.9008695221728411,
+              "lrPhaseDegrees": 13.79967188036331
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 6,
+              "frequencyHz": 277.494,
+              "meanStereoPower": 3.9195596148022134e-07,
+              "sideEnergyFraction": 0.18252542412192563,
+              "lrCoherency": 0.6596518958473108,
+              "lrPhaseDegrees": 15.728372308979093
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 8,
+              "frequencyHz": 369.992,
+              "meanStereoPower": 6.580457626722973e-08,
+              "sideEnergyFraction": 0.06669554411098376,
+              "lrCoherency": 0.8789575269748919,
+              "lrPhaseDegrees": 7.230855637027377
+            }
+          ]
+        },
+        {
+          "relativeSeconds": [
+            1.15,
+            1.45
+          ],
+          "originalSeconds": [
+            46.15,
+            46.45
+          ],
+          "possibleMissingFundamentalHz": 46.249,
+          "strongLowPeaks": [
+            {
+              "frequencyHz": 92.8619384765625,
+              "dbRelativeToStrongestFullSpectrumPeak": 0.0
+            },
+            {
+              "frequencyHz": 137.274169921875,
+              "dbRelativeToStrongestFullSpectrumPeak": -11.650591637997515
+            },
+            {
+              "frequencyHz": 104.974365234375,
+              "dbRelativeToStrongestFullSpectrumPeak": -21.977040608163456
+            },
+            {
+              "frequencyHz": 75.3662109375,
+              "dbRelativeToStrongestFullSpectrumPeak": -24.322030820048095
+            },
+            {
+              "frequencyHz": 183.0322265625,
+              "dbRelativeToStrongestFullSpectrumPeak": -25.186531007778452
+            },
+            {
+              "frequencyHz": 153.424072265625,
+              "dbRelativeToStrongestFullSpectrumPeak": -25.33213767433611
+            },
+            {
+              "frequencyHz": 65.27252197265625,
+              "dbRelativeToStrongestFullSpectrumPeak": -26.483056864646926
+            }
+          ],
+          "harmonicAndStereoMeasurements": [
+            {
+              "harmonicIfMissingFundamentalHypothesis": 1,
+              "frequencyHz": 46.249,
+              "meanStereoPower": 1.5986001505618113e-06,
+              "sideEnergyFraction": 0.11359172731551578,
+              "lrCoherency": 0.7905792196109365,
+              "lrPhaseDegrees": 7.547038769864008
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 2,
+              "frequencyHz": 92.498,
+              "meanStereoPower": 0.001593995665342639,
+              "sideEnergyFraction": 0.07416771237976363,
+              "lrCoherency": 0.9090306938492261,
+              "lrPhaseDegrees": 0.6665106815693501
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 3,
+              "frequencyHz": 138.747,
+              "meanStereoPower": 0.00011848855028978082,
+              "sideEnergyFraction": 0.030085327998484658,
+              "lrCoherency": 0.9560090306670891,
+              "lrPhaseDegrees": 4.632042521704846
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 4,
+              "frequencyHz": 184.996,
+              "meanStereoPower": 7.529537883035311e-06,
+              "sideEnergyFraction": 0.10155953067036337,
+              "lrCoherency": 0.9588097170022404,
+              "lrPhaseDegrees": 33.530838098053906
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 5,
+              "frequencyHz": 231.245,
+              "meanStereoPower": 1.2385322465821094e-06,
+              "sideEnergyFraction": 0.09494232025658168,
+              "lrCoherency": 0.9446200036339668,
+              "lrPhaseDegrees": 27.830715013356368
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 6,
+              "frequencyHz": 277.494,
+              "meanStereoPower": 1.0050516713332914e-06,
+              "sideEnergyFraction": 0.051479642307187545,
+              "lrCoherency": 0.9338964283795198,
+              "lrPhaseDegrees": 3.333064174199681
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 8,
+              "frequencyHz": 369.992,
+              "meanStereoPower": 3.738471016996748e-08,
+              "sideEnergyFraction": 0.18594370490653964,
+              "lrCoherency": 0.804531919784594,
+              "lrPhaseDegrees": 35.59415736061039
+            }
+          ]
+        },
+        {
+          "relativeSeconds": [
+            2.3,
+            2.6
+          ],
+          "originalSeconds": [
+            47.3,
+            47.6
+          ],
+          "possibleMissingFundamentalHz": 46.249,
+          "strongLowPeaks": [
+            {
+              "frequencyHz": 91.51611328125,
+              "dbRelativeToStrongestFullSpectrumPeak": 0.0
+            },
+            {
+              "frequencyHz": 137.94708251953125,
+              "dbRelativeToStrongestFullSpectrumPeak": -23.035364746171712
+            },
+            {
+              "frequencyHz": 76.7120361328125,
+              "dbRelativeToStrongestFullSpectrumPeak": -29.037413731980216
+            },
+            {
+              "frequencyHz": 184.3780517578125,
+              "dbRelativeToStrongestFullSpectrumPeak": -29.478828204142133
+            },
+            {
+              "frequencyHz": 123.14300537109375,
+              "dbRelativeToStrongestFullSpectrumPeak": -30.349715986201353
+            },
+            {
+              "frequencyHz": 45.08514404296875,
+              "dbRelativeToStrongestFullSpectrumPeak": -31.369358384363885
+            },
+            {
+              "frequencyHz": 106.3201904296875,
+              "dbRelativeToStrongestFullSpectrumPeak": -32.12352313210366
+            }
+          ],
+          "harmonicAndStereoMeasurements": [
+            {
+              "harmonicIfMissingFundamentalHypothesis": 1,
+              "frequencyHz": 46.249,
+              "meanStereoPower": 2.3235905178001597e-06,
+              "sideEnergyFraction": 0.16400516123869777,
+              "lrCoherency": 0.9318312378307001,
+              "lrPhaseDegrees": -5.838782807334863
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 2,
+              "frequencyHz": 92.498,
+              "meanStereoPower": 0.002848893107149677,
+              "sideEnergyFraction": 0.00933652475766425,
+              "lrCoherency": 0.9953306833201374,
+              "lrPhaseDegrees": 4.530651174132699
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 3,
+              "frequencyHz": 138.747,
+              "meanStereoPower": 6.37244555316433e-05,
+              "sideEnergyFraction": 0.06769759992973541,
+              "lrCoherency": 0.9063289068563793,
+              "lrPhaseDegrees": 16.630963510243816
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 4,
+              "frequencyHz": 184.996,
+              "meanStereoPower": 3.3038146575141216e-06,
+              "sideEnergyFraction": 0.20443388091134876,
+              "lrCoherency": 0.8970168869216572,
+              "lrPhaseDegrees": 46.26512453180972
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 5,
+              "frequencyHz": 231.245,
+              "meanStereoPower": 6.157177886549382e-07,
+              "sideEnergyFraction": 0.05916955535429907,
+              "lrCoherency": 0.9194020758091288,
+              "lrPhaseDegrees": 13.621468778752778
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 6,
+              "frequencyHz": 277.494,
+              "meanStereoPower": 3.4428625637744555e-07,
+              "sideEnergyFraction": 0.23891802088411696,
+              "lrCoherency": 0.7150052927348967,
+              "lrPhaseDegrees": 42.30675497984894
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 8,
+              "frequencyHz": 369.992,
+              "meanStereoPower": 4.118497139976029e-08,
+              "sideEnergyFraction": 0.20028959744002903,
+              "lrCoherency": 0.8379323762708105,
+              "lrPhaseDegrees": -42.33240458874818
+            }
+          ]
+        },
+        {
+          "relativeSeconds": [
+            3.3,
+            3.6
+          ],
+          "originalSeconds": [
+            48.3,
+            48.6
+          ],
+          "possibleMissingFundamentalHz": 43.654,
+          "strongLowPeaks": [
+            {
+              "frequencyHz": 130.5450439453125,
+              "dbRelativeToStrongestFullSpectrumPeak": 0.0
+            },
+            {
+              "frequencyHz": 89.49737548828125,
+              "dbRelativeToStrongestFullSpectrumPeak": -1.335475231857439
+            },
+            {
+              "frequencyHz": 77.38494873046875,
+              "dbRelativeToStrongestFullSpectrumPeak": -9.176020805332918
+            },
+            {
+              "frequencyHz": 141.3116455078125,
+              "dbRelativeToStrongestFullSpectrumPeak": -11.262953163417784
+            },
+            {
+              "frequencyHz": 175.63018798828125,
+              "dbRelativeToStrongestFullSpectrumPeak": -12.094979879571916
+            },
+            {
+              "frequencyHz": 103.6285400390625,
+              "dbRelativeToStrongestFullSpectrumPeak": -13.46139009950342
+            },
+            {
+              "frequencyHz": 111.7034912109375,
+              "dbRelativeToStrongestFullSpectrumPeak": -13.764795195476111
+            }
+          ],
+          "harmonicAndStereoMeasurements": [
+            {
+              "harmonicIfMissingFundamentalHypothesis": 1,
+              "frequencyHz": 43.654,
+              "meanStereoPower": 1.2863612207844895e-06,
+              "sideEnergyFraction": 0.18514463953183002,
+              "lrCoherency": 0.7021651166436618,
+              "lrPhaseDegrees": 19.687822162175607
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 2,
+              "frequencyHz": 87.308,
+              "meanStereoPower": 0.00020126498904472366,
+              "sideEnergyFraction": 0.32777998363447003,
+              "lrCoherency": 0.3540244721997245,
+              "lrPhaseDegrees": -8.389480364770568
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 3,
+              "frequencyHz": 130.96200000000002,
+              "meanStereoPower": 0.0002277332065848008,
+              "sideEnergyFraction": 0.16686106368261994,
+              "lrCoherency": 0.7234845977518333,
+              "lrPhaseDegrees": 18.925006872355066
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 4,
+              "frequencyHz": 174.616,
+              "meanStereoPower": 1.4174776792714686e-05,
+              "sideEnergyFraction": 0.03383567244499128,
+              "lrCoherency": 0.9455443774983872,
+              "lrPhaseDegrees": 5.935076600765777
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 5,
+              "frequencyHz": 218.27,
+              "meanStereoPower": 7.525171275982399e-07,
+              "sideEnergyFraction": 0.1855403487775056,
+              "lrCoherency": 0.6386750742738909,
+              "lrPhaseDegrees": -7.4484863793408165
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 6,
+              "frequencyHz": 261.92400000000004,
+              "meanStereoPower": 5.970575205182656e-07,
+              "sideEnergyFraction": 0.6921950090745779,
+              "lrCoherency": 0.38640207614087185,
+              "lrPhaseDegrees": 175.82637916572037
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 8,
+              "frequencyHz": 349.232,
+              "meanStereoPower": 2.766067906575268e-07,
+              "sideEnergyFraction": 0.10431021182080032,
+              "lrCoherency": 0.9215780967522018,
+              "lrPhaseDegrees": -6.389940164401463
+            }
+          ]
+        },
+        {
+          "relativeSeconds": [
+            4.6,
+            4.9
+          ],
+          "originalSeconds": [
+            49.6,
+            49.9
+          ],
+          "possibleMissingFundamentalHz": 38.891,
+          "strongLowPeaks": [
+            {
+              "frequencyHz": 77.38494873046875,
+              "dbRelativeToStrongestFullSpectrumPeak": 0.0
+            },
+            {
+              "frequencyHz": 115.740966796875,
+              "dbRelativeToStrongestFullSpectrumPeak": -5.80922863835449
+            },
+            {
+              "frequencyHz": 86.1328125,
+              "dbRelativeToStrongestFullSpectrumPeak": -15.049475701318482
+            },
+            {
+              "frequencyHz": 106.3201904296875,
+              "dbRelativeToStrongestFullSpectrumPeak": -21.817846033336522
+            },
+            {
+              "frequencyHz": 133.90960693359375,
+              "dbRelativeToStrongestFullSpectrumPeak": -24.623807629300416
+            },
+            {
+              "frequencyHz": 154.09698486328125,
+              "dbRelativeToStrongestFullSpectrumPeak": -25.39839086111971
+            },
+            {
+              "frequencyHz": 145.34912109375,
+              "dbRelativeToStrongestFullSpectrumPeak": -26.629432332323066
+            }
+          ],
+          "harmonicAndStereoMeasurements": [
+            {
+              "harmonicIfMissingFundamentalHypothesis": 1,
+              "frequencyHz": 38.891,
+              "meanStereoPower": 5.45225333517234e-07,
+              "sideEnergyFraction": 0.40801834915762936,
+              "lrCoherency": 0.4584759194837338,
+              "lrPhaseDegrees": 62.06157804468962
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 2,
+              "frequencyHz": 77.782,
+              "meanStereoPower": 0.0013124271686883755,
+              "sideEnergyFraction": 0.06254500816891087,
+              "lrCoherency": 0.9676991089814814,
+              "lrPhaseDegrees": 15.285820660701315
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 3,
+              "frequencyHz": 116.673,
+              "meanStereoPower": 0.000337585989843274,
+              "sideEnergyFraction": 0.43673620485276393,
+              "lrCoherency": 0.7488065169317363,
+              "lrPhaseDegrees": -78.66585919195786
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 4,
+              "frequencyHz": 155.564,
+              "meanStereoPower": 9.618509917445858e-06,
+              "sideEnergyFraction": 0.14879889935566487,
+              "lrCoherency": 0.8413714081011576,
+              "lrPhaseDegrees": 31.698805319532735
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 5,
+              "frequencyHz": 194.45499999999998,
+              "meanStereoPower": 1.5667036329889785e-06,
+              "sideEnergyFraction": 0.5081999115545769,
+              "lrCoherency": 0.7014972395409883,
+              "lrPhaseDegrees": 91.34144006723128
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 6,
+              "frequencyHz": 233.346,
+              "meanStereoPower": 2.135941941823648e-06,
+              "sideEnergyFraction": 0.37384443968776265,
+              "lrCoherency": 0.6322236353284933,
+              "lrPhaseDegrees": -52.74235908151654
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 8,
+              "frequencyHz": 311.128,
+              "meanStereoPower": 4.011612217127307e-07,
+              "sideEnergyFraction": 0.11239483229274146,
+              "lrCoherency": 0.9105443786702813,
+              "lrPhaseDegrees": 4.9768656319907905
+            }
+          ]
+        },
+        {
+          "relativeSeconds": [
+            5.5,
+            5.8
+          ],
+          "originalSeconds": [
+            50.5,
+            50.8
+          ],
+          "possibleMissingFundamentalHz": 38.891,
+          "strongLowPeaks": [
+            {
+              "frequencyHz": 76.7120361328125,
+              "dbRelativeToStrongestFullSpectrumPeak": 0.0
+            },
+            {
+              "frequencyHz": 115.740966796875,
+              "dbRelativeToStrongestFullSpectrumPeak": -2.731091049340356
+            },
+            {
+              "frequencyHz": 104.30145263671875,
+              "dbRelativeToStrongestFullSpectrumPeak": -20.74952723312327
+            },
+            {
+              "frequencyHz": 95.5535888671875,
+              "dbRelativeToStrongestFullSpectrumPeak": -21.32250619002495
+            },
+            {
+              "frequencyHz": 155.44281005859375,
+              "dbRelativeToStrongestFullSpectrumPeak": -22.48674730847751
+            },
+            {
+              "frequencyHz": 58.54339599609375,
+              "dbRelativeToStrongestFullSpectrumPeak": -24.132902444756425
+            },
+            {
+              "frequencyHz": 123.81591796875,
+              "dbRelativeToStrongestFullSpectrumPeak": -24.754633645352044
+            }
+          ],
+          "harmonicAndStereoMeasurements": [
+            {
+              "harmonicIfMissingFundamentalHypothesis": 1,
+              "frequencyHz": 38.891,
+              "meanStereoPower": 1.43533601754048e-06,
+              "sideEnergyFraction": 0.44442812616629024,
+              "lrCoherency": 0.1464504270422739,
+              "lrPhaseDegrees": -18.120022927802996
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 2,
+              "frequencyHz": 77.782,
+              "meanStereoPower": 0.0007450827911327701,
+              "sideEnergyFraction": 0.3637529612745275,
+              "lrCoherency": 0.6698922857778518,
+              "lrPhaseDegrees": 48.56134196833478
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 3,
+              "frequencyHz": 116.673,
+              "meanStereoPower": 0.00040700855689340654,
+              "sideEnergyFraction": 0.10732467643954953,
+              "lrCoherency": 0.9836840166270745,
+              "lrPhaseDegrees": 37.00899928080218
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 4,
+              "frequencyHz": 155.564,
+              "meanStereoPower": 8.288386545622424e-06,
+              "sideEnergyFraction": 0.38332741409965554,
+              "lrCoherency": 0.3359013983350663,
+              "lrPhaseDegrees": -38.104693887654165
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 5,
+              "frequencyHz": 194.45499999999998,
+              "meanStereoPower": 5.149557783282604e-06,
+              "sideEnergyFraction": 0.23431703026411785,
+              "lrCoherency": 0.8954854461989201,
+              "lrPhaseDegrees": 44.8455718808656
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 6,
+              "frequencyHz": 233.346,
+              "meanStereoPower": 1.6583672009988953e-06,
+              "sideEnergyFraction": 0.10182481301579524,
+              "lrCoherency": 0.839293131398211,
+              "lrPhaseDegrees": -11.327122422706488
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 8,
+              "frequencyHz": 311.128,
+              "meanStereoPower": 2.3674771889987804e-07,
+              "sideEnergyFraction": 0.2662836298383228,
+              "lrCoherency": 0.6873700954553289,
+              "lrPhaseDegrees": -46.005743629049825
+            }
+          ]
+        },
+        {
+          "relativeSeconds": [
+            6.3,
+            6.6
+          ],
+          "originalSeconds": [
+            51.3,
+            51.6
+          ],
+          "possibleMissingFundamentalHz": 38.891,
+          "strongLowPeaks": [
+            {
+              "frequencyHz": 76.03912353515625,
+              "dbRelativeToStrongestFullSpectrumPeak": 0.0
+            },
+            {
+              "frequencyHz": 116.41387939453125,
+              "dbRelativeToStrongestFullSpectrumPeak": -5.823971084659837
+            },
+            {
+              "frequencyHz": 154.7698974609375,
+              "dbRelativeToStrongestFullSpectrumPeak": -16.08938707943393
+            },
+            {
+              "frequencyHz": 98.91815185546875,
+              "dbRelativeToStrongestFullSpectrumPeak": -20.377920652509847
+            },
+            {
+              "frequencyHz": 61.907958984375,
+              "dbRelativeToStrongestFullSpectrumPeak": -22.572399528217414
+            },
+            {
+              "frequencyHz": 232.15484619140625,
+              "dbRelativeToStrongestFullSpectrumPeak": -23.24714750207914
+            },
+            {
+              "frequencyHz": 166.20941162109375,
+              "dbRelativeToStrongestFullSpectrumPeak": -24.659874946582562
+            }
+          ],
+          "harmonicAndStereoMeasurements": [
+            {
+              "harmonicIfMissingFundamentalHypothesis": 1,
+              "frequencyHz": 38.891,
+              "meanStereoPower": 6.757922962860142e-07,
+              "sideEnergyFraction": 0.19915728494447285,
+              "lrCoherency": 0.764125412768471,
+              "lrPhaseDegrees": -24.705831583632982
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 2,
+              "frequencyHz": 77.782,
+              "meanStereoPower": 0.0005079545673341406,
+              "sideEnergyFraction": 0.131464286031464,
+              "lrCoherency": 0.7411200755759,
+              "lrPhaseDegrees": -5.990691211968108
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 3,
+              "frequencyHz": 116.673,
+              "meanStereoPower": 0.00023665997880293737,
+              "sideEnergyFraction": 0.10906066498020009,
+              "lrCoherency": 0.8973666424081636,
+              "lrPhaseDegrees": 28.21205507892714
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 4,
+              "frequencyHz": 155.564,
+              "meanStereoPower": 7.951565507935932e-06,
+              "sideEnergyFraction": 0.6826436273082584,
+              "lrCoherency": 0.6850680114417378,
+              "lrPhaseDegrees": -126.41395955962642
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 5,
+              "frequencyHz": 194.45499999999998,
+              "meanStereoPower": 2.835700366720052e-06,
+              "sideEnergyFraction": 0.40146197918908233,
+              "lrCoherency": 0.4540023808206056,
+              "lrPhaseDegrees": 63.79842140081865
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 6,
+              "frequencyHz": 233.346,
+              "meanStereoPower": 2.8331173459831394e-06,
+              "sideEnergyFraction": 0.04980917552457681,
+              "lrCoherency": 0.9590691874751963,
+              "lrPhaseDegrees": -12.662748211944885
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 8,
+              "frequencyHz": 311.128,
+              "meanStereoPower": 8.294563842191892e-08,
+              "sideEnergyFraction": 0.1306971442871233,
+              "lrCoherency": 0.7392051463165827,
+              "lrPhaseDegrees": 1.792038030637888
+            }
+          ]
+        },
+        {
+          "relativeSeconds": [
+            7,
+            7.3
+          ],
+          "originalSeconds": [
+            52,
+            52.3
+          ],
+          "possibleMissingFundamentalHz": 43.654,
+          "strongLowPeaks": [
+            {
+              "frequencyHz": 87.4786376953125,
+              "dbRelativeToStrongestFullSpectrumPeak": 0.0
+            },
+            {
+              "frequencyHz": 129.87213134765625,
+              "dbRelativeToStrongestFullSpectrumPeak": -7.309734629648733
+            },
+            {
+              "frequencyHz": 97.57232666015625,
+              "dbRelativeToStrongestFullSpectrumPeak": -13.659820459088966
+            },
+            {
+              "frequencyHz": 117.0867919921875,
+              "dbRelativeToStrongestFullSpectrumPeak": -14.114492517377027
+            },
+            {
+              "frequencyHz": 176.3031005859375,
+              "dbRelativeToStrongestFullSpectrumPeak": -21.874753776559203
+            },
+            {
+              "frequencyHz": 70.65582275390625,
+              "dbRelativeToStrongestFullSpectrumPeak": -23.055048226688
+            },
+            {
+              "frequencyHz": 58.54339599609375,
+              "dbRelativeToStrongestFullSpectrumPeak": -25.86898369337346
+            }
+          ],
+          "harmonicAndStereoMeasurements": [
+            {
+              "harmonicIfMissingFundamentalHypothesis": 1,
+              "frequencyHz": 43.654,
+              "meanStereoPower": 6.129844081460116e-07,
+              "sideEnergyFraction": 0.5119849980292671,
+              "lrCoherency": 0.7614828791755796,
+              "lrPhaseDegrees": 91.82653981759302
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 2,
+              "frequencyHz": 87.308,
+              "meanStereoPower": 0.0006373973031248378,
+              "sideEnergyFraction": 0.08149930176569896,
+              "lrCoherency": 0.8961207868365596,
+              "lrPhaseDegrees": 8.786777650305709
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 3,
+              "frequencyHz": 130.96200000000002,
+              "meanStereoPower": 0.0002695950244610874,
+              "sideEnergyFraction": 0.04782783726205399,
+              "lrCoherency": 0.9362455494982284,
+              "lrPhaseDegrees": 9.621343301526872
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 4,
+              "frequencyHz": 174.616,
+              "meanStereoPower": 5.456637701670063e-06,
+              "sideEnergyFraction": 0.10622569747717434,
+              "lrCoherency": 0.8186253648290625,
+              "lrPhaseDegrees": 11.088740206784788
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 5,
+              "frequencyHz": 218.27,
+              "meanStereoPower": 1.16380924586118e-06,
+              "sideEnergyFraction": 0.11423172672478844,
+              "lrCoherency": 0.8199045602091195,
+              "lrPhaseDegrees": -13.327430766719198
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 6,
+              "frequencyHz": 261.92400000000004,
+              "meanStereoPower": 8.249706694621746e-07,
+              "sideEnergyFraction": 0.2794017084023377,
+              "lrCoherency": 0.4625486364532188,
+              "lrPhaseDegrees": 17.444618541225935
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 8,
+              "frequencyHz": 349.232,
+              "meanStereoPower": 1.0447780381895758e-07,
+              "sideEnergyFraction": 0.3579936154822169,
+              "lrCoherency": 0.8769828645781481,
+              "lrPhaseDegrees": -70.35601109662788
+            }
+          ]
+        }
+      ]
+    },
+    "mus3dBassGuitar05": {
+      "path": "D:\\RootSound\\experiments\\music-workflow\\reference-studio\\cases\\phone-recording-20261023-233819\\mus3d\\context-44-54\\05-bass_guitar.wav",
+      "sha256": "720741acb36bf59a734cbfa628feb5bf152c85544bd781068faf518f4b673a0d",
+      "contextCropOffsetSeconds": 1,
+      "sampleRate": 44100,
+      "method": "Sum of L and R powers; arithmetic mono averaging deliberately avoided.",
+      "windows": [
+        {
+          "relativeSeconds": [
+            0.1,
+            0.4
+          ],
+          "originalSeconds": [
+            45.1,
+            45.4
+          ],
+          "possibleMissingFundamentalHz": 46.249,
+          "strongLowPeaks": [
+            {
+              "frequencyHz": 185.723876953125,
+              "dbRelativeToStrongestFullSpectrumPeak": 0.0
+            },
+            {
+              "frequencyHz": 92.8619384765625,
+              "dbRelativeToStrongestFullSpectrumPeak": -0.16008555545860795
+            },
+            {
+              "frequencyHz": 138.6199951171875,
+              "dbRelativeToStrongestFullSpectrumPeak": -14.018338585899734
+            },
+            {
+              "frequencyHz": 276.56707763671875,
+              "dbRelativeToStrongestFullSpectrumPeak": -21.020354219053445
+            },
+            {
+              "frequencyHz": 84.7869873046875,
+              "dbRelativeToStrongestFullSpectrumPeak": -22.270464294185366
+            },
+            {
+              "frequencyHz": 119.7784423828125,
+              "dbRelativeToStrongestFullSpectrumPeak": -24.10015712288143
+            },
+            {
+              "frequencyHz": 102.28271484375,
+              "dbRelativeToStrongestFullSpectrumPeak": -24.41734792334245
+            }
+          ],
+          "harmonicAndStereoMeasurements": [
+            {
+              "harmonicIfMissingFundamentalHypothesis": 1,
+              "frequencyHz": 46.249,
+              "meanStereoPower": 1.7077753222427953e-06,
+              "sideEnergyFraction": 0.1266113440264761,
+              "lrCoherency": 0.9550729080512101,
+              "lrPhaseDegrees": 10.832387630294972
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 2,
+              "frequencyHz": 92.498,
+              "meanStereoPower": 0.0014266286037208805,
+              "sideEnergyFraction": 0.25189075977737735,
+              "lrCoherency": 0.7434616191302229,
+              "lrPhaseDegrees": 2.93776922490382
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 3,
+              "frequencyHz": 138.747,
+              "meanStereoPower": 5.223602072773795e-05,
+              "sideEnergyFraction": 0.8616660234906766,
+              "lrCoherency": 0.8475373492570304,
+              "lrPhaseDegrees": -148.6125019217895
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 4,
+              "frequencyHz": 184.996,
+              "meanStereoPower": 0.0015012815548052197,
+              "sideEnergyFraction": 0.2211607579273063,
+              "lrCoherency": 0.9740328101052572,
+              "lrPhaseDegrees": -44.30632328059947
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 5,
+              "frequencyHz": 231.245,
+              "meanStereoPower": 2.3796007835947324e-06,
+              "sideEnergyFraction": 0.7051310875474625,
+              "lrCoherency": 0.5667474940753169,
+              "lrPhaseDegrees": -140.19949123899607
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 6,
+              "frequencyHz": 277.494,
+              "meanStereoPower": 1.7954106114260734e-05,
+              "sideEnergyFraction": 0.4464974582122786,
+              "lrCoherency": 0.6075479923163755,
+              "lrPhaseDegrees": -79.71426442571601
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 8,
+              "frequencyHz": 369.992,
+              "meanStereoPower": 1.322919927099602e-07,
+              "sideEnergyFraction": 0.17967679058220998,
+              "lrCoherency": 0.7640908305253276,
+              "lrPhaseDegrees": -27.366343161806352
+            }
+          ]
+        },
+        {
+          "relativeSeconds": [
+            1.15,
+            1.45
+          ],
+          "originalSeconds": [
+            46.15,
+            46.45
+          ],
+          "possibleMissingFundamentalHz": 46.249,
+          "strongLowPeaks": [
+            {
+              "frequencyHz": 92.8619384765625,
+              "dbRelativeToStrongestFullSpectrumPeak": 0.0
+            },
+            {
+              "frequencyHz": 185.05096435546875,
+              "dbRelativeToStrongestFullSpectrumPeak": -0.8291401235802786
+            },
+            {
+              "frequencyHz": 138.6199951171875,
+              "dbRelativeToStrongestFullSpectrumPeak": -9.47673812019287
+            },
+            {
+              "frequencyHz": 104.30145263671875,
+              "dbRelativeToStrongestFullSpectrumPeak": -21.95078418416579
+            },
+            {
+              "frequencyHz": 75.3662109375,
+              "dbRelativeToStrongestFullSpectrumPeak": -22.467902388886813
+            },
+            {
+              "frequencyHz": 155.44281005859375,
+              "dbRelativeToStrongestFullSpectrumPeak": -22.521559753800577
+            },
+            {
+              "frequencyHz": 277.239990234375,
+              "dbRelativeToStrongestFullSpectrumPeak": -24.207325748869618
+            }
+          ],
+          "harmonicAndStereoMeasurements": [
+            {
+              "harmonicIfMissingFundamentalHypothesis": 1,
+              "frequencyHz": 46.249,
+              "meanStereoPower": 1.4099155172591844e-06,
+              "sideEnergyFraction": 0.04884118847912862,
+              "lrCoherency": 0.9044008511027158,
+              "lrPhaseDegrees": 3.8373972342679545
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 2,
+              "frequencyHz": 92.498,
+              "meanStereoPower": 0.001671273855003553,
+              "sideEnergyFraction": 0.0676860129714763,
+              "lrCoherency": 0.8996875227565374,
+              "lrPhaseDegrees": -5.772600210272711
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 3,
+              "frequencyHz": 138.747,
+              "meanStereoPower": 0.00029403749622421637,
+              "sideEnergyFraction": 0.06847879231649572,
+              "lrCoherency": 0.9526725773345072,
+              "lrPhaseDegrees": -13.590195456653536
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 4,
+              "frequencyHz": 184.996,
+              "meanStereoPower": 0.001341380567956558,
+              "sideEnergyFraction": 0.33352141949558917,
+              "lrCoherency": 0.9713640698846873,
+              "lrPhaseDegrees": -66.26660979150698
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 5,
+              "frequencyHz": 231.245,
+              "meanStereoPower": 3.6194815369245362e-06,
+              "sideEnergyFraction": 0.6511574261749237,
+              "lrCoherency": 0.48944390952887057,
+              "lrPhaseDegrees": -162.7504165275013
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 6,
+              "frequencyHz": 277.494,
+              "meanStereoPower": 5.331903247521351e-06,
+              "sideEnergyFraction": 0.0884976412904217,
+              "lrCoherency": 0.8881559555850715,
+              "lrPhaseDegrees": 8.066380997282106
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 8,
+              "frequencyHz": 369.992,
+              "meanStereoPower": 2.2585934032421155e-07,
+              "sideEnergyFraction": 0.4279427577077148,
+              "lrCoherency": 0.7230096136825831,
+              "lrPhaseDegrees": 75.82018327704793
+            }
+          ]
+        },
+        {
+          "relativeSeconds": [
+            2.3,
+            2.6
+          ],
+          "originalSeconds": [
+            47.3,
+            47.6
+          ],
+          "possibleMissingFundamentalHz": 46.249,
+          "strongLowPeaks": [
+            {
+              "frequencyHz": 92.18902587890625,
+              "dbRelativeToStrongestFullSpectrumPeak": 0.0
+            },
+            {
+              "frequencyHz": 183.70513916015625,
+              "dbRelativeToStrongestFullSpectrumPeak": -12.158432686860898
+            },
+            {
+              "frequencyHz": 137.94708251953125,
+              "dbRelativeToStrongestFullSpectrumPeak": -16.513721891864364
+            },
+            {
+              "frequencyHz": 233.50067138671875,
+              "dbRelativeToStrongestFullSpectrumPeak": -27.039123857275715
+            },
+            {
+              "frequencyHz": 175.63018798828125,
+              "dbRelativeToStrongestFullSpectrumPeak": -27.980822732160977
+            },
+            {
+              "frequencyHz": 276.56707763671875,
+              "dbRelativeToStrongestFullSpectrumPeak": -28.65949056086186
+            },
+            {
+              "frequencyHz": 77.38494873046875,
+              "dbRelativeToStrongestFullSpectrumPeak": -29.32910258842632
+            }
+          ],
+          "harmonicAndStereoMeasurements": [
+            {
+              "harmonicIfMissingFundamentalHypothesis": 1,
+              "frequencyHz": 46.249,
+              "meanStereoPower": 1.670310056055792e-06,
+              "sideEnergyFraction": 0.17423494321358898,
+              "lrCoherency": 0.829579956027797,
+              "lrPhaseDegrees": 18.549620629214406
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 2,
+              "frequencyHz": 92.498,
+              "meanStereoPower": 0.002881982566652144,
+              "sideEnergyFraction": 0.012738884075181069,
+              "lrCoherency": 0.9933546162999569,
+              "lrPhaseDegrees": 1.1235227327010167
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 3,
+              "frequencyHz": 138.747,
+              "meanStereoPower": 0.00017761603045623775,
+              "sideEnergyFraction": 0.2743738703398629,
+              "lrCoherency": 0.5484695957998992,
+              "lrPhaseDegrees": 21.606021347288767
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 4,
+              "frequencyHz": 184.996,
+              "meanStereoPower": 0.00027424080134569437,
+              "sideEnergyFraction": 0.228275188304025,
+              "lrCoherency": 0.9065713804216252,
+              "lrPhaseDegrees": -41.47695086533377
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 5,
+              "frequencyHz": 231.245,
+              "meanStereoPower": 8.405364754548299e-06,
+              "sideEnergyFraction": 0.7807266118885872,
+              "lrCoherency": 0.7754503829997689,
+              "lrPhaseDegrees": -136.70477000812608
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 6,
+              "frequencyHz": 277.494,
+              "meanStereoPower": 7.258752849462366e-06,
+              "sideEnergyFraction": 0.5455034390164287,
+              "lrCoherency": 0.2753711435590654,
+              "lrPhaseDegrees": 147.91346727106705
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 8,
+              "frequencyHz": 369.992,
+              "meanStereoPower": 2.5230677745554466e-07,
+              "sideEnergyFraction": 0.4668489023531737,
+              "lrCoherency": 0.909355598668302,
+              "lrPhaseDegrees": -84.67685158531455
+            }
+          ]
+        },
+        {
+          "relativeSeconds": [
+            3.3,
+            3.6
+          ],
+          "originalSeconds": [
+            48.3,
+            48.6
+          ],
+          "possibleMissingFundamentalHz": 43.654,
+          "strongLowPeaks": [
+            {
+              "frequencyHz": 174.957275390625,
+              "dbRelativeToStrongestFullSpectrumPeak": 0.0
+            },
+            {
+              "frequencyHz": 89.49737548828125,
+              "dbRelativeToStrongestFullSpectrumPeak": -15.022539885412616
+            },
+            {
+              "frequencyHz": 130.5450439453125,
+              "dbRelativeToStrongestFullSpectrumPeak": -15.31134696068004
+            },
+            {
+              "frequencyHz": 77.38494873046875,
+              "dbRelativeToStrongestFullSpectrumPeak": -21.952216431860467
+            },
+            {
+              "frequencyHz": 185.723876953125,
+              "dbRelativeToStrongestFullSpectrumPeak": -24.754219189780784
+            },
+            {
+              "frequencyHz": 104.30145263671875,
+              "dbRelativeToStrongestFullSpectrumPeak": -25.53249749973437
+            },
+            {
+              "frequencyHz": 140.63873291015625,
+              "dbRelativeToStrongestFullSpectrumPeak": -26.071729330212598
+            }
+          ],
+          "harmonicAndStereoMeasurements": [
+            {
+              "harmonicIfMissingFundamentalHypothesis": 1,
+              "frequencyHz": 43.654,
+              "meanStereoPower": 8.275405974380822e-07,
+              "sideEnergyFraction": 0.39306413875573765,
+              "lrCoherency": 0.6118018442780189,
+              "lrPhaseDegrees": 69.38625125065246
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 2,
+              "frequencyHz": 87.308,
+              "meanStereoPower": 0.0002226019380658901,
+              "sideEnergyFraction": 0.4619674687136513,
+              "lrCoherency": 0.1832847300886689,
+              "lrPhaseDegrees": -64.71650703612836
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 3,
+              "frequencyHz": 130.96200000000002,
+              "meanStereoPower": 0.000163556008990333,
+              "sideEnergyFraction": 0.29182214697478603,
+              "lrCoherency": 0.4275264822854181,
+              "lrPhaseDegrees": 9.698221386973184
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 4,
+              "frequencyHz": 174.616,
+              "meanStereoPower": 0.003827951995695707,
+              "sideEnergyFraction": 0.21943619045694518,
+              "lrCoherency": 0.9757944089994368,
+              "lrPhaseDegrees": -52.387580066031994
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 5,
+              "frequencyHz": 218.27,
+              "meanStereoPower": 3.021292706408089e-06,
+              "sideEnergyFraction": 0.5607501777536518,
+              "lrCoherency": 0.477506487677436,
+              "lrPhaseDegrees": -107.02793802644847
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 6,
+              "frequencyHz": 261.92400000000004,
+              "meanStereoPower": 4.053407676835115e-06,
+              "sideEnergyFraction": 0.4974012107617177,
+              "lrCoherency": 0.5015972224419443,
+              "lrPhaseDegrees": -89.40045448398656
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 8,
+              "frequencyHz": 349.232,
+              "meanStereoPower": 3.0576458063440246e-06,
+              "sideEnergyFraction": 0.12483860390212255,
+              "lrCoherency": 0.8163129862971765,
+              "lrPhaseDegrees": -13.649002308677757
+            }
+          ]
+        },
+        {
+          "relativeSeconds": [
+            4.6,
+            4.9
+          ],
+          "originalSeconds": [
+            49.6,
+            49.9
+          ],
+          "possibleMissingFundamentalHz": 38.891,
+          "strongLowPeaks": [
+            {
+              "frequencyHz": 156.78863525390625,
+              "dbRelativeToStrongestFullSpectrumPeak": 0.0
+            },
+            {
+              "frequencyHz": 77.38494873046875,
+              "dbRelativeToStrongestFullSpectrumPeak": -0.13325125970768267
+            },
+            {
+              "frequencyHz": 115.740966796875,
+              "dbRelativeToStrongestFullSpectrumPeak": -8.816725475533596
+            },
+            {
+              "frequencyHz": 85.45989990234375,
+              "dbRelativeToStrongestFullSpectrumPeak": -19.041063971201822
+            },
+            {
+              "frequencyHz": 233.50067138671875,
+              "dbRelativeToStrongestFullSpectrumPeak": -19.106068946661146
+            },
+            {
+              "frequencyHz": 148.71368408203125,
+              "dbRelativeToStrongestFullSpectrumPeak": -20.901114446938518
+            },
+            {
+              "frequencyHz": 175.63018798828125,
+              "dbRelativeToStrongestFullSpectrumPeak": -24.207573128723716
+            }
+          ],
+          "harmonicAndStereoMeasurements": [
+            {
+              "harmonicIfMissingFundamentalHypothesis": 1,
+              "frequencyHz": 38.891,
+              "meanStereoPower": 2.0351945567983962e-07,
+              "sideEnergyFraction": 0.4591104256460628,
+              "lrCoherency": 0.29549581416633636,
+              "lrPhaseDegrees": 72.49577414579015
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 2,
+              "frequencyHz": 77.782,
+              "meanStereoPower": 0.0009738735940482302,
+              "sideEnergyFraction": 0.06372814701922776,
+              "lrCoherency": 0.9610455425729443,
+              "lrPhaseDegrees": 13.735561187888427
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 3,
+              "frequencyHz": 116.673,
+              "meanStereoPower": 0.00014491915206569546,
+              "sideEnergyFraction": 0.5411877698191815,
+              "lrCoherency": 0.603083619100298,
+              "lrPhaseDegrees": -99.09633559131335
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 4,
+              "frequencyHz": 155.564,
+              "meanStereoPower": 0.0013541351622175274,
+              "sideEnergyFraction": 0.14970986410194106,
+              "lrCoherency": 0.9400652882687732,
+              "lrPhaseDegrees": -1.892256593756421
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 5,
+              "frequencyHz": 194.45499999999998,
+              "meanStereoPower": 3.1917497067971223e-06,
+              "sideEnergyFraction": 0.6591652085145814,
+              "lrCoherency": 0.3840657853989882,
+              "lrPhaseDegrees": 150.7407583421009
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 6,
+              "frequencyHz": 233.346,
+              "meanStereoPower": 1.8284123582919976e-05,
+              "sideEnergyFraction": 0.34568195167350296,
+              "lrCoherency": 0.8951831528935975,
+              "lrPhaseDegrees": -68.77842270200668
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 8,
+              "frequencyHz": 311.128,
+              "meanStereoPower": 2.7861077342661735e-06,
+              "sideEnergyFraction": 0.24498699627764797,
+              "lrCoherency": 0.8648483058204577,
+              "lrPhaseDegrees": -24.03905104879796
+            }
+          ]
+        },
+        {
+          "relativeSeconds": [
+            5.5,
+            5.8
+          ],
+          "originalSeconds": [
+            50.5,
+            50.8
+          ],
+          "possibleMissingFundamentalHz": 38.891,
+          "strongLowPeaks": [
+            {
+              "frequencyHz": 155.44281005859375,
+              "dbRelativeToStrongestFullSpectrumPeak": 0.0
+            },
+            {
+              "frequencyHz": 76.7120361328125,
+              "dbRelativeToStrongestFullSpectrumPeak": -4.453338099672653
+            },
+            {
+              "frequencyHz": 115.740966796875,
+              "dbRelativeToStrongestFullSpectrumPeak": -8.08525394695482
+            },
+            {
+              "frequencyHz": 233.50067138671875,
+              "dbRelativeToStrongestFullSpectrumPeak": -21.366858931474315
+            },
+            {
+              "frequencyHz": 193.12591552734375,
+              "dbRelativeToStrongestFullSpectrumPeak": -23.461277342067287
+            },
+            {
+              "frequencyHz": 129.19921875,
+              "dbRelativeToStrongestFullSpectrumPeak": -25.610452124355035
+            },
+            {
+              "frequencyHz": 94.88067626953125,
+              "dbRelativeToStrongestFullSpectrumPeak": -26.37407891205378
+            }
+          ],
+          "harmonicAndStereoMeasurements": [
+            {
+              "harmonicIfMissingFundamentalHypothesis": 1,
+              "frequencyHz": 38.891,
+              "meanStereoPower": 5.927952897348561e-07,
+              "sideEnergyFraction": 0.679535009879941,
+              "lrCoherency": 0.5346419367531001,
+              "lrPhaseDegrees": 133.16782215807027
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 2,
+              "frequencyHz": 77.782,
+              "meanStereoPower": 0.000741941161547713,
+              "sideEnergyFraction": 0.3976632126206745,
+              "lrCoherency": 0.6232695975606182,
+              "lrPhaseDegrees": 55.35194392115744
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 3,
+              "frequencyHz": 116.673,
+              "meanStereoPower": 0.0003158554141325289,
+              "sideEnergyFraction": 0.12122346468722722,
+              "lrCoherency": 0.9599014504895415,
+              "lrPhaseDegrees": 37.23597071937423
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 4,
+              "frequencyHz": 155.564,
+              "meanStereoPower": 0.00265993071325278,
+              "sideEnergyFraction": 0.4382535630037146,
+              "lrCoherency": 0.8349418543552232,
+              "lrPhaseDegrees": -75.82403123462444
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 5,
+              "frequencyHz": 194.45499999999998,
+              "meanStereoPower": 1.1741964796504698e-05,
+              "sideEnergyFraction": 0.5599150096561701,
+              "lrCoherency": 0.8388586907629927,
+              "lrPhaseDegrees": 98.4427122173419
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 6,
+              "frequencyHz": 233.346,
+              "meanStereoPower": 2.4968769077248946e-05,
+              "sideEnergyFraction": 0.1839218888138569,
+              "lrCoherency": 0.8838125376909808,
+              "lrPhaseDegrees": -33.08962775436398
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 8,
+              "frequencyHz": 311.128,
+              "meanStereoPower": 7.841372694170154e-06,
+              "sideEnergyFraction": 0.2828552457558952,
+              "lrCoherency": 0.8267321614824664,
+              "lrPhaseDegrees": -39.4285970648242
+            }
+          ]
+        },
+        {
+          "relativeSeconds": [
+            6.3,
+            6.6
+          ],
+          "originalSeconds": [
+            51.3,
+            51.6
+          ],
+          "possibleMissingFundamentalHz": 38.891,
+          "strongLowPeaks": [
+            {
+              "frequencyHz": 154.7698974609375,
+              "dbRelativeToStrongestFullSpectrumPeak": 0.0
+            },
+            {
+              "frequencyHz": 76.03912353515625,
+              "dbRelativeToStrongestFullSpectrumPeak": -7.093763195453887
+            },
+            {
+              "frequencyHz": 115.740966796875,
+              "dbRelativeToStrongestFullSpectrumPeak": -13.870716478423613
+            },
+            {
+              "frequencyHz": 232.8277587890625,
+              "dbRelativeToStrongestFullSpectrumPeak": -20.706316826077188
+            },
+            {
+              "frequencyHz": 193.12591552734375,
+              "dbRelativeToStrongestFullSpectrumPeak": -21.86572533057108
+            },
+            {
+              "frequencyHz": 273.87542724609375,
+              "dbRelativeToStrongestFullSpectrumPeak": -22.918920145951436
+            },
+            {
+              "frequencyHz": 143.33038330078125,
+              "dbRelativeToStrongestFullSpectrumPeak": -23.937549901103612
+            }
+          ],
+          "harmonicAndStereoMeasurements": [
+            {
+              "harmonicIfMissingFundamentalHypothesis": 1,
+              "frequencyHz": 38.891,
+              "meanStereoPower": 5.845818614984516e-07,
+              "sideEnergyFraction": 0.2927758219221009,
+              "lrCoherency": 0.5229299335973815,
+              "lrPhaseDegrees": 17.842570124467265
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 2,
+              "frequencyHz": 77.782,
+              "meanStereoPower": 0.0004198101159225193,
+              "sideEnergyFraction": 0.18885300527145613,
+              "lrCoherency": 0.6555030890550843,
+              "lrPhaseDegrees": -18.24116279802119
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 3,
+              "frequencyHz": 116.673,
+              "meanStereoPower": 0.00017023253753493644,
+              "sideEnergyFraction": 0.18343434275742893,
+              "lrCoherency": 0.7911845953483535,
+              "lrPhaseDegrees": 34.55882069847749
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 4,
+              "frequencyHz": 155.564,
+              "meanStereoPower": 0.0019957184424638863,
+              "sideEnergyFraction": 0.7231708424593309,
+              "lrCoherency": 0.981955893707955,
+              "lrPhaseDegrees": -117.8811899048757
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 5,
+              "frequencyHz": 194.45499999999998,
+              "meanStereoPower": 1.2693957097949533e-05,
+              "sideEnergyFraction": 0.7686451391562188,
+              "lrCoherency": 0.6917191754570404,
+              "lrPhaseDegrees": 141.8627282838852
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 6,
+              "frequencyHz": 233.346,
+              "meanStereoPower": 2.5782475760666755e-05,
+              "sideEnergyFraction": 0.2632145474399234,
+              "lrCoherency": 0.9412473189820446,
+              "lrPhaseDegrees": -58.101617072549196
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 8,
+              "frequencyHz": 311.128,
+              "meanStereoPower": 2.534511684436345e-06,
+              "sideEnergyFraction": 0.6055824972776706,
+              "lrCoherency": 0.7252129950089425,
+              "lrPhaseDegrees": -110.1208219498458
+            }
+          ]
+        },
+        {
+          "relativeSeconds": [
+            7,
+            7.3
+          ],
+          "originalSeconds": [
+            52,
+            52.3
+          ],
+          "possibleMissingFundamentalHz": 43.654,
+          "strongLowPeaks": [
+            {
+              "frequencyHz": 87.4786376953125,
+              "dbRelativeToStrongestFullSpectrumPeak": 0.0
+            },
+            {
+              "frequencyHz": 130.5450439453125,
+              "dbRelativeToStrongestFullSpectrumPeak": -4.159885356263092
+            },
+            {
+              "frequencyHz": 175.63018798828125,
+              "dbRelativeToStrongestFullSpectrumPeak": -6.7632981772767735
+            },
+            {
+              "frequencyHz": 117.0867919921875,
+              "dbRelativeToStrongestFullSpectrumPeak": -13.045817494423416
+            },
+            {
+              "frequencyHz": 97.57232666015625,
+              "dbRelativeToStrongestFullSpectrumPeak": -13.762663397040477
+            },
+            {
+              "frequencyHz": 262.4359130859375,
+              "dbRelativeToStrongestFullSpectrumPeak": -16.292477354646085
+            },
+            {
+              "frequencyHz": 153.424072265625,
+              "dbRelativeToStrongestFullSpectrumPeak": -17.858281838836355
+            }
+          ],
+          "harmonicAndStereoMeasurements": [
+            {
+              "harmonicIfMissingFundamentalHypothesis": 1,
+              "frequencyHz": 43.654,
+              "meanStereoPower": 5.801476564817468e-07,
+              "sideEnergyFraction": 0.3213600851416177,
+              "lrCoherency": 0.8036637569149083,
+              "lrPhaseDegrees": 63.530750014096924
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 2,
+              "frequencyHz": 87.308,
+              "meanStereoPower": 0.000579146957475608,
+              "sideEnergyFraction": 0.09234037921723785,
+              "lrCoherency": 0.8513064287777691,
+              "lrPhaseDegrees": 7.239285174124641
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 3,
+              "frequencyHz": 130.96200000000002,
+              "meanStereoPower": 0.00041316793694190783,
+              "sideEnergyFraction": 0.061426936544453574,
+              "lrCoherency": 0.8793393438477074,
+              "lrPhaseDegrees": -2.516443036433464
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 4,
+              "frequencyHz": 174.616,
+              "meanStereoPower": 0.00021352941122264964,
+              "sideEnergyFraction": 0.6668360826419141,
+              "lrCoherency": 0.5311741246660342,
+              "lrPhaseDegrees": 167.98742116168148
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 5,
+              "frequencyHz": 218.27,
+              "meanStereoPower": 6.994846591158966e-06,
+              "sideEnergyFraction": 0.35596631329670736,
+              "lrCoherency": 0.37731477017262866,
+              "lrPhaseDegrees": -31.1991871693511
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 6,
+              "frequencyHz": 261.92400000000004,
+              "meanStereoPower": 3.3564841405168974e-05,
+              "sideEnergyFraction": 0.546158590029112,
+              "lrCoherency": 0.5421404856860351,
+              "lrPhaseDegrees": 103.06378966656284
+            },
+            {
+              "harmonicIfMissingFundamentalHypothesis": 8,
+              "frequencyHz": 349.232,
+              "meanStereoPower": 4.740882286538671e-06,
+              "sideEnergyFraction": 0.7033882892863046,
+              "lrCoherency": 0.9286416140387423,
+              "lrPhaseDegrees": 122.94684161550786
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "usefulAnchors": [
+    {
+      "relativeSeconds": [
+        0.1,
+        0.4
+      ],
+      "frequenciesHz": [
+        92.5,
+        138.75,
+        185,
+        231.25,
+        277.5
+      ],
+      "possibleFamilyRootHz": 46.25,
+      "rootNameHypothesis": "F#1, possibly missing; octave alternatives remain"
+    },
+    {
+      "relativeSeconds": [
+        3.3,
+        3.6
+      ],
+      "frequenciesHz": [
+        87.3,
+        130.96,
+        174.62,
+        261.92
+      ],
+      "possibleFamilyRootHz": 43.65,
+      "rootNameHypothesis": "F1, possibly missing; octave alternatives remain"
+    },
+    {
+      "relativeSeconds": [
+        4.6,
+        4.9
+      ],
+      "frequenciesHz": [
+        77.78,
+        116.67,
+        155.56,
+        233.34
+      ],
+      "possibleFamilyRootHz": 38.89,
+      "rootNameHypothesis": "Eb1, possibly missing; octave alternatives remain"
+    },
+    {
+      "relativeSeconds": [
+        7,
+        7.3
+      ],
+      "frequenciesHz": [
+        87.3,
+        130.96,
+        174.62,
+        261.92
+      ],
+      "possibleFamilyRootHz": 43.65,
+      "rootNameHypothesis": "F1, possibly missing; octave alternatives remain"
+    }
+  ],
+  "interpretation": [
+    "07 contains strong changing low families, especially around 185, 175 and 155 Hz; the user describing audible bass/accompaniment is consistent with the spectrum.",
+    "The low peaks fit harmonic families with weak or missing sub fundamentals; do not blindly label every 92/138/185 peak a separate chord note.",
+    "Equally, multiple related notes/layered patches can fit the same family. Missing-fundamental root names are analysis hypotheses, not recovered MIDI.",
+    "HDEMUCS bass is dominated by lower, mostly central components. 07 retains strong moving stereo components at the higher low-family anchors.",
+    "MuS3D bass often retains the spatial shape and high low-family anchors found in 07, making it a useful reference for the remaining low layer; it also contains material no longer in07.",
+    "A simple low-pass cut or fixed Mid removal will miss much of the audible bass identity and can damage other voices.",
+    "699 and 1398 Hz are not privileged bass roots: any association must be tested as higher partials with corresponding low-family activity."
+  ],
+  "limitations": [
+    "No auditory evaluation was performed.",
+    "Spatial features vary substantially by time and frequency, so no single stable pan defines this bass.",
+    "The original model estimates differ in sample rate and context; this report compares matched time windows, not phase-aligned subtraction.",
+    "The rough anchor runs track dominant 155/175/185 energy, not exact note starts, tempo or recovered bass notes."
+  ],
+  "noModelInference": true,
+  "noAudioDeviceUsed": true,
+  "noMidiProduced": true,
+  "noSourceAudioModified": true
+}

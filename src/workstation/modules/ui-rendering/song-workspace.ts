@@ -1,12 +1,20 @@
 import type { SaveConfirmation, SaveResult } from '../../contracts/content.ts';
 import type { SongBody, SongClip, SongClipRef, SongEditorPort } from '../../contracts/song.ts';
-import type { SoundRuntimePort } from '../../contracts/sound.ts';
-import type { PostProductionSettings } from '../../contracts/post-production.ts';
+import type { PlaybackSession, SoundRuntimePort } from '../../contracts/sound.ts';
+import { songGridTempoAt } from '../song/public.ts';
 import { readEntityDrag } from './entity-drag.ts';
-import { createLivePreview } from './live-preview.ts';
 import { createSongSaveAction, isSongSaveShortcut } from './song-save.ts';
-import { createReferenceNavigation, showReferenceActions, type ReferenceEditorContext } from './reference-ui.ts';
+import type { ReferenceEditorContext } from './reference-ui.ts';
+import { createPlaylistTransport } from './playlist-transport.ts';
+import { clampPlaylist, playlistBeats, playlistClipRect, playlistGridLines, playlistSeconds, playlistSegmentIntersectsRect,
+  playlistTrackAt, zoomPlaylist, type PlaylistViewport } from './playlist-geometry.ts';
+import { PLAYLIST_COLORS, playlistColorInk, playlistPhraseColor } from './playlist-colors.ts';
+import { createSongInspector, type SongInspectorView } from './song-inspector.ts';
+import { createSongPhraseAudition } from './song-phrase-audition.ts';
+import { libraryClickDelay } from './library-click.ts';
 import './song.css';
+
+const DOUBLE_NUDGE_WINDOW_MS = 150;
 
 function node<K extends keyof HTMLElementTagNameMap>(tag: K, className = '', text = ''): HTMLElementTagNameMap[K] {
   const result = document.createElement(tag); result.className = className; result.textContent = text; return result;
@@ -14,492 +22,1049 @@ function node<K extends keyof HTMLElementTagNameMap>(tag: K, className = '', tex
 function action(label: string, className: string, callback: () => void): HTMLButtonElement {
   const button = node('button', className, label); button.type = 'button'; button.addEventListener('click', callback); return button;
 }
+function icon(kind: 'play' | 'pause' | 'stop' | 'tempo' | 'volume' | 'solo' | 'mute'): SVGSVGElement {
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('viewBox', '0 0 24 24'); svg.setAttribute('aria-hidden', 'true');
+  const paths = { play: 'M8 5v14l11-7z', pause: 'M7 5h3v14H7zM14 5h3v14h-3z', stop: 'M6 6h12v12H6z',
+    tempo: 'M9 3h6l5 18H4zM12 6v10m-3-4 7-5M8 18h8', volume: 'M4 9h4l5-4v14l-5-4H4zM16 8q5 4 0 8M19 5q7 7 0 14',
+    solo: 'M4 9h4l5-4v14l-5-4H4zM17 8v8m3-10v12', mute: 'M4 9h4l5-4v14l-5-4H4zM17 9l5 6m0-6-5 6' };
+  const path = document.createElementNS('http://www.w3.org/2000/svg', 'path'); path.setAttribute('d', paths[kind]);
+  path.setAttribute('fill', ['play', 'pause', 'stop'].includes(kind) ? 'currentColor' : 'none');
+  path.setAttribute('stroke', 'currentColor'); path.setAttribute('stroke-width', '1.5'); path.setAttribute('stroke-linejoin', 'round'); svg.append(path); return svg;
+}
+function timeLabel(seconds: number): string {
+  const sign = seconds < 0 ? '−' : ''; const value = Math.abs(seconds);
+  return `${sign}${Math.floor(value / 60)}:${(value % 60).toFixed(value % 1 > .01 ? 1 : 0).padStart(2, '0')}`;
+}
+type PickedClip = SongClipRef & { clip: SongClip; trackIndex: number };
+type Point = { x: number; y: number };
+type DragMove = { trackId: string; seconds: number };
+type Gesture =
+  | { kind: 'head'; pointerId: number }
+  | { kind: 'pan'; pointerId: number; last: Point }
+  | { kind: 'row'; pointerId: number; from: Point; trackId: string; sourceIndex: number; targetIndex: number; deltaY: number; moved: boolean; nameClicked: boolean }
+  | { kind: 'erase'; pointerId: number; previous: Point; refs: Map<string, SongClipRef> }
+  | { kind: 'clip'; pointerId: number; from: Point; lastX: number; rawDeltaX: number; clips: PickedClip[]; anchor: PickedClip; moved: boolean; valid: boolean; moves: Map<string, DragMove>; deltaX: number; deltaY: number };
 
-/** The timeline receives a public song editor; it never reads phrase implementation data. */
+/** A seconds-based, viewport-sized playlist. Song beats remain its storage boundary. */
 export function mountSongWorkspace(root: HTMLElement, options: {
   song: SongEditorPort; sound: SoundRuntimePort; onSound(): void; onPhrase(): void; onWelcome(): void;
   onLibrary?(): void; onSettings?(): void; onExport?(): void; onCoCreation?(): void; onSampling?(): void;
-  onOpenProject?(): void | Promise<void>; onSaveProject?(): void | Promise<void>;
-  referenceContext?: ReferenceEditorContext;
-  onSave?(): void; onApplyElsewhere?(): void;
-  onEditPhrase?(ref: SongClipRef, chooseLocations?: boolean): void;
-  renderEntities?(): HTMLElement;
+  onOpenProject?(): void | Promise<void>; onSaveProject?(): void | Promise<void>; onSaveProjectAs?(): void | Promise<void>;
+  onExit?(): void | Promise<void>;
+  projectName?(): string; onRenameProject?(name: string): void;
+  doubleClickIntervalMs?: number;
+  phrases?(): Array<{ id: string; name: string; tempoBpm?: number; durationSeconds?: number }>;
+  onRenamePhrase?(id: string, name: string, ref?: SongClipRef): void | { id: string } | Promise<void | { id: string }>; onOpenPhrase?(id: string): void;
+  onNewPhrase?(): void; onKeepPhrases?(ids: string[]): void;
+  onDeletePhrase?(id: string): void | Promise<void>;
+  onPreviewPhrase?(id: string, signal: AbortSignal): Promise<PlaybackSession>;
+  referenceContext?: ReferenceEditorContext; onSave?(): void; onApplyElsewhere?(): void;
+  onEditPhrase?(ref: SongClipRef, chooseLocations?: boolean): void; renderEntities?(): HTMLElement;
 }): { dispose(): void; refresh(context?: ReferenceEditorContext, onApplyElsewhere?: () => void): void; notify(message: string, error?: boolean): void } {
   const { song, sound } = options;
-  let selectedTrack: string | undefined;
-  let renderedDraftId: string | undefined;
-  let selected = new Set<string>();
-  let clipboard: Array<{ trackOffset: number; phraseId: string; beatOffset: number }> = [];
-  let snap = 1;
-  let beatPixels = 44;
-  let scrollLeft = 0;
-  let scrollTop = 0;
-  let disposed = false;
-  let sessionId: string | undefined;
-  let liveBody: SongBody | undefined;
-  const livePreview = createLivePreview(sound, () => sessionId, error => report(error instanceof Error ? error.message : String(error), true), undefined, () => song.preparePreview());
-  let preparing = false;
-  let playbackGeneration = 0;
-  let playbackTempo = 120;
-  let frame = 0;
-  let notice: HTMLElement | undefined;
-  let playButton: HTMLButtonElement | undefined;
-  let playhead: HTMLElement | undefined;
-  let stopGesture: (() => void) | undefined;
-  let pointerDown = false;
-  let deferredLayout = false;
-  let layoutTimer = 0;
-  let status = '';
-  let postOpen = false;
-  let isError = false;
-  let fieldCommitError: string | undefined;
-  const report = (message: string, error = false) => { status = message; isError = error; if (notice) { notice.textContent = message; notice.classList.toggle('is-error', error); } };
-  function stopPlayback(): void {
-    livePreview.cancel(); liveBody = undefined;
-    playbackGeneration++; preparing = false; sessionId = undefined; cancelAnimationFrame(frame);
-    sound.stopAll(); updatePlayback();
+  let disposed = false; let current = song.read(); let draftId = current.draft?.id;
+  let view: PlaylistViewport = { leftSeconds: 0, top: 0, pixelsPerSecond: 88, rowHeight: 60 };
+  let selected = new Set<string>(); let selectedTrack: string | undefined; let selectedPhrase: string | undefined; let gesture: Gesture | undefined;
+  let viewport: HTMLElement; let content: HTMLElement; let ruler: HTMLElement; let erasures: HTMLElement;
+  let notice: HTMLElement; let playButton: HTMLButtonElement; let playhead: HTMLElement; let headHandle: HTMLElement; let clock: HTMLElement; let rowControls: HTMLElement;
+  const clipNodes = new Map<string, HTMLElement>(); const rowNodes = new Map<string, HTMLElement[]>();
+  let tempoInput: HTMLInputElement; let masterInput: HTMLInputElement;
+  let frame = 0; let noticeTimer = 0; let observer: ResizeObserver | undefined;
+  let fieldCommitError: string | undefined; let pendingCommit: (() => void) | undefined;
+  let saveAsRequested = false; let exiting = false; let dragPhraseId: string | undefined;
+  let dropPreview: { phraseId: string; seconds: number; trackIndex: number } | undefined;
+  let transportState = { playing: false, preparing: false, position: 0, rate: 1 };
+  let doubleNudge: { key: string; identity: string; at: number; starts: Map<string, number>; beat: number } | undefined;
+  let deleteArmed: string | undefined; let deleteTimer = 0; let tempoEditAt: number | undefined; let tempoEdited = false;
+  let lastNamePointer: string | undefined;
+  let paletteList: HTMLElement; let newPhraseButton: HTMLElement; const phraseCards = new Map<string, HTMLElement>();
+  let trash: HTMLElement; let phraseLibrary: HTMLDialogElement | undefined;
+  let libraryDragId: string | undefined; let phraseDeleteDialog: HTMLDialogElement | undefined;
+  let lastClipPointer: SongClipRef | undefined;
+  let previousClipPointer: (SongClipRef & { at: number; point: Point }) | undefined;
+  let lastPointerActivation: (SongClipRef & { at: number }) | undefined;
+  let shelfDrag: { id: string; source: number; target: number; startY: number; deltaY: number; pitch: number } | undefined;
+  let shelfPress: { id: string; pointerId: number; from: Point; moved: boolean } | undefined;
+  let previousShelfPointer: { id: string; at: number; point: Point } | undefined;
+  let lastShelfActivation: { id: string; at: number } | undefined;
+  let suppressShelfClick = false;
+  let mixPreview: { kind: 'clip' | 'row'; trackId: string; clipId?: string; field: 'level' | 'pan'; value: number } | undefined;
+  let pendingRename = 0;
+  function report(message: string, error = false): void {
+    if (disposed || !notice) return;
+    notice.textContent = message; notice.classList.toggle('is-error', error); notice.hidden = !message;
+    window.clearTimeout(noticeTimer); noticeTimer = window.setTimeout(() => { if (notice) notice.hidden = true; }, error ? 7000 : 3200);
   }
-  function edit(change: () => void, message = '修改已保留为编辑稿。'): void {
-    const previousDraft = song.read().draft?.id;
-    liveBody = undefined;
-    try { change(); report(message); } catch (error) { fieldCommitError = error instanceof Error ? error.message : String(error); report(fieldCommitError, true); }
-    if (song.read().draft?.id !== previousDraft) stopPlayback();
-    else { playbackTempo = song.read().body?.tempoBpm ?? playbackTempo; livePreview.flush(() => song.previewPlan(undefined, { allowSilence: true })); }
-    render();
+  const inspector = createSongInspector(error => report(error instanceof Error ? error.message : String(error), true));
+  const transport = createPlaylistTransport({ runtime: sound, prepare: () => song.preparePreview(),
+    readPlan: () => song.previewPlan(previewBody(), { allowSilence: true }),
+    onError: error => report(error instanceof Error ? error.message : String(error), true),
+    onChange(state) { transportState = state; updatePlayback(); },
+  });
+  const audition = options.onPreviewPhrase ? createSongPhraseAudition({ runtime: sound, preview: options.onPreviewPhrase,
+    onChange: () => updateInspector(), onError: error => report(error instanceof Error ? error.message : String(error), true) }) : undefined;
+  function auditionControls(id: string) {
+    const state = audition?.read();
+    return { onAudition: audition ? () => { transport.pause(); void audition.toggle(id); } : undefined,
+      auditioning: state?.phraseId === id && state.playing, preparingAudition: state?.phraseId === id && state.preparing };
   }
-  function quietEdit(change: () => void): boolean {
-    liveBody = undefined;
-    try {
-      change(); const view = song.read(); report('修改已保留为编辑稿。');
-      const saveState = root.querySelector<HTMLElement>('.save-state'); if (saveState) saveState.textContent = '本机编辑稿已保留';
-      const undo = root.querySelector<HTMLButtonElement>('.song-undo'); if (undo) undo.disabled = !view.canUndo;
-      const redo = root.querySelector<HTMLButtonElement>('.song-redo'); if (redo) redo.disabled = !view.canRedo;
-      playbackTempo = view.body?.tempoBpm ?? playbackTempo; livePreview.flush(() => song.previewPlan(undefined, { allowSilence: true }));
-      return true;
-    } catch (error) {
-      playbackTempo = song.read().body?.tempoBpm ?? playbackTempo;
-      livePreview.flush(() => song.previewPlan(undefined, { allowSilence: true }));
-      fieldCommitError = error instanceof Error ? error.message : String(error);
-      report(fieldCommitError, true); render(); return false;
+  function previewBody(): SongBody | undefined {
+    const active = gesture; let body = current.body;
+    if (body && mixPreview) {
+      const mix = mixPreview;
+      body = { ...body, tracks: body.tracks.map(track => track.id !== mix.trackId ? track
+        : mix.kind === 'row' ? { ...track, [mix.field === 'pan' ? 'panOffset' : mix.field]: mix.value }
+          : { ...track, clips: track.clips.map(clip => clip.id === mix.clipId ? { ...clip, [mix.field]: mix.value } : clip) }) };
     }
+    if (mixPreview && (!active || active.kind === 'head' || active.kind === 'row' || active.kind === 'pan')) return body;
+    if (!body || !active || active.kind === 'head' || active.kind === 'row' || active.kind === 'pan') return undefined;
+    if (active.kind === 'erase') {
+      if (!active.refs.size) return undefined;
+      return { ...body, tracks: body.tracks.map(track => ({ ...track, clips: track.clips.filter(clip => !active.refs.has(clip.id)) })) };
+    }
+    if (!active.moved || !active.valid || !active.moves.size) return undefined;
+    const tracks = body.tracks.map(track => ({ ...track, clips: track.clips.filter(clip => !active.moves.has(clip.id)) }));
+    for (const ref of active.clips) {
+      const move = active.moves.get(ref.clipId)!; const target = tracks.find(track => track.id === move.trackId)!;
+      target.clips.push({ ...ref.clip, startBeat: playlistBeats(move.seconds, body.tempoBpm) });
+    }
+    return { ...body, tracks };
   }
-  function quantize(value: number): number { return snap ? Math.round(value / snap) * snap : value; }
-  function picked(): Array<SongClipRef & { clip: SongClip; trackIndex: number }> {
-    return song.read().body?.tracks.flatMap((track, trackIndex) => track.clips.filter(clip => selected.has(clip.id)).map(clip => ({ trackId: track.id, clipId: clip.id, clip, trackIndex }))) ?? [];
+  function updatePlayback(): void {
+    if (!playButton || disposed) return;
+    playButton.replaceChildren(icon(transportState.playing ? 'pause' : 'play'));
+    playButton.setAttribute('aria-label', transportState.preparing ? '取消播放准备' : transportState.playing ? '暂停' : '播放');
+    playButton.classList.toggle('is-preparing', transportState.preparing);
+    cancelAnimationFrame(frame); positionPlayhead(); if (transportState.playing) frame = requestAnimationFrame(tick);
+  }
+  function positionPlayhead(): void {
+    const seconds = transport.position(); const x = (seconds - view.leftSeconds) * view.pixelsPerSecond;
+    if (playhead) playhead.style.left = `${x}px`;
+    if (headHandle) headHandle.style.left = `${x}px`;
+    if (clock) { const ms = Math.round(seconds * 1000); clock.textContent = `${Math.floor(ms / 60000).toString().padStart(2, '0')}:${Math.floor(ms / 1000 % 60).toString().padStart(2, '0')}.${(ms % 1000).toString().padStart(3, '0')}`; }
+    if (tempoInput && document.activeElement !== tempoInput && current.body) tempoInput.value = String(songGridTempoAt(current.body, seconds));
+  }
+  function tick(): void { if (disposed) return; positionPlayhead(); if (transportState.playing) frame = requestAnimationFrame(tick); }
+  function sync(): void {
+    current = song.read();
+    if (draftId !== current.draft?.id) {
+      draftId = current.draft?.id; selected.clear(); selectedTrack = undefined; selectedPhrase = undefined; mixPreview = undefined; inspector.cancel(); view = { ...view, leftSeconds: 0, top: 0 }; transport.stop();
+    }
+    const ids = new Set(current.body?.tracks.flatMap(track => track.clips.map(clip => clip.id)));
+    selected = new Set([...selected].filter(id => ids.has(id)));
+    if (!current.body?.tracks.some(track => track.id === selectedTrack)) selectedTrack = undefined;
+    if (selectedPhrase && !phrases().some(phrase => phrase.id === selectedPhrase)) selectedPhrase = undefined;
+  }
+  function mutate(change: () => void, refreshAudio = true): boolean {
+    if (exiting) return false;
+    try { change(); fieldCommitError = undefined; sync(); if (refreshAudio) transport.refresh(); paint(); return true; }
+    catch (error) { fieldCommitError = error instanceof Error ? error.message : String(error); report(fieldCommitError, true); sync(); paint(); return false; }
+  }
+  function duration(phraseId: string): number {
+    return playlistSeconds(current.clipLengths?.[phraseId] ?? song.clipLengthBeats(phraseId), current.body?.tempoBpm ?? 120);
+  }
+  function phrases(): Array<{ id: string; name: string; tempoBpm?: number; durationSeconds?: number }> { return options.phrases?.() ?? current.availablePhrases; }
+  function orderedPhrases() {
+    const all = phrases().slice().sort((a, b) => a.name.localeCompare(b.name, 'zh-CN') || a.id.localeCompare(b.id));
+    const order = new Map((current.body?.phraseShelfOrder ?? []).map((id, index) => [id, index]));
+    return all.map((phrase, index) => ({ phrase, index })).sort((a, b) => (order.get(a.phrase.id) ?? order.size + a.index) - (order.get(b.phrase.id) ?? order.size + b.index)).map(item => item.phrase);
+  }
+  function shelfPhrases() { const hidden = new Set(current.body?.hiddenPhraseIds); return orderedPhrases().filter(phrase => !hidden.has(phrase.id)); }
+  function picked(): PickedClip[] {
+    if (selectedPhrase) return [];
+    return current.body?.tracks.flatMap((track, trackIndex) => track.clips.filter(clip => selectedTrack ? track.id === selectedTrack : selected.has(clip.id))
+      .map(clip => ({ trackId: track.id, clipId: clip.id, clip, trackIndex }))) ?? [];
+  }
+  function mixValue(kind: 'clip' | 'row', trackId: string, field: 'level' | 'pan', clipId?: string, storedOnly = false): number {
+    if (!storedOnly && mixPreview?.kind === kind && mixPreview.trackId === trackId && mixPreview.field === field && mixPreview.clipId === clipId) return mixPreview.value;
+    const track = current.body!.tracks.find(item => item.id === trackId)!;
+    if (kind === 'row') return field === 'level' ? track.level : track.panOffset ?? 0;
+    const clip = track.clips.find(item => item.id === clipId)!;
+    return field === 'level' ? clip.level ?? 1 : clip.pan ?? track.pan;
+  }
+  function changeMix(kind: 'clip' | 'row', trackId: string, clipId: string | undefined, field: 'level' | 'pan', value: number, commit: boolean): void {
+    if (exiting) return;
+    if (!commit) { mixPreview = { kind, trackId, clipId, field, value }; transport.refresh(); return; }
+    const before = mixValue(kind, trackId, field, clipId, true);
+    mixPreview = undefined;
+    if (Math.abs(before - value) < 1e-9) { updateInspector(); transport.refresh(); return; }
+    mutate(() => kind === 'row' ? song.updateTrack(trackId, field === 'pan' ? { panOffset: value } : { level: value })
+      : song.updateClip(trackId, clipId!, { [field]: value }));
+  }
+  function phraseInfo(id: string) {
+    const item = phrases().find(phrase => phrase.id === id);
+    return { id, name: item?.name ?? '乐句', tempoBpm: item?.tempoBpm, durationSeconds: item?.durationSeconds ?? duration(id) };
+  }
+  function editPhrase(ref: SongClipRef): void {
+    inspector.flush(); finishGesture(false); audition?.stop(); transport.pause();
+    try { options.onEditPhrase?.(ref); } catch (error) { report(error instanceof Error ? error.message : String(error), true); }
+  }
+  function renamePhrase(id: string, name: string, ref?: SongClipRef): void {
+    if (!options.onRenamePhrase) throw new Error('当前窗口暂不支持修改乐句名称。');
+    const apply = (result: void | { id: string }) => { if (result && selectedPhrase === id) selectedPhrase = result.id; if (!disposed) { sync(); paint(); } };
+    const result = options.onRenamePhrase(id, name, ref);
+    if (result instanceof Promise) {
+      pendingRename++; void result.then(apply).catch(error => { if (!disposed) { sync(); paint(); report(error instanceof Error ? error.message : String(error), true); } }).finally(() => { pendingRename--; });
+    } else apply(result);
+  }
+  function updateInspector(): void {
+    if (disposed) return;
+    inspector.element.style.visibility = '';
+    if (!current.body) { inspector.update(); return; }
+    const focusedPhrase = selectedPhrase ?? (!selectedTrack && picked().length === 1 ? picked()[0]!.clip.phraseId : undefined);
+    if (audition?.read().phraseId && audition.read().phraseId !== focusedPhrase) audition.stop();
+    let data: SongInspectorView | undefined;
+    if (selectedPhrase) {
+      const info = phraseInfo(selectedPhrase); const id = selectedPhrase;
+      data = { key: `phrase:${id}`, kind: 'phrase', name: info.name, ...auditionControls(id),
+        details: [{ label: '时长', value: `${Number(info.durationSeconds.toFixed(3))} 秒` }],
+        onRename: options.onRenamePhrase ? name => renamePhrase(id, name) : undefined,
+        onDetail: () => { inspector.flush(); transport.pause(); options.onOpenPhrase?.(id); } };
+    } else if (selectedTrack) {
+      const track = current.body.tracks.find(item => item.id === selectedTrack)!;
+      data = { key: `row:${track.id}`, kind: 'row', name: track.name, color: track.color,
+        details: [], level: mixValue('row', track.id, 'level'), pan: mixValue('row', track.id, 'pan'),
+        onRename: name => mutate(() => song.updateTrack(track.id, { name }), false),
+        onColor: () => colorRow(track.id), onMix: (field, value, commit) => changeMix('row', track.id, undefined, field, value, commit) };
+    } else {
+      const refs = picked();
+      if (refs.length === 1) {
+        const ref = refs[0]!; const info = phraseInfo(ref.clip.phraseId);
+        data = { key: `clip:${ref.clipId}`, kind: 'clip', name: info.name, ...auditionControls(ref.clip.phraseId),
+          details: [{ label: 'BPM', value: info.tempoBpm === undefined ? '—' : String(info.tempoBpm) },
+            { label: '时长', value: `${Number(info.durationSeconds.toFixed(3))} 秒` },
+            { label: '播放时间点', value: `${playlistSeconds(ref.clip.startBeat, current.body.tempoBpm).toFixed(3)} 秒` }],
+          level: mixValue('clip', ref.trackId, 'level', ref.clipId), pan: mixValue('clip', ref.trackId, 'pan', ref.clipId),
+          onRename: options.onRenamePhrase ? name => renamePhrase(ref.clip.phraseId, name, ref) : undefined,
+          onDetail: () => editPhrase(ref), onMix: (field, value, commit) => changeMix('clip', ref.trackId, ref.clipId, field, value, commit) };
+      }
+    }
+    inspector.update(data);
+  }
+  function selectPhrase(id: string): void {
+    if (disposed || exiting) return;
+    previousClipPointer = undefined; lastClipPointer = undefined;
+    inspector.flush(); finishGesture(false); selectedPhrase = id; selectedTrack = undefined; selected.clear(); doubleNudge = undefined;
+    viewport.focus({ preventScroll: true }); paint();
+  }
+  function openShelfPhrase(id: string): void {
+    if (disposed || exiting || !shelfPhrases().some(phrase => phrase.id === id) || !options.onOpenPhrase) return;
+    inspector.flush(); finishGesture(false); audition?.stop(); transport.pause();
+    previousShelfPointer = undefined; lastShelfActivation = { id, at: Date.now() };
+    try { options.onOpenPhrase(id); } catch (error) { report(error instanceof Error ? error.message : String(error), true); }
+  }
+  function finishShelfPress(event: PointerEvent): void {
+    const press = shelfPress; if (!press || press.pointerId !== event.pointerId) return; shelfPress = undefined;
+    if (disposed || exiting || suppressShelfClick || press.moved || Math.hypot(event.clientX - press.from.x, event.clientY - press.from.y) > 6) { previousShelfPointer = undefined; suppressShelfClick = true; return; }
+    const previous = previousShelfPointer; const now = Date.now();
+    const interval = options.doubleClickIntervalMs && Number.isFinite(options.doubleClickIntervalMs) ? options.doubleClickIntervalMs : 400;
+    const paired = previous?.id === press.id && now - previous.at <= interval && Math.hypot(previous.point.x - press.from.x, previous.point.y - press.from.y) <= 6;
+    previousShelfPointer = paired ? undefined : { id: press.id, at: now, point: press.from };
+    if (paired) openShelfPhrase(press.id);
+  }
+  function syncPalette(): void {
+    if (!paletteList) return;
+    const items = shelfPhrases(); const ids = new Set(items.map(item => item.id));
+    for (const [id, card] of phraseCards) if (!ids.has(id) && id !== dragPhraseId) { card.remove(); phraseCards.delete(id); }
+    for (const phrase of items) {
+      let card = phraseCards.get(phrase.id);
+      if (!card) {
+        card = node('div', 'song-phrase-card'); card.draggable = true; card.tabIndex = 0; card.dataset.phraseId = phrase.id;
+        card.addEventListener('pointerdown', event => {
+          if (disposed || exiting || event.button !== 0) return;
+          suppressShelfClick = false; shelfPress = { id: phrase.id, pointerId: event.pointerId, from: { x: event.clientX, y: event.clientY }, moved: false };
+        });
+        card.addEventListener('click', () => { if (!suppressShelfClick && !(lastShelfActivation?.id === phrase.id && Date.now() - lastShelfActivation.at < 500)) selectPhrase(phrase.id); });
+        card.addEventListener('dblclick', event => {
+          if (disposed || exiting || suppressShelfClick || dragPhraseId) return; event.preventDefault(); event.stopPropagation();
+          if (lastShelfActivation?.id === phrase.id && Date.now() - lastShelfActivation.at < 500) return;
+          openShelfPhrase(phrase.id);
+        });
+        card.addEventListener('keydown', event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); selectPhrase(phrase.id); } });
+        card.addEventListener('dragstart', event => {
+          if (!event.dataTransfer || exiting) { event.preventDefault(); return; }
+          shelfPress = undefined; previousShelfPointer = undefined; lastShelfActivation = undefined; suppressShelfClick = true;
+          inspector.flush(); finishGesture(false); dragPhraseId = phrase.id;
+          const items = shelfPhrases(); const index = items.findIndex(item => item.id === phrase.id);
+          const first = phraseCards.get(items[0]?.id ?? '')!; const second = phraseCards.get(items[1]?.id ?? '');
+          const layoutPitch = second ? second.offsetTop - first.offsetTop : first.offsetHeight + 12;
+          const pitch = Number.isFinite(layoutPitch) && layoutPitch > 0 ? layoutPitch
+            : second ? Math.abs(second.getBoundingClientRect().top - first.getBoundingClientRect().top) : first.getBoundingClientRect().height + 12;
+          shelfDrag = { id: phrase.id, source: index, target: index, startY: event.clientY, deltaY: 0, pitch };
+          updateInspector();
+          event.dataTransfer.effectAllowed = 'copyMove'; event.dataTransfer.setData('application/x-rootsound-phrase', phrase.id); showTrash('shelf');
+        });
+        card.addEventListener('dragend', () => { resetShelfDrag(); dropPreview = undefined; hideTrash(); paint(); });
+        phraseCards.set(phrase.id, card); paletteList.append(card);
+      }
+      card.textContent = phrase.name; card.title = phrase.name; const color = playlistPhraseColor(phrase.id);
+      card.style.backgroundColor = color; card.style.color = playlistColorInk(color); card.classList.toggle('is-selected', selectedPhrase === phrase.id);
+      card.setAttribute('aria-selected', String(selectedPhrase === phrase.id));
+    }
+    if (!shelfDrag) {
+      const cards = items.flatMap(item => phraseCards.get(item.id) ?? []);
+      if (cards.some((card, index) => paletteList.children[index] !== card)) for (const card of cards) paletteList.append(card);
+    }
+    newPhraseButton?.classList.toggle('is-highlighted', !items.length);
+  }
+  function resetShelfDrag(): void {
+    shelfDrag = undefined; dragPhraseId = undefined; paletteList?.classList.remove('is-sorting');
+    for (const card of phraseCards.values()) { card.style.transform = ''; card.classList.remove('is-shelf-dragging'); }
+  }
+  function reorderShelfPreview(event: DragEvent): void {
+    if (!shelfDrag || !dragPhraseId || exiting || !event.dataTransfer) return;
+    event.preventDefault(); event.stopPropagation(); event.dataTransfer.dropEffect = 'move';
+    const items = shelfPhrases(); const pitch = shelfDrag.pitch;
+    if (pitch <= 0) return;
+    const drag = shelfDrag; drag.deltaY = event.clientY - drag.startY;
+    drag.target = clampPlaylist(drag.source + Math.round(drag.deltaY / pitch), 0, items.length - 1);
+    paletteList.classList.add('is-sorting');
+    items.forEach((item, index) => {
+      const card = phraseCards.get(item.id); if (!card) return;
+      const delta = item.id === drag.id ? drag.deltaY
+        : drag.target > drag.source && index > drag.source && index <= drag.target ? -pitch
+          : drag.target < drag.source && index >= drag.target && index < drag.source ? pitch : 0;
+      card.style.transform = `translateY(${delta}px)`; card.classList.toggle('is-shelf-dragging', item.id === drag.id);
+    });
+  }
+  function dropShelfOrder(event: DragEvent): void {
+    if (!shelfDrag || !dragPhraseId || exiting || !event.dataTransfer) return;
+    event.preventDefault(); event.stopPropagation();
+    const drag = shelfDrag; const id = readDropId(event.dataTransfer);
+    resetShelfDrag(); hideTrash();
+    if (id === drag.id && drag.source !== drag.target) mutate(() => song.reorderPhraseShelf(drag.id, drag.target), false);
+    else paint();
+  }
+  function openPhraseLibrary(): void {
+    if (exiting || phraseLibrary) return;
+    inspector.flush(); finishGesture(false); audition?.stop(); transport.pause();
+    const dialog = node('dialog', 'song-phrase-library'); phraseLibrary = dialog;
+    dialog.setAttribute('aria-label', '乐句库'); const heading = node('header', 'song-library-heading');
+    let renaming = false; let renameInput: HTMLInputElement | undefined; const addTimers = new Map<string, number>();
+    const cancelAdd = (id?: string) => { for (const [key, timer] of addTimers) if (!id || key === id) { window.clearTimeout(timer); addTimers.delete(key); } };
+    heading.append(node('h2', '', '乐句库'), action('→', 'song-library-close', () => { if (!renaming) dialog.close(); }));
+    heading.querySelector('button')!.setAttribute('aria-label', '返回歌曲编排');
+    const grid = node('div', 'song-library-grid'); let suppressClickUntil = 0;
+    const renameError = node('p', 'song-library-rename-error'); renameError.setAttribute('role', 'alert'); renameError.hidden = true;
+    const active = () => !disposed && phraseLibrary === dialog;
+    const resetDrag = () => { libraryDragId = undefined; hideTrash(); updateInspector(); };
+    const refreshLibrary = () => {
+      if (!active()) return;
+      grid.replaceChildren(); const visible = new Set(shelfPhrases().map(phrase => phrase.id));
+      for (const phrase of phrases()) {
+        const tile = node('div', 'song-library-phrase', phrase.name); tile.tabIndex = 0; tile.setAttribute('role', 'button');
+        const toggle = () => {
+          addTimers.delete(phrase.id); if (!active() || renaming || renameInput || phraseDeleteDialog || libraryDragId) return;
+          const shown = shelfPhrases().some(item => item.id === phrase.id);
+          const focused = document.activeElement === tile;
+          if (mutate(() => { song.setPhraseShelfVisible(phrase.id, !shown); if (shown && selectedPhrase === phrase.id) selectedPhrase = undefined; }, false)) {
+            refreshLibrary(); if (focused) [...grid.querySelectorAll<HTMLElement>('.song-library-phrase')].find(item => item.dataset.phraseId === phrase.id)?.focus({ preventScroll: true });
+          }
+        };
+        tile.addEventListener('click', () => {
+          if (!active() || renaming || renameInput || phraseDeleteDialog || libraryDragId || Date.now() < suppressClickUntil) return;
+          cancelAdd(phrase.id); addTimers.set(phrase.id, window.setTimeout(toggle, libraryClickDelay(options.doubleClickIntervalMs)));
+        });
+        tile.addEventListener('keydown', event => { if (!renameInput && (event.key === 'Enter' || event.key === ' ')) { event.preventDefault(); cancelAdd(phrase.id); toggle(); } });
+        tile.addEventListener('dblclick', event => {
+          event.preventDefault(); event.stopPropagation(); cancelAdd(phrase.id);
+          if (!active() || renaming || renameInput || phraseDeleteDialog || !options.onRenamePhrase) return;
+          const input = node('input', 'song-library-rename'); input.value = phrase.name; input.maxLength = 80; input.setAttribute('aria-label', '乐句名称');
+          renameInput = input; tile.draggable = false; tile.textContent = ''; tile.replaceChildren(input); renameError.hidden = true;
+          let done = false;
+          const commit = async () => {
+            if (done || !active()) return; const name = input.value.trim();
+            if (!name || name === phrase.name) { done = true; renameInput = undefined; refreshLibrary(); return; }
+            done = true; renaming = true; input.disabled = true; pendingRename++;
+            try {
+              const result = await options.onRenamePhrase!(phrase.id, name);
+              if (!active()) return;
+              if (result && selectedPhrase === phrase.id) selectedPhrase = result.id;
+              renameInput = undefined; sync(); paint(); refreshLibrary();
+            } catch (reason) {
+              if (active()) { done = false; input.disabled = false; renameError.textContent = reason instanceof Error ? reason.message : String(reason); renameError.hidden = false; input.focus(); }
+            } finally { renaming = false; pendingRename--; }
+          };
+          input.addEventListener('click', event => event.stopPropagation()); input.addEventListener('dblclick', event => event.stopPropagation());
+          input.addEventListener('blur', () => { void commit(); }); input.addEventListener('keydown', event => {
+            event.stopPropagation(); if (event.key === 'Enter') { event.preventDefault(); void commit(); }
+            if (event.key === 'Escape' && !renaming) { event.preventDefault(); done = true; renameInput = undefined; refreshLibrary(); }
+          });
+          input.focus(); input.select?.();
+        });
+        tile.draggable = true; tile.dataset.phraseId = phrase.id; tile.title = phrase.name; tile.classList.toggle('is-on-shelf', visible.has(phrase.id));
+        tile.classList.toggle('is-selected', visible.has(phrase.id)); tile.setAttribute('aria-pressed', String(visible.has(phrase.id)));
+        tile.setAttribute('aria-label', `${visible.has(phrase.id) ? '隐藏' : '显示'}${phrase.name}`);
+        tile.addEventListener('dragstart', event => {
+          cancelAdd();
+          if (!active() || renaming || renameInput || phraseDeleteDialog || !event.dataTransfer) { event.preventDefault(); return; }
+          libraryDragId = phrase.id; suppressClickUntil = Date.now() + 250; updateInspector();
+          event.dataTransfer.effectAllowed = 'move'; event.dataTransfer.setData('application/x-rootsound-library-phrase', phrase.id); showTrash('library');
+        });
+        tile.addEventListener('dragend', () => { if (!active()) return; suppressClickUntil = Date.now() + 250; resetDrag(); });
+        grid.append(tile);
+      }
+      const create = action('+', 'song-library-new', () => {
+        cancelAdd(); if (!active() || renaming || renameInput || phraseDeleteDialog || libraryDragId) return;
+        dialog.close();
+        try { (options.onNewPhrase ?? options.onPhrase)(); }
+        catch (error) { report(error instanceof Error ? error.message : String(error), true); }
+      });
+      create.setAttribute('aria-label', '新建乐句'); grid.append(create);
+    };
+    const requestDelete = (id: string) => {
+      if (!active() || phraseDeleteDialog) return;
+      const phrase = phrases().find(item => item.id === id); if (!phrase) return;
+      const warning = node('dialog', 'song-library-delete-dialog'); phraseDeleteDialog = warning;
+      warning.setAttribute('aria-label', '彻底删除乐句'); warning.append(node('h2', '', '彻底删除乐句？'),
+        node('p', '', `“${phrase.name}”将被删除。所有使用位置和相关撤销记录将清除，并保存当前工程。此操作无法撤销。`));
+      const error = node('p', 'song-library-delete-error'); error.hidden = true; error.setAttribute('role', 'alert');
+      let busy = false;
+      const cancel = action('取消', 'song-library-delete-cancel', () => { if (!busy) warning.close(); });
+      const confirm = action('彻底删除', 'song-library-delete-confirm', () => { void remove(); });
+      async function remove(): Promise<void> {
+        if (busy || !active() || phraseDeleteDialog !== warning) return;
+        busy = true; cancel.disabled = true; confirm.disabled = true; error.hidden = true;
+        try {
+          if (!options.onDeletePhrase) throw new Error('当前窗口暂不支持删除乐句，请重新打开 RootSound。');
+          await options.onDeletePhrase(id);
+          if (!active() || phraseDeleteDialog !== warning) return;
+          warning.close(); sync(); paint(); refreshLibrary(); transport.refresh();
+        } catch (reason) {
+          if (active() && phraseDeleteDialog === warning) { error.textContent = reason instanceof Error ? reason.message : String(reason); error.hidden = false; }
+        } finally { busy = false; if (active()) { cancel.disabled = false; confirm.disabled = false; } }
+      }
+      const buttons = node('div', 'song-library-delete-actions'); buttons.append(cancel, confirm); warning.append(error, buttons);
+      warning.addEventListener('cancel', event => { if (busy) event.preventDefault(); });
+      warning.addEventListener('close', () => { if (phraseDeleteDialog === warning) phraseDeleteDialog = undefined; warning.remove(); }, { once: true });
+      root.append(warning); warning.showModal(); cancel.focus();
+    };
+    const libraryDrop = (event: DragEvent) => {
+      if (!active() || !libraryDragId || !event.dataTransfer) return;
+      event.preventDefault(); event.stopPropagation();
+      const id = event.dataTransfer.getData('application/x-rootsound-library-phrase');
+      if (id !== libraryDragId) return;
+      resetDrag(); requestDelete(id);
+    };
+    trash.addEventListener('drop', libraryDrop);
+    refreshLibrary(); dialog.append(heading, grid, renameError, trash);
+    dialog.addEventListener('cancel', event => { if (renaming) event.preventDefault(); });
+    dialog.addEventListener('click', event => { if (!renaming && event.target === dialog) dialog.close(); });
+    dialog.addEventListener('close', () => {
+      cancelAdd(); resetDrag(); trash.removeEventListener('drop', libraryDrop); phraseDeleteDialog?.close();
+      viewport.append(trash); dialog.remove();
+      if (phraseLibrary === dialog) phraseLibrary = undefined; if (!disposed) newPhraseButton?.focus();
+    }, { once: true });
+    root.append(dialog); dialog.showModal();
+  }
+  function showTrash(source: 'shelf' | 'playlist' | 'library', over = false): void {
+    if (!trash) return;
+    trash.hidden = false; trash.classList.toggle('is-over', over); trash.dataset.source = source;
+    const label = source === 'library' ? '彻底删除乐句' : source === 'shelf' ? '从乐句栏移除' : '从播放列表移除'; trash.setAttribute('aria-label', label);
+  }
+  function hideTrash(): void { if (trash) { trash.hidden = true; trash.classList.remove('is-over'); } }
+  function overTrash(event: Pick<PointerEvent, 'clientX' | 'clientY'>): boolean {
+    if (!trash || trash.hidden) return false;
+    const rect = trash.getBoundingClientRect();
+    return event.clientX >= rect.left && event.clientX <= rect.left + rect.width && event.clientY >= rect.top && event.clientY <= rect.top + rect.height;
+  }
+  function shelfDragMove(event: DragEvent): void {
+    if ((!dragPhraseId && !libraryDragId) || exiting) return;
+    const over = overTrash(event); showTrash(libraryDragId ? 'library' : 'shelf', over);
+    if (over) { event.preventDefault(); if (event.dataTransfer) event.dataTransfer.dropEffect = 'move'; if (dropPreview) { dropPreview = undefined; paint(); } }
+  }
+  function shelfTrashDrop(event: DragEvent): void {
+    event.preventDefault(); event.stopPropagation(); if (exiting || !dragPhraseId || !event.dataTransfer) return;
+    const id = readDropId(event.dataTransfer); if (id !== dragPhraseId) return;
+    resetShelfDrag(); dropPreview = undefined; hideTrash();
+    mutate(() => { song.setPhraseShelfVisible(id, false); if (selectedPhrase === id) selectedPhrase = undefined; }, false);
+  }
+  function localPoint(event: Pick<PointerEvent, 'clientX' | 'clientY'>): Point {
+    const bounds = content.getBoundingClientRect(); return { x: event.clientX - bounds.left, y: event.clientY - bounds.top };
+  }
+  function trackAt(point: Point): number | undefined { return point.x < 0 ? undefined : playlistTrackAt(point.y, view.top, view.rowHeight, current.body?.tracks.length ?? 0); }
+  function timeAt(x: number): number { return view.leftSeconds + x / view.pixelsPerSecond; }
+  function clipRect(ref: PickedClip) {
+    return playlistClipRect(playlistSeconds(ref.clip.startBeat, current.body!.tempoBpm), duration(ref.clip.phraseId), ref.trackIndex, view);
+  }
+  function flashErase(ref: PickedClip): void {
+    const rect = clipRect(ref); const ghost = node('div', 'song-clip-erasure');
+    Object.assign(ghost.style, { left: `${rect.x}px`, top: `${rect.y}px`, width: `${rect.width}px`, height: `${rect.height}px` });
+    ghost.append(node('span')); erasures.append(ghost); ghost.addEventListener('animationend', () => ghost.remove(), { once: true }); window.setTimeout(() => ghost.remove(), 350);
+  }
+  function sweep(from: Point, to: Point, target: Extract<Gesture, { kind: 'erase' }>): void {
+    const body = current.body; if (!body) return; const previousCount = target.refs.size;
+    body.tracks.forEach((track, trackIndex) => track.clips.forEach(clip => {
+      if (target.refs.has(clip.id)) return;
+      const ref = { trackId: track.id, clipId: clip.id, clip, trackIndex };
+      if (!playlistSegmentIntersectsRect(from, to, clipRect(ref))) return;
+      target.refs.set(clip.id, { trackId: track.id, clipId: clip.id }); selected.delete(clip.id); flashErase(ref);
+    })); paint(); if (target.refs.size !== previousCount) transport.refresh();
+  }
+  function finishGesture(commit = true, toTrash = false): void {
+    const finished = gesture; gesture = undefined; viewport?.classList.remove('is-erasing', 'is-moving-clip', 'is-moving-row');
+    if (!dragPhraseId) hideTrash();
+    if (!finished) return;
+    if (viewport.hasPointerCapture?.(finished.pointerId)) viewport.releasePointerCapture(finished.pointerId);
+    if (finished.kind === 'head') { positionPlayhead(); return; }
+    if (finished.kind === 'pan') { viewport.classList.remove('is-panning'); return; }
+    if (finished.kind === 'clip' && !finished.moved) {
+      const ref = { trackId: finished.anchor.trackId, clipId: finished.anchor.clipId };
+      lastClipPointer = commit && previousClipPointer?.clipId === ref.clipId && previousClipPointer.trackId === ref.trackId ? ref : undefined;
+      const now = Date.now(); const previous = previousClipPointer;
+      const paired = !!lastClipPointer && !!previous && now - previous.at <= 400
+        && Math.hypot(finished.from.x - previous.point.x, finished.from.y - previous.point.y) <= 6;
+      previousClipPointer = commit && !paired ? { ...ref, at: now, point: finished.from } : undefined;
+      updateSelection();
+      if (paired) { lastPointerActivation = { ...ref, at: now }; editPhrase(ref); }
+      return;
+    }
+    previousClipPointer = undefined; lastClipPointer = undefined;
+    if (finished.kind === 'row' && !finished.moved) {
+      lastNamePointer = commit && finished.nameClicked ? finished.trackId : undefined;
+      return;
+    }
+    if (finished.kind === 'row' && finished.moved) lastNamePointer = undefined;
+    const oldRects = new Map([...clipNodes].map(([id, element]) => [id, element.getBoundingClientRect()]));
+    const oldRows = new Map([...rowNodes].map(([id, elements]) => [id, elements.slice(0, 2).map(element => element.getBoundingClientRect())]));
+    if (commit && finished.kind === 'erase' && finished.refs.size) removeRefs([...finished.refs.values()], false);
+    else if (commit && finished.kind === 'row' && finished.moved) mutate(() => song.reorderTrack(finished.trackId, finished.targetIndex), false);
+    else if (commit && toTrash && finished.kind === 'clip' && finished.moved) { finished.clips.forEach(flashErase); removeRefs(finished.clips, false); }
+    else if (commit && finished.kind === 'clip' && finished.moved && finished.valid) {
+      const tempo = current.body!.tempoBpm;
+      mutate(() => song.moveClips(finished.clips.map(ref => ({ trackId: ref.trackId, clipId: ref.clipId,
+        targetTrackId: finished.moves.get(ref.clipId)!.trackId, startBeat: playlistBeats(finished.moves.get(ref.clipId)!.seconds, tempo) }))), false);
+    } else paint();
+    const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    if (!reduceMotion && (finished.kind === 'clip' || finished.kind === 'row')) for (const [id, element] of clipNodes) {
+      const previous = oldRects.get(id); if (!previous) continue; const next = element.getBoundingClientRect();
+      element.animate?.([{ transform: `translate(${previous.left - next.left}px, ${previous.top - next.top}px)` }, { transform: 'translate(0, 0)' }], { duration: 130, easing: 'ease-out' });
+    }
+    if (!reduceMotion && finished.kind === 'row') for (const [id, elements] of rowNodes) elements.slice(0, 2).forEach((element, index) => {
+      const previous = oldRows.get(id)?.[index]; if (!previous) return; const next = element.getBoundingClientRect();
+      element.animate?.([{ transform: `translateY(${previous.top - next.top}px)` }, { transform: 'translateY(0)' }], { duration: 130, easing: 'ease-out' });
+    });
+    if (finished.kind !== 'row') transport.refresh();
   }
   function updateSelection(): void {
-    root.querySelectorAll<HTMLElement>('.song-clip').forEach(block => {
-      const active = selected.has(block.dataset.clipId!); block.classList.toggle('is-selected', active); block.setAttribute('aria-pressed', String(active));
+    for (const [id, block] of clipNodes) {
+      const track = current.body?.tracks.find(item => item.id === block.dataset.trackId);
+      const clip = track?.clips.find(item => item.id === id);
+      const value = !!clip && (selected.has(id) || selectedTrack === track!.id || selectedPhrase === clip.phraseId);
+      block.classList.toggle('is-selected', value); block.setAttribute('aria-pressed', String(value));
+    }
+    syncPalette(); updateInspector();
+  }
+  function selectRow(id: string): void {
+    if (exiting) return;
+    inspector.flush(); selectedPhrase = undefined;
+    lastNamePointer = undefined;
+    selected.clear(); selectedTrack = id; doubleNudge = undefined;
+    if (deleteArmed && deleteArmed !== id) {
+      deleteArmed = undefined; window.clearTimeout(deleteTimer);
+      for (const button of rowControls.querySelectorAll('.song-row-delete')) button.classList.remove('is-armed');
+    }
+    for (const element of rowControls.querySelectorAll<HTMLElement>('.song-row-control')) {
+      element.classList.toggle('is-selected', element.dataset.trackId === id); element.setAttribute('aria-selected', String(element.dataset.trackId === id));
+    }
+    for (const element of content.querySelectorAll<HTMLElement>('.song-clip')) {
+      element.classList.toggle('is-selected', element.dataset.trackId === id); element.setAttribute('aria-pressed', String(element.dataset.trackId === id));
+    }
+    updateInspector(); syncPalette();
+  }
+  function activateRowName(name: HTMLInputElement, trackId: string): void {
+    if (exiting) return;
+    if (deleteArmed) { deleteArmed = undefined; window.clearTimeout(deleteTimer); for (const button of rowControls.querySelectorAll('.song-row-delete')) button.classList.remove('is-armed'); }
+    selectRow(trackId); name.readOnly = false; name.focus(); name.select?.();
+  }
+  function pointerDown(event: PointerEvent): void {
+    if (exiting || !current.body || (event.button !== 0 && event.button !== 2)) return;
+    const target = event.target as Element;
+    const rowName = target.closest<HTMLInputElement>('.song-row-name');
+    if (target.closest('.song-add-track') || (rowName && !rowName.readOnly) || target.closest('.song-row-color') || target.closest('.song-row-delete') || target.closest('.song-row-mix-button') || target.closest('.song-empty-curtain')) return;
+    inspector.flush(); finishGesture(false); lastNamePointer = undefined; const point = localPoint(event);
+    lastClipPointer = undefined;
+    if (event.button === 0 && (target.closest('.song-playhead-handle') || target.closest('.song-ruler'))) {
+      previousClipPointer = undefined;
+      event.preventDefault(); viewport.focus({ preventScroll: true });
+      audition?.stop();
+      gesture = { kind: 'head', pointerId: event.pointerId }; transport.seek(Math.max(0, timeAt(point.x))); positionPlayhead();
+    } else if (target.closest('.song-row-control')) {
+      previousClipPointer = undefined;
+      if (event.button !== 0) return; event.preventDefault(); viewport.focus({ preventScroll: true });
+      const id = target.closest<HTMLElement>('.song-row-control')!.dataset.trackId!; selectRow(id);
+      const index = current.body.tracks.findIndex(track => track.id === id);
+      gesture = { kind: 'row', pointerId: event.pointerId, from: point, trackId: id, sourceIndex: index, targetIndex: index, deltaY: 0, moved: false, nameClicked: !!rowName };
+    } else {
+      if (point.x < 0 || point.y < 0 || !phrases().length) return;
+      event.preventDefault(); viewport.focus({ preventScroll: true }); selectedTrack = undefined; selectedPhrase = undefined; deleteArmed = undefined;
+      if (event.button === 2) {
+        previousClipPointer = undefined;
+        const hitsClip = current.body.tracks.some((track, trackIndex) => track.clips.some(clip =>
+          playlistSegmentIntersectsRect(point, point, clipRect({ trackId: track.id, clipId: clip.id, clip, trackIndex }))));
+        if (!hitsClip) selected.clear();
+        doubleNudge = undefined; window.clearTimeout(deleteTimer);
+        gesture = { kind: 'erase', pointerId: event.pointerId, previous: point, refs: new Map() }; viewport.classList.add('is-erasing'); sweep(point, point, gesture);
+      } else {
+        const clipId = target.closest<HTMLElement>('.song-clip')?.dataset.clipId;
+        if (clipId) {
+          if (event.ctrlKey || event.metaKey) { if (selected.has(clipId)) selected.delete(clipId); else selected.add(clipId); }
+          else if (!selected.has(clipId)) selected = new Set([clipId]);
+          const clips = picked(); const anchor = clips.find(ref => ref.clipId === clipId); if (!anchor) { paint(); return; }
+          gesture = { kind: 'clip', pointerId: event.pointerId, from: point, lastX: point.x, rawDeltaX: 0, clips, anchor, moved: false, valid: true, moves: new Map(), deltaX: 0, deltaY: 0 }; viewport.classList.add('is-moving-clip');
+        } else {
+          previousClipPointer = undefined;
+          selected.clear(); gesture = { kind: 'pan', pointerId: event.pointerId, last: point }; viewport.classList.add('is-panning');
+        }
+        lastNamePointer = undefined;
+        doubleNudge = undefined; updateSelection();
+      }
+    }
+    if (gesture) viewport.setPointerCapture?.(event.pointerId);
+  }
+  function paintGesture(): void {
+    const active = gesture; if (!active) return;
+    if (active.kind === 'clip') for (const ref of active.clips) {
+      const block = clipNodes.get(ref.clipId); if (!block) continue;
+      block.style.transform = `translate(${active.deltaX}px, ${active.deltaY}px)`;
+      block.classList.toggle('is-dragging', active.moved); block.classList.toggle('is-invalid', !active.valid);
+    }
+    if (active.kind === 'row') current.body!.tracks.forEach((track, index) => {
+      let shift = 0;
+      if (track.id === active.trackId) shift = active.deltaY;
+      else if (active.targetIndex > active.sourceIndex && index > active.sourceIndex && index <= active.targetIndex) shift = -view.rowHeight;
+      else if (active.targetIndex < active.sourceIndex && index >= active.targetIndex && index < active.sourceIndex) shift = view.rowHeight;
+      for (const element of rowNodes.get(track.id) ?? []) { element.style.transform = `translateY(${shift}px)`; element.classList.toggle('is-row-dragging', track.id === active.trackId && active.moved); }
     });
-    root.querySelectorAll<HTMLButtonElement>('[data-song-selection-action]').forEach(button => { button.disabled = !selected.size; });
-    root.querySelectorAll<HTMLButtonElement>('[data-song-single-selection-action]').forEach(button => { button.disabled = selected.size !== 1; });
   }
-  function copy(): void {
-    const refs = picked(); if (!refs.length) return;
-    const beat = Math.min(...refs.map(ref => ref.clip.startBeat)); const track = Math.min(...refs.map(ref => ref.trackIndex));
-    clipboard = refs.map(ref => ({ trackOffset: ref.trackIndex - track, phraseId: ref.clip.phraseId, beatOffset: ref.clip.startBeat - beat }));
-    const pasteButton = root.querySelector<HTMLButtonElement>('.song-paste'); if (pasteButton) pasteButton.disabled = false;
-    report(`已复制 ${refs.length} 个片段，选择轨道后粘贴。`);
+  function pointerMove(event: PointerEvent): void {
+    if (shelfPress?.pointerId === event.pointerId && Math.hypot(event.clientX - shelfPress.from.x, event.clientY - shelfPress.from.y) > 6) { shelfPress.moved = true; previousShelfPointer = undefined; suppressShelfClick = true; }
+    const active = gesture; if (!active || active.pointerId !== event.pointerId) return;
+    event.preventDefault(); const point = localPoint(event);
+    if (active.kind === 'head') { transport.seek(Math.max(0, timeAt(point.x))); positionPlayhead(); return; }
+    if (active.kind === 'pan') {
+      if (event.shiftKey) view.top -= point.y - active.last.y;
+      else view.leftSeconds -= (point.x - active.last.x) / view.pixelsPerSecond;
+      active.last = point; constrainTop(); paint(); return;
+    }
+    if (active.kind === 'erase') { sweep(active.previous, point, active); active.previous = point; return; }
+    if (active.kind === 'row') {
+      if (!active.moved && Math.abs(point.y - active.from.y) < 3) return;
+      active.moved = true; active.deltaY = clampPlaylist(point.y - active.from.y, -active.sourceIndex * view.rowHeight, (current.body!.tracks.length - 1 - active.sourceIndex) * view.rowHeight);
+      active.targetIndex = clampPlaylist(active.sourceIndex + Math.round(active.deltaY / view.rowHeight), 0, current.body!.tracks.length - 1);
+      viewport.classList.add('is-moving-row'); paintGesture(); return;
+    }
+    if (Math.hypot(point.x - active.from.x, point.y - active.from.y) < 4 && !active.moved) return;
+    active.moved = true; const targetRow = trackAt(point); const trackDelta = (targetRow ?? -999) - active.anchor.trackIndex;
+    active.valid = point.x >= 0 && targetRow !== undefined && active.clips.every(ref => ref.trackIndex + trackDelta >= 0 && ref.trackIndex + trackDelta < current.body!.tracks.length);
+    const earliest = Math.min(...active.clips.map(ref => playlistSeconds(ref.clip.startBeat, current.body!.tempoBpm)));
+    active.rawDeltaX = Math.max(-earliest * view.pixelsPerSecond, active.rawDeltaX + (point.x - active.lastX) * (event.shiftKey ? .1 : 1)); active.lastX = point.x;
+    active.deltaX = active.rawDeltaX; active.deltaY = point.y - active.from.y;
+    showTrash('playlist'); trash.classList.toggle('is-over', overTrash(event));
+    if (active.valid) {
+      const delta = Math.max(-earliest, active.deltaX / view.pixelsPerSecond);
+      active.moves = new Map(active.clips.map(ref => [ref.clipId, { trackId: current.body!.tracks[ref.trackIndex + trackDelta]!.id,
+        seconds: playlistSeconds(ref.clip.startBeat, current.body!.tempoBpm) + delta }]));
+    }
+    paintGesture(); transport.refresh();
   }
-  function paste(): void {
-    const body = song.read().body; if (!body || !clipboard.length) return;
-    const trackIndex = Math.max(0, body.tracks.findIndex(track => track.id === selectedTrack));
-    if (clipboard.some(ref => trackIndex + ref.trackOffset >= body.tracks.length)) { report('目标位置没有足够的轨道，请先添加轨道。', true); return; }
-    const target = body.tracks[trackIndex]!;
-    const start = Math.max(0, ...target.clips.map(clip => clip.startBeat + song.clipLengthBeats(clip.phraseId)));
-    edit(() => { selected = new Set(song.addClips(clipboard.map(ref => ({ trackId: body.tracks[trackIndex + ref.trackOffset]!.id, phraseId: ref.phraseId, startBeat: start + ref.beatOffset })))); });
+  function constrainTop(): void {
+    view.leftSeconds = Math.max(0, view.leftSeconds);
+    view.top = clampPlaylist(view.top, 0, Math.max(0, ((current.body?.tracks.length ?? 0) + 1) * view.rowHeight - (content?.clientHeight || 300)));
   }
-  function duplicate(): void {
-    const refs = picked(); if (!refs.length) return;
-    const first = Math.min(...refs.map(ref => ref.clip.startBeat));
-    const last = Math.max(...refs.map(ref => ref.clip.startBeat + song.clipLengthBeats(ref.clip.phraseId)));
-    edit(() => { selected = new Set(song.addClips(refs.map(ref => ({ trackId: ref.trackId, phraseId: ref.clip.phraseId, startBeat: ref.clip.startBeat + last - first })))); });
+  function wheel(event: WheelEvent): void {
+    if (exiting) { event.preventDefault(); return; }
+    lastNamePointer = undefined;
+    event.preventDefault(); if (gesture) finishGesture(); const point = localPoint(event);
+    if (event.ctrlKey || event.metaKey) view = zoomPlaylist(view, Math.max(0, point.x), point.y, Math.exp(-event.deltaY * .002), event.shiftKey);
+    else if (event.shiftKey) view.top += event.deltaY || event.deltaX;
+    else view.leftSeconds = Math.max(0, view.leftSeconds + (event.deltaX || event.deltaY) / view.pixelsPerSecond);
+    constrainTop(); paint();
   }
-  function remove(): void { const refs = picked(); if (refs.length) edit(() => { song.removeClips(refs); selected.clear(); }); }
-  function updatePlayback(): void {
-    if (playButton) { playButton.textContent = preparing ? '取消准备' : sessionId ? '■ 停止' : '▶ 听整首'; playButton.disabled = false; }
-    if (playhead) playhead.hidden = !sessionId;
+  function readDropId(transfer: DataTransfer): string | undefined {
+    const entity = readEntityDrag(transfer); return (entity?.kind === 'rootsound.phrase' ? entity.id : transfer.getData('application/x-rootsound-phrase')) || dragPhraseId;
   }
-  function tick(): void {
-    if (disposed || !sessionId) return;
-    const position = sound.position(sessionId);
-    if (playhead && position !== undefined) playhead.style.left = `${180 + position * playbackTempo / 60 * beatPixels}px`;
-    frame = requestAnimationFrame(tick);
+  function dragOver(event: DragEvent): void {
+    if (exiting) return;
+    if (!event.dataTransfer || !event.dataTransfer.types.some(type => type === 'application/x-rootsound-phrase' || type === 'application/x-rootsound-entity')) return;
+    const point = localPoint(event); const index = trackAt(point); if (index === undefined) { dropPreview = undefined; paint(); return; }
+    event.preventDefault(); event.dataTransfer.dropEffect = 'copy'; const id = readDropId(event.dataTransfer);
+    if (id && phrases().some(phrase => phrase.id === id)) {
+      const raw = Math.max(0, timeAt(point.x));
+      dropPreview = { phraseId: id, seconds: raw, trackIndex: index }; paint();
+    }
   }
-  async function play(): Promise<void> {
-    if (preparing) { stopPlayback(); report('试听准备已取消。'); return; }
-    if (sessionId) { stopPlayback(); report('已停止。'); return; }
-    const request = ++playbackGeneration; preparing = true; updatePlayback();
-    const snapshot = JSON.stringify(song.read().draft);
-    try {
-      report('正在准备歌曲使用的声音…'); await song.preparePreview();
-      if (disposed || request !== playbackGeneration) return;
-      if (JSON.stringify(song.read().draft) !== snapshot) throw new Error('歌曲已改变，请重新试听当前内容。');
-      playbackTempo = song.read().body?.tempoBpm ?? 120;
-      const session = await sound.preview(song.previewPlan(liveBody));
-      if (disposed || request !== playbackGeneration) { sound.stop(session.id); return; }
-      sessionId = session.status === 'playing' ? session.id : undefined;
-      if (sessionId) livePreview.flush(() => song.previewPlan(liveBody, { allowSilence: true }));
-      if (sessionId) report('正在演奏…');
-    } catch (error) { if (!disposed && request === playbackGeneration) report(error instanceof Error ? error.message : String(error), true); }
-    finally { if (!disposed && request === playbackGeneration) { preparing = false; updatePlayback(); cancelAnimationFrame(frame); tick(); } }
+  function drop(event: DragEvent): void {
+    event.preventDefault(); if (exiting || !event.dataTransfer) return;
+    const point = localPoint(event); const index = trackAt(point); const id = readDropId(event.dataTransfer);
+    if (index === undefined || !id || !phrases().some(phrase => phrase.id === id)) { dropPreview = undefined; paint(); return; }
+    const seconds = Math.max(0, timeAt(point.x));
+    dropPreview = undefined; resetShelfDrag(); hideTrash();
+    inspector.flush();
+    mutate(() => { selectedTrack = undefined; selectedPhrase = undefined; selected = new Set([song.addClip(current.body!.tracks[index]!.id, id, playlistBeats(seconds, current.body!.tempoBpm))]); });
   }
-  function save(saveMode: 'overwrite' | 'new', confirmation?: SaveConfirmation): void {
-    try {
-      const result = song.save(saveMode, confirmation);
-      if (result.status === 'saved') { report(`“${result.content.name}”已保存。`); render(); }
-      else if (result.status === 'needs-confirmation') confirmSave(result);
-      else report(result.status === 'conflict' ? result.reason : result.message, true);
-    } catch (error) { report(error instanceof Error ? error.message : String(error), true); }
+  function colorRow(trackId: string): void {
+    if (exiting) return;
+    const track = current.body?.tracks.find(item => item.id === trackId); if (!track) return;
+    const dialog = node('dialog', 'song-color-dialog'); dialog.append(node('div', 'song-color-title', track.name));
+    const swatches = node('div', 'song-color-swatches');
+    for (const color of PLAYLIST_COLORS) {
+      const swatch = action('', 'song-color-swatch', () => { mutate(() => song.updateTrack(trackId, { color }), false); dialog.close(); });
+      swatch.style.background = color; swatch.setAttribute('aria-label', color); swatches.append(swatch);
+    }
+    const custom = node('input'); custom.type = 'color'; custom.value = track.color ?? '#cbd3dc'; custom.setAttribute('aria-label', '自定义行颜色');
+    const buttons = node('div', 'dialog-actions'); buttons.append(action('取消', 'secondary', () => dialog.close()), action('应用', 'primary', () => { mutate(() => song.updateTrack(trackId, { color: custom.value }), false); dialog.close(); }));
+    dialog.append(swatches, custom, buttons); dialog.addEventListener('close', () => dialog.remove(), { once: true }); root.append(dialog); dialog.showModal();
+  }
+  function deleteRow(trackId: string): void {
+    if (exiting) return;
+    window.clearTimeout(deleteTimer);
+    if (deleteArmed !== trackId) {
+      deleteArmed = trackId; selectRow(trackId); paint();
+      deleteTimer = window.setTimeout(() => { deleteArmed = undefined; paint(); }, 1800); return;
+    }
+    const track = current.body?.tracks.find(item => item.id === trackId); if (!track) return;
+    deleteArmed = undefined;
+    mutate(() => { options.onKeepPhrases?.([...new Set(track.clips.map(clip => clip.phraseId))]); song.removeTrack(trackId); });
+  }
+  function rowControl(track: NonNullable<typeof current.body>['tracks'][number], trackIndex: number): HTMLElement {
+    const control = node('div', 'song-row-control'); control.dataset.trackId = track.id; control.tabIndex = 0;
+    if (track.color) control.style.backgroundColor = `${track.color}25`;
+    control.classList.toggle('is-selected', selectedTrack === track.id); control.setAttribute('aria-label', `${track.name}，行调控`);
+    const color = action('', 'song-row-color', () => { selectRow(track.id); colorRow(track.id); }); color.style.background = track.color ?? '#cbd3dc'; color.setAttribute('aria-label', `为${track.name}选择颜色`);
+    const name = node('input', 'song-row-name'); name.value = track.name; name.maxLength = 32; name.readOnly = true; name.setAttribute('aria-label', `第${trackIndex + 1}行名称`);
+    name.title = '双击修改名称';
+    name.addEventListener('click', () => { if (name.readOnly) { selectRow(track.id); viewport.focus({ preventScroll: true }); } });
+    name.addEventListener('dblclick', event => { event.preventDefault(); event.stopPropagation(); finishGesture(false); activateRowName(name, track.id); });
+    name.addEventListener('blur', () => {
+      name.readOnly = true; const value = name.value.trim(); const savedName = current.body?.tracks.find(item => item.id === track.id)?.name ?? track.name;
+      if (exiting || !value || value === savedName) { name.value = savedName; return; }
+      // A blur can be caused by pressing a neighboring button. Preserve that
+      // button until its pending click is dispatched rather than rebuilding rows.
+      try { song.updateTrack(track.id, { name: value }); fieldCommitError = undefined; sync(); }
+      catch (error) { fieldCommitError = error instanceof Error ? error.message : String(error); report(fieldCommitError, true); sync(); }
+      const updatedName = current.body?.tracks.find(item => item.id === track.id)?.name ?? savedName;
+      name.value = updatedName; control.setAttribute('aria-label', `${updatedName}，行调控`);
+      color.setAttribute('aria-label', `为${updatedName}选择颜色`); remove.setAttribute('aria-label', `删除${updatedName}，连续点击两次`);
+      solo.setAttribute('aria-label', `独奏${updatedName}`); mute.setAttribute('aria-label', `静默${updatedName}`);
+      rowNodes.get(track.id)?.[0]?.setAttribute('aria-label', updatedName);
+      updateInspector();
+    });
+    name.addEventListener('keydown', event => { if (event.key === 'Enter') { event.preventDefault(); name.blur(); viewport.focus(); } else if (event.key === 'Escape') { name.value = current.body?.tracks.find(item => item.id === track.id)?.name ?? track.name; name.blur(); viewport.focus(); } });
+    const remove = action('×', 'song-row-delete', () => deleteRow(track.id)); remove.setAttribute('aria-label', `删除${track.name}，连续点击两次`); remove.classList.toggle('is-armed', deleteArmed === track.id); remove.title = deleteArmed === track.id ? '再次点击删除这一行' : '连续点击两次删除';
+    const solo = action('', 'song-row-mix-button song-row-solo', () => mutate(() => song.toggleTrackSolo(track.id)));
+    solo.append(icon('solo')); solo.setAttribute('aria-label', `独奏${track.name}`); solo.setAttribute('aria-pressed', String(track.solo)); solo.classList.toggle('is-on', track.solo);
+    const mute = action('', 'song-row-mix-button song-row-mute', () => mutate(() => song.toggleTrackMute(track.id)));
+    mute.append(icon('mute')); mute.setAttribute('aria-label', `静默${track.name}`); mute.setAttribute('aria-pressed', String(track.muted)); mute.classList.toggle('is-on', track.muted);
+    control.append(color, name, solo, mute, remove); return control;
+  }
+  function paint(): void {
+    if (disposed || !content) return;
+    const curtain = viewport.querySelector('.song-empty-curtain');
+    if (!phrases().length && !curtain) {
+      const empty = node('div', 'song-empty-curtain'); empty.append(node('p', '', '先创建乐句吧'), node('span', 'song-empty-arrow', '←')); viewport.append(empty);
+    } else if (phrases().length) curtain?.remove();
+    // Removing a focused input need not dispatch blur in browsers. Commit it while
+    // it is still attached, before reading the body used to rebuild the rows.
+    const active = document.activeElement;
+    if (active instanceof HTMLInputElement && active.classList.contains('song-row-name') && rowControls.contains(active)) active.blur();
+    syncPalette(); const body = current.body; const width = content.clientWidth || viewport.clientWidth || 1000; const height = content.clientHeight || 600;
+    constrainTop(); content.replaceChildren(); ruler.replaceChildren(); rowControls.replaceChildren(); clipNodes.clear(); rowNodes.clear();
+    if (!body) { content.append(action('新建歌曲', 'song-create', () => { if (mutate(() => song.create())) render(); })); return; }
+    const grid = node('div', 'song-grid-lines'); grid.style.height = `${Math.max(0, Math.min(height, body.tracks.length * view.rowHeight - view.top))}px`;
+    const lines = playlistGridLines(view.leftSeconds, width, view.pixelsPerSecond, body.gridTempoBpm ?? body.tempoBpm, body.gridOffsetSeconds ?? 0, body.gridTempoChanges);
+    for (const line of lines) {
+      const mark = node('i', line.strong ? 'is-bar' : 'is-beat'); mark.style.left = `${line.x}px`; grid.append(mark);
+    }
+    content.append(grid);
+    const start = Math.max(0, Math.floor(view.top / view.rowHeight)); const end = Math.min(body.tracks.length, Math.ceil((view.top + height) / view.rowHeight));
+    const phraseNames = new Map(phrases().map(phrase => [phrase.id, phrase.name]));
+    for (let trackIndex = start; trackIndex < end; trackIndex++) {
+      const track = body.tracks[trackIndex]!; const row = node('div', 'song-track'); row.dataset.trackId = track.id;
+      row.style.top = `${trackIndex * view.rowHeight - view.top}px`; row.style.height = `${view.rowHeight}px`; row.setAttribute('aria-label', track.name); content.append(row);
+      if (track.color) row.style.backgroundColor = `${track.color}16`;
+      const control = rowControl(track, trackIndex); control.style.top = row.style.top; control.style.height = row.style.height; rowControls.append(control); rowNodes.set(track.id, [row, control]);
+    }
+    body.tracks.forEach((track, sourceIndex) => track.clips.forEach(clip => {
+      if (gesture?.kind === 'erase' && gesture.refs.has(clip.id)) return;
+      const trackIndex = sourceIndex;
+      const seconds = playlistSeconds(clip.startBeat, body.tempoBpm);
+      const rect = playlistClipRect(seconds, duration(clip.phraseId), trackIndex, view);
+      if (rect.x + rect.width < 0 || rect.x > width || rect.y + rect.height < 0 || rect.y > height) return;
+      const block = action(phraseNames.get(clip.phraseId) ?? '乐句', 'song-clip', () => {}); block.dataset.clipId = clip.id; block.dataset.trackId = track.id;
+      const isSelected = selected.has(clip.id) || selectedTrack === track.id || selectedPhrase === clip.phraseId;
+      block.classList.toggle('is-selected', isSelected); block.setAttribute('aria-pressed', String(isSelected));
+      block.title = `${block.textContent} · ${timeLabel(seconds)} · 音量 ${Math.round((clip.level ?? 1) * 100)}% · 声像 ${Math.round((clip.pan ?? track.pan) * 100)}`;
+      Object.assign(block.style, { left: `${rect.x}px`, top: `${rect.y}px`, width: `${Math.max(1, rect.width)}px`, height: `${rect.height}px` });
+      const color = track.color ?? playlistPhraseColor(clip.phraseId);
+      block.style.backgroundColor = color; block.style.color = playlistColorInk(color); block.style.borderLeftColor = color;
+      content.append(block); clipNodes.set(clip.id, block); rowNodes.set(track.id, [...rowNodes.get(track.id) ?? [], block]);
+    }));
+    if (dropPreview) {
+      const rect = playlistClipRect(dropPreview.seconds, duration(dropPreview.phraseId), dropPreview.trackIndex, view);
+      const preview = node('div', 'song-drop-preview'); Object.assign(preview.style, { left: `${rect.x}px`, top: `${rect.y}px`, width: `${rect.width}px`, height: `${rect.height}px` }); content.append(preview);
+    }
+    const addY = body.tracks.length * view.rowHeight - view.top;
+    if (addY < height && addY + view.rowHeight > 0) {
+      const add = action('+', 'song-add-track', () => mutate(() => { song.addTrack(); })); add.style.top = `${addY}px`; add.style.height = `${view.rowHeight}px`; add.setAttribute('aria-label', '添加行');
+      add.addEventListener('pointerdown', event => event.stopPropagation()); content.append(add);
+    }
+    content.append(playhead); ruler.append(headHandle); paintGesture(); positionPlayhead(); updateInspector();
+  }
+  function localSave(mode: 'overwrite' | 'new', confirmation?: SaveConfirmation): void {
+    const result = song.save(mode, confirmation);
+    if (result.status === 'saved') { sync(); report('已保存。'); }
+    else if (result.status === 'needs-confirmation') confirmSave(result);
+    else throw new Error(result.status === 'conflict' ? result.reason : result.message);
   }
   function confirmSave(result: Extract<SaveResult, { status: 'needs-confirmation' }>): void {
-    const dialog = node('dialog', 'save-dialog'); dialog.append(node('h2', '', '这首歌曲正在被使用'), node('p', '', '覆盖后，以下内容也会使用修改后的歌曲。'));
-    const list = node('ul'); result.affectedContent.forEach(item => list.append(node('li', '', item.name))); result.affectedDrafts.forEach(item => list.append(node('li', '', `${item.name} · 编辑稿`))); dialog.append(list);
-    const buttons = node('div', 'dialog-actions');
-    buttons.append(action('返回', 'secondary', () => dialog.close()), action('另存为新歌曲', 'secondary', () => { dialog.close(); save('new'); }), action('确认覆盖', 'primary', () => { dialog.close(); save('overwrite', result.confirmation); }));
+    const dialog = node('dialog', 'save-dialog'); dialog.append(node('h2', '', '这首歌曲正在被使用'));
+    const list = node('ul'); [...result.affectedContent, ...result.affectedDrafts].forEach(item => list.append(node('li', '', item.name))); dialog.append(list);
+    const buttons = node('div', 'dialog-actions'); buttons.append(action('返回', 'secondary', () => dialog.close()),
+      action('另存为新歌曲', 'secondary', () => { dialog.close(); localSave('new'); }), action('确认覆盖', 'primary', () => { dialog.close(); localSave('overwrite', result.confirmation); }));
     dialog.append(buttons); dialog.addEventListener('close', () => dialog.remove(), { once: true }); root.append(dialog); dialog.showModal();
   }
-  function saveLocal(): void {
-    try {
-      const callback = options.referenceContext?.onSave ?? options.onSave;
-      if (callback) callback(); else save(song.read().draft?.sourceId ? 'overwrite' : 'new');
-    } catch (error) { report(error instanceof Error ? error.message : String(error), true); }
+  function prepareFileAction(): void {
+    if (pendingRename) throw new Error('名称正在保存，请稍后再试。');
+    fieldCommitError = undefined; inspector.flush();
+    if (pendingRename) throw new Error('名称正在保存，请稍后再试。');
+    if (mixPreview) { const mix = mixPreview; changeMix(mix.kind, mix.trackId, mix.clipId, mix.field, mix.value, true); }
+    finishGesture();
+    if (fieldCommitError) throw new Error(fieldCommitError);
+    pendingCommit?.();
+    if (fieldCommitError) throw new Error(fieldCommitError);
+    if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+    if (fieldCommitError) throw new Error(fieldCommitError);
+  }
+  function fileBusy(busy: boolean): void {
+    [...root.querySelectorAll<HTMLButtonElement>('.song-save'), ...root.querySelectorAll<HTMLButtonElement>('.song-settings'), ...root.querySelectorAll<HTMLButtonElement>('.song-exit')].forEach(button => { button.disabled = busy || exiting; });
   }
   const saveAction = createSongSaveAction({
-    prepare() {
-      fieldCommitError = undefined;
-      if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
-      if (fieldCommitError) throw new Error(fieldCommitError);
+    prepare: prepareFileAction,
+    saveProject: options.onSaveProject || options.onSaveProjectAs ? () => saveAsRequested && options.onSaveProjectAs ? options.onSaveProjectAs() : options.onSaveProject?.() : undefined,
+    saveLocal() {
+      if (saveAsRequested) localSave('new');
+      else { const callback = options.referenceContext?.onSave ?? options.onSave; if (callback) callback(); else localSave(current.draft?.sourceId ? 'overwrite' : 'new'); }
     },
-    saveProject: options.onSaveProject ? () => options.onSaveProject!() : undefined,
-    saveLocal,
     active: () => !disposed && !!song.read().draft,
-    onBusy(busy) {
-      root.querySelectorAll<HTMLButtonElement>('.song-save-project').forEach(button => {
-        button.disabled = busy;
-        button.textContent = busy ? '正在保存…' : '保存工程…';
-      });
-    },
+    onBusy: fileBusy,
     onError: error => report(error instanceof Error ? error.message : String(error), true),
   });
-  function saveCurrent(): void { void saveAction.run(); }
-  function editPhrase(ref: SongClipRef, chooseLocations = false): void {
-    if (!options.onEditPhrase) return;
-    try { stopGesture?.(); stopPlayback(); options.onEditPhrase(ref, chooseLocations); }
-    catch (error) { report(error instanceof Error ? error.message : String(error), true); }
-  }
-  async function projectFile(callback: () => void | Promise<void>): Promise<void> {
+  function saveCurrent(as = false): void { if (saveAction.busy || exiting) return; saveAsRequested = as; void saveAction.run(); }
+  async function exitCurrent(): Promise<void> {
+    if (saveAction.busy || exiting || disposed) return;
     try {
-      if (!disposed) await callback();
-    } catch (error) {
-      if (!disposed) report(error instanceof Error ? error.message : String(error), true);
+      prepareFileAction(); exiting = true; fileBusy(true);
+      const page = root.querySelector<HTMLElement>('.song-studio'); if (page) page.inert = true;
+      await (options.onExit ?? options.onWelcome)();
+    }
+    catch (error) { report(error instanceof Error ? error.message : String(error), true); }
+    finally {
+      exiting = false;
+      if (!disposed) { const page = root.querySelector<HTMLElement>('.song-studio'); if (page) page.inert = false; fileBusy(false); }
     }
   }
-  function openSongs(): void {
-    stopPlayback(); const view = song.read(); const dialog = node('dialog', 'library-dialog');
-    const heading = node('div', 'library-heading'); heading.append(node('h2', '', '我的歌曲'), action('关闭', 'quiet', () => dialog.close())); dialog.append(heading);
-    if (!view.savedSongs.length && !view.unfinishedDrafts.length) dialog.append(node('p', '', '第一首歌会留在这里。'));
-    for (const draft of view.unfinishedDrafts) dialog.append(action(`${draft.name} · 编辑稿 ↗`, 'library-sound', () => { dialog.close(); edit(() => { song.openDraft(draft.id); selected.clear(); selectedTrack = undefined; }); }));
-    for (const content of view.savedSongs) dialog.append(action(`${content.name} ↗`, 'library-sound', () => { dialog.close(); edit(() => { song.open(content.id); selected.clear(); selectedTrack = undefined; }); }));
-    dialog.addEventListener('close', () => dialog.remove(), { once: true }); root.append(dialog); dialog.showModal();
+  function popover(label: string, contents: HTMLElement, kind?: 'tempo' | 'volume'): HTMLElement {
+    const wrapper = node('div', 'song-popover'); const button = action(kind ? '' : label, 'song-icon-button', () => {});
+    if (kind) button.append(icon(kind)); button.setAttribute('aria-label', label); button.title = label;
+    contents.classList.add('song-popover-panel'); wrapper.append(button, contents); return wrapper;
   }
-  function rememberScroll(): void { const scroller = root.querySelector<HTMLElement>('.song-scroll'); if (scroller) { scrollLeft = scroller.scrollLeft; scrollTop = scroller.scrollTop; } }
   function render(): void {
-    if (disposed) return;
-    const pageScrollTop = document.scrollingElement?.scrollTop ?? 0;
-    window.clearTimeout(layoutTimer); deferredLayout = false; rememberScroll(); stopGesture?.(); stopGesture = undefined;
-    const view = song.read(); const body = view.body;
-    const sameDraft = !!view.draft && view.draft.id === renderedDraftId;
-    if (!sameDraft) {
-      renderedDraftId = view.draft?.id; selectedTrack = undefined; selected.clear(); scrollLeft = 0; scrollTop = 0;
-    }
-    const lengths = new Map<string, number>(Object.entries(view.clipLengths ?? {}));
-    const lengthFor = (id: string) => { let length = lengths.get(id); if (length === undefined) { length = song.clipLengthBeats(id); lengths.set(id, length); } return length; };
-    if (body) { selectedTrack = body.tracks.some(track => track.id === selectedTrack) ? selectedTrack : body.tracks[0]!.id; selected = new Set([...selected].filter(id => body.tracks.some(track => track.clips.some(clip => clip.id === id)))); }
-    root.replaceChildren(); const page = node('div', 'studio song-studio'); const toolbar = node('header', 'studio-toolbar');
-    toolbar.append(action('RootSound', 'wordmark brand-button', options.onWelcome));
-    const tabs = node('nav', 'workspace-tabs'); tabs.setAttribute('aria-label', '切换创作工作区');
-    if (options.onSampling) tabs.append(action('采样获取', 'workspace-tab', options.onSampling));
-    tabs.append(action('音色制作', 'workspace-tab', options.onSound), action('乐句谱写', 'workspace-tab', options.onPhrase), action('歌曲编排', 'workspace-tab is-active', () => {})); toolbar.append(tabs);
-    const tools = node('nav', 'toolbar-tools');
-    if (!options.referenceContext) tools.append(action('新建歌曲', 'quiet', () => edit(() => { song.create(); selected.clear(); selectedTrack = undefined; scrollLeft = 0; })), action('我的歌曲', 'quiet', openSongs));
-    if (options.onOpenProject) tools.append(action('打开工程…', 'quiet song-open-project', () => { void projectFile(options.onOpenProject!); }));
-    if (options.onLibrary) tools.append(action('素材', 'quiet', () => { stopPlayback(); options.onLibrary!(); }));
-    if (options.onSettings) tools.append(action('设置', 'quiet', () => { stopPlayback(); options.onSettings!(); })); toolbar.append(tools); page.append(toolbar);
-    const main = node('main', 'song-workspace');
-    if (options.referenceContext) main.append(createReferenceNavigation(options.referenceContext));
-    if (!body || !view.draft) {
-      const empty = node('section', 'song-empty'); empty.append(node('h1', '', view.problem ? '歌曲无法打开' : '歌曲编排'));
-      if (view.problem) empty.append(node('p', 'muted', view.problem));
-      empty.append(action('新建歌曲', 'primary', () => edit(() => { song.create(); selected.clear(); selectedTrack = undefined; })));
-      if (!view.availablePhrases.length) empty.append(action('先写一段乐句', 'quiet', options.onPhrase)); main.append(empty);
-    } else {
-      const heading = node('div', 'song-heading'); const title = node('div');
-      const name = node('input', 'sound-name'); name.value = view.draft.name; name.maxLength = 100; name.setAttribute('aria-label', '歌曲名称'); name.addEventListener('change', () => { if (quietEdit(() => song.rename(name.value))) name.value = song.read().draft!.name; });
-      title.append(name, node('p', 'save-state', '本机编辑稿已保留')); heading.append(title);
-      const transport = node('div', 'song-transport'); playButton = action('▶ 听整首', 'preview-button', () => { void play(); });
-      const saveButton = action(options.onSaveProject ? (saveAction.busy ? '正在保存…' : '保存工程…') : '保存歌曲', 'primary compact' + (options.onSaveProject ? ' song-save-project' : ''), saveCurrent);
-      saveButton.disabled = saveAction.busy;
-      transport.append(playButton, saveButton);
-      if (!options.onSaveProject && view.draft.sourceId && !options.referenceContext) transport.append(action('另存', 'quiet', () => save('new')));
-      const applyElsewhere = options.referenceContext?.onApplyElsewhere ?? options.onApplyElsewhere;
-      if (applyElsewhere) transport.append(action('应用到其他位置…', 'quiet', applyElsewhere));
-      if (options.onExport) transport.append(action('导出音频', 'secondary', () => { stopPlayback(); options.onExport!(); })); heading.append(transport); main.append(heading);
-      const controls = node('div', 'song-controls');
-      const tempoLabel = node('label', 'song-field'); tempoLabel.append(node('span', '', '歌曲速度'));
-      const tempo = node('input'); tempo.type = 'number'; tempo.min = '40'; tempo.max = '240'; tempo.step = '1'; tempo.value = String(body.tempoBpm); tempo.setAttribute('aria-label', '歌曲速度'); tempo.addEventListener('change', () => {
-        if (!quietEdit(() => song.setTempo(Number(tempo.value)))) return;
-        if (pointerDown) deferredLayout = true; else render();
-      }); tempoLabel.append(tempo); controls.append(tempoLabel);
-      tempo.addEventListener('input', () => {
-        const value = Number(tempo.value); if (!Number.isFinite(value) || value < 40 || value > 240) return;
-        liveBody = { ...song.read().body!, tempoBpm: value }; playbackTempo = value;
-        livePreview.request(() => song.previewPlan(liveBody, { allowSilence: true }));
+    if (disposed) return; phraseLibrary?.close(); inspector.flush(); finishGesture(false); observer?.disconnect(); sync();
+    const page = node('div', 'song-studio'); const top = node('header', 'song-topbar');
+    const projectTitle = node('div', 'song-project-name', options.projectName?.() ?? current.draft?.name ?? '新项目');
+    projectTitle.title = '双击修改项目名称';
+    projectTitle.addEventListener('dblclick', () => {
+      if (exiting || projectTitle.querySelector('input')) return;
+      const previous = projectTitle.textContent ?? ''; const input = node('input', 'song-project-name-input'); input.value = previous; input.maxLength = 80;
+      input.setAttribute('aria-label', '项目名称'); let done = false;
+      const commit = () => {
+        if (done) return; done = true; const name = input.value.trim(); let display = previous;
+        if (name && name !== previous) {
+          try { if (options.onRenameProject) options.onRenameProject(name); else song.rename(name); sync(); fieldCommitError = undefined; display = name; }
+          catch (error) { fieldCommitError = error instanceof Error ? error.message : String(error); report(fieldCommitError, true); }
+        }
+        projectTitle.replaceChildren(); projectTitle.textContent = display;
+      };
+      input.addEventListener('blur', commit); input.addEventListener('keydown', event => {
+        if (event.key === 'Enter') { event.preventDefault(); input.blur(); viewport.focus(); }
+        if (event.key === 'Escape') { event.preventDefault(); input.value = previous; input.blur(); viewport.focus(); }
       });
-      const tempoModeLabel = node('label', 'song-field'); tempoModeLabel.append(node('span', '', '乐句速度')); const tempoMode = node('select'); tempoMode.setAttribute('aria-label', '乐句播放速度规则');
-      for (const [value, label] of [['source', '各自保留原速'], ['song', '跟随歌曲速度']]) { const option = node('option', '', label); option.value = value!; tempoMode.append(option); }
-      tempoMode.value = body.tempoMode; tempoMode.addEventListener('change', () => edit(() => song.setTempoMode(tempoMode.value as 'source' | 'song'))); tempoModeLabel.append(tempoMode); controls.append(tempoModeLabel);
-      const snapLabel = node('label', 'song-field'); snapLabel.append(node('span', '', '对齐')); const snapSelect = node('select'); snapSelect.setAttribute('aria-label', '片段移动对齐');
-      for (const [value, label] of [['1', '一拍'], ['0.5', '半拍'], ['0.25', '四分之一拍'], ['0', '自由移动']]) { const option = node('option', '', label); option.value = value!; snapSelect.append(option); }
-      snapSelect.value = String(snap); snapSelect.addEventListener('change', () => { snap = Number(snapSelect.value); }); snapLabel.append(snapSelect); controls.append(snapLabel);
-      const zoomLabel = node('label', 'song-field song-zoom'); zoomLabel.append(node('span', '', '缩放')); const zoom = node('input'); zoom.type = 'range'; zoom.min = '20'; zoom.max = '100'; zoom.step = '4'; zoom.value = String(beatPixels); zoom.setAttribute('aria-label', '歌曲时间线缩放'); zoom.addEventListener('change', () => { beatPixels = Number(zoom.value); render(); }); zoomLabel.append(zoom); controls.append(zoomLabel);
-      const undo = action('撤销', 'quiet song-undo', () => edit(() => song.undo())); undo.disabled = !view.canUndo; const redo = action('重做', 'quiet song-redo', () => edit(() => song.redo())); redo.disabled = !view.canRedo; controls.append(undo, redo); main.append(controls);
-      const post = node('details', 'song-post'); post.open = postOpen;
-      post.addEventListener('toggle', () => { postOpen = post.open; });
-      const summary = node('summary', '', '后期'); summary.title = '最终输出处理；试听和导出使用相同设置，自动峰值保护始终开启。'; post.append(summary);
-      const postControls = node('div', 'song-post-controls');
-      const readSettings = (): PostProductionSettings => song.read().body!.postProduction ?? { enabled: true, level: 1, fadeInSeconds: 0, fadeOutSeconds: 0 };
-      const original = node('label', 'song-field'); const bypass = node('input'); bypass.type = 'checkbox'; bypass.checked = !readSettings().enabled;
-      bypass.addEventListener('change', () => {
-        if (quietEdit(() => song.setPostProduction({ ...readSettings(), enabled: !bypass.checked }))) {
-          postControls.querySelectorAll<HTMLInputElement>('[data-post-control]').forEach(input => { input.disabled = bypass.checked; });
-        }
-      }); original.append(bypass, node('span', '', '原声对比')); postControls.append(original);
-      for (const field of ['level', 'fadeInSeconds', 'fadeOutSeconds'] as const) {
-        const label = node('label', 'song-field'); const caption = field === 'level' ? '总音量' : field === 'fadeInSeconds' ? '淡入 / 秒' : '淡出 / 秒';
-        label.append(node('span', '', caption)); const input = node('input'); input.dataset.postControl = '';
-        input.type = field === 'level' ? 'range' : 'number'; input.min = '0'; input.max = field === 'level' ? '1' : '30'; input.step = field === 'level' ? '0.01' : '0.1';
-        input.value = String(readSettings()[field]); input.disabled = bypass.checked; input.setAttribute('aria-label', caption);
-        input.title = field === 'level' ? '整首歌输出音量' : '按整首歌的时间计算，包含末尾收音；过长时自动收缩到歌长。';
-        const value = node('output', 'song-output-value', `${Math.round(Number(input.value) * 100)}%`);
-        input.addEventListener('input', () => {
-          const setting = Number(input.value); if (!Number.isFinite(setting) || setting < 0 || setting > Number(input.max)) return;
-          value.textContent = `${Math.round(setting * 100)}%`;
-          liveBody = { ...song.read().body!, postProduction: { ...readSettings(), [field]: setting } };
-          livePreview.request(() => song.previewPlan(liveBody, { allowSilence: true }));
-        });
-        input.addEventListener('pointercancel', () => {
-          liveBody = undefined; input.value = String(readSettings()[field]); value.textContent = `${Math.round(Number(input.value) * 100)}%`;
-          livePreview.flush(() => song.previewPlan(undefined, { allowSilence: true }));
-        });
-        input.addEventListener('change', () => { quietEdit(() => song.setPostProduction({ ...readSettings(), [field]: Number(input.value) })); });
-        label.append(input); if (field === 'level') label.append(value); postControls.append(label);
-      }
-      post.append(postControls); main.append(post);
-      if (!options.renderEntities) {
-      const palette = node('section', 'song-palette'); palette.setAttribute('aria-label', '可用乐句');
-      if (!view.availablePhrases.length) palette.append(node('span', 'muted', '这里还没有乐句。'), action('去写一段 ↗', 'quiet', options.onPhrase));
-      else {
-        palette.append(node('span', 'song-palette-label', '我的乐句'));
-        for (const phrase of view.availablePhrases) {
-          const card = action(`＋ ${phrase.name}`, 'song-phrase-card', () => {
-            const target = body.tracks.find(track => track.id === selectedTrack)!;
-            const start = Math.max(0, ...target.clips.map(clip => clip.startBeat + lengthFor(clip.phraseId)));
-            edit(() => { selected = new Set([song.addClip(target.id, phrase.id, start)]); });
-          });
-          card.draggable = true; card.title = '拖到时间线上；点击会接在当前轨道末尾。';
-          card.addEventListener('dragstart', event => { event.dataTransfer?.setData('application/x-rootsound-phrase', phrase.id); if (event.dataTransfer) event.dataTransfer.effectAllowed = 'copy'; }); palette.append(card);
-        }
-      }
-      main.append(palette);
-      }
-      const scroller = node('div', 'song-scroll'); const timeline = node('div', 'song-timeline');
-      const displayBeats = Math.max(16, Math.ceil(view.lengthBeats / 4) * 4 + 4); timeline.style.width = `${180 + displayBeats * beatPixels}px`;
-      const ruler = node('div', 'song-ruler'); ruler.append(node('span', 'song-ruler-corner', '时间 · 拍'));
-      for (let beat = 0; beat < displayBeats; beat++) { const mark = node('span', beat % 4 === 0 ? 'is-strong' : '', String(beat + 1)); mark.style.width = `${beatPixels}px`; ruler.append(mark); } timeline.append(ruler);
-      const rows: Array<{ id: string; grid: HTMLElement }> = [];
-      const clipElements = new Map<string, HTMLElement>();
-      body.tracks.forEach((track, trackIndex) => {
-        const row = node('section', 'song-track' + (track.id === selectedTrack ? ' is-active' : '') + (track.muted ? ' is-muted' : '')); row.dataset.trackId = track.id;
-        const sidebar = node('div', 'song-track-controls'); sidebar.addEventListener('click', () => { selectedTrack = track.id; root.querySelectorAll('.song-track').forEach(item => item.classList.toggle('is-active', (item as HTMLElement).dataset.trackId === track.id)); });
-        const trackName = node('input', 'song-track-name'); trackName.value = track.name; trackName.maxLength = 60; trackName.setAttribute('aria-label', `轨道 ${trackIndex + 1} 名称`); trackName.addEventListener('change', () => { quietEdit(() => song.updateTrack(track.id, { name: trackName.value.trim() })); }); sidebar.append(trackName);
-        const switches = node('div', 'song-track-switches');
-        const mute = action('静音', 'song-toggle' + (track.muted ? ' is-on' : ''), () => edit(() => song.updateTrack(track.id, { muted: !track.muted }))); mute.setAttribute('aria-pressed', String(track.muted)); mute.setAttribute('aria-label', `${track.name}静音`);
-        const solo = action('单独听', 'song-toggle' + (track.solo ? ' is-on' : ''), () => edit(() => song.updateTrack(track.id, { solo: !track.solo }))); solo.setAttribute('aria-pressed', String(track.solo)); solo.setAttribute('aria-label', `${track.name}单独听`); switches.append(mute, solo);
-        const removeTrack = action('×', 'song-remove-track', () => {
-          if (!track.clips.length) { edit(() => song.removeTrack(track.id)); return; }
-          const dialog = node('dialog'); dialog.append(node('h2', '', '移除这条轨道？'), node('p', '', `${track.clips.length} 个乐句片段也会移除，可用撤销找回。`)); const buttons = node('div', 'dialog-actions');
-          buttons.append(action('返回', 'secondary', () => dialog.close()), action('移除', 'primary', () => { dialog.close(); edit(() => song.removeTrack(track.id)); })); dialog.append(buttons); dialog.addEventListener('close', () => dialog.remove(), { once: true }); root.append(dialog); dialog.showModal();
-        }); removeTrack.disabled = body.tracks.length === 1; removeTrack.setAttribute('aria-label', `移除${track.name}轨道`); switches.append(removeTrack); sidebar.append(switches);
-        for (const field of ['level', 'pan'] as const) {
-          const label = node('label', 'song-mix'); label.append(node('span', '', field === 'level' ? '音量' : '左右'));
-          const input = node('input'); input.type = 'range'; input.min = field === 'level' ? '0' : '-1'; input.max = '1'; input.step = '0.01'; input.value = String(track[field]); input.setAttribute('aria-label', `${track.name}${field === 'level' ? '音量' : '左右位置'}`);
-          input.addEventListener('input', () => {
-            const current = song.read().body!;
-            liveBody = { ...current, tracks: current.tracks.map(item => item.id === track.id ? { ...item, [field]: Number(input.value) } : item) };
-            livePreview.request(() => song.previewPlan(liveBody, { allowSilence: true }));
-            report(`${track.name} · ${field === 'level' ? `音量 ${Math.round(Number(input.value) * 100)}%` : Number(input.value) === 0 ? '居中' : `${Number(input.value) < 0 ? '偏左' : '偏右'} ${Math.abs(Math.round(Number(input.value) * 100))}%`}`);
-          });
-          input.addEventListener('pointercancel', () => {
-            liveBody = undefined; input.value = String(song.read().body!.tracks.find(item => item.id === track.id)![field]);
-            livePreview.flush(() => song.previewPlan(undefined, { allowSilence: true }));
-          });
-          input.addEventListener('change', () => edit(() => song.updateTrack(track.id, { [field]: Number(input.value) }))); label.append(input); sidebar.append(label);
-        }
-        const grid = node('div', 'song-track-grid'); grid.style.width = `${displayBeats * beatPixels}px`; grid.style.setProperty('--song-beat-width', `${beatPixels}px`); rows.push({ id: track.id, grid });
-        // Overlapping phrases get separate visual rows without changing their musical overlap.
-        const ends: number[] = [];
-        [...track.clips].sort((a, b) => a.startBeat - b.startBeat).forEach(clip => {
-          const length = lengthFor(clip.phraseId); let lane = ends.findIndex(end => end <= clip.startBeat + 1e-8); if (lane < 0) lane = ends.length; ends[lane] = clip.startBeat + length;
-          const phraseName = view.availablePhrases.find(item => item.id === clip.phraseId)?.name ?? '乐句';
-          const block = action(phraseName, 'song-clip' + (selected.has(clip.id) ? ' is-selected' : ''), () => {}); block.dataset.clipId = clip.id;
-          clipElements.set(clip.id, block);
-          block.style.left = `${clip.startBeat * beatPixels + 2}px`; block.style.width = `${Math.max(12, length * beatPixels - 4)}px`; block.style.top = `${14 + lane * 39}px`;
-          const description = `${phraseName}，${track.name}，第 ${Number((clip.startBeat + 1).toFixed(3))} 拍，持续 ${Number(length.toFixed(3))} 拍`;
-          block.setAttribute('aria-label', description); block.title = description; block.setAttribute('aria-pressed', String(selected.has(clip.id)));
-          if (options.onEditPhrase) {
-            block.title += '；双击编辑这一处乐句，右键可选择联合修改。';
-            block.addEventListener('dblclick', event => {
-              if (event.ctrlKey || event.metaKey || event.shiftKey) return;
-              event.preventDefault(); event.stopPropagation(); editPhrase({ trackId: track.id, clipId: clip.id });
-            });
-            block.addEventListener('contextmenu', event => {
-              event.preventDefault(); event.stopPropagation();
-              selected = new Set([clip.id]); selectedTrack = track.id; updateSelection();
-              const ref = { trackId: track.id, clipId: clip.id };
-              showReferenceActions(root, { label: phraseName, onEdit: () => editPhrase(ref), onChoose: () => editPhrase(ref, true) });
-            });
-          }
-          block.addEventListener('pointerdown', event => {
-            if (event.button !== 0) return; event.preventDefault(); event.stopPropagation();
-            // Preventing the browser's pointer default preserves our drag gesture,
-            // so explicitly leave any text field before using workspace shortcuts.
-            block.focus({ preventScroll: true });
-            if (!block.isConnected) return; // A rejected field edit may have rebuilt the authoritative view.
-            if (event.ctrlKey || event.metaKey || event.shiftKey) { if (selected.has(clip.id)) selected.delete(clip.id); else selected.add(clip.id); selectedTrack = track.id; updateSelection(); return; }
-            if (!selected.has(clip.id)) selected = new Set([clip.id]); selectedTrack = track.id; updateSelection();
-            const refs = picked(); const originX = event.clientX; const originY = event.clientY;
-            const minBeat = Math.min(...refs.map(ref => ref.clip.startBeat));
-            const maxEnd = Math.max(...refs.map(ref => ref.clip.startBeat + lengthFor(ref.clip.phraseId)));
-            const originals = refs.map(ref => ({ ...ref, element: clipElements.get(ref.clipId) }));
-            let delta = 0; let targetIndex = trackIndex; let moved = false;
-            block.setPointerCapture(event.pointerId); block.classList.add('is-dragging');
-            const move = (input: PointerEvent) => {
-              moved ||= Math.abs(input.clientX - originX) > 2 || Math.abs(input.clientY - originY) > 2;
-              if (!moved) return;
-              delta = Math.max(-minBeat, Math.min(1024 - maxEnd, (input.clientX - originX) / beatPixels));
-              const hovered = rows.findIndex(item => { const rect = item.grid.getBoundingClientRect(); return input.clientY >= rect.top && input.clientY <= rect.bottom; });
-              targetIndex = hovered >= 0 ? hovered : targetIndex;
-              const minIndex = Math.min(...refs.map(ref => ref.trackIndex)); const maxIndex = Math.max(...refs.map(ref => ref.trackIndex));
-              const trackDelta = Math.max(-minIndex, Math.min(body.tracks.length - 1 - maxIndex, targetIndex - trackIndex)); targetIndex = trackIndex + trackDelta;
-              for (const ref of originals) if (ref.element) { const current = rows[ref.trackIndex]!.grid.getBoundingClientRect(); const target = rows[ref.trackIndex + trackDelta]!.grid.getBoundingClientRect(); ref.element.style.transform = `translate(${delta * beatPixels}px, ${target.top - current.top}px)`; ref.element.classList.add('is-dragging'); }
-              const moving = new Map(refs.map(ref => [ref.clipId, { ...ref.clip, startBeat: Math.max(0, ref.clip.startBeat + delta), target: ref.trackIndex + trackDelta }]));
-              liveBody = { ...body, tracks: body.tracks.map((item, index) => ({ ...item,
-                clips: [...item.clips.filter(clip => !moving.has(clip.id)), ...[...moving.values()].filter(clip => clip.target === index).map(({ target: _target, ...clip }) => clip)] })) };
-              livePreview.request(() => song.previewPlan(liveBody, { allowSilence: true }));
-            };
-            const cleanup = () => { block.removeEventListener('pointermove', move); block.removeEventListener('pointerup', up); block.removeEventListener('pointercancel', cancel); block.removeEventListener('lostpointercapture', cancel); if (block.hasPointerCapture(event.pointerId)) block.releasePointerCapture(event.pointerId); originals.forEach(ref => { if (ref.element) { ref.element.style.transform = ''; ref.element.classList.remove('is-dragging'); } }); stopGesture = undefined; };
-            const up = () => {
-              cleanup();
-              if (moved) {
-                const landing = Math.max(-minBeat, Math.min(1024 - maxEnd, quantize(delta)));
-                edit(() => song.moveClips(refs.map(ref => ({ trackId: ref.trackId, clipId: ref.clipId, targetTrackId: body.tracks[ref.trackIndex + targetIndex - trackIndex]!.id, startBeat: Math.max(0, ref.clip.startBeat + landing) }))));
-              } else block.focus({ preventScroll: true });
-            };
-            const cancel = () => { cleanup(); liveBody = undefined; livePreview.flush(() => song.previewPlan(undefined, { allowSilence: true })); };
-            stopGesture?.(); stopGesture = cancel; block.addEventListener('pointermove', move); block.addEventListener('pointerup', up); block.addEventListener('pointercancel', cancel); block.addEventListener('lostpointercapture', cancel);
-          });
-          block.addEventListener('keydown', event => {
-            if (event.key === 'Enter' && !event.ctrlKey && !event.metaKey && options.onEditPhrase) {
-              event.preventDefault(); event.stopPropagation(); editPhrase({ trackId: track.id, clipId: clip.id }); return;
-            }
-            if ((event.key === 'ArrowLeft' || event.key === 'ArrowRight') && !event.ctrlKey && !event.metaKey) {
-              event.preventDefault(); const refs = picked(); const delta = (event.key === 'ArrowLeft' ? -1 : 1) * (snap || 0.1);
-              edit(() => song.moveClips(refs.map(ref => ({ trackId: ref.trackId, clipId: ref.clipId, targetTrackId: ref.trackId, startBeat: ref.clip.startBeat + delta }))));
-            }
-          }); grid.append(block);
-        });
-        grid.style.height = `${Math.max(144, ends.length * 39 + 28)}px`;
-        grid.addEventListener('pointerdown', event => { if ((event.target as Element).closest('.song-clip')) return; selectedTrack = track.id; selected.clear(); updateSelection(); root.querySelectorAll('.song-track').forEach(item => item.classList.toggle('is-active', (item as HTMLElement).dataset.trackId === track.id)); });
-        grid.addEventListener('dragover', event => { if (event.dataTransfer?.types.some(type => type === 'application/x-rootsound-phrase' || type === 'application/x-rootsound-entity')) { event.preventDefault(); event.dataTransfer.dropEffect = 'copy'; grid.classList.add('is-drop-target'); } });
-        grid.addEventListener('dragleave', () => grid.classList.remove('is-drop-target'));
-        grid.addEventListener('drop', event => {
-          event.preventDefault(); grid.classList.remove('is-drop-target'); if (!event.dataTransfer) return;
-          const entity = readEntityDrag(event.dataTransfer); const id = entity?.kind === 'rootsound.phrase' ? entity.id : event.dataTransfer.getData('application/x-rootsound-phrase');
-          if (!id || !song.read().availablePhrases.some(phrase => phrase.id === id)) return;
-          const beat = Math.max(0, quantize((event.clientX - grid.getBoundingClientRect().left) / beatPixels));
-          edit(() => { selectedTrack = track.id; selected = new Set([song.addClip(track.id, id, beat)]); });
-        });
-        row.append(sidebar, grid); timeline.append(row);
-      });
-      playhead = node('div', 'song-playhead'); playhead.hidden = !sessionId; timeline.append(playhead); scroller.append(timeline); main.append(scroller);
-      queueMicrotask(() => { if (scroller.isConnected) { scroller.scrollLeft = scrollLeft; scroller.scrollTop = scrollTop; } });
-      const footer = node('div', 'song-edit-tools'); footer.append(action('＋ 添加轨道', 'quiet', () => edit(() => { selectedTrack = song.addTrack(); })), action('延长 16 拍', 'quiet', () => edit(() => song.setLength(Math.ceil(view.lengthBeats / 16) * 16 + 16))));
-      for (const [label, callback] of [['复制一份', duplicate], ['复制', copy], ['删除选中', remove]] as const) { const button = action(label, 'quiet', callback); button.dataset.songSelectionAction = ''; button.disabled = !selected.size; footer.append(button); }
-      if (options.onEditPhrase) {
-        const open = action('编辑乐句', 'quiet song-edit-phrase', () => { const refs = picked(); if (refs.length === 1) editPhrase(refs[0]!); });
-        open.dataset.songSingleSelectionAction = ''; open.disabled = selected.size !== 1; footer.append(open);
-      }
-      const pasteButton = action('粘贴到末尾', 'quiet song-paste', paste); pasteButton.disabled = !clipboard.length; footer.append(pasteButton); main.append(footer);
-    }
-    notice = node('p', 'studio-notice' + (isError ? ' is-error' : ''), status); notice.setAttribute('role', 'status'); main.append(notice); page.append(main);
-    if (options.renderEntities) { page.append(options.renderEntities()); page.classList.add('has-entity-rail'); }
-    root.append(page); updatePlayback();
-    const restoreScroll = () => {
-      if (disposed || !page.isConnected) return;
-      // Replacing the document collapses its height momentarily. Keep this draft's
-      // page and timeline positions, and start another draft at its own beginning.
-      if (document.scrollingElement) document.scrollingElement.scrollTop = sameDraft ? pageScrollTop : 0;
-      const scroller = page.querySelector<HTMLElement>('.song-scroll');
-      if (scroller) { scroller.scrollLeft = scrollLeft; scroller.scrollTop = scrollTop; }
+      projectTitle.replaceChildren(input); input.focus(); input.select?.();
+    });
+    const projectIdentity = node('div', 'song-project-identity'); projectIdentity.append(projectTitle, node('span', 'song-project-kind', '乐曲')); top.append(projectIdentity);
+    const controls = node('div', 'song-transport');
+    const stopButton = action('', 'song-icon-button song-stop', () => { finishGesture(false); audition?.stop(); transport.stop(); }); stopButton.append(icon('stop')); stopButton.setAttribute('aria-label', '停止并回到开头');
+    playButton = action('', 'song-icon-button song-play', () => { audition?.stop(); void transport.toggle(); }); clock = node('output', 'song-clock'); clock.setAttribute('aria-label', '当前时间'); controls.append(stopButton, playButton, clock);
+    const rates = node('div', 'song-rate-options'); const rateWrapper = popover(`${transportState.rate}x`, rates); const rateButton = rateWrapper.querySelector<HTMLButtonElement>('button')!;
+    for (const rate of [1, .75, 1.25]) rates.append(action(`${rate}x`, 'song-rate-choice', () => { transport.setRate(rate); rateButton.textContent = `${rate}x`; })); controls.append(rateWrapper);
+    const tempoPanel = node('div', 'song-tempo-panel'); tempoInput = node('input'); tempoInput.type = 'number'; tempoInput.min = '40'; tempoInput.max = '240'; tempoInput.step = '1'; tempoInput.required = true;
+    tempoInput.value = String(current.body ? songGridTempoAt(current.body, transport.position()) : 120); tempoInput.setAttribute('aria-label', '网格 BPM');
+    const commitTempo = () => {
+      if (exiting) return;
+      const value = Number(tempoInput.value);
+      if (!tempoInput.value.trim() || !Number.isFinite(value) || value < 40 || value > 240) { fieldCommitError = 'BPM 应在 40 至 240 之间。'; report(fieldCommitError, true); return; }
+      const at = tempoEditAt ?? transport.position();
+      const resetsFuture = tempoEdited && current.body?.gridTempoChanges?.some(change => change.atSeconds >= at);
+      if (current.body && (value !== songGridTempoAt(current.body, at) || resetsFuture)) {
+        if (mutate(() => song.setGridTempo(value, at), false)) tempoEdited = false;
+      } else { fieldCommitError = undefined; tempoEdited = false; }
     };
-    restoreScroll(); queueMicrotask(restoreScroll);
+    tempoInput.addEventListener('focus', () => { tempoEditAt = transport.position(); tempoEdited = false; pendingCommit = commitTempo; });
+    pendingCommit = commitTempo; tempoInput.addEventListener('blur', () => { commitTempo(); tempoEditAt = undefined; });
+    tempoInput.addEventListener('input', () => { tempoEdited = true; const value = Number(tempoInput.value); if (tempoInput.value && value >= 40 && value <= 240) commitTempo(); });
+    tempoPanel.append(node('span', '', 'BPM'), tempoInput); controls.append(popover('BPM', tempoPanel, 'tempo'));
+    const volumePanel = node('div', 'song-volume-panel'); masterInput = node('input'); masterInput.type = 'range'; masterInput.min = '0'; masterInput.max = '1'; masterInput.step = '.01';
+    masterInput.value = String(current.body?.masterLevel ?? 1); masterInput.setAttribute('aria-label', '总音量');
+    masterInput.addEventListener('input', () => mutate(() => song.setMasterLevel(Number(masterInput.value)))); volumePanel.append(masterInput); controls.append(popover('总音量', volumePanel, 'volume'));
+    const files = node('div', 'song-file-actions');
+    if (options.onSettings) files.append(action('设置', 'song-settings', () => {
+      if (disposed || exiting || saveAction.busy) return;
+      try { prepareFileAction(); options.onSettings!(); }
+      catch (error) { report(error instanceof Error ? error.message : String(error), true); }
+    }));
+    files.append(action('保存', 'song-save', () => saveCurrent()), action('另存为', 'song-save', () => saveCurrent(true)), action('退出', 'song-exit', () => { void exitCurrent(); }));
+    top.append(controls, files); page.append(top);
+    const main = node('main', 'song-workspace'); const palette = node('aside', 'song-palette'); palette.setAttribute('aria-label', '当前歌曲乐句');
+    paletteList = node('div', 'song-phrase-list'); phraseCards.clear();
+    paletteList.addEventListener('dragover', reorderShelfPreview); paletteList.addEventListener('drop', dropShelfOrder);
+    newPhraseButton = action('+', 'song-new-phrase', openPhraseLibrary); newPhraseButton.setAttribute('aria-label', '打开乐句库'); palette.append(paletteList, newPhraseButton);
+    viewport = node('section', 'song-scroll'); viewport.tabIndex = -1; viewport.setAttribute('aria-label', '歌曲编排');
+    ruler = node('div', 'song-ruler'); content = node('div', 'song-timeline'); playhead = node('div', 'song-playhead'); headHandle = node('div', 'song-playhead-handle'); headHandle.setAttribute('aria-label', '拖动播放头');
+    rowControls = node('div', 'song-row-controls'); rowControls.setAttribute('aria-label', '行调控');
+    erasures = node('div', 'song-erasures'); notice = node('div', 'song-notice'); notice.setAttribute('role', 'status'); notice.hidden = true;
+    viewport.append(rowControls, ruler, content, erasures, notice);
+    if (!phrases().length) { const curtain = node('div', 'song-empty-curtain'); curtain.append(node('p', '', '先创建乐句吧'), node('span', 'song-empty-arrow', '←')); viewport.append(curtain); }
+    const arrangement = node('div', 'song-arrangement'); arrangement.append(viewport, inspector.element);
+    main.append(palette, arrangement); page.append(main);
+    trash = node('div', 'song-phrase-trash'); trash.hidden = true; trash.setAttribute('role', 'region');
+    const trashIcon = document.createElementNS('http://www.w3.org/2000/svg', 'svg'); trashIcon.setAttribute('viewBox', '0 0 24 24'); trashIcon.setAttribute('aria-hidden', 'true');
+    const trashPath = document.createElementNS('http://www.w3.org/2000/svg', 'path'); trashPath.setAttribute('d', 'M4 6h16M9 6V3h6v3M6 6l1 15h10l1-15M10 10v7m4-7v7');
+    trashPath.setAttribute('fill', 'none'); trashPath.setAttribute('stroke', 'currentColor'); trashPath.setAttribute('stroke-width', '1.6'); trashPath.setAttribute('stroke-linecap', 'round'); trashPath.setAttribute('stroke-linejoin', 'round');
+    trashIcon.append(trashPath); trash.append(trashIcon);
+    trash.addEventListener('dragover', event => { if (!dragPhraseId && !libraryDragId) return; event.preventDefault(); event.stopPropagation(); if (event.dataTransfer) event.dataTransfer.dropEffect = 'move'; showTrash(libraryDragId ? 'library' : 'shelf', true); });
+    trash.addEventListener('dragleave', event => { if (!(event.relatedTarget instanceof Node) || !trash.contains(event.relatedTarget)) trash.classList.remove('is-over'); });
+    trash.addEventListener('drop', shelfTrashDrop); viewport.append(trash); root.replaceChildren(page);
+    viewport.addEventListener('pointerdown', pointerDown); viewport.addEventListener('wheel', wheel, { passive: false });
+    viewport.addEventListener('dblclick', event => {
+      if (exiting) return;
+      // Pointer capture retargets the browser's double-click to the viewport.
+      // Retain only the last stationary name target, while letting the browser
+      // decide double-click timing according to the user's system settings.
+      if (lastNamePointer) {
+        const id = lastNamePointer; lastNamePointer = undefined;
+        const control = [...rowControls.querySelectorAll<HTMLElement>('.song-row-control')].find(element => element.dataset.trackId === id);
+        const name = control?.querySelector<HTMLInputElement>('.song-row-name');
+        if (name) { event.preventDefault(); finishGesture(false); activateRowName(name, id); return; }
+      }
+      if (lastClipPointer) {
+        const ref = lastClipPointer; lastClipPointer = undefined;
+        if (current.body?.tracks.find(track => track.id === ref.trackId)?.clips.some(clip => clip.id === ref.clipId)) {
+          if (lastPointerActivation?.clipId === ref.clipId && Date.now() - lastPointerActivation.at <= 500) { lastPointerActivation = undefined; return; }
+          event.preventDefault(); editPhrase(ref); return;
+        }
+      }
+      if ((event.target as Element).closest('.song-row-controls') || (event.target as Element).closest('.song-ruler') || (event.target as Element).closest('.song-playhead')) return;
+      const direct = (event.target as Element).closest<HTMLElement>('.song-clip');
+      const clipId = direct?.dataset.clipId;
+      const ref = current.body?.tracks.flatMap(track => track.clips.map(clip => ({ trackId: track.id, clipId: clip.id }))).find(item => item.clipId === clipId);
+      if (ref && lastPointerActivation?.clipId === ref.clipId && Date.now() - lastPointerActivation.at <= 500) { lastPointerActivation = undefined; return; }
+      if (!ref) return; event.preventDefault(); editPhrase(ref);
+    });
+    viewport.addEventListener('contextmenu', event => event.preventDefault()); viewport.addEventListener('dragover', dragOver); viewport.addEventListener('drop', drop);
+    viewport.addEventListener('dragleave', event => { if (!(event.relatedTarget instanceof Node) || !viewport.contains(event.relatedTarget)) { dropPreview = undefined; paint(); } });
+    observer = typeof ResizeObserver === 'undefined' ? undefined : new ResizeObserver(() => paint()); observer?.observe(viewport); paint(); updatePlayback();
   }
-  const unsubscribe = sound.subscribe(event => {
-    if (event.type === 'session') {
-      if (event.session.status === 'playing') {
-        if (preparing) { sessionId = event.session.id; report('正在演奏…'); cancelAnimationFrame(frame); tick(); }
-      } else if (event.session.id === sessionId) { sessionId = undefined; cancelAnimationFrame(frame); report(event.session.status === 'failed' ? event.session.error ?? '演奏未能完成。' : '已结束。', event.session.status === 'failed'); }
-      updatePlayback();
-    } else if (event.status === 'failed' || event.status === 'suspended') report(event.error ?? '声音设备暂不可用。', true);
-  });
-  const keydown = (event: KeyboardEvent) => {
+  function removeRefs(refs: SongClipRef[], refreshAudio = true): void {
+    mutate(() => {
+      const ids = new Set(refs.map(ref => current.body?.tracks.find(track => track.id === ref.trackId)?.clips.find(clip => clip.id === ref.clipId)?.phraseId).filter((id): id is string => !!id));
+      options.onKeepPhrases?.([...ids]); song.removeClips(refs);
+    }, refreshAudio);
+  }
+  function removeSelected(): void { const refs = picked(); if (!refs.length) return; refs.forEach(flashErase); removeRefs(refs); }
+  function adjust(key: string, repeat = false): void {
+    if (selectedPhrase) return;
+    if (selectedTrack && ['q', 'e', 'w', 's'].includes(key)) {
+      const track = current.body?.tracks.find(item => item.id === selectedTrack); if (!track) return;
+      mutate(() => song.updateTrack(track.id, key === 'q' || key === 'e'
+        ? { panOffset: clampPlaylist((track.panOffset ?? 0) + (key === 'q' ? -.05 : .05), -1, 1) }
+        : { level: clampPlaylist(track.level + (key === 's' ? -.05 : .05), 0, 1) })); return;
+    }
+    const refs = picked(); const body = current.body; if (!body || !refs.length) return;
+    if (key === 'a' || key === 'd') {
+      const identity = selectedTrack ? `row:${selectedTrack}` : [...selected].sort().join(':'); const now = Date.now();
+      const earliest = Math.min(...refs.map(ref => playlistSeconds(ref.clip.startBeat, body.tempoBpm)));
+      const pair = doubleNudge;
+      if (!repeat && pair && pair.key === key && pair.identity === identity && now - pair.at <= DOUBLE_NUDGE_WINDOW_MS) {
+        const minimum = Math.min(...pair.starts.values()); const delta = Math.max(-minimum, (key === 'a' ? -1 : 1) * pair.beat);
+        doubleNudge = undefined;
+        mutate(() => song.moveClips(refs.map(ref => ({ trackId: ref.trackId, clipId: ref.clipId, targetTrackId: ref.trackId,
+          startBeat: playlistBeats(pair.starts.get(ref.clipId)! + delta, body.tempoBpm) })))); return;
+      }
+      if (!repeat) doubleNudge = { key, identity, at: now, starts: new Map(refs.map(ref => [ref.clipId, playlistSeconds(ref.clip.startBeat, body.tempoBpm)])), beat: 60 / songGridTempoAt(body, transport.position()) };
+      const delta = Math.max(-earliest, (key === 'a' ? -1 : 1) * .025);
+      if (Math.abs(delta) > 1e-8) mutate(() => song.moveClips(refs.map(ref => ({ trackId: ref.trackId, clipId: ref.clipId, targetTrackId: ref.trackId, startBeat: playlistBeats(playlistSeconds(ref.clip.startBeat, body.tempoBpm) + delta, body.tempoBpm) }))));
+    } else {
+      doubleNudge = undefined;
+      mutate(() => song.updateClips(refs.map(ref => key === 'q' || key === 'e'
+        ? { trackId: ref.trackId, clipId: ref.clipId, pan: clampPlaylist((ref.clip.pan ?? body.tracks[ref.trackIndex]!.pan) + (key === 'q' ? -.05 : .05), -1, 1) }
+        : { trackId: ref.trackId, clipId: ref.clipId, level: clampPlaylist((ref.clip.level ?? 1) + (key === 's' ? -.05 : .05), 0, 1) })));
+    }
+  }
+  function keydown(event: KeyboardEvent): void {
+    if (disposed || exiting || event.isComposing || event.keyCode === 229) return;
+    previousClipPointer = undefined; lastClipPointer = undefined;
+    lastNamePointer = undefined;
     if (root.querySelector('dialog[open]')) return;
-    if (isSongSaveShortcut(event)) {
-      event.preventDefault();
-      if (!event.repeat) saveCurrent(); return;
+    if (isSongSaveShortcut(event)) { event.preventDefault(); if (!event.repeat) saveCurrent(event.shiftKey); return; }
+    const target = event.target as HTMLElement;
+    const rangeUndo = event.key === 'Backspace' && target instanceof HTMLInputElement && target.type === 'range';
+    if (target instanceof HTMLInputElement && !rangeUndo || target instanceof HTMLSelectElement || target instanceof HTMLTextAreaElement || target?.isContentEditable) return;
+    if (event.altKey) return;
+    if (!event.metaKey && !event.shiftKey && ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)) {
+      event.preventDefault(); if (gesture) finishGesture();
+      const horizontal = event.key === 'ArrowLeft' || event.key === 'ArrowRight';
+      const forward = event.key === 'ArrowRight' || event.key === 'ArrowDown';
+      if (event.ctrlKey) {
+        const factor = (horizontal ? forward : !forward) ? 1.15 : 1 / 1.15;
+        view = zoomPlaylist(view, (content.clientWidth || viewport.clientWidth) / 2, (content.clientHeight || viewport.clientHeight) / 2, factor, !horizontal);
+      } else if (horizontal) view.leftSeconds += (forward ? 64 : -64) / view.pixelsPerSecond;
+      else view.top += forward ? view.rowHeight : -view.rowHeight;
+      doubleNudge = undefined; constrainTop(); paint(); return;
     }
-    if (event.target instanceof HTMLInputElement || event.target instanceof HTMLSelectElement || event.target instanceof HTMLTextAreaElement || (event.target as HTMLElement)?.isContentEditable) return;
-    if ((event.code === 'Space' || event.key === ' ') && (!(event.target instanceof HTMLButtonElement) || event.target.classList.contains('song-clip'))) { event.preventDefault(); void play(); }
-    if (event.key === 'Delete' || event.key === 'Backspace' || event.code === 'Delete' || event.code === 'Backspace') { event.preventDefault(); remove(); }
     if (event.ctrlKey || event.metaKey) {
-      // Virtual/accessibility keyboards can supply a key without a physical code.
-      const shortcut = (letter: string) => /^Key[A-Z]$/u.test(event.code)
-        ? event.code === `Key${letter.toUpperCase()}` : event.key.toLowerCase() === letter;
-      if (shortcut('z')) { event.preventDefault(); edit(() => event.shiftKey ? song.redo() : song.undo()); }
-      if (shortcut('y')) { event.preventDefault(); edit(() => song.redo()); }
-      if (shortcut('a')) { event.preventDefault(); selected = new Set(song.read().body?.tracks.flatMap(track => track.clips.map(clip => clip.id))); updateSelection(); }
-      if (shortcut('c')) { event.preventDefault(); copy(); }
-      if (shortcut('v')) { event.preventDefault(); paste(); }
-      if (shortcut('d')) { event.preventDefault(); duplicate(); }
+      const key = event.key.toLowerCase();
+      if (key === 'z' || key === 'y') { event.preventDefault(); if (!event.repeat) mutate(() => key === 'y' || event.shiftKey ? song.redo() : song.undo()); }
+      if (key === 'a') { event.preventDefault(); inspector.flush(); selectedTrack = undefined; selectedPhrase = undefined; selected = new Set(current.body?.tracks.flatMap(track => track.clips.map(clip => clip.id))); paint(); } return;
     }
+    const key = event.key.toLowerCase();
+    if (key !== 'a' && key !== 'd') doubleNudge = undefined;
+    if (event.code === 'Space' || key === ' ') { event.preventDefault(); if (!event.repeat) { audition?.stop(); void transport.toggle(); } }
+    else if (key === 'backspace' && !event.shiftKey) { event.preventDefault(); if (!event.repeat) mutate(() => song.undo()); }
+    else if (key === 'delete') { event.preventDefault(); removeSelected(); }
+    else if (['q', 'e', 'w', 's', 'a', 'd'].includes(key) && !selectedPhrase && (selected.size || selectedTrack)) { event.preventDefault(); adjust(key, event.repeat); }
+    else if (key === 'enter' && !selectedTrack && selected.size === 1 && options.onEditPhrase) { event.preventDefault(); const ref = picked()[0]!; transport.pause(); options.onEditPhrase(ref); }
+  }
+  const pointerUp = (event: PointerEvent) => { finishShelfPress(event); if (disposed) return; if (gesture?.pointerId === event.pointerId) finishGesture(true, gesture.kind === 'clip' && gesture.moved && overTrash(event)); inspector.pointerEnd(); updateInspector(); };
+  const pointerCancel = (event: PointerEvent) => { if (shelfPress?.pointerId === event.pointerId) { shelfPress = undefined; previousShelfPointer = undefined; } if (gesture?.pointerId === event.pointerId) finishGesture(false); if (mixPreview) { mixPreview = undefined; inspector.cancel(); transport.refresh(); } updateInspector(); };
+  const resized = () => paint();
+  const outsideClipPress = (event: PointerEvent) => {
+    const target = event.target as Element;
+    if (event.button !== 0 || !target || !viewport.contains(target) || !target.closest('.song-clip')) { previousClipPointer = undefined; lastClipPointer = undefined; }
+    if (event.button !== 0 || !target?.closest('.song-phrase-card')) { shelfPress = undefined; previousShelfPointer = undefined; }
   };
-  const beginPointer = () => { pointerDown = true; };
-  const applyDeferredLayout = () => {
-    if (disposed) return;
-    const dialog = root.querySelector<HTMLDialogElement>('dialog[open]');
-    // The click following a field blur may open settings or export. Keep that dialog alive.
-    if (dialog) { dialog.addEventListener('close', () => { layoutTimer = window.setTimeout(applyDeferredLayout, 0); }, { once: true }); return; }
-    render();
-  };
-  const endPointer = () => { pointerDown = false; if (deferredLayout) { deferredLayout = false; layoutTimer = window.setTimeout(applyDeferredLayout, 0); } };
-  document.addEventListener('keydown', keydown); document.addEventListener('pointerdown', beginPointer, true); document.addEventListener('pointerup', endPointer, true); document.addEventListener('pointercancel', endPointer, true); render();
+  document.addEventListener('pointermove', pointerMove); document.addEventListener('pointerup', pointerUp); document.addEventListener('pointercancel', pointerCancel);
+  document.addEventListener('pointerdown', outsideClipPress);
+  document.addEventListener('keydown', keydown); document.addEventListener('dragover', shelfDragMove); window.addEventListener('resize', resized); render();
   return {
-    notify(message, error = false) { if (!disposed) report(message, error); },
-    refresh(context, onApplyElsewhere) {
-      if (disposed) return;
-      options.referenceContext = context; options.onApplyElsewhere = onApplyElsewhere; render();
+    notify(message, error = false) { report(message, error); },
+    refresh(context, onApplyElsewhere) { if (disposed) return; options.referenceContext = context; options.onApplyElsewhere = onApplyElsewhere; render(); transport.refresh(); },
+    dispose() {
+      if (disposed) return; phraseLibrary?.close(); finishGesture(false); resetShelfDrag(); hideTrash(); mixPreview = undefined; inspector.cancel(); audition?.dispose(); disposed = true; transport.dispose(); cancelAnimationFrame(frame); observer?.disconnect(); window.clearTimeout(noticeTimer); window.clearTimeout(deleteTimer);
+      document.removeEventListener('pointermove', pointerMove); document.removeEventListener('pointerup', pointerUp); document.removeEventListener('pointercancel', pointerCancel);
+      document.removeEventListener('pointerdown', outsideClipPress);
+      document.removeEventListener('keydown', keydown); document.removeEventListener('dragover', shelfDragMove); window.removeEventListener('resize', resized);
     },
-    dispose() { disposed = true; stopPlayback(); stopGesture?.(); unsubscribe(); cancelAnimationFrame(frame); window.clearTimeout(layoutTimer); document.removeEventListener('keydown', keydown); document.removeEventListener('pointerdown', beginPointer, true); document.removeEventListener('pointerup', endPointer, true); document.removeEventListener('pointercancel', endPointer, true); },
   };
 }

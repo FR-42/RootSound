@@ -1,0 +1,3439 @@
+{
+  "status": "Stereo/reference audit only; no isolated instrument ground truth",
+  "sources": {
+    "accepted07": {
+      "path": "D:\\RootSound\\experiments\\music-workflow\\reference-studio\\cases\\phone-recording-20261023-233819\\试听\\07-普通分轨基线.wav",
+      "sha256": "db79615e148120d8183bca8cddf7e4d881beefb09999b45ee9e215b24c672fac",
+      "sampleRate": 48000,
+      "measurements": [
+        {
+          "relativeWindowSeconds": [
+            0.06,
+            0.26
+          ],
+          "originalWindowSeconds": [
+            45.06,
+            45.26
+          ],
+          "frequencyHz": 233.08,
+          "bandHalfWidthHz": 12,
+          "leftMinusRightDb": 9.584092206420635,
+          "sideEnergyFraction": 0.6883417846074488,
+          "lrCoherencyMagnitude": 0.634212807585205,
+          "lrCoherencyPhaseDegrees": 173.56940450953994,
+          "meanStereoPower": 1.5130550531793704e-05
+        },
+        {
+          "relativeWindowSeconds": [
+            0.06,
+            0.26
+          ],
+          "originalWindowSeconds": [
+            45.06,
+            45.26
+          ],
+          "frequencyHz": 466.16,
+          "bandHalfWidthHz": 12,
+          "leftMinusRightDb": 1.9523278009975868,
+          "sideEnergyFraction": 0.7245896689055327,
+          "lrCoherencyMagnitude": 0.5680772447882149,
+          "lrCoherencyPhaseDegrees": 144.17016685622883,
+          "meanStereoPower": 1.4492733177908149e-05
+        },
+        {
+          "relativeWindowSeconds": [
+            0.06,
+            0.26
+          ],
+          "originalWindowSeconds": [
+            45.06,
+            45.26
+          ],
+          "frequencyHz": 698.46,
+          "bandHalfWidthHz": 12,
+          "leftMinusRightDb": -3.554270132272184,
+          "sideEnergyFraction": 0.7760004128222271,
+          "lrCoherencyMagnitude": 0.8855071552638114,
+          "lrCoherencyPhaseDegrees": -132.55480774357102,
+          "meanStereoPower": 1.9841642021376016e-05
+        },
+        {
+          "relativeWindowSeconds": [
+            0.06,
+            0.26
+          ],
+          "originalWindowSeconds": [
+            45.06,
+            45.26
+          ],
+          "frequencyHz": 1396.91,
+          "bandHalfWidthHz": 12,
+          "leftMinusRightDb": 3.5465261854786605,
+          "sideEnergyFraction": 0.43027171962955535,
+          "lrCoherencyMagnitude": 0.3761996316973272,
+          "lrCoherencyPhaseDegrees": -66.29481187449896,
+          "meanStereoPower": 4.738882534396378e-06
+        },
+        {
+          "relativeWindowSeconds": [
+            0.06,
+            0.26
+          ],
+          "originalWindowSeconds": [
+            45.06,
+            45.26
+          ],
+          "frequencyHz": 2095.37,
+          "bandHalfWidthHz": 14.667589999999999,
+          "leftMinusRightDb": 1.0617304041255664,
+          "sideEnergyFraction": 0.017288247958234793,
+          "lrCoherencyMagnitude": 0.9906892075155739,
+          "lrCoherencyPhaseDegrees": -10.952139170491089,
+          "meanStereoPower": 1.50984942694662e-05
+        },
+        {
+          "relativeWindowSeconds": [
+            0.06,
+            0.26
+          ],
+          "originalWindowSeconds": [
+            45.06,
+            45.26
+          ],
+          "frequencyHz": 2330.82,
+          "bandHalfWidthHz": 16.31574,
+          "leftMinusRightDb": -0.8620030358037953,
+          "sideEnergyFraction": 0.10371186607825228,
+          "lrCoherencyMagnitude": 0.8054663558997642,
+          "lrCoherencyPhaseDegrees": -8.565449390596985,
+          "meanStereoPower": 1.7946364425081443e-07
+        },
+        {
+          "relativeWindowSeconds": [
+            0.06,
+            0.26
+          ],
+          "originalWindowSeconds": [
+            45.06,
+            45.26
+          ],
+          "frequencyHz": 3492.28,
+          "bandHalfWidthHz": 24.445960000000003,
+          "leftMinusRightDb": 0.8866241391169748,
+          "sideEnergyFraction": 0.006924657819944148,
+          "lrCoherencyMagnitude": 0.993090029739676,
+          "lrCoherencyPhaseDegrees": -3.447561869309424,
+          "meanStereoPower": 1.5337628257019423e-06
+        },
+        {
+          "relativeWindowSeconds": [
+            0.37,
+            0.57
+          ],
+          "originalWindowSeconds": [
+            45.37,
+            45.57
+          ],
+          "frequencyHz": 233.08,
+          "bandHalfWidthHz": 12,
+          "leftMinusRightDb": -2.087860866127408,
+          "sideEnergyFraction": 0.4121533821171979,
+          "lrCoherencyMagnitude": 0.23556039269742288,
+          "lrCoherencyPhaseDegrees": 39.86975377511103,
+          "meanStereoPower": 2.4759327891214524e-05
+        },
+        {
+          "relativeWindowSeconds": [
+            0.37,
+            0.57
+          ],
+          "originalWindowSeconds": [
+            45.37,
+            45.57
+          ],
+          "frequencyHz": 466.16,
+          "bandHalfWidthHz": 12,
+          "leftMinusRightDb": -0.5158781444585518,
+          "sideEnergyFraction": 0.32716908977280634,
+          "lrCoherencyMagnitude": 0.7308268154152223,
+          "lrCoherencyPhaseDegrees": -61.71822666573019,
+          "meanStereoPower": 2.847151522447002e-05
+        },
+        {
+          "relativeWindowSeconds": [
+            0.37,
+            0.57
+          ],
+          "originalWindowSeconds": [
+            45.37,
+            45.57
+          ],
+          "frequencyHz": 698.46,
+          "bandHalfWidthHz": 12,
+          "leftMinusRightDb": -3.1074107613442212,
+          "sideEnergyFraction": 0.8225213596377839,
+          "lrCoherencyMagnitude": 0.9701529374920258,
+          "lrCoherencyPhaseDegrees": 135.06367525745873,
+          "meanStereoPower": 1.1862354762025362e-05
+        },
+        {
+          "relativeWindowSeconds": [
+            0.37,
+            0.57
+          ],
+          "originalWindowSeconds": [
+            45.37,
+            45.57
+          ],
+          "frequencyHz": 1396.91,
+          "bandHalfWidthHz": 12,
+          "leftMinusRightDb": 1.6374690537250578,
+          "sideEnergyFraction": 0.4873636493498115,
+          "lrCoherencyMagnitude": 0.8837120005770138,
+          "lrCoherencyPhaseDegrees": -88.33199624891036,
+          "meanStereoPower": 1.7601562682609057e-05
+        },
+        {
+          "relativeWindowSeconds": [
+            0.37,
+            0.57
+          ],
+          "originalWindowSeconds": [
+            45.37,
+            45.57
+          ],
+          "frequencyHz": 2095.37,
+          "bandHalfWidthHz": 14.667589999999999,
+          "leftMinusRightDb": 1.7224783947735653,
+          "sideEnergyFraction": 0.2684365482824965,
+          "lrCoherencyMagnitude": 0.47623179030785456,
+          "lrCoherencyPhaseDegrees": 7.401961516519422,
+          "meanStereoPower": 5.052503271710529e-07
+        },
+        {
+          "relativeWindowSeconds": [
+            0.37,
+            0.57
+          ],
+          "originalWindowSeconds": [
+            45.37,
+            45.57
+          ],
+          "frequencyHz": 2330.82,
+          "bandHalfWidthHz": 16.31574,
+          "leftMinusRightDb": 2.5468455098350478,
+          "sideEnergyFraction": 0.0682269570807642,
+          "lrCoherencyMagnitude": 0.9015244162253437,
+          "lrCoherencyPhaseDegrees": 2.072181648926387,
+          "meanStereoPower": 4.952949357883209e-07
+        },
+        {
+          "relativeWindowSeconds": [
+            0.37,
+            0.57
+          ],
+          "originalWindowSeconds": [
+            45.37,
+            45.57
+          ],
+          "frequencyHz": 3492.28,
+          "bandHalfWidthHz": 24.445960000000003,
+          "leftMinusRightDb": -3.972051539976604,
+          "sideEnergyFraction": 0.2328718411872334,
+          "lrCoherencyMagnitude": 0.6272860379255726,
+          "lrCoherencyPhaseDegrees": -19.556466778579345,
+          "meanStereoPower": 4.570054332479403e-08
+        },
+        {
+          "relativeWindowSeconds": [
+            0.7,
+            0.9
+          ],
+          "originalWindowSeconds": [
+            45.7,
+            45.9
+          ],
+          "frequencyHz": 233.08,
+          "bandHalfWidthHz": 12,
+          "leftMinusRightDb": -1.9525103161065673,
+          "sideEnergyFraction": 0.9013513985009013,
+          "lrCoherencyMagnitude": 0.8491807785857187,
+          "lrCoherencyPhaseDegrees": -165.7545996951744,
+          "meanStereoPower": 1.1444357444931978e-05
+        },
+        {
+          "relativeWindowSeconds": [
+            0.7,
+            0.9
+          ],
+          "originalWindowSeconds": [
+            45.7,
+            45.9
+          ],
+          "frequencyHz": 466.16,
+          "bandHalfWidthHz": 12,
+          "leftMinusRightDb": 0.7698271259819321,
+          "sideEnergyFraction": 0.8953229925062713,
+          "lrCoherencyMagnitude": 0.8321170365643342,
+          "lrCoherencyPhaseDegrees": 162.53420543030447,
+          "meanStereoPower": 2.1247354398832734e-05
+        },
+        {
+          "relativeWindowSeconds": [
+            0.7,
+            0.9
+          ],
+          "originalWindowSeconds": [
+            45.7,
+            45.9
+          ],
+          "frequencyHz": 698.46,
+          "bandHalfWidthHz": 12,
+          "leftMinusRightDb": 2.6099579241257547,
+          "sideEnergyFraction": 0.7057834274503365,
+          "lrCoherencyMagnitude": 0.850022281692454,
+          "lrCoherencyPhaseDegrees": 120.41150687606442,
+          "meanStereoPower": 2.0266177413911578e-06
+        },
+        {
+          "relativeWindowSeconds": [
+            0.7,
+            0.9
+          ],
+          "originalWindowSeconds": [
+            45.7,
+            45.9
+          ],
+          "frequencyHz": 1396.91,
+          "bandHalfWidthHz": 12,
+          "leftMinusRightDb": -9.231828205625428,
+          "sideEnergyFraction": 0.4925583448978241,
+          "lrCoherencyMagnitude": 0.5027648270392282,
+          "lrCoherencyPhaseDegrees": -87.25115244144227,
+          "meanStereoPower": 7.688100928965618e-06
+        },
+        {
+          "relativeWindowSeconds": [
+            0.7,
+            0.9
+          ],
+          "originalWindowSeconds": [
+            45.7,
+            45.9
+          ],
+          "frequencyHz": 2095.37,
+          "bandHalfWidthHz": 14.667589999999999,
+          "leftMinusRightDb": -2.5657961098773274,
+          "sideEnergyFraction": 0.13868886140506706,
+          "lrCoherencyMagnitude": 0.7675279911605785,
+          "lrCoherencyPhaseDegrees": 10.6203296806594,
+          "meanStereoPower": 6.348475358970149e-07
+        },
+        {
+          "relativeWindowSeconds": [
+            0.7,
+            0.9
+          ],
+          "originalWindowSeconds": [
+            45.7,
+            45.9
+          ],
+          "frequencyHz": 2330.82,
+          "bandHalfWidthHz": 16.31574,
+          "leftMinusRightDb": -0.7267530099674837,
+          "sideEnergyFraction": 0.10258987281885881,
+          "lrCoherencyMagnitude": 0.8182554850227839,
+          "lrCoherencyPhaseDegrees": 12.899888266638875,
+          "meanStereoPower": 2.65265208261988e-07
+        },
+        {
+          "relativeWindowSeconds": [
+            0.7,
+            0.9
+          ],
+          "originalWindowSeconds": [
+            45.7,
+            45.9
+          ],
+          "frequencyHz": 3492.28,
+          "bandHalfWidthHz": 24.445960000000003,
+          "leftMinusRightDb": 1.7286970281160874,
+          "sideEnergyFraction": 0.09055973363275069,
+          "lrCoherencyMagnitude": 0.8511023358228905,
+          "lrCoherencyPhaseDegrees": 11.109874300409604,
+          "meanStereoPower": 3.427151380873942e-08
+        },
+        {
+          "relativeWindowSeconds": [
+            0.99,
+            1.09
+          ],
+          "originalWindowSeconds": [
+            45.99,
+            46.09
+          ],
+          "frequencyHz": 233.08,
+          "bandHalfWidthHz": 12,
+          "leftMinusRightDb": 0.6092107081893545,
+          "sideEnergyFraction": 0.36754016445496557,
+          "lrCoherencyMagnitude": 0.7087223713088826,
+          "lrCoherencyPhaseDegrees": 67.99306979583241,
+          "meanStereoPower": 1.8612704664386735e-05
+        },
+        {
+          "relativeWindowSeconds": [
+            0.99,
+            1.09
+          ],
+          "originalWindowSeconds": [
+            45.99,
+            46.09
+          ],
+          "frequencyHz": 466.16,
+          "bandHalfWidthHz": 12,
+          "leftMinusRightDb": -4.681552102584779,
+          "sideEnergyFraction": 0.8258027498853563,
+          "lrCoherencyMagnitude": 0.7887376484946322,
+          "lrCoherencyPhaseDegrees": 161.6349248123096,
+          "meanStereoPower": 1.8871666285119433e-05
+        },
+        {
+          "relativeWindowSeconds": [
+            0.99,
+            1.09
+          ],
+          "originalWindowSeconds": [
+            45.99,
+            46.09
+          ],
+          "frequencyHz": 698.46,
+          "bandHalfWidthHz": 12,
+          "leftMinusRightDb": 2.100095477303256,
+          "sideEnergyFraction": 0.8155829898994158,
+          "lrCoherencyMagnitude": 0.8265081511080832,
+          "lrCoherencyPhaseDegrees": 141.82102173776005,
+          "meanStereoPower": 4.7318572185065906e-05
+        },
+        {
+          "relativeWindowSeconds": [
+            0.99,
+            1.09
+          ],
+          "originalWindowSeconds": [
+            45.99,
+            46.09
+          ],
+          "frequencyHz": 1396.91,
+          "bandHalfWidthHz": 12,
+          "leftMinusRightDb": -4.986591848183327,
+          "sideEnergyFraction": 0.6368344784586346,
+          "lrCoherencyMagnitude": 0.48942890269875317,
+          "lrCoherencyPhaseDegrees": 130.83375715613505,
+          "meanStereoPower": 5.31535681548037e-06
+        },
+        {
+          "relativeWindowSeconds": [
+            0.99,
+            1.09
+          ],
+          "originalWindowSeconds": [
+            45.99,
+            46.09
+          ],
+          "frequencyHz": 2095.37,
+          "bandHalfWidthHz": 14.667589999999999,
+          "leftMinusRightDb": -1.7317624267047262,
+          "sideEnergyFraction": 0.15798710960058815,
+          "lrCoherencyMagnitude": 0.8070855281743201,
+          "lrCoherencyPhaseDegrees": -30.18270091391183,
+          "meanStereoPower": 3.3570830515458725e-06
+        },
+        {
+          "relativeWindowSeconds": [
+            0.99,
+            1.09
+          ],
+          "originalWindowSeconds": [
+            45.99,
+            46.09
+          ],
+          "frequencyHz": 2330.82,
+          "bandHalfWidthHz": 16.31574,
+          "leftMinusRightDb": -1.0756669370417695,
+          "sideEnergyFraction": 0.1005198144775199,
+          "lrCoherencyMagnitude": 0.8135931860034084,
+          "lrCoherencyPhaseDegrees": 8.28857448248542,
+          "meanStereoPower": 2.0343593859641857e-07
+        },
+        {
+          "relativeWindowSeconds": [
+            0.99,
+            1.09
+          ],
+          "originalWindowSeconds": [
+            45.99,
+            46.09
+          ],
+          "frequencyHz": 3492.28,
+          "bandHalfWidthHz": 24.445960000000003,
+          "leftMinusRightDb": 3.4997555005754406,
+          "sideEnergyFraction": 0.1085992005346436,
+          "lrCoherencyMagnitude": 0.857327234005555,
+          "lrCoherencyPhaseDegrees": 8.811372541704815,
+          "meanStereoPower": 2.25288953671476e-07
+        },
+        {
+          "relativeWindowSeconds": [
+            1.16,
+            1.245
+          ],
+          "originalWindowSeconds": [
+            46.16,
+            46.245
+          ],
+          "frequencyHz": 233.08,
+          "bandHalfWidthHz": 12,
+          "leftMinusRightDb": -1.5172524216463028,
+          "sideEnergyFraction": 0.3033990402560462,
+          "lrCoherencyMagnitude": 0.6544339968014957,
+          "lrCoherencyPhaseDegrees": -52.409241268058324,
+          "meanStereoPower": 1.6196872120661626e-05
+        },
+        {
+          "relativeWindowSeconds": [
+            1.16,
+            1.245
+          ],
+          "originalWindowSeconds": [
+            46.16,
+            46.245
+          ],
+          "frequencyHz": 466.16,
+          "bandHalfWidthHz": 12,
+          "leftMinusRightDb": -4.311806043843728,
+          "sideEnergyFraction": 0.5182883770250459,
+          "lrCoherencyMagnitude": 0.8622473150062262,
+          "lrCoherencyPhaseDegrees": 92.73721512662742,
+          "meanStereoPower": 1.701957551125697e-05
+        },
+        {
+          "relativeWindowSeconds": [
+            1.16,
+            1.245
+          ],
+          "originalWindowSeconds": [
+            46.16,
+            46.245
+          ],
+          "frequencyHz": 698.46,
+          "bandHalfWidthHz": 12,
+          "leftMinusRightDb": 5.688508309647997,
+          "sideEnergyFraction": 0.806973752550944,
+          "lrCoherencyMagnitude": 0.781666583424408,
+          "lrCoherencyPhaseDegrees": 163.7361711415417,
+          "meanStereoPower": 4.119694664762482e-05
+        },
+        {
+          "relativeWindowSeconds": [
+            1.16,
+            1.245
+          ],
+          "originalWindowSeconds": [
+            46.16,
+            46.245
+          ],
+          "frequencyHz": 1396.91,
+          "bandHalfWidthHz": 12,
+          "leftMinusRightDb": -5.011105085402696,
+          "sideEnergyFraction": 0.23875554534542998,
+          "lrCoherencyMagnitude": 0.9536854579476934,
+          "lrCoherencyPhaseDegrees": -50.08906419893217,
+          "meanStereoPower": 1.7609999177477627e-05
+        },
+        {
+          "relativeWindowSeconds": [
+            1.16,
+            1.245
+          ],
+          "originalWindowSeconds": [
+            46.16,
+            46.245
+          ],
+          "frequencyHz": 2095.37,
+          "bandHalfWidthHz": 14.667589999999999,
+          "leftMinusRightDb": 1.0784315970160736,
+          "sideEnergyFraction": 0.18792084063402267,
+          "lrCoherencyMagnitude": 0.7542388748699297,
+          "lrCoherencyPhaseDegrees": -33.496387941669,
+          "meanStereoPower": 3.9572604904190075e-06
+        },
+        {
+          "relativeWindowSeconds": [
+            1.16,
+            1.245
+          ],
+          "originalWindowSeconds": [
+            46.16,
+            46.245
+          ],
+          "frequencyHz": 2330.82,
+          "bandHalfWidthHz": 16.31574,
+          "leftMinusRightDb": 1.0462446353675843,
+          "sideEnergyFraction": 0.03752321110080919,
+          "lrCoherencyMagnitude": 0.9317460698206167,
+          "lrCoherencyPhaseDegrees": 0.7235463375937679,
+          "meanStereoPower": 4.4309472309161065e-07
+        },
+        {
+          "relativeWindowSeconds": [
+            1.16,
+            1.245
+          ],
+          "originalWindowSeconds": [
+            46.16,
+            46.245
+          ],
+          "frequencyHz": 3492.28,
+          "bandHalfWidthHz": 24.445960000000003,
+          "leftMinusRightDb": 0.21284072865356402,
+          "sideEnergyFraction": 0.03438036234498404,
+          "lrCoherencyMagnitude": 0.933097955459649,
+          "lrCoherencyPhaseDegrees": -3.3337855117168886,
+          "meanStereoPower": 8.990258449336707e-08
+        },
+        {
+          "relativeWindowSeconds": [
+            1.3,
+            1.4
+          ],
+          "originalWindowSeconds": [
+            46.3,
+            46.4
+          ],
+          "frequencyHz": 233.08,
+          "bandHalfWidthHz": 12,
+          "leftMinusRightDb": 0.0848672461159012,
+          "sideEnergyFraction": 0.8335851748834401,
+          "lrCoherencyMagnitude": 0.7569394968077842,
+          "lrCoherencyPhaseDegrees": 151.8174334776167,
+          "meanStereoPower": 2.4285524812189253e-05
+        },
+        {
+          "relativeWindowSeconds": [
+            1.3,
+            1.4
+          ],
+          "originalWindowSeconds": [
+            46.3,
+            46.4
+          ],
+          "frequencyHz": 466.16,
+          "bandHalfWidthHz": 12,
+          "leftMinusRightDb": 5.924717617319354,
+          "sideEnergyFraction": 0.3955281168568814,
+          "lrCoherencyMagnitude": 0.3975321401031803,
+          "lrCoherencyPhaseDegrees": -49.255188096511425,
+          "meanStereoPower": 2.789816597505187e-05
+        },
+        {
+          "relativeWindowSeconds": [
+            1.3,
+            1.4
+          ],
+          "originalWindowSeconds": [
+            46.3,
+            46.4
+          ],
+          "frequencyHz": 698.46,
+          "bandHalfWidthHz": 12,
+          "leftMinusRightDb": -1.1458773249379566,
+          "sideEnergyFraction": 0.9481954956441248,
+          "lrCoherencyMagnitude": 0.9436601046161517,
+          "lrCoherencyPhaseDegrees": 163.37279664542612,
+          "meanStereoPower": 1.6434105768360025e-05
+        },
+        {
+          "relativeWindowSeconds": [
+            1.3,
+            1.4
+          ],
+          "originalWindowSeconds": [
+            46.3,
+            46.4
+          ],
+          "frequencyHz": 1396.91,
+          "bandHalfWidthHz": 12,
+          "leftMinusRightDb": 6.502124193005305,
+          "sideEnergyFraction": 0.4408525807669322,
+          "lrCoherencyMagnitude": 0.7436831373458003,
+          "lrCoherencyPhaseDegrees": -78.12627630491568,
+          "meanStereoPower": 1.792216190492377e-05
+        },
+        {
+          "relativeWindowSeconds": [
+            1.3,
+            1.4
+          ],
+          "originalWindowSeconds": [
+            46.3,
+            46.4
+          ],
+          "frequencyHz": 2095.37,
+          "bandHalfWidthHz": 14.667589999999999,
+          "leftMinusRightDb": -4.777432825886853,
+          "sideEnergyFraction": 0.5877518895249478,
+          "lrCoherencyMagnitude": 0.2079349818138887,
+          "lrCoherencyPhaseDegrees": 167.14942976719715,
+          "meanStereoPower": 5.932163480266289e-07
+        },
+        {
+          "relativeWindowSeconds": [
+            1.3,
+            1.4
+          ],
+          "originalWindowSeconds": [
+            46.3,
+            46.4
+          ],
+          "frequencyHz": 2330.82,
+          "bandHalfWidthHz": 16.31574,
+          "leftMinusRightDb": 1.6835379778090602,
+          "sideEnergyFraction": 0.04591416161065803,
+          "lrCoherencyMagnitude": 0.9252982175292883,
+          "lrCoherencyPhaseDegrees": -0.31523195672217075,
+          "meanStereoPower": 9.894530940527705e-07
+        },
+        {
+          "relativeWindowSeconds": [
+            1.3,
+            1.4
+          ],
+          "originalWindowSeconds": [
+            46.3,
+            46.4
+          ],
+          "frequencyHz": 3492.28,
+          "bandHalfWidthHz": 24.445960000000003,
+          "leftMinusRightDb": -0.7441169481305179,
+          "sideEnergyFraction": 0.08987670311731617,
+          "lrCoherencyMagnitude": 0.878808818009474,
+          "lrCoherencyPhaseDegrees": -20.48087813512551,
+          "meanStereoPower": 9.118970609014458e-08
+        },
+        {
+          "relativeWindowSeconds": [
+            1.46,
+            1.54
+          ],
+          "originalWindowSeconds": [
+            46.46,
+            46.54
+          ],
+          "frequencyHz": 233.08,
+          "bandHalfWidthHz": 12,
+          "leftMinusRightDb": -10.891863638190395,
+          "sideEnergyFraction": 0.484069685601873,
+          "lrCoherencyMagnitude": 0.17480506627910136,
+          "lrCoherencyPhaseDegrees": 69.7966109792018,
+          "meanStereoPower": 3.5287574747355384e-05
+        },
+        {
+          "relativeWindowSeconds": [
+            1.46,
+            1.54
+          ],
+          "originalWindowSeconds": [
+            46.46,
+            46.54
+          ],
+          "frequencyHz": 466.16,
+          "bandHalfWidthHz": 12,
+          "leftMinusRightDb": 4.473324912583848,
+          "sideEnergyFraction": 0.28153470257462543,
+          "lrCoherencyMagnitude": 0.8165643461283775,
+          "lrCoherencyPhaseDegrees": -52.581793406052356,
+          "meanStereoPower": 2.1693046498995583e-05
+        },
+        {
+          "relativeWindowSeconds": [
+            1.46,
+            1.54
+          ],
+          "originalWindowSeconds": [
+            46.46,
+            46.54
+          ],
+          "frequencyHz": 698.46,
+          "bandHalfWidthHz": 12,
+          "leftMinusRightDb": 0.3457191212066593,
+          "sideEnergyFraction": 0.6949539527429264,
+          "lrCoherencyMagnitude": 0.9893694932293545,
+          "lrCoherencyPhaseDegrees": 113.22915565361723,
+          "meanStereoPower": 2.2136481497509235e-05
+        },
+        {
+          "relativeWindowSeconds": [
+            1.46,
+            1.54
+          ],
+          "originalWindowSeconds": [
+            46.46,
+            46.54
+          ],
+          "frequencyHz": 1396.91,
+          "bandHalfWidthHz": 12,
+          "leftMinusRightDb": -4.371861721247608,
+          "sideEnergyFraction": 0.07497070897325671,
+          "lrCoherencyMagnitude": 0.9704590377663295,
+          "lrCoherencyPhaseDegrees": 8.408132989461045,
+          "meanStereoPower": 1.320667584373698e-05
+        },
+        {
+          "relativeWindowSeconds": [
+            1.46,
+            1.54
+          ],
+          "originalWindowSeconds": [
+            46.46,
+            46.54
+          ],
+          "frequencyHz": 2095.37,
+          "bandHalfWidthHz": 14.667589999999999,
+          "leftMinusRightDb": -3.3231503618034814,
+          "sideEnergyFraction": 0.28970900000802896,
+          "lrCoherencyMagnitude": 0.5751435357002972,
+          "lrCoherencyPhaseDegrees": 38.23857087963234,
+          "meanStereoPower": 2.1697832045064025e-06
+        },
+        {
+          "relativeWindowSeconds": [
+            1.46,
+            1.54
+          ],
+          "originalWindowSeconds": [
+            46.46,
+            46.54
+          ],
+          "frequencyHz": 2330.82,
+          "bandHalfWidthHz": 16.31574,
+          "leftMinusRightDb": 1.9018955082157487,
+          "sideEnergyFraction": 0.017453205331949204,
+          "lrCoherencyMagnitude": 0.9896818298777018,
+          "lrCoherencyPhaseDegrees": -3.0039263574684725,
+          "meanStereoPower": 2.3169669022768515e-06
+        },
+        {
+          "relativeWindowSeconds": [
+            1.46,
+            1.54
+          ],
+          "originalWindowSeconds": [
+            46.46,
+            46.54
+          ],
+          "frequencyHz": 3492.28,
+          "bandHalfWidthHz": 24.445960000000003,
+          "leftMinusRightDb": -1.3693792750357725,
+          "sideEnergyFraction": 0.38863070049960824,
+          "lrCoherencyMagnitude": 0.2310858235853524,
+          "lrCoherencyPhaseDegrees": 12.609174562630326,
+          "meanStereoPower": 2.257270938418002e-08
+        }
+      ]
+    },
+    "original": {
+      "path": "D:\\RootSound\\experiments\\music-workflow\\reference-studio\\cases\\phone-recording-20261023-233819\\input\\original-45-53.wav",
+      "sha256": "9839a75db1eeb1bf4c8cef409ffe631e7885dceea577d58c6189566928fe9847",
+      "sampleRate": 48000,
+      "measurements": [
+        {
+          "relativeWindowSeconds": [
+            0.06,
+            0.26
+          ],
+          "originalWindowSeconds": [
+            45.06,
+            45.26
+          ],
+          "frequencyHz": 233.08,
+          "bandHalfWidthHz": 12,
+          "leftMinusRightDb": 4.921065645100052,
+          "sideEnergyFraction": 0.2248174592125296,
+          "lrCoherencyMagnitude": 0.7296651472891822,
+          "lrCoherencyPhaseDegrees": -28.52606856495422,
+          "meanStereoPower": 6.826810673707852e-05
+        },
+        {
+          "relativeWindowSeconds": [
+            0.06,
+            0.26
+          ],
+          "originalWindowSeconds": [
+            45.06,
+            45.26
+          ],
+          "frequencyHz": 466.16,
+          "bandHalfWidthHz": 12,
+          "leftMinusRightDb": 1.8854446508954827,
+          "sideEnergyFraction": 0.6994203227581662,
+          "lrCoherencyMagnitude": 0.5545205184667107,
+          "lrCoherencyPhaseDegrees": 137.41423048557695,
+          "meanStereoPower": 1.6260270365569834e-05
+        },
+        {
+          "relativeWindowSeconds": [
+            0.06,
+            0.26
+          ],
+          "originalWindowSeconds": [
+            45.06,
+            45.26
+          ],
+          "frequencyHz": 698.46,
+          "bandHalfWidthHz": 12,
+          "leftMinusRightDb": -3.5379476578856717,
+          "sideEnergyFraction": 0.7574704785827782,
+          "lrCoherencyMagnitude": 0.8720342401848318,
+          "lrCoherencyPhaseDegrees": -129.80464787810004,
+          "meanStereoPower": 2.1032170047753308e-05
+        },
+        {
+          "relativeWindowSeconds": [
+            0.06,
+            0.26
+          ],
+          "originalWindowSeconds": [
+            45.06,
+            45.26
+          ],
+          "frequencyHz": 1396.91,
+          "bandHalfWidthHz": 12,
+          "leftMinusRightDb": 3.4656984664386132,
+          "sideEnergyFraction": 0.4106985736117758,
+          "lrCoherencyMagnitude": 0.3670765164659617,
+          "lrCoherencyPhaseDegrees": -58.277747449722284,
+          "meanStereoPower": 5.0174409523273705e-06
+        },
+        {
+          "relativeWindowSeconds": [
+            0.06,
+            0.26
+          ],
+          "originalWindowSeconds": [
+            45.06,
+            45.26
+          ],
+          "frequencyHz": 2095.37,
+          "bandHalfWidthHz": 14.667589999999999,
+          "leftMinusRightDb": 1.0269212543505066,
+          "sideEnergyFraction": 0.017110338388476466,
+          "lrCoherencyMagnitude": 0.9902142108460458,
+          "lrCoherencyPhaseDegrees": -10.842458041529335,
+          "meanStereoPower": 1.6216390965494325e-05
+        },
+        {
+          "relativeWindowSeconds": [
+            0.06,
+            0.26
+          ],
+          "originalWindowSeconds": [
+            45.06,
+            45.26
+          ],
+          "frequencyHz": 2330.82,
+          "bandHalfWidthHz": 16.31574,
+          "leftMinusRightDb": -1.0515912092581956,
+          "sideEnergyFraction": 0.07706589163638383,
+          "lrCoherencyMagnitude": 0.8548614280600293,
+          "lrCoherencyPhaseDegrees": -4.6273216597537665,
+          "meanStereoPower": 3.891903615789688e-07
+        },
+        {
+          "relativeWindowSeconds": [
+            0.06,
+            0.26
+          ],
+          "originalWindowSeconds": [
+            45.06,
+            45.26
+          ],
+          "frequencyHz": 3492.28,
+          "bandHalfWidthHz": 24.445960000000003,
+          "leftMinusRightDb": 0.8606793906924244,
+          "sideEnergyFraction": 0.007644800062228158,
+          "lrCoherencyMagnitude": 0.9914434888817549,
+          "lrCoherencyPhaseDegrees": -3.542903569271225,
+          "meanStereoPower": 1.6220434220211496e-06
+        },
+        {
+          "relativeWindowSeconds": [
+            0.37,
+            0.57
+          ],
+          "originalWindowSeconds": [
+            45.37,
+            45.57
+          ],
+          "frequencyHz": 233.08,
+          "bandHalfWidthHz": 12,
+          "leftMinusRightDb": -0.9091634895467294,
+          "sideEnergyFraction": 0.09612597333710016,
+          "lrCoherencyMagnitude": 0.8166713147331577,
+          "lrCoherencyPhaseDegrees": -6.01376448794833,
+          "meanStereoPower": 0.0001548784362746787
+        },
+        {
+          "relativeWindowSeconds": [
+            0.37,
+            0.57
+          ],
+          "originalWindowSeconds": [
+            45.37,
+            45.57
+          ],
+          "frequencyHz": 466.16,
+          "bandHalfWidthHz": 12,
+          "leftMinusRightDb": -0.7008434114806843,
+          "sideEnergyFraction": 0.33037583389012665,
+          "lrCoherencyMagnitude": 0.7111443001110277,
+          "lrCoherencyPhaseDegrees": -61.40603056552505,
+          "meanStereoPower": 2.929384366274613e-05
+        },
+        {
+          "relativeWindowSeconds": [
+            0.37,
+            0.57
+          ],
+          "originalWindowSeconds": [
+            45.37,
+            45.57
+          ],
+          "frequencyHz": 698.46,
+          "bandHalfWidthHz": 12,
+          "leftMinusRightDb": -3.045190032992016,
+          "sideEnergyFraction": 0.8108084880523257,
+          "lrCoherencyMagnitude": 0.9676469156073303,
+          "lrCoherencyPhaseDegrees": 133.0225832515598,
+          "meanStereoPower": 1.2302514773785022e-05
+        },
+        {
+          "relativeWindowSeconds": [
+            0.37,
+            0.57
+          ],
+          "originalWindowSeconds": [
+            45.37,
+            45.57
+          ],
+          "frequencyHz": 1396.91,
+          "bandHalfWidthHz": 12,
+          "leftMinusRightDb": 1.5905477934747636,
+          "sideEnergyFraction": 0.4799282330894365,
+          "lrCoherencyMagnitude": 0.8797994105041753,
+          "lrCoherencyPhaseDegrees": -87.34079614845345,
+          "meanStereoPower": 1.7966429348067553e-05
+        },
+        {
+          "relativeWindowSeconds": [
+            0.37,
+            0.57
+          ],
+          "originalWindowSeconds": [
+            45.37,
+            45.57
+          ],
+          "frequencyHz": 2095.37,
+          "bandHalfWidthHz": 14.667589999999999,
+          "leftMinusRightDb": 1.6400570261897967,
+          "sideEnergyFraction": 0.23456512286455766,
+          "lrCoherencyMagnitude": 0.5406353764167462,
+          "lrCoherencyPhaseDegrees": 1.8244639201377195,
+          "meanStereoPower": 6.139755423446959e-07
+        },
+        {
+          "relativeWindowSeconds": [
+            0.37,
+            0.57
+          ],
+          "originalWindowSeconds": [
+            45.37,
+            45.57
+          ],
+          "frequencyHz": 2330.82,
+          "bandHalfWidthHz": 16.31574,
+          "leftMinusRightDb": 2.4601682819080017,
+          "sideEnergyFraction": 0.059713245656515056,
+          "lrCoherencyMagnitude": 0.9162137669302344,
+          "lrCoherencyPhaseDegrees": -0.7674838700747219,
+          "meanStereoPower": 7.013192533696211e-07
+        },
+        {
+          "relativeWindowSeconds": [
+            0.37,
+            0.57
+          ],
+          "originalWindowSeconds": [
+            45.37,
+            45.57
+          ],
+          "frequencyHz": 3492.28,
+          "bandHalfWidthHz": 24.445960000000003,
+          "leftMinusRightDb": -2.398447314247335,
+          "sideEnergyFraction": 0.13449147961057056,
+          "lrCoherencyMagnitude": 0.7855446428815873,
+          "lrCoherencyPhaseDegrees": -14.919126753129172,
+          "meanStereoPower": 1.3798850468205703e-07
+        },
+        {
+          "relativeWindowSeconds": [
+            0.7,
+            0.9
+          ],
+          "originalWindowSeconds": [
+            45.7,
+            45.9
+          ],
+          "frequencyHz": 233.08,
+          "bandHalfWidthHz": 12,
+          "leftMinusRightDb": 0.6648478088634355,
+          "sideEnergyFraction": 0.5827398851606055,
+          "lrCoherencyMagnitude": 0.16682313422433526,
+          "lrCoherencyPhaseDegrees": -174.18524657062218,
+          "meanStereoPower": 2.5160429680416047e-05
+        },
+        {
+          "relativeWindowSeconds": [
+            0.7,
+            0.9
+          ],
+          "originalWindowSeconds": [
+            45.7,
+            45.9
+          ],
+          "frequencyHz": 466.16,
+          "bandHalfWidthHz": 12,
+          "leftMinusRightDb": 0.8991844843152628,
+          "sideEnergyFraction": 0.8852415253628666,
+          "lrCoherencyMagnitude": 0.8185142621472985,
+          "lrCoherencyPhaseDegrees": 161.14997776253134,
+          "meanStereoPower": 2.1940875142373398e-05
+        },
+        {
+          "relativeWindowSeconds": [
+            0.7,
+            0.9
+          ],
+          "originalWindowSeconds": [
+            45.7,
+            45.9
+          ],
+          "frequencyHz": 698.46,
+          "bandHalfWidthHz": 12,
+          "leftMinusRightDb": 2.56632209051459,
+          "sideEnergyFraction": 0.7183753806904937,
+          "lrCoherencyMagnitude": 0.831295927968191,
+          "lrCoherencyPhaseDegrees": 123.26312036449644,
+          "meanStereoPower": 2.1232382354101598e-06
+        },
+        {
+          "relativeWindowSeconds": [
+            0.7,
+            0.9
+          ],
+          "originalWindowSeconds": [
+            45.7,
+            45.9
+          ],
+          "frequencyHz": 1396.91,
+          "bandHalfWidthHz": 12,
+          "leftMinusRightDb": -8.90364246403386,
+          "sideEnergyFraction": 0.4828387456600249,
+          "lrCoherencyMagnitude": 0.504211803764307,
+          "lrCoherencyPhaseDegrees": -83.85305593885037,
+          "meanStereoPower": 7.87474434191331e-06
+        },
+        {
+          "relativeWindowSeconds": [
+            0.7,
+            0.9
+          ],
+          "originalWindowSeconds": [
+            45.7,
+            45.9
+          ],
+          "frequencyHz": 2095.37,
+          "bandHalfWidthHz": 14.667589999999999,
+          "leftMinusRightDb": -2.345558992445439,
+          "sideEnergyFraction": 0.1066792688305026,
+          "lrCoherencyMagnitude": 0.8263447879335123,
+          "lrCoherencyPhaseDegrees": 9.293472987884195,
+          "meanStereoPower": 9.026755767376704e-07
+        },
+        {
+          "relativeWindowSeconds": [
+            0.7,
+            0.9
+          ],
+          "originalWindowSeconds": [
+            45.7,
+            45.9
+          ],
+          "frequencyHz": 2330.82,
+          "bandHalfWidthHz": 16.31574,
+          "leftMinusRightDb": -0.7177010233457616,
+          "sideEnergyFraction": 0.06899977926923005,
+          "lrCoherencyMagnitude": 0.8692886483692845,
+          "lrCoherencyPhaseDegrees": 5.730289291376112,
+          "meanStereoPower": 4.6863664482110283e-07
+        },
+        {
+          "relativeWindowSeconds": [
+            0.7,
+            0.9
+          ],
+          "originalWindowSeconds": [
+            45.7,
+            45.9
+          ],
+          "frequencyHz": 3492.28,
+          "bandHalfWidthHz": 24.445960000000003,
+          "leftMinusRightDb": 1.2338886691818105,
+          "sideEnergyFraction": 0.06376101186812307,
+          "lrCoherencyMagnitude": 0.8851766173675345,
+          "lrCoherencyPhaseDegrees": 5.366908187842181,
+          "meanStereoPower": 6.724897192525449e-08
+        },
+        {
+          "relativeWindowSeconds": [
+            0.99,
+            1.09
+          ],
+          "originalWindowSeconds": [
+            45.99,
+            46.09
+          ],
+          "frequencyHz": 233.08,
+          "bandHalfWidthHz": 12,
+          "leftMinusRightDb": -1.5043124900210723,
+          "sideEnergyFraction": 0.06818816492665083,
+          "lrCoherencyMagnitude": 0.9123542066138091,
+          "lrCoherencyPhaseDegrees": 16.09154418440497,
+          "meanStereoPower": 0.0002602656640990888
+        },
+        {
+          "relativeWindowSeconds": [
+            0.99,
+            1.09
+          ],
+          "originalWindowSeconds": [
+            45.99,
+            46.09
+          ],
+          "frequencyHz": 466.16,
+          "bandHalfWidthHz": 12,
+          "leftMinusRightDb": -4.247054846688505,
+          "sideEnergyFraction": 0.823179619748361,
+          "lrCoherencyMagnitude": 0.7708366705544744,
+          "lrCoherencyPhaseDegrees": 160.18071096754497,
+          "meanStereoPower": 2.0419815173240252e-05
+        },
+        {
+          "relativeWindowSeconds": [
+            0.99,
+            1.09
+          ],
+          "originalWindowSeconds": [
+            45.99,
+            46.09
+          ],
+          "frequencyHz": 698.46,
+          "bandHalfWidthHz": 12,
+          "leftMinusRightDb": 2.10520091552746,
+          "sideEnergyFraction": 0.8123481525094193,
+          "lrCoherencyMagnitude": 0.8198936677056324,
+          "lrCoherencyPhaseDegrees": 141.66635483235572,
+          "meanStereoPower": 4.8794230601837885e-05
+        },
+        {
+          "relativeWindowSeconds": [
+            0.99,
+            1.09
+          ],
+          "originalWindowSeconds": [
+            45.99,
+            46.09
+          ],
+          "frequencyHz": 1396.91,
+          "bandHalfWidthHz": 12,
+          "leftMinusRightDb": -4.883384815212797,
+          "sideEnergyFraction": 0.6114990447778581,
+          "lrCoherencyMagnitude": 0.43983671365264493,
+          "lrCoherencyPhaseDegrees": 126.10484249585026,
+          "meanStereoPower": 5.6071112053024525e-06
+        },
+        {
+          "relativeWindowSeconds": [
+            0.99,
+            1.09
+          ],
+          "originalWindowSeconds": [
+            45.99,
+            46.09
+          ],
+          "frequencyHz": 2095.37,
+          "bandHalfWidthHz": 14.667589999999999,
+          "leftMinusRightDb": -1.6301709358028416,
+          "sideEnergyFraction": 0.1508300750235587,
+          "lrCoherencyMagnitude": 0.8149250314856741,
+          "lrCoherencyPhaseDegrees": -29.299418385939784,
+          "meanStereoPower": 3.683727186590415e-06
+        },
+        {
+          "relativeWindowSeconds": [
+            0.99,
+            1.09
+          ],
+          "originalWindowSeconds": [
+            45.99,
+            46.09
+          ],
+          "frequencyHz": 2330.82,
+          "bandHalfWidthHz": 16.31574,
+          "leftMinusRightDb": -1.1300205924805005,
+          "sideEnergyFraction": 0.09056818935857447,
+          "lrCoherencyMagnitude": 0.827206539527424,
+          "lrCoherencyPhaseDegrees": 3.3378049897499893,
+          "meanStereoPower": 3.28146965925505e-07
+        },
+        {
+          "relativeWindowSeconds": [
+            0.99,
+            1.09
+          ],
+          "originalWindowSeconds": [
+            45.99,
+            46.09
+          ],
+          "frequencyHz": 3492.28,
+          "bandHalfWidthHz": 24.445960000000003,
+          "leftMinusRightDb": 3.243494098866417,
+          "sideEnergyFraction": 0.10259716143752873,
+          "lrCoherencyMagnitude": 0.8588873009669904,
+          "lrCoherencyPhaseDegrees": 7.8357828479484555,
+          "meanStereoPower": 3.294085396862294e-07
+        },
+        {
+          "relativeWindowSeconds": [
+            1.16,
+            1.245
+          ],
+          "originalWindowSeconds": [
+            46.16,
+            46.245
+          ],
+          "frequencyHz": 233.08,
+          "bandHalfWidthHz": 12,
+          "leftMinusRightDb": -2.4133278820984034,
+          "sideEnergyFraction": 0.281558889411836,
+          "lrCoherencyMagnitude": 0.7112744143591921,
+          "lrCoherencyPhaseDegrees": -50.350767941380155,
+          "meanStereoPower": 2.6183116662989554e-05
+        },
+        {
+          "relativeWindowSeconds": [
+            1.16,
+            1.245
+          ],
+          "originalWindowSeconds": [
+            46.16,
+            46.245
+          ],
+          "frequencyHz": 466.16,
+          "bandHalfWidthHz": 12,
+          "leftMinusRightDb": -4.215338390726384,
+          "sideEnergyFraction": 0.48738952211593356,
+          "lrCoherencyMagnitude": 0.890073993054717,
+          "lrCoherencyPhaseDegrees": 88.18120128408513,
+          "meanStereoPower": 1.8428903225023393e-05
+        },
+        {
+          "relativeWindowSeconds": [
+            1.16,
+            1.245
+          ],
+          "originalWindowSeconds": [
+            46.16,
+            46.245
+          ],
+          "frequencyHz": 698.46,
+          "bandHalfWidthHz": 12,
+          "leftMinusRightDb": 5.731754055997854,
+          "sideEnergyFraction": 0.8034007449607496,
+          "lrCoherencyMagnitude": 0.7748035759655186,
+          "lrCoherencyPhaseDegrees": 163.73263198835764,
+          "meanStereoPower": 4.2062702638649566e-05
+        },
+        {
+          "relativeWindowSeconds": [
+            1.16,
+            1.245
+          ],
+          "originalWindowSeconds": [
+            46.16,
+            46.245
+          ],
+          "frequencyHz": 1396.91,
+          "bandHalfWidthHz": 12,
+          "leftMinusRightDb": -4.966331462286153,
+          "sideEnergyFraction": 0.23788783491542909,
+          "lrCoherencyMagnitude": 0.9509480333020918,
+          "lrCoherencyPhaseDegrees": -49.91998261896831,
+          "meanStereoPower": 1.785814618025084e-05
+        },
+        {
+          "relativeWindowSeconds": [
+            1.16,
+            1.245
+          ],
+          "originalWindowSeconds": [
+            46.16,
+            46.245
+          ],
+          "frequencyHz": 2095.37,
+          "bandHalfWidthHz": 14.667589999999999,
+          "leftMinusRightDb": 1.108848730214623,
+          "sideEnergyFraction": 0.18038127327752387,
+          "lrCoherencyMagnitude": 0.7624736034099547,
+          "lrCoherencyPhaseDegrees": -32.305115377416925,
+          "meanStereoPower": 4.144894202236755e-06
+        },
+        {
+          "relativeWindowSeconds": [
+            1.16,
+            1.245
+          ],
+          "originalWindowSeconds": [
+            46.16,
+            46.245
+          ],
+          "frequencyHz": 2330.82,
+          "bandHalfWidthHz": 16.31574,
+          "leftMinusRightDb": 1.0427078949967723,
+          "sideEnergyFraction": 0.033133761435323685,
+          "lrCoherencyMagnitude": 0.9405085648732834,
+          "lrCoherencyPhaseDegrees": -0.5281295843654518,
+          "meanStereoPower": 5.522939010457528e-07
+        },
+        {
+          "relativeWindowSeconds": [
+            1.16,
+            1.245
+          ],
+          "originalWindowSeconds": [
+            46.16,
+            46.245
+          ],
+          "frequencyHz": 3492.28,
+          "bandHalfWidthHz": 24.445960000000003,
+          "leftMinusRightDb": 0.006419750004385811,
+          "sideEnergyFraction": 0.03470457784406806,
+          "lrCoherencyMagnitude": 0.9322066538240359,
+          "lrCoherencyPhaseDegrees": -3.3736901319592505,
+          "meanStereoPower": 1.1378902811931776e-07
+        },
+        {
+          "relativeWindowSeconds": [
+            1.3,
+            1.4
+          ],
+          "originalWindowSeconds": [
+            46.3,
+            46.4
+          ],
+          "frequencyHz": 233.08,
+          "bandHalfWidthHz": 12,
+          "leftMinusRightDb": 2.430499603815512,
+          "sideEnergyFraction": 0.6085474654637102,
+          "lrCoherencyMagnitude": 0.6998089705531039,
+          "lrCoherencyPhaseDegrees": 108.81084505568478,
+          "meanStereoPower": 4.9819763761139394e-05
+        },
+        {
+          "relativeWindowSeconds": [
+            1.3,
+            1.4
+          ],
+          "originalWindowSeconds": [
+            46.3,
+            46.4
+          ],
+          "frequencyHz": 466.16,
+          "bandHalfWidthHz": 12,
+          "leftMinusRightDb": 6.045844995577193,
+          "sideEnergyFraction": 0.4102555170574739,
+          "lrCoherencyMagnitude": 0.3798011578029108,
+          "lrCoherencyPhaseDegrees": -53.71757067136386,
+          "meanStereoPower": 3.181306671311538e-05
+        },
+        {
+          "relativeWindowSeconds": [
+            1.3,
+            1.4
+          ],
+          "originalWindowSeconds": [
+            46.3,
+            46.4
+          ],
+          "frequencyHz": 698.46,
+          "bandHalfWidthHz": 12,
+          "leftMinusRightDb": -1.1320965675021104,
+          "sideEnergyFraction": 0.9431404886396757,
+          "lrCoherencyMagnitude": 0.937376303636852,
+          "lrCoherencyPhaseDegrees": 162.46506637233742,
+          "meanStereoPower": 1.6876091222408522e-05
+        },
+        {
+          "relativeWindowSeconds": [
+            1.3,
+            1.4
+          ],
+          "originalWindowSeconds": [
+            46.3,
+            46.4
+          ],
+          "frequencyHz": 1396.91,
+          "bandHalfWidthHz": 12,
+          "leftMinusRightDb": 6.100302706714842,
+          "sideEnergyFraction": 0.42167158806566957,
+          "lrCoherencyMagnitude": 0.7420294973093104,
+          "lrCoherencyPhaseDegrees": -74.61145715640428,
+          "meanStereoPower": 1.9230007984855924e-05
+        },
+        {
+          "relativeWindowSeconds": [
+            1.3,
+            1.4
+          ],
+          "originalWindowSeconds": [
+            46.3,
+            46.4
+          ],
+          "frequencyHz": 2095.37,
+          "bandHalfWidthHz": 14.667589999999999,
+          "leftMinusRightDb": -4.315008316998307,
+          "sideEnergyFraction": 0.435552195819903,
+          "lrCoherencyMagnitude": 0.14588038567475706,
+          "lrCoherencyPhaseDegrees": 5.81096827356237,
+          "meanStereoPower": 8.627681827742823e-07
+        },
+        {
+          "relativeWindowSeconds": [
+            1.3,
+            1.4
+          ],
+          "originalWindowSeconds": [
+            46.3,
+            46.4
+          ],
+          "frequencyHz": 2330.82,
+          "bandHalfWidthHz": 16.31574,
+          "leftMinusRightDb": 1.5237902372903558,
+          "sideEnergyFraction": 0.028479204165808587,
+          "lrCoherencyMagnitude": 0.9587665453401304,
+          "lrCoherencyPhaseDegrees": -2.8379319075544602,
+          "meanStereoPower": 2.2982840772507974e-06
+        },
+        {
+          "relativeWindowSeconds": [
+            1.3,
+            1.4
+          ],
+          "originalWindowSeconds": [
+            46.3,
+            46.4
+          ],
+          "frequencyHz": 3492.28,
+          "bandHalfWidthHz": 24.445960000000003,
+          "leftMinusRightDb": -0.5083505163713194,
+          "sideEnergyFraction": 0.05849795224061709,
+          "lrCoherencyMagnitude": 0.9186303194406447,
+          "lrCoherencyPhaseDegrees": -15.663315906142415,
+          "meanStereoPower": 2.2610013741641398e-07
+        },
+        {
+          "relativeWindowSeconds": [
+            1.46,
+            1.54
+          ],
+          "originalWindowSeconds": [
+            46.46,
+            46.54
+          ],
+          "frequencyHz": 233.08,
+          "bandHalfWidthHz": 12,
+          "leftMinusRightDb": -5.185484513100237,
+          "sideEnergyFraction": 0.39427805929902954,
+          "lrCoherencyMagnitude": 0.26992352177924017,
+          "lrCoherencyPhaseDegrees": 22.006774342379437,
+          "meanStereoPower": 6.179085507543915e-05
+        },
+        {
+          "relativeWindowSeconds": [
+            1.46,
+            1.54
+          ],
+          "originalWindowSeconds": [
+            46.46,
+            46.54
+          ],
+          "frequencyHz": 466.16,
+          "bandHalfWidthHz": 12,
+          "leftMinusRightDb": 4.725064505842855,
+          "sideEnergyFraction": 0.2853213293243534,
+          "lrCoherencyMagnitude": 0.7846153369176619,
+          "lrCoherencyPhaseDegrees": -50.93469476466906,
+          "meanStereoPower": 2.464487514199883e-05
+        },
+        {
+          "relativeWindowSeconds": [
+            1.46,
+            1.54
+          ],
+          "originalWindowSeconds": [
+            46.46,
+            46.54
+          ],
+          "frequencyHz": 698.46,
+          "bandHalfWidthHz": 12,
+          "leftMinusRightDb": 0.4010709844828577,
+          "sideEnergyFraction": 0.6933964903339289,
+          "lrCoherencyMagnitude": 0.9859699677246271,
+          "lrCoherencyPhaseDegrees": 113.12355339538061,
+          "meanStereoPower": 2.2979191235149987e-05
+        },
+        {
+          "relativeWindowSeconds": [
+            1.46,
+            1.54
+          ],
+          "originalWindowSeconds": [
+            46.46,
+            46.54
+          ],
+          "frequencyHz": 1396.91,
+          "bandHalfWidthHz": 12,
+          "leftMinusRightDb": -4.312470146376886,
+          "sideEnergyFraction": 0.07244638361657525,
+          "lrCoherencyMagnitude": 0.9716586529295823,
+          "lrCoherencyPhaseDegrees": 7.7934948778202,
+          "meanStereoPower": 1.382601530487535e-05
+        },
+        {
+          "relativeWindowSeconds": [
+            1.46,
+            1.54
+          ],
+          "originalWindowSeconds": [
+            46.46,
+            46.54
+          ],
+          "frequencyHz": 2095.37,
+          "bandHalfWidthHz": 14.667589999999999,
+          "leftMinusRightDb": -3.202435064965337,
+          "sideEnergyFraction": 0.26530436481344427,
+          "lrCoherencyMagnitude": 0.6009028565175604,
+          "lrCoherencyPhaseDegrees": 33.40082225165031,
+          "meanStereoPower": 2.4153958455655587e-06
+        },
+        {
+          "relativeWindowSeconds": [
+            1.46,
+            1.54
+          ],
+          "originalWindowSeconds": [
+            46.46,
+            46.54
+          ],
+          "frequencyHz": 2330.82,
+          "bandHalfWidthHz": 16.31574,
+          "leftMinusRightDb": 1.685857457606642,
+          "sideEnergyFraction": 0.014310192828027346,
+          "lrCoherencyMagnitude": 0.9907581657782717,
+          "lrCoherencyPhaseDegrees": -2.605671021428862,
+          "meanStereoPower": 3.207786437276717e-06
+        },
+        {
+          "relativeWindowSeconds": [
+            1.46,
+            1.54
+          ],
+          "originalWindowSeconds": [
+            46.46,
+            46.54
+          ],
+          "frequencyHz": 3492.28,
+          "bandHalfWidthHz": 24.445960000000003,
+          "leftMinusRightDb": -1.1325545602453173,
+          "sideEnergyFraction": 0.25797815951228525,
+          "lrCoherencyMagnitude": 0.4933275050571205,
+          "lrCoherencyPhaseDegrees": 8.296795247282839,
+          "meanStereoPower": 4.227524435599564e-08
+        }
+      ]
+    },
+    "oldGuidedEstimate": {
+      "path": "D:\\RootSound\\experiments\\music-workflow\\reference-studio\\cases\\phone-recording-20261023-233819\\试听\\02-参考引导候选A.wav",
+      "sha256": "f6ea1c7bb164f66a53b2e2a36a76ffe238f72c81a577707c8ce26343a987268e",
+      "sampleRate": 48000,
+      "measurements": [
+        {
+          "relativeWindowSeconds": [
+            0.06,
+            0.26
+          ],
+          "originalWindowSeconds": [
+            45.06,
+            45.26
+          ],
+          "frequencyHz": 233.08,
+          "bandHalfWidthHz": 12,
+          "leftMinusRightDb": 3.059324492848641,
+          "sideEnergyFraction": 0.7837760604878926,
+          "lrCoherencyMagnitude": 0.7616356467440938,
+          "lrCoherencyPhaseDegrees": -142.36130834473397,
+          "meanStereoPower": 1.0060491478113858e-05
+        },
+        {
+          "relativeWindowSeconds": [
+            0.06,
+            0.26
+          ],
+          "originalWindowSeconds": [
+            45.06,
+            45.26
+          ],
+          "frequencyHz": 466.16,
+          "bandHalfWidthHz": 12,
+          "leftMinusRightDb": 3.3311381678924907,
+          "sideEnergyFraction": 0.7744602251600301,
+          "lrCoherencyMagnitude": 0.6702612148757559,
+          "lrCoherencyPhaseDegrees": 151.63438924869217,
+          "meanStereoPower": 5.831609508990787e-06
+        },
+        {
+          "relativeWindowSeconds": [
+            0.06,
+            0.26
+          ],
+          "originalWindowSeconds": [
+            45.06,
+            45.26
+          ],
+          "frequencyHz": 698.46,
+          "bandHalfWidthHz": 12,
+          "leftMinusRightDb": -3.8765251863619414,
+          "sideEnergyFraction": 0.7751417205074255,
+          "lrCoherencyMagnitude": 0.8748473456804926,
+          "lrCoherencyPhaseDegrees": -133.84390366513458,
+          "meanStereoPower": 4.001002903772345e-06
+        },
+        {
+          "relativeWindowSeconds": [
+            0.06,
+            0.26
+          ],
+          "originalWindowSeconds": [
+            45.06,
+            45.26
+          ],
+          "frequencyHz": 1396.91,
+          "bandHalfWidthHz": 12,
+          "leftMinusRightDb": 3.143631989451823,
+          "sideEnergyFraction": 0.444984779542878,
+          "lrCoherencyMagnitude": 0.5075554366137943,
+          "lrCoherencyPhaseDegrees": -76.63586358363003,
+          "meanStereoPower": 2.331161834730601e-06
+        },
+        {
+          "relativeWindowSeconds": [
+            0.06,
+            0.26
+          ],
+          "originalWindowSeconds": [
+            45.06,
+            45.26
+          ],
+          "frequencyHz": 2095.37,
+          "bandHalfWidthHz": 14.667589999999999,
+          "leftMinusRightDb": 0.2383462201002245,
+          "sideEnergyFraction": 0.01324732759371976,
+          "lrCoherencyMagnitude": 0.9914522321287453,
+          "lrCoherencyPhaseDegrees": -10.805858384584434,
+          "meanStereoPower": 4.379636038029849e-06
+        },
+        {
+          "relativeWindowSeconds": [
+            0.06,
+            0.26
+          ],
+          "originalWindowSeconds": [
+            45.06,
+            45.26
+          ],
+          "frequencyHz": 2330.82,
+          "bandHalfWidthHz": 16.31574,
+          "leftMinusRightDb": 0.2320778294379316,
+          "sideEnergyFraction": 0.07432174221188237,
+          "lrCoherencyMagnitude": 0.867535983036095,
+          "lrCoherencyPhaseDegrees": -10.977991285453983,
+          "meanStereoPower": 6.667424400821399e-08
+        },
+        {
+          "relativeWindowSeconds": [
+            0.06,
+            0.26
+          ],
+          "originalWindowSeconds": [
+            45.06,
+            45.26
+          ],
+          "frequencyHz": 3492.28,
+          "bandHalfWidthHz": 24.445960000000003,
+          "leftMinusRightDb": 0.45627023061719807,
+          "sideEnergyFraction": 0.006302277671114805,
+          "lrCoherencyMagnitude": 0.9904115261317019,
+          "lrCoherencyPhaseDegrees": -3.3112082081511476,
+          "meanStereoPower": 2.312560944634604e-07
+        },
+        {
+          "relativeWindowSeconds": [
+            0.37,
+            0.57
+          ],
+          "originalWindowSeconds": [
+            45.37,
+            45.57
+          ],
+          "frequencyHz": 233.08,
+          "bandHalfWidthHz": 12,
+          "leftMinusRightDb": -4.643448998598426,
+          "sideEnergyFraction": 0.6933448829427957,
+          "lrCoherencyMagnitude": 0.6939041070461613,
+          "lrCoherencyPhaseDegrees": -129.70338268936558,
+          "meanStereoPower": 1.3167816757854686e-05
+        },
+        {
+          "relativeWindowSeconds": [
+            0.37,
+            0.57
+          ],
+          "originalWindowSeconds": [
+            45.37,
+            45.57
+          ],
+          "frequencyHz": 466.16,
+          "bandHalfWidthHz": 12,
+          "leftMinusRightDb": 0.169095463617761,
+          "sideEnergyFraction": 0.4289348298614454,
+          "lrCoherencyMagnitude": 0.7005363972436688,
+          "lrCoherencyPhaseDegrees": -78.29186521977417,
+          "meanStereoPower": 1.2422991841504251e-05
+        },
+        {
+          "relativeWindowSeconds": [
+            0.37,
+            0.57
+          ],
+          "originalWindowSeconds": [
+            45.37,
+            45.57
+          ],
+          "frequencyHz": 698.46,
+          "bandHalfWidthHz": 12,
+          "leftMinusRightDb": -2.8424311358071797,
+          "sideEnergyFraction": 0.8138480440286983,
+          "lrCoherencyMagnitude": 0.9737361299365699,
+          "lrCoherencyPhaseDegrees": 132.80086046288872,
+          "meanStereoPower": 2.7220273496329385e-06
+        },
+        {
+          "relativeWindowSeconds": [
+            0.37,
+            0.57
+          ],
+          "originalWindowSeconds": [
+            45.37,
+            45.57
+          ],
+          "frequencyHz": 1396.91,
+          "bandHalfWidthHz": 12,
+          "leftMinusRightDb": 1.6026414791647745,
+          "sideEnergyFraction": 0.4935025999393323,
+          "lrCoherencyMagnitude": 0.8788615476184446,
+          "lrCoherencyPhaseDegrees": -89.13833352575818,
+          "meanStereoPower": 5.4460308726007964e-06
+        },
+        {
+          "relativeWindowSeconds": [
+            0.37,
+            0.57
+          ],
+          "originalWindowSeconds": [
+            45.37,
+            45.57
+          ],
+          "frequencyHz": 2095.37,
+          "bandHalfWidthHz": 14.667589999999999,
+          "leftMinusRightDb": 0.6454387327346269,
+          "sideEnergyFraction": 0.19886156620413875,
+          "lrCoherencyMagnitude": 0.6042322479850183,
+          "lrCoherencyPhaseDegrees": 1.7806779066420988,
+          "meanStereoPower": 1.3481529058703692e-07
+        },
+        {
+          "relativeWindowSeconds": [
+            0.37,
+            0.57
+          ],
+          "originalWindowSeconds": [
+            45.37,
+            45.57
+          ],
+          "frequencyHz": 2330.82,
+          "bandHalfWidthHz": 16.31574,
+          "leftMinusRightDb": 2.39808492364973,
+          "sideEnergyFraction": 0.06290068163628436,
+          "lrCoherencyMagnitude": 0.9115671474191441,
+          "lrCoherencyPhaseDegrees": -5.259683417074126,
+          "meanStereoPower": 9.59229593441099e-08
+        },
+        {
+          "relativeWindowSeconds": [
+            0.37,
+            0.57
+          ],
+          "originalWindowSeconds": [
+            45.37,
+            45.57
+          ],
+          "frequencyHz": 3492.28,
+          "bandHalfWidthHz": 24.445960000000003,
+          "leftMinusRightDb": -2.089277341822185,
+          "sideEnergyFraction": 0.1836235667803786,
+          "lrCoherencyMagnitude": 0.6746977111243179,
+          "lrCoherencyPhaseDegrees": -15.183217197073843,
+          "meanStereoPower": 9.194847221047975e-09
+        },
+        {
+          "relativeWindowSeconds": [
+            0.7,
+            0.9
+          ],
+          "originalWindowSeconds": [
+            45.7,
+            45.9
+          ],
+          "frequencyHz": 233.08,
+          "bandHalfWidthHz": 12,
+          "leftMinusRightDb": -1.9055892169844761,
+          "sideEnergyFraction": 0.9318826006969275,
+          "lrCoherencyMagnitude": 0.89220277356339,
+          "lrCoherencyPhaseDegrees": -172.53256222666843,
+          "meanStereoPower": 1.2276640561376532e-05
+        },
+        {
+          "relativeWindowSeconds": [
+            0.7,
+            0.9
+          ],
+          "originalWindowSeconds": [
+            45.7,
+            45.9
+          ],
+          "frequencyHz": 466.16,
+          "bandHalfWidthHz": 12,
+          "leftMinusRightDb": 1.5006877111960133,
+          "sideEnergyFraction": 0.9221451943447648,
+          "lrCoherencyMagnitude": 0.8867315007501114,
+          "lrCoherencyPhaseDegrees": 165.1017371401343,
+          "meanStereoPower": 1.2511006491278482e-05
+        },
+        {
+          "relativeWindowSeconds": [
+            0.7,
+            0.9
+          ],
+          "originalWindowSeconds": [
+            45.7,
+            45.9
+          ],
+          "frequencyHz": 698.46,
+          "bandHalfWidthHz": 12,
+          "leftMinusRightDb": 2.6129932768770865,
+          "sideEnergyFraction": 0.7237104170341856,
+          "lrCoherencyMagnitude": 0.8298009237255962,
+          "lrCoherencyPhaseDegrees": 124.31716217743701,
+          "meanStereoPower": 7.973721503192069e-07
+        },
+        {
+          "relativeWindowSeconds": [
+            0.7,
+            0.9
+          ],
+          "originalWindowSeconds": [
+            45.7,
+            45.9
+          ],
+          "frequencyHz": 1396.91,
+          "bandHalfWidthHz": 12,
+          "leftMinusRightDb": -9.761973374489587,
+          "sideEnergyFraction": 0.4866118464567519,
+          "lrCoherencyMagnitude": 0.5111352256266285,
+          "lrCoherencyPhaseDegrees": -84.88796506162475,
+          "meanStereoPower": 4.835005790432328e-06
+        },
+        {
+          "relativeWindowSeconds": [
+            0.7,
+            0.9
+          ],
+          "originalWindowSeconds": [
+            45.7,
+            45.9
+          ],
+          "frequencyHz": 2095.37,
+          "bandHalfWidthHz": 14.667589999999999,
+          "leftMinusRightDb": -2.0509618401390317,
+          "sideEnergyFraction": 0.10026709900184441,
+          "lrCoherencyMagnitude": 0.8295787605996671,
+          "lrCoherencyPhaseDegrees": 7.823664139187264,
+          "meanStereoPower": 2.9692502279483157e-07
+        },
+        {
+          "relativeWindowSeconds": [
+            0.7,
+            0.9
+          ],
+          "originalWindowSeconds": [
+            45.7,
+            45.9
+          ],
+          "frequencyHz": 2330.82,
+          "bandHalfWidthHz": 16.31574,
+          "leftMinusRightDb": -0.7337280677875542,
+          "sideEnergyFraction": 0.08874994531625001,
+          "lrCoherencyMagnitude": 0.8407559630989764,
+          "lrCoherencyPhaseDegrees": 10.954355906390509,
+          "meanStereoPower": 1.3250284479613097e-07
+        },
+        {
+          "relativeWindowSeconds": [
+            0.7,
+            0.9
+          ],
+          "originalWindowSeconds": [
+            45.7,
+            45.9
+          ],
+          "frequencyHz": 3492.28,
+          "bandHalfWidthHz": 24.445960000000003,
+          "leftMinusRightDb": 1.5440186890824568,
+          "sideEnergyFraction": 0.07968152199193355,
+          "lrCoherencyMagnitude": 0.8567364995801358,
+          "lrCoherencyPhaseDegrees": 4.619255835701286,
+          "meanStereoPower": 1.2291749648075552e-08
+        },
+        {
+          "relativeWindowSeconds": [
+            0.99,
+            1.09
+          ],
+          "originalWindowSeconds": [
+            45.99,
+            46.09
+          ],
+          "frequencyHz": 233.08,
+          "bandHalfWidthHz": 12,
+          "leftMinusRightDb": -10.509963700755963,
+          "sideEnergyFraction": 0.5070982571543644,
+          "lrCoherencyMagnitude": 0.057099024732899295,
+          "lrCoherencyPhaseDegrees": 116.99803549071765,
+          "meanStereoPower": 1.4793355362027946e-05
+        },
+        {
+          "relativeWindowSeconds": [
+            0.99,
+            1.09
+          ],
+          "originalWindowSeconds": [
+            45.99,
+            46.09
+          ],
+          "frequencyHz": 466.16,
+          "bandHalfWidthHz": 12,
+          "leftMinusRightDb": -3.130957720264714,
+          "sideEnergyFraction": 0.8764600626338415,
+          "lrCoherencyMagnitude": 0.8618379077410874,
+          "lrCoherencyPhaseDegrees": 158.5905596800798,
+          "meanStereoPower": 9.315818663549794e-06
+        },
+        {
+          "relativeWindowSeconds": [
+            0.99,
+            1.09
+          ],
+          "originalWindowSeconds": [
+            45.99,
+            46.09
+          ],
+          "frequencyHz": 698.46,
+          "bandHalfWidthHz": 12,
+          "leftMinusRightDb": 3.6395830826312365,
+          "sideEnergyFraction": 0.8175621663159698,
+          "lrCoherencyMagnitude": 0.8411329120587223,
+          "lrCoherencyPhaseDegrees": 145.32035282469673,
+          "meanStereoPower": 1.2761922755991263e-05
+        },
+        {
+          "relativeWindowSeconds": [
+            0.99,
+            1.09
+          ],
+          "originalWindowSeconds": [
+            45.99,
+            46.09
+          ],
+          "frequencyHz": 1396.91,
+          "bandHalfWidthHz": 12,
+          "leftMinusRightDb": -4.984411636746845,
+          "sideEnergyFraction": 0.6415605178064557,
+          "lrCoherencyMagnitude": 0.45609712869992397,
+          "lrCoherencyPhaseDegrees": 136.5346730988605,
+          "meanStereoPower": 2.4887813010748926e-06
+        },
+        {
+          "relativeWindowSeconds": [
+            0.99,
+            1.09
+          ],
+          "originalWindowSeconds": [
+            45.99,
+            46.09
+          ],
+          "frequencyHz": 2095.37,
+          "bandHalfWidthHz": 14.667589999999999,
+          "leftMinusRightDb": -1.8840090523527733,
+          "sideEnergyFraction": 0.15948340662416868,
+          "lrCoherencyMagnitude": 0.7970990565597985,
+          "lrCoherencyPhaseDegrees": -29.006221116455485,
+          "meanStereoPower": 7.880248753447624e-07
+        },
+        {
+          "relativeWindowSeconds": [
+            0.99,
+            1.09
+          ],
+          "originalWindowSeconds": [
+            45.99,
+            46.09
+          ],
+          "frequencyHz": 2330.82,
+          "bandHalfWidthHz": 16.31574,
+          "leftMinusRightDb": -1.1715402744004833,
+          "sideEnergyFraction": 0.09230093051092632,
+          "lrCoherencyMagnitude": 0.8243117611418106,
+          "lrCoherencyPhaseDegrees": 3.440181951452189,
+          "meanStereoPower": 7.365733929362836e-08
+        },
+        {
+          "relativeWindowSeconds": [
+            0.99,
+            1.09
+          ],
+          "originalWindowSeconds": [
+            45.99,
+            46.09
+          ],
+          "frequencyHz": 3492.28,
+          "bandHalfWidthHz": 24.445960000000003,
+          "leftMinusRightDb": 3.929044684446263,
+          "sideEnergyFraction": 0.11561334683038887,
+          "lrCoherencyMagnitude": 0.8564213601021532,
+          "lrCoherencyPhaseDegrees": 7.661378485477126,
+          "meanStereoPower": 6.172597525725393e-08
+        },
+        {
+          "relativeWindowSeconds": [
+            1.16,
+            1.245
+          ],
+          "originalWindowSeconds": [
+            46.16,
+            46.245
+          ],
+          "frequencyHz": 233.08,
+          "bandHalfWidthHz": 12,
+          "leftMinusRightDb": -9.453702272564135,
+          "sideEnergyFraction": 0.5059364866972212,
+          "lrCoherencyMagnitude": 0.6430770377567903,
+          "lrCoherencyPhaseDegrees": -91.74901934691906,
+          "meanStereoPower": 1.0369895480818801e-05
+        },
+        {
+          "relativeWindowSeconds": [
+            1.16,
+            1.245
+          ],
+          "originalWindowSeconds": [
+            46.16,
+            46.245
+          ],
+          "frequencyHz": 466.16,
+          "bandHalfWidthHz": 12,
+          "leftMinusRightDb": -4.403250419038899,
+          "sideEnergyFraction": 0.5593991134441929,
+          "lrCoherencyMagnitude": 0.8947059131064914,
+          "lrCoherencyPhaseDegrees": 98.63904643920027,
+          "meanStereoPower": 8.235555789472122e-06
+        },
+        {
+          "relativeWindowSeconds": [
+            1.16,
+            1.245
+          ],
+          "originalWindowSeconds": [
+            46.16,
+            46.245
+          ],
+          "frequencyHz": 698.46,
+          "bandHalfWidthHz": 12,
+          "leftMinusRightDb": 5.901130885090799,
+          "sideEnergyFraction": 0.8068513817576465,
+          "lrCoherencyMagnitude": 0.7879849476223096,
+          "lrCoherencyPhaseDegrees": 164.92572643638744,
+          "meanStereoPower": 1.3730176530346694e-05
+        },
+        {
+          "relativeWindowSeconds": [
+            1.16,
+            1.245
+          ],
+          "originalWindowSeconds": [
+            46.16,
+            46.245
+          ],
+          "frequencyHz": 1396.91,
+          "bandHalfWidthHz": 12,
+          "leftMinusRightDb": -5.547691096568402,
+          "sideEnergyFraction": 0.251889029733779,
+          "lrCoherencyMagnitude": 0.9492177610074614,
+          "lrCoherencyPhaseDegrees": -50.72279012712904,
+          "meanStereoPower": 9.034538265455218e-06
+        },
+        {
+          "relativeWindowSeconds": [
+            1.16,
+            1.245
+          ],
+          "originalWindowSeconds": [
+            46.16,
+            46.245
+          ],
+          "frequencyHz": 2095.37,
+          "bandHalfWidthHz": 14.667589999999999,
+          "leftMinusRightDb": 0.4860975688001602,
+          "sideEnergyFraction": 0.16749088219167746,
+          "lrCoherencyMagnitude": 0.7825259365607591,
+          "lrCoherencyPhaseDegrees": -31.661220396573142,
+          "meanStereoPower": 1.3287729762626824e-06
+        },
+        {
+          "relativeWindowSeconds": [
+            1.16,
+            1.245
+          ],
+          "originalWindowSeconds": [
+            46.16,
+            46.245
+          ],
+          "frequencyHz": 2330.82,
+          "bandHalfWidthHz": 16.31574,
+          "leftMinusRightDb": 0.6341833203284096,
+          "sideEnergyFraction": 0.047713350886209024,
+          "lrCoherencyMagnitude": 0.9080673126105023,
+          "lrCoherencyPhaseDegrees": -2.7970765965006543,
+          "meanStereoPower": 1.304641628283511e-07
+        },
+        {
+          "relativeWindowSeconds": [
+            1.16,
+            1.245
+          ],
+          "originalWindowSeconds": [
+            46.16,
+            46.245
+          ],
+          "frequencyHz": 3492.28,
+          "bandHalfWidthHz": 24.445960000000003,
+          "leftMinusRightDb": 0.3987606351614112,
+          "sideEnergyFraction": 0.03915509643039264,
+          "lrCoherencyMagnitude": 0.9238730603411185,
+          "lrCoherencyPhaseDegrees": -2.9348937227525522,
+          "meanStereoPower": 2.1480923349119476e-08
+        },
+        {
+          "relativeWindowSeconds": [
+            1.3,
+            1.4
+          ],
+          "originalWindowSeconds": [
+            46.3,
+            46.4
+          ],
+          "frequencyHz": 233.08,
+          "bandHalfWidthHz": 12,
+          "leftMinusRightDb": -4.548167486074106,
+          "sideEnergyFraction": 0.8350532597146962,
+          "lrCoherencyMagnitude": 0.7659805229392049,
+          "lrCoherencyPhaseDegrees": 175.9753169739772,
+          "meanStereoPower": 1.8256718562597942e-05
+        },
+        {
+          "relativeWindowSeconds": [
+            1.3,
+            1.4
+          ],
+          "originalWindowSeconds": [
+            46.3,
+            46.4
+          ],
+          "frequencyHz": 466.16,
+          "bandHalfWidthHz": 12,
+          "leftMinusRightDb": 4.80590888233458,
+          "sideEnergyFraction": 0.4414688181020473,
+          "lrCoherencyMagnitude": 0.2808738671874405,
+          "lrCoherencyPhaseDegrees": -61.16949773590231,
+          "meanStereoPower": 8.836842141930812e-06
+        },
+        {
+          "relativeWindowSeconds": [
+            1.3,
+            1.4
+          ],
+          "originalWindowSeconds": [
+            46.3,
+            46.4
+          ],
+          "frequencyHz": 698.46,
+          "bandHalfWidthHz": 12,
+          "leftMinusRightDb": -2.4139496488292362,
+          "sideEnergyFraction": 0.9281869670181334,
+          "lrCoherencyMagnitude": 0.9311680565301232,
+          "lrCoherencyPhaseDegrees": 162.8280534370467,
+          "meanStereoPower": 5.87765497580316e-06
+        },
+        {
+          "relativeWindowSeconds": [
+            1.3,
+            1.4
+          ],
+          "originalWindowSeconds": [
+            46.3,
+            46.4
+          ],
+          "frequencyHz": 1396.91,
+          "bandHalfWidthHz": 12,
+          "leftMinusRightDb": 5.362792800713101,
+          "sideEnergyFraction": 0.4289186834202679,
+          "lrCoherencyMagnitude": 0.7212864941517201,
+          "lrCoherencyPhaseDegrees": -76.35702368484732,
+          "meanStereoPower": 6.403018761718565e-06
+        },
+        {
+          "relativeWindowSeconds": [
+            1.3,
+            1.4
+          ],
+          "originalWindowSeconds": [
+            46.3,
+            46.4
+          ],
+          "frequencyHz": 2095.37,
+          "bandHalfWidthHz": 14.667589999999999,
+          "leftMinusRightDb": -5.752534859170371,
+          "sideEnergyFraction": 0.44452797720514936,
+          "lrCoherencyMagnitude": 0.15220200221851277,
+          "lrCoherencyPhaseDegrees": -26.527895061811233,
+          "meanStereoPower": 2.8672541953587384e-07
+        },
+        {
+          "relativeWindowSeconds": [
+            1.3,
+            1.4
+          ],
+          "originalWindowSeconds": [
+            46.3,
+            46.4
+          ],
+          "frequencyHz": 2330.82,
+          "bandHalfWidthHz": 16.31574,
+          "leftMinusRightDb": 1.5545058713851587,
+          "sideEnergyFraction": 0.03284922910969369,
+          "lrCoherencyMagnitude": 0.9522756983318328,
+          "lrCoherencyPhaseDegrees": -4.527383197399892,
+          "meanStereoPower": 6.294565291726112e-07
+        },
+        {
+          "relativeWindowSeconds": [
+            1.3,
+            1.4
+          ],
+          "originalWindowSeconds": [
+            46.3,
+            46.4
+          ],
+          "frequencyHz": 3492.28,
+          "bandHalfWidthHz": 24.445960000000003,
+          "leftMinusRightDb": -0.29639454688143296,
+          "sideEnergyFraction": 0.05718274890224022,
+          "lrCoherencyMagnitude": 0.9257944813101688,
+          "lrCoherencyPhaseDegrees": -16.828011878078378,
+          "meanStereoPower": 4.8075213702224556e-08
+        },
+        {
+          "relativeWindowSeconds": [
+            1.46,
+            1.54
+          ],
+          "originalWindowSeconds": [
+            46.46,
+            46.54
+          ],
+          "frequencyHz": 233.08,
+          "bandHalfWidthHz": 12,
+          "leftMinusRightDb": -14.046747563649454,
+          "sideEnergyFraction": 0.4658396509309574,
+          "lrCoherencyMagnitude": 0.1842430578455428,
+          "lrCoherencyPhaseDegrees": -13.818521232634296,
+          "meanStereoPower": 2.6263160519374152e-05
+        },
+        {
+          "relativeWindowSeconds": [
+            1.46,
+            1.54
+          ],
+          "originalWindowSeconds": [
+            46.46,
+            46.54
+          ],
+          "frequencyHz": 466.16,
+          "bandHalfWidthHz": 12,
+          "leftMinusRightDb": 5.756527570384632,
+          "sideEnergyFraction": 0.38939098786006393,
+          "lrCoherencyMagnitude": 0.8401777350029543,
+          "lrCoherencyPhaseDegrees": -71.13912256171496,
+          "meanStereoPower": 1.3466441639635068e-05
+        },
+        {
+          "relativeWindowSeconds": [
+            1.46,
+            1.54
+          ],
+          "originalWindowSeconds": [
+            46.46,
+            46.54
+          ],
+          "frequencyHz": 698.46,
+          "bandHalfWidthHz": 12,
+          "leftMinusRightDb": 0.39896942473404917,
+          "sideEnergyFraction": 0.729102300381172,
+          "lrCoherencyMagnitude": 0.9893749123050202,
+          "lrCoherencyPhaseDegrees": 117.62055904438776,
+          "meanStereoPower": 9.35749134619182e-06
+        },
+        {
+          "relativeWindowSeconds": [
+            1.46,
+            1.54
+          ],
+          "originalWindowSeconds": [
+            46.46,
+            46.54
+          ],
+          "frequencyHz": 1396.91,
+          "bandHalfWidthHz": 12,
+          "leftMinusRightDb": -4.927737675726461,
+          "sideEnergyFraction": 0.08430962258079783,
+          "lrCoherencyMagnitude": 0.9773451990263046,
+          "lrCoherencyPhaseDegrees": 7.581242867776031,
+          "meanStereoPower": 8.189252246637429e-06
+        },
+        {
+          "relativeWindowSeconds": [
+            1.46,
+            1.54
+          ],
+          "originalWindowSeconds": [
+            46.46,
+            46.54
+          ],
+          "frequencyHz": 2095.37,
+          "bandHalfWidthHz": 14.667589999999999,
+          "leftMinusRightDb": -3.625136231819168,
+          "sideEnergyFraction": 0.2773076978472621,
+          "lrCoherencyMagnitude": 0.5745523905621565,
+          "lrCoherencyPhaseDegrees": 32.46864368257072,
+          "meanStereoPower": 6.717555238481151e-07
+        },
+        {
+          "relativeWindowSeconds": [
+            1.46,
+            1.54
+          ],
+          "originalWindowSeconds": [
+            46.46,
+            46.54
+          ],
+          "frequencyHz": 2330.82,
+          "bandHalfWidthHz": 16.31574,
+          "leftMinusRightDb": 2.0613458056267975,
+          "sideEnergyFraction": 0.020448864620095698,
+          "lrCoherencyMagnitude": 0.9871909700516612,
+          "lrCoherencyPhaseDegrees": -2.5174220861982524,
+          "meanStereoPower": 1.2449145351015923e-06
+        },
+        {
+          "relativeWindowSeconds": [
+            1.46,
+            1.54
+          ],
+          "originalWindowSeconds": [
+            46.46,
+            46.54
+          ],
+          "frequencyHz": 3492.28,
+          "bandHalfWidthHz": 24.445960000000003,
+          "leftMinusRightDb": -1.5862521142255328,
+          "sideEnergyFraction": 0.28006542330256806,
+          "lrCoherencyMagnitude": 0.448952860034922,
+          "lrCoherencyPhaseDegrees": 5.028823193414421,
+          "meanStereoPower": 1.0902920638524183e-08
+        }
+      ]
+    },
+    "oldAutomaticEstimate": {
+      "path": "D:\\RootSound\\experiments\\music-workflow\\reference-studio\\cases\\phone-recording-20261023-233819\\试听\\05-自动分离候选B.wav",
+      "sha256": "57e7b6cd2546ccd3a899a9f1b2ff0fc7ff2b7bc90d19609e924deba6e08b62ca",
+      "sampleRate": 48000,
+      "measurements": [
+        {
+          "relativeWindowSeconds": [
+            0.06,
+            0.26
+          ],
+          "originalWindowSeconds": [
+            45.06,
+            45.26
+          ],
+          "frequencyHz": 233.08,
+          "bandHalfWidthHz": 12,
+          "leftMinusRightDb": 6.447174062531081,
+          "sideEnergyFraction": 0.21055400767144136,
+          "lrCoherencyMagnitude": 0.8033684276548466,
+          "lrCoherencyPhaseDegrees": 21.818674574115132,
+          "meanStereoPower": 7.546658196527141e-07
+        },
+        {
+          "relativeWindowSeconds": [
+            0.06,
+            0.26
+          ],
+          "originalWindowSeconds": [
+            45.06,
+            45.26
+          ],
+          "frequencyHz": 466.16,
+          "bandHalfWidthHz": 12,
+          "leftMinusRightDb": 3.8385652577464073,
+          "sideEnergyFraction": 0.6772830375643552,
+          "lrCoherencyMagnitude": 0.5046750628527844,
+          "lrCoherencyPhaseDegrees": 140.56028057591482,
+          "meanStereoPower": 3.226191098442947e-06
+        },
+        {
+          "relativeWindowSeconds": [
+            0.06,
+            0.26
+          ],
+          "originalWindowSeconds": [
+            45.06,
+            45.26
+          ],
+          "frequencyHz": 698.46,
+          "bandHalfWidthHz": 12,
+          "leftMinusRightDb": -2.2050172258433434,
+          "sideEnergyFraction": 0.7770996380147267,
+          "lrCoherencyMagnitude": 0.8735574968471116,
+          "lrCoherencyPhaseDegrees": -130.91732079467423,
+          "meanStereoPower": 5.125431367315236e-06
+        },
+        {
+          "relativeWindowSeconds": [
+            0.06,
+            0.26
+          ],
+          "originalWindowSeconds": [
+            45.06,
+            45.26
+          ],
+          "frequencyHz": 1396.91,
+          "bandHalfWidthHz": 12,
+          "leftMinusRightDb": 3.812915191882154,
+          "sideEnergyFraction": 0.4246522263165149,
+          "lrCoherencyMagnitude": 0.47161404068375695,
+          "lrCoherencyPhaseDegrees": -69.46275217715372,
+          "meanStereoPower": 2.8826982917330297e-06
+        },
+        {
+          "relativeWindowSeconds": [
+            0.06,
+            0.26
+          ],
+          "originalWindowSeconds": [
+            45.06,
+            45.26
+          ],
+          "frequencyHz": 2095.37,
+          "bandHalfWidthHz": 14.667589999999999,
+          "leftMinusRightDb": 0.9406254524932017,
+          "sideEnergyFraction": 0.015543913558629736,
+          "lrCoherencyMagnitude": 0.9925835023228625,
+          "lrCoherencyPhaseDegrees": -10.923431499325183,
+          "meanStereoPower": 1.1522944713143979e-05
+        },
+        {
+          "relativeWindowSeconds": [
+            0.06,
+            0.26
+          ],
+          "originalWindowSeconds": [
+            45.06,
+            45.26
+          ],
+          "frequencyHz": 2330.82,
+          "bandHalfWidthHz": 16.31574,
+          "leftMinusRightDb": -0.23157925084750314,
+          "sideEnergyFraction": 0.09335941127259402,
+          "lrCoherencyMagnitude": 0.8235944483386017,
+          "lrCoherencyPhaseDegrees": -8.948437847337072,
+          "meanStereoPower": 1.3162902934354872e-07
+        },
+        {
+          "relativeWindowSeconds": [
+            0.06,
+            0.26
+          ],
+          "originalWindowSeconds": [
+            45.06,
+            45.26
+          ],
+          "frequencyHz": 3492.28,
+          "bandHalfWidthHz": 24.445960000000003,
+          "leftMinusRightDb": 0.5854118399843029,
+          "sideEnergyFraction": 0.005705965423491821,
+          "lrCoherencyMagnitude": 0.9922946597828257,
+          "lrCoherencyPhaseDegrees": -3.108911692097627,
+          "meanStereoPower": 6.75295063659796e-07
+        },
+        {
+          "relativeWindowSeconds": [
+            0.37,
+            0.57
+          ],
+          "originalWindowSeconds": [
+            45.37,
+            45.57
+          ],
+          "frequencyHz": 233.08,
+          "bandHalfWidthHz": 12,
+          "leftMinusRightDb": 3.2191476681774382,
+          "sideEnergyFraction": 0.20968037772981105,
+          "lrCoherencyMagnitude": 0.7590637137152061,
+          "lrCoherencyPhaseDegrees": 35.10686665317488,
+          "meanStereoPower": 2.192072131994624e-07
+        },
+        {
+          "relativeWindowSeconds": [
+            0.37,
+            0.57
+          ],
+          "originalWindowSeconds": [
+            45.37,
+            45.57
+          ],
+          "frequencyHz": 466.16,
+          "bandHalfWidthHz": 12,
+          "leftMinusRightDb": 0.2552250095846177,
+          "sideEnergyFraction": 0.26484017612529354,
+          "lrCoherencyMagnitude": 0.7411419908151005,
+          "lrCoherencyPhaseDegrees": -50.59026844520703,
+          "meanStereoPower": 7.585299871128691e-06
+        },
+        {
+          "relativeWindowSeconds": [
+            0.37,
+            0.57
+          ],
+          "originalWindowSeconds": [
+            45.37,
+            45.57
+          ],
+          "frequencyHz": 698.46,
+          "bandHalfWidthHz": 12,
+          "leftMinusRightDb": -2.052367531169857,
+          "sideEnergyFraction": 0.8250047674578733,
+          "lrCoherencyMagnitude": 0.9667518424398998,
+          "lrCoherencyPhaseDegrees": 133.72688412241286,
+          "meanStereoPower": 2.7990152025131737e-06
+        },
+        {
+          "relativeWindowSeconds": [
+            0.37,
+            0.57
+          ],
+          "originalWindowSeconds": [
+            45.37,
+            45.57
+          ],
+          "frequencyHz": 1396.91,
+          "bandHalfWidthHz": 12,
+          "leftMinusRightDb": 2.4427629925768475,
+          "sideEnergyFraction": 0.4681123618176639,
+          "lrCoherencyMagnitude": 0.8953174658827038,
+          "lrCoherencyPhaseDegrees": -85.7523497379961,
+          "meanStereoPower": 1.0620528668175917e-05
+        },
+        {
+          "relativeWindowSeconds": [
+            0.37,
+            0.57
+          ],
+          "originalWindowSeconds": [
+            45.37,
+            45.57
+          ],
+          "frequencyHz": 2095.37,
+          "bandHalfWidthHz": 14.667589999999999,
+          "leftMinusRightDb": 2.1530187670537875,
+          "sideEnergyFraction": 0.22014552078728497,
+          "lrCoherencyMagnitude": 0.5792590972300662,
+          "lrCoherencyPhaseDegrees": 5.0707450866945685,
+          "meanStereoPower": 2.0900756188464082e-07
+        },
+        {
+          "relativeWindowSeconds": [
+            0.37,
+            0.57
+          ],
+          "originalWindowSeconds": [
+            45.37,
+            45.57
+          ],
+          "frequencyHz": 2330.82,
+          "bandHalfWidthHz": 16.31574,
+          "leftMinusRightDb": 2.2780153359727517,
+          "sideEnergyFraction": 0.06183222903948937,
+          "lrCoherencyMagnitude": 0.90710992129699,
+          "lrCoherencyPhaseDegrees": -1.8296848312768335,
+          "meanStereoPower": 4.0249909787066487e-07
+        },
+        {
+          "relativeWindowSeconds": [
+            0.37,
+            0.57
+          ],
+          "originalWindowSeconds": [
+            45.37,
+            45.57
+          ],
+          "frequencyHz": 3492.28,
+          "bandHalfWidthHz": 24.445960000000003,
+          "leftMinusRightDb": -2.0855141805007267,
+          "sideEnergyFraction": 0.14803655360775245,
+          "lrCoherencyMagnitude": 0.7348559740253248,
+          "lrCoherencyPhaseDegrees": -9.71613995410901,
+          "meanStereoPower": 2.8757220965363048e-08
+        },
+        {
+          "relativeWindowSeconds": [
+            0.7,
+            0.9
+          ],
+          "originalWindowSeconds": [
+            45.7,
+            45.9
+          ],
+          "frequencyHz": 233.08,
+          "bandHalfWidthHz": 12,
+          "leftMinusRightDb": 1.9217798299955522,
+          "sideEnergyFraction": 0.3511459626814045,
+          "lrCoherencyMagnitude": 0.5520256112909113,
+          "lrCoherencyPhaseDegrees": 56.45750399010243,
+          "meanStereoPower": 1.8443735800545725e-07
+        },
+        {
+          "relativeWindowSeconds": [
+            0.7,
+            0.9
+          ],
+          "originalWindowSeconds": [
+            45.7,
+            45.9
+          ],
+          "frequencyHz": 466.16,
+          "bandHalfWidthHz": 12,
+          "leftMinusRightDb": 1.0377600975833445,
+          "sideEnergyFraction": 0.885313648617223,
+          "lrCoherencyMagnitude": 0.8260297338032436,
+          "lrCoherencyPhaseDegrees": 159.98378474016883,
+          "meanStereoPower": 6.889686139714162e-06
+        },
+        {
+          "relativeWindowSeconds": [
+            0.7,
+            0.9
+          ],
+          "originalWindowSeconds": [
+            45.7,
+            45.9
+          ],
+          "frequencyHz": 698.46,
+          "bandHalfWidthHz": 12,
+          "leftMinusRightDb": 2.9651858044045607,
+          "sideEnergyFraction": 0.698086813654513,
+          "lrCoherencyMagnitude": 0.7986650463874149,
+          "lrCoherencyPhaseDegrees": 121.68380389153,
+          "meanStereoPower": 6.55261522757408e-07
+        },
+        {
+          "relativeWindowSeconds": [
+            0.7,
+            0.9
+          ],
+          "originalWindowSeconds": [
+            45.7,
+            45.9
+          ],
+          "frequencyHz": 1396.91,
+          "bandHalfWidthHz": 12,
+          "leftMinusRightDb": -8.73960056752005,
+          "sideEnergyFraction": 0.4646466214379351,
+          "lrCoherencyMagnitude": 0.5300933456131713,
+          "lrCoherencyPhaseDegrees": -78.06523787245754,
+          "meanStereoPower": 4.380005581512918e-06
+        },
+        {
+          "relativeWindowSeconds": [
+            0.7,
+            0.9
+          ],
+          "originalWindowSeconds": [
+            45.7,
+            45.9
+          ],
+          "frequencyHz": 2095.37,
+          "bandHalfWidthHz": 14.667589999999999,
+          "leftMinusRightDb": -1.8705530603526785,
+          "sideEnergyFraction": 0.08877567861595512,
+          "lrCoherencyMagnitude": 0.8524179320001959,
+          "lrCoherencyPhaseDegrees": 9.140299455022289,
+          "meanStereoPower": 3.81546076549767e-07
+        },
+        {
+          "relativeWindowSeconds": [
+            0.7,
+            0.9
+          ],
+          "originalWindowSeconds": [
+            45.7,
+            45.9
+          ],
+          "frequencyHz": 2330.82,
+          "bandHalfWidthHz": 16.31574,
+          "leftMinusRightDb": -1.0350444341845948,
+          "sideEnergyFraction": 0.08595615545424543,
+          "lrCoherencyMagnitude": 0.8393097044973933,
+          "lrCoherencyPhaseDegrees": 6.463968374646534,
+          "meanStereoPower": 2.0540038180449223e-07
+        },
+        {
+          "relativeWindowSeconds": [
+            0.7,
+            0.9
+          ],
+          "originalWindowSeconds": [
+            45.7,
+            45.9
+          ],
+          "frequencyHz": 3492.28,
+          "bandHalfWidthHz": 24.445960000000003,
+          "leftMinusRightDb": 1.4878461122357833,
+          "sideEnergyFraction": 0.07053331284404292,
+          "lrCoherencyMagnitude": 0.8729095424089768,
+          "lrCoherencyPhaseDegrees": 3.179840149426466,
+          "meanStereoPower": 2.6654118441556796e-08
+        },
+        {
+          "relativeWindowSeconds": [
+            0.99,
+            1.09
+          ],
+          "originalWindowSeconds": [
+            45.99,
+            46.09
+          ],
+          "frequencyHz": 233.08,
+          "bandHalfWidthHz": 12,
+          "leftMinusRightDb": 2.8202253271736395,
+          "sideEnergyFraction": 0.15368048892182726,
+          "lrCoherencyMagnitude": 0.8174604533204104,
+          "lrCoherencyPhaseDegrees": 26.828333478981417,
+          "meanStereoPower": 2.868341156330904e-07
+        },
+        {
+          "relativeWindowSeconds": [
+            0.99,
+            1.09
+          ],
+          "originalWindowSeconds": [
+            45.99,
+            46.09
+          ],
+          "frequencyHz": 466.16,
+          "bandHalfWidthHz": 12,
+          "leftMinusRightDb": -4.434728616534346,
+          "sideEnergyFraction": 0.8060371715666897,
+          "lrCoherencyMagnitude": 0.7572160967682137,
+          "lrCoherencyPhaseDegrees": 156.34623865315965,
+          "meanStereoPower": 3.6319745455566523e-06
+        },
+        {
+          "relativeWindowSeconds": [
+            0.99,
+            1.09
+          ],
+          "originalWindowSeconds": [
+            45.99,
+            46.09
+          ],
+          "frequencyHz": 698.46,
+          "bandHalfWidthHz": 12,
+          "leftMinusRightDb": 3.0912006209988463,
+          "sideEnergyFraction": 0.8104298368479855,
+          "lrCoherencyMagnitude": 0.8287441584425815,
+          "lrCoherencyPhaseDegrees": 142.8543157916706,
+          "meanStereoPower": 1.3272132445131386e-05
+        },
+        {
+          "relativeWindowSeconds": [
+            0.99,
+            1.09
+          ],
+          "originalWindowSeconds": [
+            45.99,
+            46.09
+          ],
+          "frequencyHz": 1396.91,
+          "bandHalfWidthHz": 12,
+          "leftMinusRightDb": -3.8673175733193466,
+          "sideEnergyFraction": 0.6481269444939851,
+          "lrCoherencyMagnitude": 0.42150982152757815,
+          "lrCoherencyPhaseDegrees": 140.68404243914517,
+          "meanStereoPower": 2.274815842156922e-06
+        },
+        {
+          "relativeWindowSeconds": [
+            0.99,
+            1.09
+          ],
+          "originalWindowSeconds": [
+            45.99,
+            46.09
+          ],
+          "frequencyHz": 2095.37,
+          "bandHalfWidthHz": 14.667589999999999,
+          "leftMinusRightDb": -0.6405264843260517,
+          "sideEnergyFraction": 0.13696645147974032,
+          "lrCoherencyMagnitude": 0.82504720904242,
+          "lrCoherencyPhaseDegrees": -28.06372498477081,
+          "meanStereoPower": 1.084221702848712e-06
+        },
+        {
+          "relativeWindowSeconds": [
+            0.99,
+            1.09
+          ],
+          "originalWindowSeconds": [
+            45.99,
+            46.09
+          ],
+          "frequencyHz": 2330.82,
+          "bandHalfWidthHz": 16.31574,
+          "leftMinusRightDb": -1.2550663214402602,
+          "sideEnergyFraction": 0.08494034122838197,
+          "lrCoherencyMagnitude": 0.8458610970354064,
+          "lrCoherencyPhaseDegrees": 7.408262789118346,
+          "meanStereoPower": 1.2223412222778177e-07
+        },
+        {
+          "relativeWindowSeconds": [
+            0.99,
+            1.09
+          ],
+          "originalWindowSeconds": [
+            45.99,
+            46.09
+          ],
+          "frequencyHz": 3492.28,
+          "bandHalfWidthHz": 24.445960000000003,
+          "leftMinusRightDb": 3.9658700763524384,
+          "sideEnergyFraction": 0.11619096699354993,
+          "lrCoherencyMagnitude": 0.8544563999167095,
+          "lrCoherencyPhaseDegrees": 6.45987445594158,
+          "meanStereoPower": 1.363951363138365e-07
+        },
+        {
+          "relativeWindowSeconds": [
+            1.16,
+            1.245
+          ],
+          "originalWindowSeconds": [
+            46.16,
+            46.245
+          ],
+          "frequencyHz": 233.08,
+          "bandHalfWidthHz": 12,
+          "leftMinusRightDb": 1.728325914766128,
+          "sideEnergyFraction": 0.06467786299216506,
+          "lrCoherencyMagnitude": 0.8880544523941228,
+          "lrCoherencyPhaseDegrees": -0.9314834563326566,
+          "meanStereoPower": 4.848162426645266e-07
+        },
+        {
+          "relativeWindowSeconds": [
+            1.16,
+            1.245
+          ],
+          "originalWindowSeconds": [
+            46.16,
+            46.245
+          ],
+          "frequencyHz": 466.16,
+          "bandHalfWidthHz": 12,
+          "leftMinusRightDb": -3.4018690541037278,
+          "sideEnergyFraction": 0.4606482237395842,
+          "lrCoherencyMagnitude": 0.8509151149489972,
+          "lrCoherencyPhaseDegrees": 84.27937862340106,
+          "meanStereoPower": 3.8038597639772142e-06
+        },
+        {
+          "relativeWindowSeconds": [
+            1.16,
+            1.245
+          ],
+          "originalWindowSeconds": [
+            46.16,
+            46.245
+          ],
+          "frequencyHz": 698.46,
+          "bandHalfWidthHz": 12,
+          "leftMinusRightDb": 5.758813618365188,
+          "sideEnergyFraction": 0.8085118627352273,
+          "lrCoherencyMagnitude": 0.7825953229965412,
+          "lrCoherencyPhaseDegrees": 165.50367968184548,
+          "meanStereoPower": 1.046185881334491e-05
+        },
+        {
+          "relativeWindowSeconds": [
+            1.16,
+            1.245
+          ],
+          "originalWindowSeconds": [
+            46.16,
+            46.245
+          ],
+          "frequencyHz": 1396.91,
+          "bandHalfWidthHz": 12,
+          "leftMinusRightDb": -4.5781444719796065,
+          "sideEnergyFraction": 0.23065165625134992,
+          "lrCoherencyMagnitude": 0.9568267476793471,
+          "lrCoherencyPhaseDegrees": -49.981481715418234,
+          "meanStereoPower": 1.0053815630315935e-05
+        },
+        {
+          "relativeWindowSeconds": [
+            1.16,
+            1.245
+          ],
+          "originalWindowSeconds": [
+            46.16,
+            46.245
+          ],
+          "frequencyHz": 2095.37,
+          "bandHalfWidthHz": 14.667589999999999,
+          "leftMinusRightDb": 1.087650507938069,
+          "sideEnergyFraction": 0.17740900454229397,
+          "lrCoherencyMagnitude": 0.7620017122256912,
+          "lrCoherencyPhaseDegrees": -31.423125250140455,
+          "meanStereoPower": 1.9159316959347204e-06
+        },
+        {
+          "relativeWindowSeconds": [
+            1.16,
+            1.245
+          ],
+          "originalWindowSeconds": [
+            46.16,
+            46.245
+          ],
+          "frequencyHz": 2330.82,
+          "bandHalfWidthHz": 16.31574,
+          "leftMinusRightDb": 1.3187979622815706,
+          "sideEnergyFraction": 0.04222591088238777,
+          "lrCoherencyMagnitude": 0.9276247877423612,
+          "lrCoherencyPhaseDegrees": -3.262306231433806,
+          "meanStereoPower": 2.302567768008838e-07
+        },
+        {
+          "relativeWindowSeconds": [
+            1.16,
+            1.245
+          ],
+          "originalWindowSeconds": [
+            46.16,
+            46.245
+          ],
+          "frequencyHz": 3492.28,
+          "bandHalfWidthHz": 24.445960000000003,
+          "leftMinusRightDb": 0.6172682551970963,
+          "sideEnergyFraction": 0.043005633735251986,
+          "lrCoherencyMagnitude": 0.9163071202572748,
+          "lrCoherencyPhaseDegrees": -0.2601667922128275,
+          "meanStereoPower": 5.707989529103819e-08
+        },
+        {
+          "relativeWindowSeconds": [
+            1.3,
+            1.4
+          ],
+          "originalWindowSeconds": [
+            46.3,
+            46.4
+          ],
+          "frequencyHz": 233.08,
+          "bandHalfWidthHz": 12,
+          "leftMinusRightDb": 2.6622438408694826,
+          "sideEnergyFraction": 0.3407161120254761,
+          "lrCoherencyMagnitude": 0.7880423397585755,
+          "lrCoherencyPhaseDegrees": 64.95122280108964,
+          "meanStereoPower": 4.069991280206523e-07
+        },
+        {
+          "relativeWindowSeconds": [
+            1.3,
+            1.4
+          ],
+          "originalWindowSeconds": [
+            46.3,
+            46.4
+          ],
+          "frequencyHz": 466.16,
+          "bandHalfWidthHz": 12,
+          "leftMinusRightDb": 7.169151458434447,
+          "sideEnergyFraction": 0.370091571552672,
+          "lrCoherencyMagnitude": 0.45615909462259224,
+          "lrCoherencyPhaseDegrees": -39.20818705111002,
+          "meanStereoPower": 1.2975562683969748e-05
+        },
+        {
+          "relativeWindowSeconds": [
+            1.3,
+            1.4
+          ],
+          "originalWindowSeconds": [
+            46.3,
+            46.4
+          ],
+          "frequencyHz": 698.46,
+          "bandHalfWidthHz": 12,
+          "leftMinusRightDb": -1.5441347965637342,
+          "sideEnergyFraction": 0.9371739316517773,
+          "lrCoherencyMagnitude": 0.9308360690635024,
+          "lrCoherencyPhaseDegrees": 162.59164715621557,
+          "meanStereoPower": 5.618615867138036e-06
+        },
+        {
+          "relativeWindowSeconds": [
+            1.3,
+            1.4
+          ],
+          "originalWindowSeconds": [
+            46.3,
+            46.4
+          ],
+          "frequencyHz": 1396.91,
+          "bandHalfWidthHz": 12,
+          "leftMinusRightDb": 6.4625092650769345,
+          "sideEnergyFraction": 0.423407587311524,
+          "lrCoherencyMagnitude": 0.7439874710937923,
+          "lrCoherencyPhaseDegrees": -74.5995083870606,
+          "meanStereoPower": 1.232726395433463e-05
+        },
+        {
+          "relativeWindowSeconds": [
+            1.3,
+            1.4
+          ],
+          "originalWindowSeconds": [
+            46.3,
+            46.4
+          ],
+          "frequencyHz": 2095.37,
+          "bandHalfWidthHz": 14.667589999999999,
+          "leftMinusRightDb": -5.134431553113831,
+          "sideEnergyFraction": 0.43721585959567394,
+          "lrCoherencyMagnitude": 0.1482147712391885,
+          "lrCoherencyPhaseDegrees": 1.6535951825560629,
+          "meanStereoPower": 3.2931834288060553e-07
+        },
+        {
+          "relativeWindowSeconds": [
+            1.3,
+            1.4
+          ],
+          "originalWindowSeconds": [
+            46.3,
+            46.4
+          ],
+          "frequencyHz": 2330.82,
+          "bandHalfWidthHz": 16.31574,
+          "leftMinusRightDb": 1.199631119073186,
+          "sideEnergyFraction": 0.025012659551652175,
+          "lrCoherencyMagnitude": 0.9603586185917939,
+          "lrCoherencyPhaseDegrees": -2.991960323485725,
+          "meanStereoPower": 1.344044255227599e-06
+        },
+        {
+          "relativeWindowSeconds": [
+            1.3,
+            1.4
+          ],
+          "originalWindowSeconds": [
+            46.3,
+            46.4
+          ],
+          "frequencyHz": 3492.28,
+          "bandHalfWidthHz": 24.445960000000003,
+          "leftMinusRightDb": 0.1440506903165164,
+          "sideEnergyFraction": 0.05769511790834289,
+          "lrCoherencyMagnitude": 0.9238645336046785,
+          "lrCoherencyPhaseDegrees": -16.735963427923767,
+          "meanStereoPower": 1.00315110663933e-07
+        },
+        {
+          "relativeWindowSeconds": [
+            1.46,
+            1.54
+          ],
+          "originalWindowSeconds": [
+            46.46,
+            46.54
+          ],
+          "frequencyHz": 233.08,
+          "bandHalfWidthHz": 12,
+          "leftMinusRightDb": -5.290321475788524,
+          "sideEnergyFraction": 0.30617085874094574,
+          "lrCoherencyMagnitude": 0.5707246590311643,
+          "lrCoherencyPhaseDegrees": 35.985120830717754,
+          "meanStereoPower": 2.4526270570178456e-07
+        },
+        {
+          "relativeWindowSeconds": [
+            1.46,
+            1.54
+          ],
+          "originalWindowSeconds": [
+            46.46,
+            46.54
+          ],
+          "frequencyHz": 466.16,
+          "bandHalfWidthHz": 12,
+          "leftMinusRightDb": 5.560923077895362,
+          "sideEnergyFraction": 0.3030048101093579,
+          "lrCoherencyMagnitude": 0.8241423972953911,
+          "lrCoherencyPhaseDegrees": -54.58957792441113,
+          "meanStereoPower": 6.853413804854322e-06
+        },
+        {
+          "relativeWindowSeconds": [
+            1.46,
+            1.54
+          ],
+          "originalWindowSeconds": [
+            46.46,
+            46.54
+          ],
+          "frequencyHz": 698.46,
+          "bandHalfWidthHz": 12,
+          "leftMinusRightDb": 1.1079228239530405,
+          "sideEnergyFraction": 0.7059109029332166,
+          "lrCoherencyMagnitude": 0.9876525076166818,
+          "lrCoherencyPhaseDegrees": 114.85776126574041,
+          "meanStereoPower": 8.557962749896897e-06
+        },
+        {
+          "relativeWindowSeconds": [
+            1.46,
+            1.54
+          ],
+          "originalWindowSeconds": [
+            46.46,
+            46.54
+          ],
+          "frequencyHz": 1396.91,
+          "bandHalfWidthHz": 12,
+          "leftMinusRightDb": -4.223843478512747,
+          "sideEnergyFraction": 0.0680354399349532,
+          "lrCoherencyMagnitude": 0.9779608591356163,
+          "lrCoherencyPhaseDegrees": 8.140277513332835,
+          "meanStereoPower": 8.73615599156433e-06
+        },
+        {
+          "relativeWindowSeconds": [
+            1.46,
+            1.54
+          ],
+          "originalWindowSeconds": [
+            46.46,
+            46.54
+          ],
+          "frequencyHz": 2095.37,
+          "bandHalfWidthHz": 14.667589999999999,
+          "leftMinusRightDb": -3.3395465322768385,
+          "sideEnergyFraction": 0.2709534920176291,
+          "lrCoherencyMagnitude": 0.5814587021908104,
+          "lrCoherencyPhaseDegrees": 32.13624438913038,
+          "meanStereoPower": 6.556954858195158e-07
+        },
+        {
+          "relativeWindowSeconds": [
+            1.46,
+            1.54
+          ],
+          "originalWindowSeconds": [
+            46.46,
+            46.54
+          ],
+          "frequencyHz": 2330.82,
+          "bandHalfWidthHz": 16.31574,
+          "leftMinusRightDb": 1.6161795513400152,
+          "sideEnergyFraction": 0.013467069462113724,
+          "lrCoherencyMagnitude": 0.9911636463765198,
+          "lrCoherencyPhaseDegrees": -2.8248976893770665,
+          "meanStereoPower": 1.4705184661726846e-06
+        },
+        {
+          "relativeWindowSeconds": [
+            1.46,
+            1.54
+          ],
+          "originalWindowSeconds": [
+            46.46,
+            46.54
+          ],
+          "frequencyHz": 3492.28,
+          "bandHalfWidthHz": 24.445960000000003,
+          "leftMinusRightDb": -1.2639386095420506,
+          "sideEnergyFraction": 0.268412688945051,
+          "lrCoherencyMagnitude": 0.4719287727187415,
+          "lrCoherencyPhaseDegrees": 7.315638851429058,
+          "meanStereoPower": 1.6624130225531114e-08
+        }
+      ]
+    }
+  },
+  "referenceWindows": [
+    {
+      "purpose": "Relatively brighter, coherent central attack/harmonic material",
+      "relativeSeconds": [
+        0.06,
+        0.26
+      ],
+      "originalSeconds": [
+        45.06,
+        45.26
+      ],
+      "frequencyHintsHz": [
+        [
+          2010,
+          2180
+        ],
+        [
+          3400,
+          3580
+        ]
+      ],
+      "preferredSpatialObservation": "Mid can emphasize this material; do not confuse Mid with an instrument identity.",
+      "contamination": "Bass, chords, earlier tails and lower/wide components coexist. The window is only .2 s, not a clean full-timbre query."
+    },
+    {
+      "purpose": "Relatively wider lower-frequency sustained material",
+      "relativeSeconds": [
+        0.99,
+        1.09
+      ],
+      "alternateRelativeSeconds": [
+        1.3,
+        1.4
+      ],
+      "originalSeconds": [
+        45.99,
+        46.09
+      ],
+      "frequencyHintsHz": [
+        [
+          650,
+          745
+        ]
+      ],
+      "preferredSpatialObservation": "Side strongly retains this band, unlike direct L/R averaging.",
+      "contamination": "This band can be the third harmonic of a lower note, not necessarily a F5 fundamental. The full Side signal also includes reverberation and other stereo sources."
+    }
+  ],
+  "unsafeReferences": [
+    {
+      "relativeSeconds": [
+        1.16,
+        1.245
+      ],
+      "reason": "A newly increasing 466/1398 family coexists with 698/2095 material. Not an isolated second instrument, despite the useful change in spectral balance."
+    },
+    {
+      "relativeSeconds": [
+        1.12,
+        1.57
+      ],
+      "reason": "Multiple overlapping attacks/tails and changing stereo phase. Do not concatenate the dominant peaks into one voice or treat the whole window as a pure second reference."
+    }
+  ],
+  "conclusions": [
+    "Different bands have strongly different stereo structure in the original mixture as well as 07, so this is not solely a Demucs artifact.",
+    "A direct arithmetic L/R average suppresses substantial Side energy and can bias both pitch analysis and reference embeddings toward the brighter central partials.",
+    "Neither a solo exposure nor a stationary independent pan position for exactly two instruments has been established.",
+    "Stereo chorus, detuning, all-pass effects, reverberation, layered patches and different instruments can all explain frequency-dependent stereo shape.",
+    "The two proposed reference observations are contrasts, not two verified complete timbres. Keep an unassigned residual layer."
+  ],
+  "noNewModelInference": true,
+  "noAudioDeviceUsed": true,
+  "noSourceAudioModified": true
+}

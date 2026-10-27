@@ -9,7 +9,7 @@ public interface IAuditionVoice : IAsyncDisposable
     bool IsNote { get; }
     void Play();
     void Pause();
-    void Seek(double frame);
+    long Seek(double frame);
 }
 
 /// <summary>
@@ -23,12 +23,14 @@ public sealed class AuditionSession : IAsyncDisposable
     private readonly TaskCompletionSource disposeCompletion = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private IAuditionVoice? current;
     private long revision;
+    private long initialSeekRevision;
     private int disposed;
 
     public AuditionSession() : this(static (clip, note) => new PlaybackVoice(clip, note)) { }
     internal AuditionSession(Func<PcmClip, bool, IAuditionVoice> factory) => this.factory = factory ?? throw new ArgumentNullException(nameof(factory));
 
     public IAuditionVoice? Current => Volatile.Read(ref current);
+    public long InitialSeekRevision => Interlocked.Read(ref initialSeekRevision);
 
     public async Task SetAsync(PcmClip clip, bool note, double position = 0, bool play = true,
         CancellationToken cancellationToken = default)
@@ -50,10 +52,11 @@ public sealed class AuditionSession : IAsyncDisposable
             IAuditionVoice? candidate = factory(clip, note);
             try
             {
-                if (position > 0) candidate.Seek(Math.Min(position, clip.FrameCount));
+                long seek = position > 0 ? candidate.Seek(Math.Min(position, clip.FrameCount)) : 0;
                 cancellationToken.ThrowIfCancellationRequested();
                 if (Volatile.Read(ref disposed) != 0 || request != Volatile.Read(ref revision)) return;
                 if (play) candidate.Play();
+                Interlocked.Exchange(ref initialSeekRevision, seek);
                 Volatile.Write(ref current, candidate);
                 candidate = null;
             }
@@ -107,7 +110,12 @@ public sealed class AuditionSession : IAsyncDisposable
         public bool IsNote { get; }
         public void Play() => Command(engine.Play);
         public void Pause() => Command(engine.Pause);
-        public void Seek(double frame) => Command(() => engine.Seek(frame));
+        public long Seek(double frame)
+        {
+            if (Volatile.Read(ref disposed) != 0) return 0;
+            try { return engine.Seek(frame); }
+            catch (ObjectDisposedException) when (Volatile.Read(ref disposed) != 0) { return 0; }
+        }
         public ValueTask DisposeAsync()
         {
             Interlocked.Exchange(ref disposed, 1);

@@ -49,7 +49,11 @@ export interface ReferenceEditingPort {
   sessions(): ReferenceSession[];
   locations(draftId: string): ReferenceLocations;
   /** Omitted selection means the current occurrence only. Only multiple logical uses require a new identity. */
-  apply(draftId: string, options?: { locationIds?: string[]; expectedToken?: string }): ReferenceApplyResult;
+  apply(draftId: string, options?: {
+    locationIds?: string[]; expectedToken?: string;
+    /** Explicit whole-entity editing may retain identity only when every logical use in its song is selected. */
+    reuseIfAllSelected?: boolean;
+  }): ReferenceApplyResult;
   cancel(draftId: string): ReferenceOperationResult;
 }
 

@@ -65,6 +65,7 @@ export function mountSamplingWorkspace(root: HTMLElement, options: {
   const tools = node('nav', 'toolbar-tools');
   if (options.onLibrary) tools.append(button('素材', 'quiet', () => leave(options.onLibrary!)));
   if (options.onSettings) tools.append(button('设置', 'quiet', () => leave(options.onSettings!)));
+  const saveButton = button('保存采样', 'primary', save); tools.append(saveButton);
   toolbar.append(tools); page.append(toolbar);
 
   const main = node('main', 'sampling-workspace');
@@ -113,9 +114,8 @@ export function mountSamplingWorkspace(root: HTMLElement, options: {
   const envelope = document.createElementNS('http://www.w3.org/2000/svg', 'path'); envelope.classList.add('sampling-waveform-shape'); waveform.append(center, envelope); audio.append(waveform);
   const audioFooter = node('div', 'sampling-audio-footer');
   const metadata = node('p', 'sampling-metadata');
-  const saveButton = button('保存采样', 'primary', save);
   const useAsSound = button('用这段声音制作音色', 'secondary', () => { void createTimbre(); }); useAsSound.hidden = !options.onCreateSampleTimbre;
-  audioFooter.append(metadata, useAsSound, saveButton); audio.append(audioFooter); main.append(audio);
+  audioFooter.append(metadata, useAsSound); audio.append(audioFooter); main.append(audio);
 
   const melody = node('section', 'sampling-melody'); melody.setAttribute('aria-label', '从哼唱整理旋律'); melody.hidden = true;
   const melodyHeading = node('div', 'sampling-melody-heading');

@@ -1,0 +1,19 @@
+{
+  "name": "Vulcanus-Noise-Rhythm",
+  "rate": 48000,
+  "channels": 2,
+  "frames": 5760,
+  "hash": "9D835BA0229D7CE1CB98BB6073B64A2B2722012F6B4EF06F14BABFA09393865D",
+  "settings": {
+    "RootMidi": 60,
+    "AttackSeconds": 0.001,
+    "DecaySeconds": 0,
+    "Sustain": 1,
+    "ReleaseSeconds": 0.015,
+    "LoopEnabled": false,
+    "LoopStart": 0,
+    "LoopEnd": 0,
+    "LoopCrossfadeSeconds": 0.015,
+    "GainDb": 0
+  }
+}

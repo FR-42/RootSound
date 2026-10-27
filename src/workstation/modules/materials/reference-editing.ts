@@ -319,7 +319,23 @@ export function createReferenceEditing(library: MaterialLibrary, adapters: Refer
         }
         const outgoing = !parentMeta && pendingReuses.length ? { ...draft, ...adapter(draft).replace(draft,
           adapter(draft).slots(draft).map(slot => ({ slotId: slot.id, targetId: materialize(library.readContent(slot.targetId)!).id }))) } : draft;
-        const mayReuse = !parentMeta && (uses.get(meta.target.id) ?? 0) <= 1;
+        // Whole-entity editing from the shelf is explicit. It may retain the
+        // shared identity only when every audible position is selected and
+        // belongs to the same private song. Saved/editor views of one position
+        // collapse to the same canonical key, just as countUsagePositions does.
+        const songScope = parent?.kind === 'rootsound.song' ? library.projectScopeOf?.({ type: 'draft', id: parent.id }) : undefined;
+        const canonicalSelected = new Set(selected.map(candidate => {
+          const root = candidate.location.root;
+          const sourceId = root.type === 'draft' ? library.readDraft(root.id)?.sourceId : undefined;
+          return JSON.stringify([sourceId ? `content:${sourceId}` : rootKey(root), candidate.location.path]);
+        }));
+        const allPrivateUsesSelected = options.reuseIfAllSelected === true && !!songScope
+          && library.projectScopeOf?.({ type: 'content', id: meta.target.id }) === songScope
+          && selected.length > 0 && selected.every(candidate => library.projectScopeOf?.(candidate.location.root) === songScope)
+          && library.listDrafts().every(item => item.id === draft.id || item.sourceId !== meta.target.id
+            || !item.editingContext && editableSame(item, meta.target))
+          && canonicalSelected.size === (uses.get(meta.target.id) ?? 0);
+        const mayReuse = !parentMeta && ((uses.get(meta.target.id) ?? 0) <= 1 || allPrivateUsesSelected);
         const leaf: ContentRecord = meta.context && unchanged ? clone(meta.target)
           : { ...fields(outgoing), id: mayReuse ? meta.target.id : crypto.randomUUID(), revision: mayReuse ? meta.target.revision + 1 : 1 };
         adapter(leaf).slots(leaf);

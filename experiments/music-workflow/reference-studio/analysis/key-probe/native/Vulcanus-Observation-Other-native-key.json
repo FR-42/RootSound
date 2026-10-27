@@ -1,0 +1,19 @@
+{
+  "name": "Vulcanus-Observation-Other",
+  "rate": 48000,
+  "channels": 2,
+  "frames": 434717,
+  "hash": "7C8C360D1BECA10295EDC1D9446542B2F0934E54013953A7C791F3BD2F1AF313",
+  "settings": {
+    "RootMidi": 60,
+    "AttackSeconds": 0,
+    "DecaySeconds": 0,
+    "Sustain": 1,
+    "ReleaseSeconds": 0.005,
+    "LoopEnabled": false,
+    "LoopStart": 0,
+    "LoopEnd": 0,
+    "LoopCrossfadeSeconds": 0.015,
+    "GainDb": 0
+  }
+}

@@ -1,22 +1,40 @@
 import type { ContentRecord, Draft, SaveConfirmation, SaveResult } from './content.ts';
 import type { PlayableNotePlan, SoundPlan, SoundSequencePlan } from './sound.ts';
 
+/** The interactive step grid subdivides each beat into four cells. Stored timing remains continuous. */
+export const PHRASE_STEPS_PER_BEAT = 4;
+
 /** Musical positions use beats; tempo translates those beats to execution seconds. */
 export type PhraseNote = {
   id: string;
   startBeat: number;
   durationBeats: number;
+  /** Explicit held duration independent of BPM; omitted older notes use durationBeats. */
+  durationSeconds?: number;
   /** Explicit physical pitch; the editor's keyboard does not limit stored precision. */
   frequencyHz: number;
   velocity: number;
+  /** Per-note output gain; omitted older notes use unity gain. */
+  level?: number;
+  /** Per-note stereo position; omitted older notes are centered. */
+  pan?: number;
 };
-export type PhrasePart = { id: string; name: string; timbreId: string; notes: PhraseNote[] };
+export type PhraseSection = 'melody' | 'rhythm';
+/** Older unmarked parts belong to Melody; both sections share one phrase clock. */
+export type PhrasePart = {
+  id: string; name: string; timbreId: string; section?: PhraseSection;
+  /** Unassigned tone uses keep notes and origin identity for rebinding but remain silent. */
+  unassigned?: boolean;
+  notes: PhraseNote[];
+};
 export type PhraseBody = {
   model: 'note-phrase';
   version: 1;
   timeUnit: 'beat';
   tempoBpm: number;
   lengthBeats: number;
+  /** Phrase output gain; omitted older content uses unity gain. */
+  masterLevel?: number;
   parts: PhrasePart[];
 };
 export type KeyboardPitch = { label: string; frequencyHz: number; accidental: boolean };
@@ -49,16 +67,25 @@ export interface PhraseEditorPort {
   open(contentId: string): void;
   openDraft(draftId: string): void;
   rename(name: string): void;
-  setTempo(tempoBpm: number): void;
+  setTempo(tempoBpm: number, options?: { preserveNoteDurations?: boolean }): void;
+  setMasterLevel(level: number): void;
   setLength(lengthBeats: number): void;
-  addPart(timbreId: string): string;
+  addPart(timbreId: string, section?: PhraseSection): string;
   setPartTimbre(partId: string, timbreId: string): void;
+  /** Unselecting a tone preserves its notes as silent, undefined tone uses. */
+  setPartVisible(partId: string, visible: boolean): void;
+  /** Related duplicate uses toggle together in one undo step. */
+  setPartsVisible(partIds: string[], visible: boolean): void;
   removePart(partId: string): void;
+  /** Removes the selected uses and their notes together, retaining the sound assets. */
+  removeParts(partIds: string[]): void;
   addNote(partId: string, input: Omit<PhraseNote, 'id'>): string;
   /** Each bulk operation validates and persists once, with one undo step. */
   addNotes(partId: string, inputs: Array<Omit<PhraseNote, 'id'>>): string[];
   updateNote(partId: string, noteId: string, changes: Partial<Omit<PhraseNote, 'id'>>): void;
   updateNotes(updates: PhraseNoteUpdate[]): void;
+  /** Transfer a note to another tone within its section, preserving its identity. */
+  moveNote(partId: string, noteId: string, targetPartId: string, changes?: Partial<Omit<PhraseNote, 'id'>>): void;
   removeNote(partId: string, noteId: string): void;
   removeNotes(notes: PhraseNoteRef[]): void;
   undo(): void;
@@ -68,6 +95,8 @@ export interface PhraseEditorPort {
   preparePreview(): Promise<void>;
   /** Audition one selected voice without changing or requiring any stored notes. */
   previewNotePlan(partId: string, note: SoundPlan['note']): Promise<PlayableNotePlan>;
+  /** Audition an available current-project tone without adding a part or musical history. */
+  previewTimbrePlan(timbreId: string, note: SoundPlan['note']): Promise<PlayableNotePlan>;
   /** A temporary body supports live gestures without changing the draft/history. */
   previewPlan(bodyOverride?: PhraseBody, options?: { allowSilence?: boolean }): SoundSequencePlan;
   save(mode: 'overwrite' | 'new', confirmation?: SaveConfirmation): SaveResult;

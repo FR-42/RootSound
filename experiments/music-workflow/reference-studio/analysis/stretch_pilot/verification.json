@@ -1,0 +1,47 @@
+{
+  "unity_bit_exact": true,
+  "slowdown": {
+    "input_frames": 96000,
+    "output_frames": 160000,
+    "sample_rate": 48000,
+    "channels": 2,
+    "speed": 0.6,
+    "pitch_semitones": 0,
+    "input_latency": 2880,
+    "output_latency": 2880,
+    "peak": 0.454580724239,
+    "unity_bypass": false
+  },
+  "measured_hz": 440.00244140625,
+  "stereo_proportion_max_error": 0.00047519756481051445,
+  "stereo_proportion_rms_error": 8.286004231194966e-06,
+  "stereo_correlation": 0.9999999969417425,
+  "first_20ms_rms": 0.12243044376373291,
+  "last_20ms_rms": 0.16553696990013123,
+  "short_clip": {
+    "input_frames": 2400,
+    "output_frames": 4000,
+    "sample_rate": 48000,
+    "channels": 2,
+    "speed": 0.6,
+    "pitch_semitones": 0,
+    "input_latency": 2880,
+    "output_latency": 2880,
+    "peak": 0.427265256643,
+    "unity_bypass": false
+  },
+  "octave_up": {
+    "input_frames": 96000,
+    "output_frames": 96000,
+    "sample_rate": 48000,
+    "channels": 2,
+    "speed": 1,
+    "pitch_semitones": 12,
+    "input_latency": 2880,
+    "output_latency": 2880,
+    "peak": 0.310548603535,
+    "unity_bypass": false
+  },
+  "octave_up_measured_hz": 880.5084228515625,
+  "limitation": "Synthetic integrity only; no subjective listening or music-quality acceptance."
+}

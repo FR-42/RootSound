@@ -37,6 +37,7 @@ public sealed class NativeSoundFiles
         };
         if (dialog.ShowDialog(owner) != DialogResult.OK) return JsonSerializer.Serialize(new { status = "cancelled" });
         var target = Path.GetFullPath(dialog.FileName);
+        ProjectFileProtection.RequireExportTarget(target);
         if (!string.Equals(Path.GetExtension(target), ".rssound", StringComparison.OrdinalIgnoreCase))
             throw new IOException("请使用 .rssound 后缀保存声音文件。");
         var temporary = target + "." + Guid.NewGuid().ToString("N") + ".tmp";

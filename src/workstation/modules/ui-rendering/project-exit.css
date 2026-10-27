@@ -1,0 +1,11 @@
+.project-exit-dialog { width: min(390px, calc(100vw - 40px)); border: 1px solid #b7c2cc; border-radius: 7px; padding: 22px; background: #fff; color: #263544; box-shadow: 0 16px 64px #23314035; }
+.project-exit-dialog::backdrop { background: #26354465; }
+.project-exit-dialog h2 { font-size: 17px; margin: 0 0 12px; }
+.project-exit-dialog p { color: #65717e; margin: 0 0 20px; font-size: 13px; }
+.project-exit-dialog .project-exit-error { color: #a63742; }
+.project-exit-actions { display: flex; gap: 8px; justify-content: flex-end; }
+.project-exit-actions button { padding: 8px 12px; font: inherit; font-size: 12px; border: 1px solid #bdc8d2; border-radius: 4px; background: #f1f4f6; color: #32495b; }
+.project-exit-actions .project-exit-discard { color: #a63742; }
+.project-exit-actions .project-exit-save { background: #426d91; color: #fff; border-color: #426d91; }
+.project-exit-actions button:hover { filter: brightness(.96); }
+.project-exit-actions button:disabled { opacity: .5; cursor: wait; }

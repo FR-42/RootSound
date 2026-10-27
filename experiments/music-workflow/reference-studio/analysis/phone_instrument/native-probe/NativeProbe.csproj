@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net9.0-windows10.0.19041.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <PlatformTarget>x64</PlatformTarget>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../../../../timbre-lab/Core/Models.cs" Link="Shared/Models.cs" />
+    <Compile Include="../../../../timbre-lab/Instrument/AtomicFile.cs" Link="Shared/AtomicFile.cs" />
+    <Compile Include="../../../../timbre-lab/Instrument/InstrumentRenderer.cs" Link="Shared/InstrumentRenderer.cs" />
+    <Compile Include="../../../../timbre-lab/Instrument/InstrumentValidation.cs" Link="Shared/InstrumentValidation.cs" />
+    <Compile Include="../../../../timbre-lab/Instrument/LoopFinder.cs" Link="Shared/LoopFinder.cs" />
+    <Compile Include="../../../../timbre-lab/Instrument/PcmWaveExporter.cs" Link="Shared/PcmWaveExporter.cs" />
+    <Compile Include="../../../../timbre-lab/Instrument/TimbreArchive.cs" Link="Shared/TimbreArchive.cs" />
+    <Compile Include="../../../../phrase-studio/Core/PhraseModels.cs" Link="Shared/PhraseModels.cs" />
+    <Compile Include="../../../../phrase-studio/Persistence/PhraseArchive.cs" Link="Shared/PhraseArchive.cs" />
+    <Compile Include="../../../../phrase-studio/Persistence/DocumentFormat.cs" Link="Shared/DocumentFormat.cs" />
+    <Compile Include="../../../../phrase-studio/Audio/PhraseMixSource.cs" Link="Shared/PhraseMixSource.cs" />
+    <Compile Include="../../../../phrase-studio/Audio/InstrumentVoice.cs" Link="Shared/InstrumentVoice.cs" />
+    <Compile Include="../../../../sample-editor/Core/IAudioFrameSource.cs" Link="Shared/IAudioFrameSource.cs" />
+  </ItemGroup>
+</Project>

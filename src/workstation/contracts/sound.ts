@@ -65,6 +65,8 @@ export interface SoundSequencePlan {
   readonly version: 1;
   /** Musical extent; the runtime preserves this silence and any note release tails. */
   readonly durationSeconds: number;
+  /** Playback-head position and speed only. Individual sounds keep their own clock. */
+  readonly transport?: { readonly positionSeconds: number; readonly rate: number };
   /** Final-mix processing. Fades include the final note's release tail. */
   readonly output?: OutputProcessingPlan;
   readonly events: readonly {
@@ -93,7 +95,7 @@ export interface AudioRenderOptions {
   readonly onProgress?: (progress: number) => void;
 }
 
-export type PlaybackStatus = 'playing' | 'ended' | 'stopped' | 'failed';
+export type PlaybackStatus = 'playing' | 'paused' | 'ended' | 'stopped' | 'failed';
 
 /** An immutable state snapshot; subscribe for subsequent snapshots. */
 export interface PlaybackSession {
@@ -129,9 +131,13 @@ export interface SoundRuntimePort {
    * An empty sequence silences the music while its timeline keeps advancing.
    */
   update(sessionId: string, plan: PlayableNotePlan | SoundSequencePlan): PlaybackSession | undefined;
+  /** Optional sequence transport: freeze source ages without suspending the shared device. */
+  pause?(sessionId: string): PlaybackSession | undefined;
+  /** Continue the paused sequence at its retained source ages, optionally applying edits. */
+  resume?(sessionId: string, plan?: SoundSequencePlan): Promise<PlaybackSession>;
   /** Renders on an offline clock; never records or opens the playback device. */
   render(plan: PlayableNotePlan | SoundSequencePlan, options?: AudioRenderOptions): Promise<RenderedAudio>;
-  /** Device-clock seconds since this session began, clamped to its duration. */
+  /** Active device seconds, excluding transport pauses; never song seconds or head speed. */
   position(sessionId: string): number | undefined;
   stop(sessionId: string): void;
   stopAll(): void;

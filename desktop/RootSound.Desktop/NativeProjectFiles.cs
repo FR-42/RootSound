@@ -87,6 +87,7 @@ public sealed class NativeProjectFiles
 
     internal static void WriteAtomic(string target, string text)
     {
+        ProjectFileProtection.RequireExportTarget(target);
         if (!string.Equals(Path.GetExtension(target), ".rsproject", StringComparison.OrdinalIgnoreCase))
             throw new IOException("请使用 .rsproject 后缀保存工程文件。");
         var bytes = Utf8.GetBytes(ValidateText(text));

@@ -17,6 +17,7 @@
     <Compile Include="../sample-editor/Audio/**/*.cs" Link="SharedAudio/%(RecursiveDir)%(Filename)%(Extension)" />
     <Compile Include="../sample-editor/Playback/**/*.cs" Link="SharedPlayback/%(RecursiveDir)%(Filename)%(Extension)" />
     <Compile Include="../sample-editor/Core/IAudioFrameSource.cs" Link="SharedAudio/IAudioFrameSource.cs" />
+    <Compile Include="../sample-editor/Core/Timeline.cs" Link="SharedAudio/Timeline.cs" />
     <InternalsVisibleTo Include="RootSound.TimbreLab.Tests" />
   </ItemGroup>
 </Project>

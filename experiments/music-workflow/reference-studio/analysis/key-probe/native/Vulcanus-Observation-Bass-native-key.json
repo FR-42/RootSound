@@ -1,0 +1,19 @@
+{
+  "name": "Vulcanus-Observation-Bass",
+  "rate": 48000,
+  "channels": 2,
+  "frames": 434717,
+  "hash": "B7AC6973541867EEFD709E0BA63AB4A8D8BC10E3EFB21015EEB755E67A92A7CD",
+  "settings": {
+    "RootMidi": 60,
+    "AttackSeconds": 0,
+    "DecaySeconds": 0,
+    "Sustain": 1,
+    "ReleaseSeconds": 0.005,
+    "LoopEnabled": false,
+    "LoopStart": 0,
+    "LoopEnd": 0,
+    "LoopCrossfadeSeconds": 0.015,
+    "GainDb": 0
+  }
+}

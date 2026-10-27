@@ -41,6 +41,29 @@ function collectJournals(state: State): void {
   state.transactionHistory.entries = state.transactionHistory.entries.filter(entry => used.has(entry.id));
 }
 
+/** Histories are recovery custody. Explicit permanent deletion must forget it too. */
+function forgetDeletedIdentities(state: State, ids: Set<string>): void {
+  function mentions(value: unknown): boolean {
+    if (typeof value === 'string') return ids.has(value);
+    if (!value || typeof value !== 'object') return false;
+    return (Array.isArray(value) ? value : Object.values(value)).some(mentions);
+  }
+  const journals = new Set((state.transactionHistory?.entries ?? []).filter(mentions).map(journal => journal.id));
+  if (state.editHistory) state.editHistory.entries = state.editHistory.entries.filter(entry =>
+    !ids.has(entry.draftId) && !mentions(entry)
+    && ![...entry.past, ...entry.future].some(step => step.transactionId && journals.has(step.transactionId)));
+  if (state.transactionHistory) state.transactionHistory.entries = state.transactionHistory.entries.filter(entry => !journals.has(entry.id));
+  if (state.projectScopes) {
+    const scopes = state.projectScopes;
+    scopes.contents = scopes.contents.filter(item => !ids.has(item.id));
+    scopes.roots = scopes.roots.filter(item => !ids.has(item.id));
+    if (scopes.members) scopes.members = scopes.members.filter(item => !ids.has(item.id));
+    if (scopes.imports) scopes.imports = scopes.imports.filter(item => !ids.has(item.sourceId) && !ids.has(item.localId)
+      && ![...ids].some(id => item.graphToken.includes(JSON.stringify(id))));
+  }
+  collectJournals(state);
+}
+
 function fail(message: string): never { throw new Error(`素材库：${message}`); }
 function clone<T>(value: T): T { return JSON.parse(JSON.stringify(value)) as T; }
 function isObject(value: unknown): value is Record<string, unknown> {
@@ -219,14 +242,15 @@ export function createMaterialLibrary(storage?: MaterialStorage, options?: { pro
     ? { format: 'RootSoundMaterialLibrary', version: 1, contents: [], drafts: [] }
     : restore(raw);
   let token = crypto.randomUUID();
-  function commit(next: State): void {
+  function commit(next: State, permanent = false): void {
     collectJournals(next);
     const nextRaw = JSON.stringify(next);
     try {
       // Another store client may have committed since this instance was opened.
       // Never let an old undo stack replace newer disk content.
       if (storage && storage.read() !== raw) fail('素材库已被其他窗口修改，请重新打开后继续。原数据未被覆盖。');
-      storage?.write(nextRaw);
+      if (permanent && storage?.writePermanent) storage.writePermanent(nextRaw);
+      else storage?.write(nextRaw);
     } catch (error) { fail(`写入失败：${String(error)}`); }
     state = next;
     raw = nextRaw;
@@ -253,6 +277,8 @@ export function createMaterialLibrary(storage?: MaterialStorage, options?: { pro
     const changedDrafts = new Set<string>();
     try {
       if (typeof transaction.label !== 'string' || !transaction.label.trim()) fail('请说明这次联合编辑的用途。');
+      if (transaction.permanentDelete !== undefined && (transaction.permanentDelete !== true || transaction.anchorDraftId
+        || !transaction.deleteContents?.length)) fail('永久删除需要实际删除素材，且不能同时创建撤销记录。');
       function apply<T extends ContentRecord | Draft>(
         records: T[], creates: T[] | undefined, replacements: { expected: T; replacement: T }[] | undefined,
         deletes: T[] | undefined, patches: RecordPatch<T>[], saved: boolean,
@@ -289,12 +315,21 @@ export function createMaterialLibrary(storage?: MaterialStorage, options?: { pro
       }
       apply(next.contents, transaction.createContents, transaction.replaceContents, transaction.deleteContents, contents, true);
       apply(next.drafts, transaction.createDrafts, transaction.replaceDrafts, transaction.deleteDrafts, drafts, false);
+      if (transaction.permanentDelete) forgetDeletedIdentities(next,
+        new Set([...transaction.deleteContents!, ...(transaction.deleteDrafts ?? [])].map(item => item.id)));
       for (const membership of transaction.projectMembers ?? []) {
-        const root = next.contents.find(item => item.id === membership.rootId);
-        if (!root || options?.project && root.kind !== options.project.rootKind || !Array.isArray(membership.contentIds)) fail('工程素材成员缺少有效的歌曲根。');
+        const savedRoot = next.contents.find(item => item.id === membership.rootId);
+        const root = savedRoot ?? next.drafts.find(item => item.id === membership.rootId);
+        const rootType = savedRoot ? 'content' : 'draft';
+        if (!root || options?.project && root.kind !== options.project.rootKind
+          || !savedRoot && root.kind !== (options?.project?.rootKind ?? 'rootsound.song')
+          || !Array.isArray(membership.contentIds)) fail('工程素材成员缺少有效的歌曲根。');
         next.projectScopes ??= { version: 1, roots: [], contents: [] };
-        const scopeId = next.projectScopes.roots.find(item => item.type === 'content' && item.id === root.id)?.scopeId ?? root.id;
-        if (!next.projectScopes.roots.some(item => item.type === 'content' && item.id === root.id)) next.projectScopes.roots.push({ type: 'content', id: root.id, scopeId });
+        const scopeId = next.projectScopes.roots.find(item => item.type === rootType && item.id === root.id)?.scopeId
+          ?? (!savedRoot && 'sourceId' in root && root.sourceId
+            ? next.projectScopes.roots.find(item => item.type === 'content' && item.id === root.sourceId)?.scopeId : undefined)
+          ?? root.id;
+        if (!next.projectScopes.roots.some(item => item.type === rootType && item.id === root.id)) next.projectScopes.roots.push({ type: rootType, id: root.id, scopeId });
         next.projectScopes.members ??= [];
         const pending = [...membership.contentIds]; const seen = new Set<string>();
         while (pending.length) {
@@ -369,7 +404,7 @@ export function createMaterialLibrary(storage?: MaterialStorage, options?: { pro
       }
       checkCandidate(next, changedDrafts);
     } catch (error) { return { status: 'conflict', reason: String(error) }; }
-    try { commit(next); } catch (error) { return { status: 'storage-error', message: String(error) }; }
+    try { commit(next, transaction.permanentDelete); } catch (error) { return { status: 'storage-error', message: String(error) }; }
     return { status: 'committed', transactionId };
   }
   function createDraft(input: NewContent | { sourceId: string }): Draft {

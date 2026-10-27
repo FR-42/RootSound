@@ -1,0 +1,19 @@
+{
+  "name": "Vulcanus-Spectral-Lead",
+  "rate": 48000,
+  "channels": 2,
+  "frames": 129600,
+  "hash": "5235F600344617EE0B0CEBE1FEA9B216410A6DB2DC2B2C3956C71A44C01DFB39",
+  "settings": {
+    "RootMidi": 70,
+    "AttackSeconds": 0.004,
+    "DecaySeconds": 0.11,
+    "Sustain": 0.7,
+    "ReleaseSeconds": 0.065,
+    "LoopEnabled": false,
+    "LoopStart": 0,
+    "LoopEnd": 0,
+    "LoopCrossfadeSeconds": 0.015,
+    "GainDb": 0
+  }
+}

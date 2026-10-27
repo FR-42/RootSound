@@ -16,16 +16,28 @@ public sealed class AtomicTextStore : IDisposable
 
     public string FilePath { get; }
 
-    public AtomicTextStore(string directory)
+    public AtomicTextStore(string directory) : this(directory, "materials.json", null) { }
+
+    /// <summary>A song file owns its canonical path through a lock outside the project library.</summary>
+    internal static AtomicTextStore ForProjectFile(string path)
+    {
+        path = Path.GetFullPath(path);
+        string locks = Path.Combine(Path.GetTempPath(), "RootSound", "ProjectLocks");
+        Directory.CreateDirectory(locks);
+        string key = Convert.ToHexString(SHA256.HashData(Utf8.GetBytes(path.ToUpperInvariant())));
+        return new AtomicTextStore(Path.GetDirectoryName(path)!, Path.GetFileName(path), Path.Combine(locks, key + ".lock"));
+    }
+
+    private AtomicTextStore(string directory, string fileName, string? lockPath)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(directory);
         this.directory = Path.GetFullPath(directory);
-        FilePath = Path.Combine(this.directory, "materials.json");
+        FilePath = Path.Combine(this.directory, fileName);
         Directory.CreateDirectory(this.directory);
         try
         {
             // Keep the handle open. The mere presence of a lock file is not a lock.
-            ownership = new FileStream(Path.Combine(this.directory, "materials.lock"),
+            ownership = new FileStream(lockPath ?? Path.Combine(this.directory, "materials.lock"),
                 FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
         }
         catch (IOException error)
@@ -44,7 +56,9 @@ public sealed class AtomicTextStore : IDisposable
         }
     }
 
-    public string? Read()
+    public string? Read() => ReadValidated(null);
+
+    internal string? ReadValidated(Action<string?>? validate)
     {
         lock (gate)
         {
@@ -52,8 +66,31 @@ public sealed class AtomicTextStore : IDisposable
             byte[]? bytes = ReadBytes();
             // Decode first: an unreadable file must not become an accepted new baseline.
             string? text = bytes is null ? null : Decode(bytes);
+            validate?.Invoke(text);
             observedHash = Fingerprint(bytes);
             return text;
+        }
+    }
+
+    public void Checkpoint()
+    {
+        lock (gate)
+        {
+            ThrowIfDisposed();
+            RequireUnchanged();
+            var bytes = ReadBytes() ?? throw new IOException("当前项目资料已被移走，本次没有重建它。");
+            Write(Decode(bytes));
+        }
+    }
+
+    /// <summary>Check ownership of the observed bytes without adopting an external revision.</summary>
+    internal void VerifyUnchanged()
+    {
+        lock (gate)
+        {
+            ThrowIfDisposed();
+            RequireUnchanged();
+            if (ReadBytes() is null) throw new IOException("当前项目资料已被移走，本次没有重建它。");
         }
     }
 
@@ -67,7 +104,7 @@ public sealed class AtomicTextStore : IDisposable
         {
             ThrowIfDisposed();
             RequireUnchanged();
-            string temporary = Path.Combine(directory, $".materials.{Guid.NewGuid():N}.tmp");
+            string temporary = Path.Combine(directory, $".rootsound-write-{Guid.NewGuid():N}.tmp");
             try
             {
                 using (var stream = new FileStream(temporary, FileMode.CreateNew,

@@ -6,10 +6,12 @@ import type { PostProductionPort, PostProductionSettings } from '../../contracts
 import type { ReferenceAdapter } from '../../contracts/references.ts';
 
 export type { SongBody, SongClip, SongEditorPort, SongPlaybackPort, SongTempoMode, SongTrack, SongView } from '../../contracts/song.ts';
+export { songGridTempoAt, songGridSegments } from './grid.ts';
+export type { SongGrid, SongGridSegment } from './grid.ts';
 
 const KIND = 'rootsound.song';
 const OWNER = 'song';
-const MAX_TRACKS = 16;
+const MAX_TRACKS = 128;
 const MAX_CLIPS = 512;
 const MAX_LENGTH = 1024;
 const MAX_EVENTS = 2048;
@@ -32,6 +34,10 @@ function finite(value: unknown, label: string, min: number, max: number): number
 }
 function boolean(value: unknown, label: string): boolean {
   if (typeof value !== 'boolean') throw new Error(`${label}必须明确开启或关闭。`);
+  return value;
+}
+function color(value: unknown): string {
+  if (typeof value !== 'string' || !/^#[0-9a-fA-F]{6}$/.test(value)) throw new Error('行颜色需要是六位十六进制颜色。');
   return value;
 }
 function mode(value: unknown): SongTempoMode {
@@ -76,12 +82,35 @@ export function createSongReferenceAdapter(): ReferenceAdapter {
 /** Unknown formats are preserved rather than reinterpreted as this first timeline model. */
 export function readSongBody(value: unknown): SongBody {
   const body = object(value, '歌曲');
-  fields(body, ['model', 'version', 'timeUnit', 'tempoBpm', 'tempoMode', 'lengthBeats', 'tracks', 'postProduction'], '歌曲');
+  fields(body, ['model', 'version', 'timeUnit', 'tempoBpm', 'tempoMode', 'gridTempoBpm', 'gridTempoChanges', 'gridOffsetSeconds', 'masterLevel', 'hiddenPhraseIds', 'phraseShelfOrder', 'lengthBeats', 'tracks', 'postProduction'], '歌曲');
   if (body.model !== 'phrase-arrangement' || body.version !== 1 || body.timeUnit !== 'beat') throw new Error('暂不支持这份歌曲的格式或版本。原内容已保留。');
   const tempoBpm = finite(body.tempoBpm, '歌曲速度', 40, 240);
   const tempoMode = mode(body.tempoMode);
   const lengthBeats = finite(body.lengthBeats, '歌曲长度', 16, MAX_LENGTH);
-  if (!Array.isArray(body.tracks) || body.tracks.length < 1 || body.tracks.length > MAX_TRACKS) throw new Error(`当前歌曲需要 1 至 ${MAX_TRACKS} 条声音轨道。`);
+  const hiddenPhraseIds = body.hiddenPhraseIds === undefined ? undefined : (() => {
+    if (!Array.isArray(body.hiddenPhraseIds)) throw new Error('乐句栏显示设置需要是标识列表。');
+    const ids = body.hiddenPhraseIds.map(id => text(id, '乐句栏来源标识'));
+    if (new Set(ids).size !== ids.length) throw new Error('乐句栏显示设置包含重复标识。');
+    return ids;
+  })();
+  const phraseShelfOrder = body.phraseShelfOrder === undefined ? undefined : (() => {
+    if (!Array.isArray(body.phraseShelfOrder)) throw new Error('乐句栏顺序需要是标识列表。');
+    const order = body.phraseShelfOrder.map(id => text(id, '乐句栏顺序标识'));
+    if (new Set(order).size !== order.length) throw new Error('乐句栏顺序包含重复标识。');
+    return order;
+  })();
+  if (!Array.isArray(body.tracks) || body.tracks.length > MAX_TRACKS) throw new Error(`当前歌曲最多支持 ${MAX_TRACKS} 行。`);
+  const gridTempoChanges = body.gridTempoChanges === undefined ? undefined : (() => {
+    if (!Array.isArray(body.gridTempoChanges) || body.gridTempoChanges.length > 2048) throw new Error('背景速度分段格式无效或过多。');
+    let previous = 0;
+    return body.gridTempoChanges.map(raw => {
+      const change = object(raw, '背景速度分段'); fields(change, ['atSeconds', 'tempoBpm'], '背景速度分段');
+      const atSeconds = finite(change.atSeconds, '背景速度分段位置', 0, 1e6);
+      if (atSeconds <= previous) throw new Error('背景速度分段需要按时间排列且不能重叠。');
+      previous = atSeconds;
+      return { atSeconds, tempoBpm: finite(change.tempoBpm, '背景网格速度', 40, 240) };
+    });
+  })();
   const ids = new Set<string>();
   let count = 0;
   function unique(value: unknown): string {
@@ -90,18 +119,38 @@ export function readSongBody(value: unknown): SongBody {
     ids.add(id); return id;
   }
   const tracks = body.tracks.map(raw => {
-    const track = object(raw, '轨道'); fields(track, ['id', 'name', 'level', 'pan', 'muted', 'solo', 'clips'], '轨道');
+    const track = object(raw, '轨道'); fields(track, ['id', 'name', 'level', 'pan', 'muted', 'solo', 'clips', 'color', 'panOffset'], '轨道');
     const id = unique(track.id);
     if (!Array.isArray(track.clips) || (count += track.clips.length) > MAX_CLIPS) throw new Error(`当前歌曲最多放置 ${MAX_CLIPS} 个乐句片段。`);
     const clips = track.clips.map(rawClip => {
-      const clip = object(rawClip, '乐句片段'); fields(clip, ['id', 'phraseId', 'startBeat'], '乐句片段');
-      return { id: unique(clip.id), phraseId: text(clip.phraseId, '引用乐句'), startBeat: finite(clip.startBeat, '片段开始位置', 0, MAX_LENGTH) };
+      const clip = object(rawClip, '乐句片段'); fields(clip, ['id', 'phraseId', 'startBeat', 'level', 'pan'], '乐句片段');
+      return { id: unique(clip.id), phraseId: text(clip.phraseId, '引用乐句'), startBeat: finite(clip.startBeat, '片段开始位置', 0, MAX_LENGTH),
+        ...(clip.level === undefined ? {} : { level: finite(clip.level, '片段音量', 0, 1) }),
+        ...(clip.pan === undefined ? {} : { pan: finite(clip.pan, '片段左右位置', -1, 1) }) };
     });
     return { id, name: text(track.name, '轨道名称'), level: finite(track.level, '轨道音量', 0, 1),
-      pan: finite(track.pan, '左右位置', -1, 1), muted: boolean(track.muted, '静音'), solo: boolean(track.solo, '单独播放'), clips };
+      pan: finite(track.pan, '左右位置', -1, 1), muted: boolean(track.muted, '静音'), solo: boolean(track.solo, '单独播放'), clips,
+      ...(track.color === undefined ? {} : { color: color(track.color) }),
+      ...(track.panOffset === undefined ? {} : { panOffset: finite(track.panOffset, '行声像偏移', -1, 1) }) };
   });
   return { model: 'phrase-arrangement', version: 1, timeUnit: 'beat', tempoBpm, tempoMode, lengthBeats, tracks,
+    ...(body.gridTempoBpm === undefined ? {} : { gridTempoBpm: finite(body.gridTempoBpm, '背景网格速度', 40, 240) }),
+    ...(gridTempoChanges === undefined ? {} : { gridTempoChanges }),
+    ...(body.gridOffsetSeconds === undefined ? {} : { gridOffsetSeconds: finite(body.gridOffsetSeconds, '背景网格偏移', -1e6, 1e6) }),
+    ...(body.masterLevel === undefined ? {} : { masterLevel: finite(body.masterLevel, '总音量', 0, 1) }),
+    ...(hiddenPhraseIds === undefined ? {} : { hiddenPhraseIds }),
+    ...(phraseShelfOrder === undefined ? {} : { phraseShelfOrder }),
     ...(body.postProduction === undefined ? {} : { postProduction: readPostProduction(body.postProduction) }) };
+}
+
+/** Persisted order precedes newly created sources, without changing the supplied identities. */
+export function orderSongPhraseShelf<T extends { id: string }>(items: readonly T[], body?: Pick<SongBody, 'phraseShelfOrder'>): T[] {
+  const byId = new Map(items.map(item => [item.id, item])); const result: T[] = [];
+  for (const id of body?.phraseShelfOrder ?? []) {
+    const item = byId.get(id); if (item) { result.push(item); byId.delete(id); }
+  }
+  for (const item of items) if (byId.delete(item.id)) result.push(item);
+  return result;
 }
 
 type Snapshot = { name: string; dependencies: string[]; body: SongBody };
@@ -128,22 +177,34 @@ function validateSong(record: Draft | ContentRecord, phrases: PhrasePlaybackPort
 }
 function compileSong(body: SongBody, phrases: PhrasePlaybackPort, allowSilence = false, postProduction?: PostProductionPort): SoundSequencePlan {
   const secondsPerBeat = 60 / body.tempoBpm;
-  const hasSolo = body.tracks.some(track => track.solo && !track.muted);
+  const hasSolo = body.tracks.some(track => track.solo);
   const events: Array<SoundSequencePlan['events'][number]> = [];
+  const phraseHasNotes = new Map<string, boolean>();
   let durationSeconds = extent(body, phrases) * secondsPerBeat;
   for (const track of body.tracks) {
     if (track.muted || track.level === 0 || hasSolo && !track.solo) continue;
     for (const clip of track.clips) {
+      if (clip.level === 0 || body.masterLevel === 0) continue;
+      let hasNotes = phraseHasNotes.get(clip.phraseId);
+      if (hasNotes === undefined) {
+        hasNotes = phrases.readSaved(clip.phraseId).body.parts.some(part => part.notes.length > 0);
+        phraseHasNotes.set(clip.phraseId, hasNotes);
+      }
+      // New shelf phrases are valid before their first note is written. Their
+      // placement still extends the song, but independent phrase audition's
+      // no-note guard must not prevent the rest of an arrangement from playing.
+      if (!hasNotes) continue;
       const plan = phrases.planForSaved(clip.phraseId, body.tempoMode === 'song' ? body.tempoBpm : undefined);
       const offset = clip.startBeat * secondsPerBeat;
       durationSeconds = Math.max(durationSeconds, offset + plan.durationSeconds);
       for (const event of plan.events) events.push({ atSeconds: offset + event.atSeconds,
-        sound: { ...event.sound, level: event.sound.level * track.level }, pan: track.pan });
+        sound: { ...event.sound, level: event.sound.level * track.level * (clip.level ?? 1) * (body.masterLevel ?? 1) },
+        pan: Math.max(-1, Math.min(1, (event.pan ?? 0) + (clip.pan ?? track.pan) + (track.panOffset ?? 0))) });
       if (events.length > MAX_EVENTS) throw new Error(`这首歌曲超过当前 ${MAX_EVENTS} 个发声音符的试听范围，请缩短编排。`);
     }
   }
   if (!events.length && !allowSilence) throw new Error('先放入有音符的乐句，并开启至少一条轨道，再听整首歌吧。');
-  if (durationSeconds > MAX_SECONDS) throw new Error('当前歌曲试听与导出支持最长 10 分钟，请缩短编排或提高速度。');
+  if (durationSeconds > MAX_SECONDS) throw new Error('当前歌曲试听与导出支持最长 10 分钟，请缩短编排。');
   events.sort((a, b) => a.atSeconds - b.atSeconds);
   const plan: SoundSequencePlan = { kind: 'sequence', version: 1, durationSeconds, events };
   if (!body.postProduction) return plan;
@@ -163,9 +224,14 @@ export function createSongPlayback(library: MaterialLibrary, phrases: PhrasePlay
     planForSaved(id) { return compileSong(readSaved(id).body, phrases, false, postProduction); } };
 }
 
-export function createSongEditor(library: MaterialLibrary, phrases: PhrasePlaybackPort, options: { defaultTempoMode: SongTempoMode; postProduction?: PostProductionPort }): SongEditorPort {
+export function createSongEditor(library: MaterialLibrary, phrases: PhrasePlaybackPort, options: { defaultTempoMode: SongTempoMode; postProduction?: PostProductionPort; initialTrackCount?: number }): SongEditorPort {
   const defaultTempoMode = mode(options.defaultTempoMode);
+  const initialTrackCount = options.initialTrackCount ?? 1;
+  if (!Number.isInteger(initialTrackCount) || initialTrackCount < 1 || initialTrackCount > MAX_TRACKS) throw new Error(`初始声音行数需要是 1 至 ${MAX_TRACKS} 之间的整数。`);
   const apiPostProduction = options.postProduction;
+  const initialTracks = (): SongTrack[] => Array.from({ length: initialTrackCount }, (_, index) => ({
+    id: crypto.randomUUID(), name: `行${index + 1}`, level: 0.8, pan: 0, muted: false, solo: false, clips: [],
+  }));
   let active = library.listDrafts().filter(draft => draft.kind === KIND).at(-1)?.id;
   const clipLength = (body: SongBody, id: string) => phraseLength(body, id, phrases);
   const songLength = (body: SongBody) => extent(body, phrases);
@@ -222,15 +288,15 @@ export function createSongEditor(library: MaterialLibrary, phrases: PhrasePlayba
     },
     create() {
       const body: SongBody = { model: 'phrase-arrangement', version: 1, timeUnit: 'beat', tempoBpm: 120, tempoMode: defaultTempoMode,
-        lengthBeats: 16, tracks: [{ id: crypto.randomUUID(), name: '旋律', level: 0.8, pan: 0, muted: false, solo: false, clips: [] }] };
+        lengthBeats: 16, tracks: initialTracks() };
       active = library.createDraft({ kind: KIND, schemaVersion: 1, owner: OWNER, name: '我的第一首歌', dependencies: [], body }).id;
     },
     createFromPhrase(phraseId, name) {
       const source = phrases.readSaved(phraseId);
       const body: SongBody = { model: 'phrase-arrangement', version: 1, timeUnit: 'beat', tempoBpm: source.body.tempoBpm,
         tempoMode: defaultTempoMode, lengthBeats: Math.max(16, source.body.lengthBeats),
-        tracks: [{ id: crypto.randomUUID(), name: '旋律', level: 0.8, pan: 0, muted: false, solo: false,
-          clips: [{ id: crypto.randomUUID(), phraseId, startBeat: 0 }] }] };
+        tracks: initialTracks() };
+      body.tracks[0]!.clips.push({ id: crypto.randomUUID(), phraseId, startBeat: 0 });
       const input = { kind: KIND, schemaVersion: 1, owner: OWNER, name: text((name ?? source.content.name).trim(), '歌曲名称'), dependencies: [phraseId], body };
       validate({ ...input, id: 'new-song' });
       active = library.createDraft(input).id;
@@ -243,6 +309,61 @@ export function createSongEditor(library: MaterialLibrary, phrases: PhrasePlayba
     openDraft(draftId) { const draft = library.readDraft(draftId); if (!draft) throw new Error('找不到这份歌曲编辑稿。'); validate(draft); active = draft.id; },
     rename(name) { const { draft, body } = current(); write({ name: text(name.trim(), '歌曲名称'), dependencies: draft.dependencies, body }); },
     setTempo(tempoBpm) { modify(body => { body.tempoBpm = tempoBpm; }); },
+    setGridTempo(tempoBpm, fromSeconds = 0) {
+      finite(tempoBpm, '背景网格速度', 40, 240); finite(fromSeconds, '背景速度分段位置', 0, 1e6);
+      modify(body => {
+        if (fromSeconds === 0) {
+          body.gridTempoBpm = tempoBpm;
+          delete body.gridTempoChanges;
+          return;
+        }
+        // This command redraws the whole right-hand grid, including any older
+        // tempo edits farther right. Only the strictly earlier section survives.
+        body.gridTempoChanges = [
+          ...(body.gridTempoChanges ?? []).filter(change => change.atSeconds < fromSeconds),
+          { atSeconds: fromSeconds, tempoBpm },
+        ];
+      });
+    },
+    setGridOffset(seconds) { finite(seconds, '背景网格偏移', -1e6, 1e6); modify(body => { body.gridOffsetSeconds = seconds; }); },
+    setMasterLevel(level) { finite(level, '总音量', 0, 1); modify(body => { body.masterLevel = level; }); },
+    setPhraseShelfVisible(phraseId, visible) {
+      text(phraseId, '乐句栏来源标识'); boolean(visible, '乐句栏显示');
+      const { draft, body } = current();
+      phrases.readSaved(phraseId);
+      const view = library.currentProjectView?.(draft.id);
+      const currentIds = view ? new Set([...view.memberIds, ...view.contents.map(item => item.id),
+        ...view.drafts.flatMap(item => item.sourceId ? [item.sourceId] : [])]) : undefined;
+      const scope = library.projectScopeOf?.({ type: 'draft', id: draft.id });
+      const owner = library.projectScopeOf?.({ type: 'content', id: phraseId });
+      if (currentIds && !currentIds.has(phraseId) || owner && owner !== scope) throw new Error('这份乐句不属于当前歌曲的乐句库。');
+      const hidden = new Set(body.hiddenPhraseIds ?? []);
+      if (visible === !hidden.has(phraseId)) return;
+      if (visible) hidden.delete(phraseId); else hidden.add(phraseId);
+      if (hidden.size) body.hiddenPhraseIds = [...hidden]; else delete body.hiddenPhraseIds;
+      write({ name: draft.name, dependencies: draft.dependencies, body });
+    },
+    reorderPhraseShelf(phraseId, targetIndex) {
+      text(phraseId, '乐句栏来源标识');
+      const { draft, body } = current(); const project = library.currentProjectView?.(draft.id);
+      const scope = library.projectScopeOf?.({ type: 'draft', id: draft.id });
+      const currentIds = project ? new Set([...project.memberIds, ...project.contents.map(item => item.id),
+        ...project.drafts.flatMap(item => item.sourceId ? [item.sourceId] : [])]) : undefined;
+      const available = phrases.listSaved().filter(item => (!currentIds || currentIds.has(item.id))
+        && (!library.projectScopeOf || library.projectScopeOf({ type: 'content', id: item.id }) === scope));
+      const displayName = (item: ContentRecord): string => project?.drafts.find(draft => draft.kind === 'rootsound.phrase' && draft.sourceId === item.id)?.name ?? item.name;
+      available.sort((a, b) => displayName(a).localeCompare(displayName(b), 'zh-CN') || a.id.localeCompare(b.id));
+      const ordered = orderSongPhraseShelf(available, body);
+      const hidden = new Set(body.hiddenPhraseIds); const visible = ordered.filter(item => !hidden.has(item.id));
+      const from = visible.findIndex(item => item.id === phraseId);
+      if (from < 0) throw new Error('这份乐句不属于当前可见的乐句栏。');
+      if (!Number.isInteger(targetIndex) || targetIndex < 0 || targetIndex >= visible.length) throw new Error('乐句栏位置无效。');
+      if (from === targetIndex) return;
+      const [moved] = visible.splice(from, 1); visible.splice(targetIndex, 0, moved!);
+      let index = 0;
+      body.phraseShelfOrder = ordered.map(item => hidden.has(item.id) ? item.id : visible[index++]!.id);
+      write({ name: draft.name, dependencies: draft.dependencies, body });
+    },
     setTempoMode(tempoMode) { modify(body => { body.tempoMode = mode(tempoMode); }); },
     setPostProduction(settings) {
       if (!apiPostProduction) throw new Error('后期处理模块尚未连接。');
@@ -253,10 +374,31 @@ export function createSongEditor(library: MaterialLibrary, phrases: PhrasePlayba
       modify(body => { if (body.tracks.some(item => item.clips.some(clip => clip.startBeat + clipLength(body, clip.phraseId) > lengthBeats + 1e-8))) throw new Error('乐句仍在这个位置之后，请先移动或移除这些片段。'); body.lengthBeats = lengthBeats; });
     },
     addTrack(name) {
-      const id = crypto.randomUUID(); modify(body => { body.tracks.push({ id, name: text(name ?? `声音 ${body.tracks.length + 1}`, '轨道名称'), level: 0.8, pan: 0, muted: false, solo: false, clips: [] }); }); return id;
+      const id = crypto.randomUUID(); modify(body => { body.tracks.push({ id, name: text(name ?? `行${body.tracks.length + 1}`, '轨道名称'), level: 0.8, pan: 0, muted: false, solo: false, clips: [] }); }); return id;
     },
-    updateTrack(trackId, changes) { fields(object(changes, '轨道修改'), ['name', 'level', 'pan', 'muted', 'solo'], '轨道修改'); modify(body => { Object.assign(track(body, trackId), changes); }); },
-    removeTrack(trackId) { modify(body => { track(body, trackId); if (body.tracks.length === 1) throw new Error('至少保留一条轨道。'); body.tracks = body.tracks.filter(item => item.id !== trackId); }); },
+    updateTrack(trackId, changes) {
+      fields(object(changes, '轨道修改'), ['name', 'level', 'pan', 'muted', 'solo', 'color', 'panOffset'], '轨道修改');
+      if ('color' in changes) color(changes.color);
+      if ('panOffset' in changes) finite(changes.panOffset, '行声像偏移', -1, 1);
+      modify(body => { Object.assign(track(body, trackId), changes); });
+    },
+    toggleTrackSolo(trackId) {
+      modify(body => {
+        const selected = track(body, trackId); const enabled = !selected.solo;
+        for (const row of body.tracks) row.solo = row.id === trackId && enabled;
+        if (enabled) { selected.muted = false; if (selected.level === 0) selected.level = 1; }
+      });
+    },
+    toggleTrackMute(trackId) { modify(body => { const selected = track(body, trackId); selected.muted = !selected.muted; }); },
+    reorderTrack(trackId, targetIndex) {
+      modify(body => {
+        const row = track(body, trackId);
+        if (!Number.isInteger(targetIndex) || targetIndex < 0 || targetIndex >= body.tracks.length) throw new Error('行的位置无效。');
+        const origin = body.tracks.indexOf(row); if (origin === targetIndex) return;
+        body.tracks.splice(origin, 1); body.tracks.splice(targetIndex, 0, row);
+      });
+    },
+    removeTrack(trackId) { modify(body => { track(body, trackId); body.tracks = body.tracks.filter(item => item.id !== trackId); }); },
     addClip(trackId, phraseId, startBeat) {
       return api.addClips([{ trackId, phraseId, startBeat }])[0]!;
     },
@@ -268,6 +410,23 @@ export function createSongEditor(library: MaterialLibrary, phrases: PhrasePlayba
         phrases.readSaved(input.phraseId); const id = crypto.randomUUID(); ids.push(id);
         track(body, input.trackId).clips.push({ id, phraseId: input.phraseId, startBeat: input.startBeat });
       } }); return ids;
+    },
+    updateClip(trackId, clipId, changes) {
+      fields(object(changes, '片段修改'), ['level', 'pan'], '片段修改');
+      api.updateClips([{ trackId, clipId, ...changes }]);
+    },
+    updateClips(updates) {
+      if (!updates.length) return;
+      modify(body => {
+        const seen = new Set<string>();
+        for (const update of updates) {
+          fields(object(update, '片段修改'), ['trackId', 'clipId', 'level', 'pan'], '片段修改');
+          if (seen.has(update.clipId)) throw new Error('同一片段不能重复修改。'); seen.add(update.clipId);
+          const target = clip(body, update.trackId, update.clipId);
+          if ('level' in update) target.level = finite(update.level, '片段音量', 0, 1);
+          if ('pan' in update) target.pan = finite(update.pan, '片段左右位置', -1, 1);
+        }
+      });
     },
     moveClip(trackId, clipId, targetTrackId, startBeat) {
       api.moveClips([{ trackId, clipId, targetTrackId, startBeat }]);

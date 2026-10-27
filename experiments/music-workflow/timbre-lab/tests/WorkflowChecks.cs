@@ -99,16 +99,16 @@ internal static class WorkflowChecks
             refused = false; try { guard.CheckDestination(source); } catch (IOException) { refused = true; }
             Require(refused, "file identity guard was bypassed by a different pathname");
         });
-        Check("offscreen waveform and loop positions render without a screen or window", () =>
+        Check("offscreen waveform and selection positions render without a screen or window", () =>
         {
             using var graph = new SampleGraph { Size = new Size(1000, 300) };
             graph.SetAudio(primary, result!.Audio);
-            graph.SetLoop(true, 4000, 12000);
+            graph.SetSelection(4000, 12000);
             using var bitmap = new Bitmap(1000, 300);
             using (var graphics = Graphics.FromImage(bitmap)) graph.DrawGraph(graphics);
             Require(!graph.IsHandleCreated, "offscreen drawing created a native graph window");
             int x1 = 16 + (1000 - 32) * 4000 / rate, x2 = 16 + (1000 - 32) * 12000 / rate;
-            Require(bitmap.GetPixel(x1, 30).B > 180 && bitmap.GetPixel(x2, 30).B > 180, "loop markers have incorrect time mapping");
+            Require(bitmap.GetPixel(x1, 30).B > 180 && bitmap.GetPixel(x2, 30).B > 180, "selection markers have incorrect time mapping");
             bitmap.Save(Path.Combine(directory, "清理与延音.png"), ImageFormat.Png);
         });
         return passed;

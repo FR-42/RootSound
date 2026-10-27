@@ -11,6 +11,7 @@ dist/
 /.cache/
 /.test-output/
 /data/
+/project/
 /RootSound.exe
 /RootSound.*.tmp
 bin/

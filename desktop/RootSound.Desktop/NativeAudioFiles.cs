@@ -69,6 +69,7 @@ public sealed class NativeAudioFiles
 
     internal static void WriteAtomic(string target, byte[] bytes)
     {
+        ProjectFileProtection.RequireExportTarget(target);
         if (!string.Equals(Path.GetExtension(target), ".wav", StringComparison.OrdinalIgnoreCase))
             throw new IOException("请使用 .wav 后缀导出音频。");
         ValidateWave(bytes);

@@ -14,17 +14,25 @@ button { transition: background .16s, border-color .16s, color .16s; }
 .primary { display: inline-flex; align-items: center; justify-content: center; gap: 12px; background: var(--accent); color: #28291e; border: 1px solid var(--accent); padding: 12px 22px; border-radius: 9px; font-size: 13px; font-weight: 600; }
 .primary:hover { background: #f0dca5; border-color: #f0dca5; }
 .secondary { background: #ffffff08; color: #ddd; border: 1px solid #ffffff20; padding: 12px 16px; border-radius: 8px; }
-.welcome { position: relative; min-height: 100svh; padding: 40px 56px; overflow: hidden; background: radial-gradient(ellipse at 68% 52%, #59644813, transparent 53%), #141715; }
-.welcome::after { content: ''; pointer-events: none; position: absolute; width: 510px; height: 510px; border: 1px solid #d0c3930a; border-radius: 50%; right: -190px; top: 24%; box-shadow: 0 0 0 64px #b9c3a803, 0 0 0 128px #b9c3a802; }
-.invitation { width: min(600px, 100%); margin: min(15vh, 150px) auto 140px; position: relative; z-index: 1; }
+.welcome { min-height: 100svh; padding: 40px 56px; background: #141715; }
+.invitation { width: min(800px, 100%); margin: min(15vh, 150px) auto 80px; }
 .eyebrow { font-size: 11px; color: #a5ad98; letter-spacing: 3px; margin: 0 0 23px; }
-.invitation h1 { white-space: pre-line; font-weight: 400; font-size: clamp(40px, 5vw, 64px); line-height: 1.48; letter-spacing: 2px; margin: 0; }
-.welcome-description { color: #8e988d; font-size: 14px; letter-spacing: 1.5px; margin: 26px 0 40px; }
-.journey { padding: 15px 30px; font-size: 14px; min-width: 158px; }
-.continue { margin-left: 14px; }
-.welcome-open-project { margin-left: 10px; font-size: 12px; }
-.skip { position: absolute; top: 34px; right: 40px; font-size: 12px; }
-.welcome-footer { position: absolute; bottom: 30px; left: 56px; color: #59645b; font-size: 11px; letter-spacing: 1px; }
+.invitation h1 { font-weight: 400; font-size: clamp(40px, 5vw, 64px); line-height: 1.48; letter-spacing: 2px; margin: 0; }
+.welcome-actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 32px; }
+.welcome-actions button { min-width: 158px; padding: 15px 26px; font-size: 14px; }
+.project-start { display: flex; flex-direction: column; }
+.project-start-form { display: flex; flex: 1; flex-direction: column; gap: 40px; margin-top: 48px; }
+.project-start-content { width: min(440px, 100%); margin: auto; text-align: center; }
+.project-start-label { display: block; margin-bottom: 24px; color: #e9e7e2; font-size: 22px; line-height: 1.6; }
+.project-start-input { display: block; width: 100%; min-width: 0; padding: 13px 15px; border: 1px solid #ffffff24; border-radius: 8px; background: #ffffff04; color: #e9e7e2; }
+.project-start-input:hover { border-color: #c6bd8666; }
+.project-start-submit { margin-top: 24px; min-width: 124px; }
+.project-start-location { display: flex; align-items: stretch; gap: 10px; }
+.project-location-choose { flex: 0 0 48px; padding: 8px; font-size: 20px; }
+.project-start-footer { display: flex; justify-content: center; margin-top: auto; position: relative; }
+.project-start-back { position: absolute; left: 0; }
+.project-start-footer .project-start-submit { margin-top: 0; }
+.project-start-error { color: #e5a99b; font-size: 13px; line-height: 1.7; margin: 16px 0 0; overflow-wrap: anywhere; }
 .studio { min-height: 100svh; display: flex; flex-direction: column; background: radial-gradient(ellipse at 50% 40%, #2930283a, transparent 70%); }
 .studio-toolbar { height: 72px; display: flex; align-items: center; gap: 28px; padding: 0 44px; border-bottom: 1px solid #ffffff09; }
 .brand-button { background: none; border: 0; padding: 4px 0; }
@@ -130,10 +138,8 @@ dialog p, dialog li { font-size: 13px; line-height: 1.8; color: #adb7a5; }
   .studio-footer { padding: 20px; }
   .welcome { padding: 28px; }
   .welcome .wordmark { font-size: 20px; }
-  .skip { top: 25px; right: 18px; font-size: 11px; }
   .invitation { margin-top: 17vh; }
   .invitation h1 { font-size: 40px; }
-  .welcome-footer { left: 28px; }
 }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 
@@ -144,7 +150,6 @@ dialog p, dialog li { font-size: 13px; line-height: 1.8; color: #adb7a5; }
 .studio .toolbar-tools .quiet { padding: 8px 9px; font-size: 12px; }
 .studio .workspace-tab { padding: 8px 10px; }
 .studio-notice:empty { display: none; }
-.welcome .journey { margin-top: 28px; }
 .studio.has-entity-rail { height: 100dvh; min-height: 0; display: grid; grid-template-columns: 208px minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); overflow: hidden; background: #171c18; }
 .has-entity-rail > .studio-toolbar { grid-column: 1 / -1; grid-row: 1; }
 .has-entity-rail > main { grid-column: 2; grid-row: 2; width: 100%; margin: 0; min-width: 0; min-height: 0; padding: 14px; overflow: auto; }

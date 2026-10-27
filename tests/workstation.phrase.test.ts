@@ -51,6 +51,50 @@ function baseBody(timbreId = 'sound-a'): PhraseBody {
     parts: [{ id: 'part-a', name: '一个声音', timbreId, notes: [{ id: 'note-a', ...note() }] }] };
 }
 
+test('unselecting tones is optional, atomic and retains note identities while silencing their uses', () => {
+  const f=fixture();const one=start(f);const two=f.phrase.addPart(f.first.id);const rhythm=f.phrase.addPart(f.first.id,'rhythm');
+  f.phrase.addNote(one,note());f.phrase.addNote(two,note({startBeat:1}));f.phrase.addNote(rhythm,note({startBeat:2}));
+  const original=f.phrase.read().body!;const plan=f.phrase.previewPlan();const writes=f.writes();
+  assert.equal(Object.hasOwn(original.parts[0]!,'unassigned'),false);
+  f.phrase.setPartsVisible([one,two],false);assert.equal(f.writes(),writes+1);
+  const hidden=f.phrase.read().body!;assert(hidden.parts.slice(0,2).every(part=>part.unassigned===true));assert.equal(hidden.parts[2]!.unassigned,undefined);
+  assert.deepEqual(hidden.parts.map(part=>part.notes),original.parts.map(part=>part.notes));const partial={...plan,events:[plan.events[2]!]};assert.deepEqual(f.phrase.previewPlan(),partial);
+  const token=f.library.currentToken();f.phrase.setPartsVisible([one,two],false);assert.equal(f.library.currentToken(),token);
+  f.phrase.undo();assert.deepEqual(f.phrase.read().body,original);f.phrase.redo();assert.deepEqual(f.phrase.read().body,hidden);
+  const content=saved(f.phrase.save('new'));const reopenedLibrary=createMaterialLibrary(f.storage);const reopened=createPhraseEditor(reopenedLibrary,createTimbrePlayback(reopenedLibrary));reopened.open(content.id);
+  assert.deepEqual(reopened.read().body,hidden);assert.deepEqual(reopened.previewPlan(),partial);
+  reopened.setPartVisible(one,true);assert.equal(Object.hasOwn(reopened.read().body!.parts[0]!,'unassigned'),false);
+  const before=f.raw();assert.throws(()=>f.phrase.setPartsVisible([one,'missing'],true),/找不到/);assert.equal(f.raw(),before);
+  for(const value of [null,'true',1]){const body=structuredClone(original);Object.assign(body.parts[0]!,{unassigned:value});assert.throws(()=>readPhraseBody(body),/音色状态/);}
+});
+
+test('removing every tone is a reversible silent phrase edit and never removes the saved sound assets', () => {
+  const f=fixture();const one=start(f),two=f.phrase.addPart(f.second.id);f.phrase.addNote(one,note());f.phrase.addNote(two,note());
+  const before=f.phrase.read().body!;const writes=f.writes();f.phrase.removeParts([one,two]);assert.equal(f.writes(),writes+1);
+  assert.deepEqual(f.phrase.read().body!.parts,[]);assert.deepEqual(f.phrase.read().draft!.dependencies,[]);
+  assert.deepEqual(f.phrase.previewPlan(undefined,{allowSilence:true}),{kind:'sequence',version:1,durationSeconds:4,events:[]});
+  assert.deepEqual(f.library.readContent(f.first.id),f.first);assert.deepEqual(f.library.readContent(f.second.id),f.second);
+  f.phrase.undo();assert.deepEqual(f.phrase.read().body,before);f.phrase.redo();assert.deepEqual(f.phrase.read().body!.parts,[]);
+  f.phrase.addPart(f.first.id);assert.equal(f.phrase.read().body!.parts.length,1);
+});
+
+test('a library tone can be auditioned before it is added without changing phrase history or selection data', async () => {
+  const f=fixture();start(f);f.phrase.setMasterLevel(.4);const before=f.raw(),writes=f.writes(),history=f.library.readDraftHistory(f.phrase.read().draft!.id);
+  const input={frequencyHz:261.6255653005986,holdSeconds:.35,velocity:.75};const sound=await f.phrase.previewTimbrePlan(f.second.id,input);const raw=f.playback.planForSaved(f.second.id,input);
+  assert.deepEqual(sound,{...raw,level:raw.level*.4});assert.equal(f.raw(),before);assert.equal(f.writes(),writes);assert.deepEqual(f.library.readDraftHistory(f.phrase.read().draft!.id),history);assert.equal(f.phrase.read().body!.parts.length,1);
+  await assert.rejects(f.phrase.previewTimbrePlan('missing',input),/当前歌曲音色库/);await assert.rejects(f.phrase.previewTimbrePlan(f.second.id,{...input,frequencyHz:NaN}),/音高/);assert.equal(f.raw(),before);
+});
+
+test('fully unassigned notes save and play silently without preparing or auditioning their former tone', async () => {
+  const f=fixture();const part=start(f);const id=f.phrase.addNote(part,note());const original=f.phrase.read().body!;f.phrase.setPartVisible(part,false);
+  const prepared:string[]=[];const editor=createPhraseEditor(f.library,{...f.playback,async prepareForSaved(id){prepared.push(id);}});
+  await editor.preparePreview();assert.deepEqual(prepared,[]);assert.deepEqual(editor.previewPlan().events,[]);
+  await assert.rejects(editor.previewNotePlan(part,noteToPlan()),/尚未定义/);assert.deepEqual(prepared,[]);
+  const file=saved(editor.save('new'));const phrases=createPhrasePlayback(f.library,f.playback);await phrases.prepareForSaved(file.id);assert.deepEqual(phrases.planForSaved(file.id).events,[]);
+  const input={frequencyHz:261.6255653005986,holdSeconds:.35,velocity:.75};const sound=await editor.previewTimbrePlan(f.first.id,input);assert.equal(sound.note.frequencyHz,input.frequencyHz);
+  editor.setPartVisible(part,true);assert.deepEqual(editor.read().body,original);assert.equal(editor.read().body!.parts[0]!.notes[0]!.id,id);assert.equal(editor.previewPlan().events.length,1);
+});
+
 test('phrase construction is lazy and exposes every valid equal-tempered pitch without limiting stored tuning', () => {
   const f = fixture();
   const before = f.raw();
@@ -282,7 +326,10 @@ test('note and part editing support undo, redo, branched history and independent
   assert.deepEqual(f.phrase.read().draft!.dependencies, [f.first.id, f.second.id]);
   f.phrase.removePart(secondPart);
   assert.equal(f.phrase.read().canRedo, false);
-  assert.throws(() => f.phrase.removePart(firstPart), /至少需要/);
+  f.phrase.removePart(firstPart);
+  assert.deepEqual(f.phrase.read().body!.parts, []);
+  assert.deepEqual(f.phrase.read().draft!.dependencies, []);
+  f.phrase.undo();
   f.phrase.removeNote(firstPart, noteId);
   assert.throws(() => f.phrase.previewPlan(), /先添加/);
   assert.throws(() => f.phrase.save('new'), /先添加/);
@@ -347,7 +394,7 @@ test('unfinished older phrases remain discoverable and reopen without changing s
 test('unknown, missing and duplicate phrase fields are rejected without silently converting content', () => {
   const base = baseBody();
   const invalid: unknown[] = [null, [], {}, { ...base, version: 2 }, { ...base, timeUnit: 'seconds' },
-    { ...base, waveform: 'sine' }, { ...base, parts: [] }, { ...base, tempoBpm: NaN },
+    { ...base, waveform: 'sine' }, { ...base, parts: null }, { ...base, tempoBpm: NaN },
     { ...base, parts: [{ ...base.parts[0], timbre: {} }] },
     { ...base, parts: [{ ...base.parts[0], notes: [{ ...base.parts[0]!.notes[0], midi: 60 }] }] },
     { ...base, parts: [{ ...base.parts[0], notes: [{ ...base.parts[0]!.notes[0], id: 'part-a' }] }] },
@@ -464,7 +511,7 @@ test('the current editor caps parts, total notes and draft history without disca
   start(f);
   for (let index = 1; index < 8; index++) f.phrase.addPart(f.first.id);
   const before = f.raw();
-  assert.throws(() => f.phrase.addPart(f.second.id), /1 至 8/);
+  assert.throws(() => f.phrase.addPart(f.second.id), /最多可使用 8/);
   assert.equal(f.raw(), before);
   const body = baseBody(f.first.id);
   body.parts[0]!.notes = Array.from({ length: 512 }, (_, index) => ({ id: `note-${index}`, ...note() }));

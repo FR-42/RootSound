@@ -1,0 +1,191 @@
+{
+  "status": "Promising local quasiperiodic reference windows, not pure instruments",
+  "source": "D:\\RootSound\\experiments\\music-workflow\\reference-studio\\cases\\phone-recording-20261023-233819\\试听\\07-普通分轨基线.wav",
+  "sourceSha256": "db79615e148120d8183bca8cddf7e4d881beefb09999b45ee9e215b24c672fac",
+  "windows": [
+    {
+      "role": "training",
+      "relativeSeconds": [
+        0.08,
+        0.28
+      ],
+      "originalSeconds": [
+        45.08,
+        45.28
+      ],
+      "upperInterferenceHint": "Upper spectral family near 698 Hz, not an isolated F5 instrument",
+      "lagComparisons": [
+        {
+          "periodFrequencyHypothesisHz": 185,
+          "lagSamples": 259,
+          "lagSeconds": 0.005395833333333333,
+          "normalizedStereoLagCorrelation": 0.02690537715545369,
+          "cyclesInWindow": 37.0
+        },
+        {
+          "periodFrequencyHypothesisHz": 92.5,
+          "lagSamples": 519,
+          "lagSeconds": 0.0108125,
+          "normalizedStereoLagCorrelation": 0.6757571329579954,
+          "cyclesInWindow": 18.5
+        },
+        {
+          "periodFrequencyHypothesisHz": 46.25,
+          "lagSamples": 1038,
+          "lagSeconds": 0.021625,
+          "normalizedStereoLagCorrelation": 0.8626227967568446,
+          "cyclesInWindow": 9.25
+        },
+        {
+          "periodFrequencyHypothesisHz": 23.125,
+          "lagSamples": 2076,
+          "lagSeconds": 0.04325,
+          "normalizedStereoLagCorrelation": 0.8488017531390104,
+          "cyclesInWindow": 4.625
+        }
+      ],
+      "localLowPeaks": [
+        {
+          "nominalCenterHz": 46.25,
+          "observedLocalPeakHz": 47.05810546875,
+          "dbRelativeToStrongestPeak": -29.579535806321054
+        },
+        {
+          "nominalCenterHz": 92.5,
+          "observedLocalPeakHz": 91.552734375,
+          "dbRelativeToStrongestPeak": -0.02118885646621304
+        },
+        {
+          "nominalCenterHz": 138.75,
+          "observedLocalPeakHz": 137.6953125,
+          "dbRelativeToStrongestPeak": -6.134077077870218
+        },
+        {
+          "nominalCenterHz": 185,
+          "observedLocalPeakHz": 185.302734375,
+          "dbRelativeToStrongestPeak": 0.0
+        },
+        {
+          "nominalCenterHz": 231.25,
+          "observedLocalPeakHz": 231.99462890625,
+          "dbRelativeToStrongestPeak": -17.65286557975586
+        },
+        {
+          "nominalCenterHz": 277.5,
+          "observedLocalPeakHz": 279.60205078125,
+          "dbRelativeToStrongestPeak": -14.426411770928437
+        },
+        {
+          "nominalCenterHz": 370,
+          "observedLocalPeakHz": 369.140625,
+          "dbRelativeToStrongestPeak": -20.753641844390962
+        }
+      ]
+    },
+    {
+      "role": "external validation",
+      "relativeSeconds": [
+        0.7,
+        0.9
+      ],
+      "originalSeconds": [
+        45.7,
+        45.9
+      ],
+      "upperInterferenceHint": "Upper spectral family near 622 Hz, not an isolated Eb5 instrument",
+      "lagComparisons": [
+        {
+          "periodFrequencyHypothesisHz": 185,
+          "lagSamples": 259,
+          "lagSeconds": 0.005395833333333333,
+          "normalizedStereoLagCorrelation": 0.2112790794132845,
+          "cyclesInWindow": 37.000000000000014
+        },
+        {
+          "periodFrequencyHypothesisHz": 92.5,
+          "lagSamples": 519,
+          "lagSeconds": 0.0108125,
+          "normalizedStereoLagCorrelation": 0.6739744872287363,
+          "cyclesInWindow": 18.500000000000007
+        },
+        {
+          "periodFrequencyHypothesisHz": 46.25,
+          "lagSamples": 1038,
+          "lagSeconds": 0.021625,
+          "normalizedStereoLagCorrelation": 0.80812150018912,
+          "cyclesInWindow": 9.250000000000004
+        },
+        {
+          "periodFrequencyHypothesisHz": 23.125,
+          "lagSamples": 2076,
+          "lagSeconds": 0.04325,
+          "normalizedStereoLagCorrelation": 0.796175803202545,
+          "cyclesInWindow": 4.625000000000002
+        }
+      ],
+      "localLowPeaks": [
+        {
+          "nominalCenterHz": 46.25,
+          "observedLocalPeakHz": 41.3818359375,
+          "dbRelativeToStrongestPeak": -44.83617371712573
+        },
+        {
+          "nominalCenterHz": 92.5,
+          "observedLocalPeakHz": 92.46826171875,
+          "dbRelativeToStrongestPeak": -2.65816390825323
+        },
+        {
+          "nominalCenterHz": 138.75,
+          "observedLocalPeakHz": 137.51220703125,
+          "dbRelativeToStrongestPeak": -8.642081318450458
+        },
+        {
+          "nominalCenterHz": 185,
+          "observedLocalPeakHz": 184.5703125,
+          "dbRelativeToStrongestPeak": 0.0
+        },
+        {
+          "nominalCenterHz": 231.25,
+          "observedLocalPeakHz": 230.712890625,
+          "dbRelativeToStrongestPeak": -20.116516404489964
+        },
+        {
+          "nominalCenterHz": 277.5,
+          "observedLocalPeakHz": 276.85546875,
+          "dbRelativeToStrongestPeak": -12.989682050518269
+        },
+        {
+          "nominalCenterHz": 370,
+          "observedLocalPeakHz": 371.52099609375,
+          "dbRelativeToStrongestPeak": -28.815646024945796
+        }
+      ]
+    }
+  ],
+  "supportedApproach": [
+    "A stationary pitched source can provide several repeatable waveform cycles without the melody repeating.",
+    "Estimate a short local cycle or harmonic template with both channels intact, then assess it on a separate same-root window with different upper interference.",
+    "About nine putative 46.25 Hz cycles exist in each .2 s window; this is a small prototype sample, not a robust instrument library.",
+    "Keep the extracted component and unassigned remainder so leakage and missing desired components can both be judged."
+  ],
+  "limits": [
+    "A perceived pitch need not imply exact waveform repetition: missing fundamentals, detuned layers, inharmonic partials, noise and modulation matter.",
+    "The low 46.25 Hz hypothesis fits the approximate 92/138/185 family, but a half-frequency 23.125 Hz cycle also gives high correlation; longer cycles can fit additional mixture components.",
+    "The partial peaks are not perfectly integer-related in these short windows. Fixed-cycle averaging can erase stereo modulation and timbral details.",
+    "Periodic folding is closely related to projection onto a harmonic Fourier basis. It does not supply independent source identity or separate sources sharing those harmonics.",
+    "Ordinary autocorrelation and power-spectrum views are closely related; presenting the same information differently does not itself solve separation.",
+    "For F1 and Eb1, the sixteenth harmonic coincides exactly with F5 and Eb5. A bass template extended too far upward can absorb the wanted melody.",
+    "A lower residual or higher lag correlation is a fitting result, not proof of musical purity or the correct original bass octave."
+  ],
+  "validationRequirements": [
+    "Freeze the training-derived cycle/template before examining the external validation window.",
+    "Allow root/phase tracking only from independently selected low anchors, not free tuning on upper melody bins.",
+    "Report energy and stereo structure retained in the desired low family and leakage from the changed upper family separately.",
+    "Compare doubled/halved period hypotheses under the same model capacity, favoring the shortest adequate explanation rather than unconstrained long-period fit.",
+    "Listener confirmation is still required; this audit did not audition audio."
+  ],
+  "noSourceAudioModified": true,
+  "noModelInference": true,
+  "noMidiProduced": true,
+  "noAudioDeviceUsed": true
+}

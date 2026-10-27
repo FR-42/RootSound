@@ -1,0 +1,19 @@
+{
+  "name": "Vulcanus-Observation-Drums",
+  "rate": 48000,
+  "channels": 2,
+  "frames": 434717,
+  "hash": "64C964FD090EA2D48BE5CA5F4D16758752486A96C9D46AA164B830DD4D69ED33",
+  "settings": {
+    "RootMidi": 60,
+    "AttackSeconds": 0,
+    "DecaySeconds": 0,
+    "Sustain": 1,
+    "ReleaseSeconds": 0.005,
+    "LoopEnabled": false,
+    "LoopStart": 0,
+    "LoopEnd": 0,
+    "LoopCrossfadeSeconds": 0.015,
+    "GainDb": 0
+  }
+}

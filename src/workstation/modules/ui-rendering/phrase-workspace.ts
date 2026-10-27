@@ -22,6 +22,8 @@ export function mountPhraseWorkspace(root: HTMLElement, options: {
   referenceContext?: ReferenceEditorContext;
   renderEntities?(): HTMLElement;
   onSave?(): void; onApplyElsewhere?(): void;
+  onNewPhrase?(timbreId?: string): void;
+  onSaved?(id: string): void;
   onEditSound?(partId: string, chooseLocations?: boolean): void;
 }): { dispose(): void; refresh(context?: ReferenceEditorContext, onApplyElsewhere?: () => void): void } {
   const { phrase, sound } = options;
@@ -168,15 +170,19 @@ export function mountPhraseWorkspace(root: HTMLElement, options: {
   function save(mode: 'overwrite' | 'new', confirmation?: SaveConfirmation): void {
     try {
       const result = phrase.save(mode, confirmation);
-      if (result.status === 'saved') { report(`“${result.content.name}”已保存。`); render(); }
+      if (result.status === 'saved') { options.onSaved?.(result.content.id); report(`“${result.content.name}”已保存。`); render(); }
       else if (result.status === 'needs-confirmation') confirmSave(result);
       else report(result.status === 'conflict' ? result.reason : result.message, true);
-    } catch (error) { report(error instanceof Error ? error.message : String(error), true); }
+    } catch (error) { report(error instanceof Error ? error.message : String(error), true); render(); }
   }
   function saveCurrent(): void {
     try {
       const callback = options.referenceContext?.onSave ?? options.onSave;
-      if (callback) callback(); else save(phrase.read().draft?.sourceId ? 'overwrite' : 'new');
+      if (callback) {
+        callback();
+        const view = phrase.read();
+        if (view.draft?.sourceId && !view.changed) options.onSaved?.(view.draft.sourceId);
+      } else save(phrase.read().draft?.sourceId ? 'overwrite' : 'new');
     } catch (error) { report(error instanceof Error ? error.message : String(error), true); }
   }
   function editSound(partId: string, chooseLocations = false): void {
@@ -211,6 +217,10 @@ export function mountPhraseWorkspace(root: HTMLElement, options: {
     dialog.addEventListener('close', () => dialog.remove(), { once: true }); root.append(dialog); dialog.showModal();
   }
   function startPhrase(): void {
+    if (options.onNewPhrase) {
+      edit(() => { options.onNewPhrase!(); selectedPart = undefined; selectedNotes.clear(); scrollLeft = 0; pasteBeat = 0; }, '已新建乐句。');
+      return;
+    }
     const sounds = phrase.read().availableSounds;
     if (!sounds.length) { report('先制作并保存一个声音，再来写旋律。'); render(); return; }
     const dialog = node('dialog', 'library-dialog');
@@ -269,6 +279,7 @@ export function mountPhraseWorkspace(root: HTMLElement, options: {
     if (options.onLibrary) tools.append(action('素材', 'quiet', options.onLibrary));
     if (options.onExport) tools.append(action('导出音频', 'quiet', () => { stopPlayback(); options.onExport!(); }));
     if (options.onSettings) tools.append(action('设置', 'quiet', options.onSettings));
+    if (view.body && view.draft) tools.append(action('保存', 'primary', saveCurrent));
     toolbar.append(tools); page.append(toolbar);
     const main = node('main', 'phrase-workspace');
     main.addEventListener('dragover', event => {
@@ -291,7 +302,7 @@ export function mountPhraseWorkspace(root: HTMLElement, options: {
       if (current.body && current.body.parts.length >= 8) { report('一段乐句最多使用 8 个音色。', true); return; }
       edit(() => {
         if (current.body && current.draft) selectedPart = phrase.addPart(incoming.id);
-        else { phrase.create(incoming.id); selectedPart = undefined; scrollLeft = 0; pasteBeat = 0; }
+        else { if (options.onNewPhrase) options.onNewPhrase(incoming.id); else phrase.create(incoming.id); selectedPart = undefined; scrollLeft = 0; pasteBeat = 0; }
         selectedNotes.clear();
       }, '已加入音色。');
     });
@@ -322,7 +333,6 @@ export function mountPhraseWorkspace(root: HTMLElement, options: {
       title.append(name, saveState);
       const transport = node('div', 'phrase-transport'); playButton = action('', 'preview-button', () => { void play(); }); transport.append(playButton);
       if (view.draft.sourceId && !options.referenceContext) transport.append(action('另存', 'quiet', () => save('new')));
-      transport.append(action('保存', 'primary', saveCurrent));
       const applyElsewhere = options.referenceContext?.onApplyElsewhere ?? options.onApplyElsewhere;
       if (applyElsewhere) transport.append(action('应用到其他位置…', 'quiet', applyElsewhere));
       heading.append(title, transport); main.append(heading);

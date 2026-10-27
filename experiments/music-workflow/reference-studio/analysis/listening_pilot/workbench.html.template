@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="zh-CN">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; media-src data:; connect-src 'none'">
+<title>听清这一小段 · RootSound</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#111820;color:#e4e9ee;font:15px/1.6 system-ui,"Microsoft YaHei UI",sans-serif}main{max-width:1120px;margin:5vh auto;padding:28px}h1{font-size:26px;font-weight:550;margin:0}p{color:#a7b1bd;margin:6px 0 22px}.bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:14px 0}button{border:1px solid #3a4654;border-radius:7px;padding:9px 18px;background:#202a36;color:inherit;font:inherit;cursor:pointer}button:hover{border-color:#a1c3b5}button:focus-visible,canvas:focus-visible,a:focus-visible{outline:2px solid #88e0bc;outline-offset:4px}button.active{border-color:#88e0bc;background:#264337;color:#c3f7df}#play{background:#a7dfc5;color:#15251e;border-color:#a7dfc5;min-width:92px;font-weight:600}.space{flex:1}label{color:#bdc7d2;font-size:14px;cursor:pointer}input{accent-color:#88e0bc;margin-right:6px}canvas{width:100%;height:330px;display:block;border:1px solid #303b48;border-radius:8px;cursor:crosshair}#time{font-variant-numeric:tabular-nums;color:#efacad;min-width:76px;text-align:right}#description{color:#bec8d1;min-height:28px;margin-top:10px}small,details{color:#94a2b1;font-size:13px}summary{cursor:pointer;margin:26px 0 8px}details p{font-size:13px;margin:10px 0}a{color:#a7dfc5}#status{color:#edbe7e;min-height:24px}.links{display:flex;gap:20px;flex-wrap:wrap}@media(max-width:600px){main{padding:16px;margin:2vh auto}button{padding:8px 12px}.space{display:none}}
+</style>
+<main>
+<h1>听清这一小段</h1>
+<p>手机录音 · 45–53秒</p>
+<div class="bar" aria-label="切换声音">
+<button data-track="original">原曲</button><button data-track="selected" class="active">07原声</button><button data-track="a">候选 A</button><button data-track="b">候选 B</button>
+</div>
+<canvas id="timeline" tabindex="0" role="slider" aria-label="试听位置；点击定位，左右键精调"></canvas>
+<div class="bar">
+<button id="play">播放</button><button id="restart">回到开头</button>
+<button data-speed="0.6" class="active">慢放 0.6×</button><button data-speed="1">原速</button>
+<span class="space"></span><label><input id="focus" type="checkbox" checked>只听开头</label><label><input id="loop" type="checkbox" checked>循环</label><span id="time">45.00 秒</span>
+</div>
+<div id="description"></div><div id="status" role="status"></div>
+<small>A、B尚未确认。图中亮线也可能是泛音，不能直接当作音符。</small>
+<details><summary>这次核对什么</summary>
+<p>只比较开头约一秒的一个分歧：中间那一下是否换成较高的音。A在这里以同一音高再次发声，B在同一位置换音；其余部分保持一致。候选使用同一种钢琴参考声，不代表还原了音色。</p>
+<p>默认慢放保持音高；播放中切换声音和速度会保留对应的原曲时间。取消“只听开头”可听完整8秒；旋律候选只覆盖开头。</p>
+<p>这张图始终显示07的频谱。选中候选时，色条标出其假设音符，帮助对照，不是已识别的乐谱。</p>
+<div class="links">__DOWNLOAD_LINKS__</div>
+<p>全部声音已经包含在此文件中，离线可用。原曲和认可的07均未修改。</p>
+</details>
+</main>
+<script>window.LISTENING_DATA=__LISTENING_DATA__;</script>
+<script>__WORKBENCH_JS__</script>
+</html>

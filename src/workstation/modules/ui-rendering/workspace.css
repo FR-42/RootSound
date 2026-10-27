@@ -22,8 +22,13 @@
 .settings-check input { width: 17px; height: 17px; accent-color: #d1bf88; }
 .settings-field { display: flex; flex-direction: column; gap: 12px; color: #9caa90; font-size: 12px; }
 .settings-field select { background: #1c231c; color: #d4dec8; border: 1px solid #ffffff15; border-radius: 7px; padding: 12px; }
+.workspace-settings-dialog { width: min(480px, calc(100vw - 40px)); padding: 24px; border: 1px solid #bac6d1; border-radius: 6px; background: #fafbfd; color: #30465b; }
+.workspace-settings-dialog::backdrop { background: #263b4d35; }
+.workspace-settings-dialog .settings-check, .workspace-settings-dialog .settings-field { color: #4c6377; }
+.workspace-settings-dialog .settings-check input { accent-color: #577c9d; }
+.workspace-settings-dialog .settings-field select { background: #fff; color: #30465b; border-color: #bac6d1; }
+.workspace-settings-dialog .dialog-error { color: #a03c46; }
 .dialog-error { color: #dda696; font-size: 12px; line-height: 1.8; }
 .audio-export-progress { width: 100%; accent-color: #c7bd89; height: 8px; margin: 15px 0; }
 .export-notice { color: #9aa88f; font-size: 12px; line-height: 1.8; }
-.welcome-settings { position: absolute; bottom: 22px; right: 30px; font-size: 11px; }
 @media(max-width:800px) { .catalog-workspace { width: calc(100% - 40px); margin-top: 30px; } .catalog-card { align-items: flex-start; flex-direction: column; gap: 15px; } .catalog-filters .catalog-search { width: 100%; margin-left: 0; } .workspace-title { font-size: 24px; line-height: 1.6; } }

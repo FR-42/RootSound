@@ -10,9 +10,13 @@ binding. Decisions confirmed in the current collaboration remain active.
 Earlier paths in retained decisions describe their original date; the current
 archive location is legacy/.
 
-## D-2026-10-22 · Workstation purpose and rebuild authorization — ACTIVE
+Current ultimate purpose: enable rhythm-game music enthusiasts to get started
+quickly and create rhythm-game music they find satisfying. D-2026-10-27-10
+supersedes the earlier universal purpose and records the accepted first milestone.
 
-- Decision: the root purpose is zero-friction creation by ordinary people,
+## D-2026-10-22 · Workstation purpose and rebuild authorization — PURPOSE SUPERSEDED; REBUILD AUTHORIZATION ACTIVE
+
+- Historical purpose, superseded by D-2026-10-27-10: zero-friction creation by ordinary people,
   from an imagined/referenced sound to editable results, covering a single
   sound as well as complete music. Users need not first learn professional
   terminology, complex software operation, or tedious note entry.
@@ -94,11 +98,23 @@ archive location is legacy/.
 
 ## D-2026-10-22-4 · Creative entry, co-creation handoff and optional networking — ACTIVE
 
-- Decision: the default welcome surface is friendly, minimal and suggestive,
-  with no distracting implementation/professional detail. A primary start
-  action guides curious users; a quiet skip/direct-entry path serves users
-  with intent or expertise. Offer continuation when a project exists. Users
-  can disable the welcome and choose their startup module/window.
+- Decision, revised by user on 2026-10-25: the welcome surface contains only
+  RootSound, “你好，你想创作什么？”, “新的开始” and “打开已有项目”. Remove all
+  other welcome controls, explanatory text and decoration. This supersedes
+  the earlier separate continuation, direct-entry and welcome-settings controls.
+  Existing preferences to disable welcome/select a startup workspace remain;
+  this visual revision did not decide the subsequent new-project workflow.
+- User follow-up, 2026-10-25: “新的开始” shows the unchanged RootSound brand,
+  one song-name field, “为新歌曲起一个名字把~”, and “创建！”. Create a named child
+  under installation-root/project/. Bottom “详细设置” shows only this project's
+  storage location and bottom “保存”, which returns with the name preserved.
+  The default project folder governs future automatic discovery; a custom
+  location does not automatically enter that scope. Delete old main-workstation
+  projects. Implementation: per-folder materials plus a versioned manifest;
+  settings select this creation's parent, not a move/global-default operation.
+  Creation/opening temporarily enters the existing song workspace. Startup
+  first requires selecting a project rather than applying an unbound old entry
+  preference. These last implementation choices remain revisable.
 - Decision: guided conversation serves coarse generation and exploration.
   Faithfully record an input melody and offer a small number of playable
   enhancements (typically 3–4 or a suitable slider), using everyday or
@@ -428,8 +444,586 @@ logical music positions use the entity; a single position overwrites it.
   in an independent .rstimbre experiment file, reopenable in this tool.
   It is not yet a workstation-standard instrument file. References and the
   cleaning process are not included in that rendered-instrument snapshot.
+- User graph refinement, 2026-10-24: the timbre-lab graph has one draggable
+  red playback cursor and two draggable blue selection boundaries. A compact
+  control row toggles sample play/pause at the cursor; horizontal zoom is
+  adjustable. Both Save Timbre and Export WAV retain only blue-line audio.
+  Implementation choice: keep full original/processed context visible and
+  crop actual PCM at save/key audition, with rebased/intersected sustain loops.
+  Blue boundaries no longer edit sustain; its numeric controls remain separate.
+- User keyboard refinement, 2026-10-24: add Piano and Sample modes on the same
+  keyboard and expand its pitch range, to compare sampled sounds with known
+  pitches. Current choices: continuous 88-key A0–C8 keyboard with octave/center
+  navigation and pitch labels; offline synthesized piano reference at A4=440,
+  available without a sample. Sample mode keeps selected-sample performance
+  settings. Switching does not edit root pitch or saved audio; files continue
+  to contain the blue-line sample only. The piano is a reference, not a sampled
+  instrument library. Original-pitch listening remains the direct way to match
+  a sample against piano notes; transposed sample keys serve a different check.
 - Provisional limits: offline, at most eight input clips, each at most 30
   seconds; no semantic AI source-separation model. Shared interference and
   coincident frequencies may remain, and strong processing can damage target
   detail. Synthetic tests are evidence for specific cases, not a guarantee of
   real-song quality. Product-wide architecture and libraries remain unchanged.
+
+## D-2026-10-24-3 · Independent phrase composition from timbre files — ACTIVE
+
+- Origin: user specifies the fourth personal workflow experiment: New Phrase,
+  name, create channels, import timbres, edit and save a phrase file. Initial
+  workbench is empty; phrase work occupies a large child workspace.
+- Decision: each channel can independently choose step sequencer or piano
+  roll, without instrument-type restrictions. Steps are directly editable in
+  the narrow channel row; piano rows show only a simple overview. Both have a
+  large detailed editor and edits apply immediately. Mode changes preserve
+  the underlying notes. Imported names default to the source filename, allow
+  manual renaming and receive suffixes on collision within the phrase.
+- Decision: Save is unavailable while a channel lacks a timbre. First Save
+  selects a destination. Starting from an existing phrase loads it directly;
+  subsequent Save warns before overwriting it, with Save As alongside.
+- Implementation choices: import third-module .rstimbre and embed exact audio
+  plus performance settings in a self-contained .rsphrase. Local recovery
+  drafts update automatically and are distinct from explicit file export.
+  Workspaces use large tabs; detailed editing occupies their main area.
+  Notes share one model across both editors; playback reflects current edits.
+- Provisional scope: 4/4, 20–300 BPM, 1–16 bars, 32 channels and 10,000 notes;
+  512 MiB of embedded sample data and 128 simultaneous playing notes. These
+  are experiment limits, not permanent workstation rules. Native file format
+  interoperability with the main workstation is not yet implemented. Actual
+  interface/listening acceptance remains separate from automated checks.
+
+## D-2026-10-24-4 · Learn and create through reference music — ACTIVE
+
+- User-confirmed purpose: hear music they love, understand its construction,
+  and acquire the ability to create work that excites them similarly. Their
+  personal references include Meta-Mysteria, Inverted World, Lament Rain and
+  Arghena: fast electronic/rhythm-game music. At that time this was a personal
+  direction rather than a product-scope restriction; D-2026-10-27-10 now defines
+  the product's ultimate purpose around rhythm-game music enthusiasts.
+- Origin: the user reports that the recent acquisition→sample→timbre→phrase
+  experiments have not yet achieved that purpose. They authorize trying a
+  reference-led editable reconstruction with D:/Sound/temp/music/Vulcanus.wav.
+  D:/Sound/temp/music/ is their designated song directory; file ownership does
+  not by itself establish authorship. This run uses only the specified song.
+- Current implementation proposal: prepare a small actual-song case with
+  aligned reference/reconstruction audition, individually audible editable
+  layers, sound changes and portable saving. Reuse useful existing editors.
+  The first case is assistant-prepared, not an arbitrary-song automatic
+  transcription service. Keep estimates, sampled material and original stems
+  distinguishable. Sound resemblance and educational usefulness require
+  listening/user review, separately from software checks.
+- Scope: another independent personal experiment; preserve the original song,
+  previous tools and main workstation. Case format, excerpt, estimated tempo,
+  sound controls, algorithm/model choice and UI remain provisional.
+
+## D-2026-10-24-5 · Independent phrase playlist and song delivery — ACTIVE
+
+- Origin: user requests an FL Studio Playlist-like personal experiment: import
+  phrases, list all imported phrases on the left, drag them into a large right
+  arrangement window, adjust positions and export an editable song or audio.
+- Decision: deliver an independent song-studio module connected to the existing
+  .rsphrase workflow. Preserve the prior confirmed default of original phrase
+  speed (D-2026-10-23-3); following song tempo is an explicit per-placement choice.
+- Implementation choices: multitrack bar/beat grid, repeated/overlapping clips,
+  drag/snap/free precision, zoom/scroll, copy/delete, track and clip gain/mute,
+  undo/redo, device-clock transport and streamed polyphonic mix with release.
+  Self-contained .rssong embeds the imported phrase snapshots and exact sample
+  settings/audio. WAV uses the same renderer. Atomic replacement/cancellation,
+  close-save prompts and a separate content-addressed recovery cache protect work.
+- Provisional limits: 4/4, 20–300 BPM, 64 phrases, 32 tracks, 512 placements,
+  100,000 arranged notes, 512 MiB samples and 128 simultaneous voices; at most
+  two hours/2048 bars. No FLP compatibility or main-workstation project bridge.
+  The reference is the placement workflow, not complete FL Studio functionality.
+  Real listening, pointer feel and dialogs remain subject to user acceptance.
+
+## D-2026-10-24-6 · Product independence with licensed open components — ACTIVE
+
+- Origin: user objects that relying on commercial RipX conflicts with project
+  originality, then explicitly selects: "产品与核心流程自主，允许使用许可合适的开源库和模型".
+- Decision: RootSound owns its product design and core creation workflow;
+  appropriately licensed open-source libraries and models may be used. This
+  is not a requirement to reinvent every foundational algorithm or model.
+- Preserve the existing module-boundary and portable-project principles.
+  Evaluate components as replaceable implementations, rather than making a
+  closed commercial application's project format or activation a required
+  foundation. No RipX integration or commercial dependency was approved.
+- Record third-party sources and applicable licence obligations accurately;
+  reuse is not described as wholly self-authored code. Code, model weights and
+  audio assets have separate permissions. A research-only/noncommercial model
+  trial does not authorize shipping those weights with the product.
+- Scope: this confirms an independence/reuse boundary, not a specific library,
+  licence for RootSound, model quality claim or approval of previous failed
+  musical results. Signalsmith Stretch and original-audio editing remain
+  assistant proposals requiring implementation and listening validation.
+
+## D-2026-10-25-1 · Song-first project entry and playlist interaction — ACTIVE
+
+- User: all new/opened projects enter arrangement. Replace its RootSound row
+  with project name, centered transport/rate/BPM/master volume and Save/Save As.
+  Save/Ctrl+S writes the existing project; Save As creates a complete new named
+  folder, default original-name plus “ 1” under installation/project/.
+- Shelf holds only phrases and a same-sized plus tile. Timeline has seven rows
+  by default and a non-droppable plus row without vertical lines. Mixed phrase
+  tempos retain original timing. BPM affects grid only; blank drag offsets grid
+  (implementation interpretation), wheel pans, Shift vertical pans, Ctrl horizontal
+  zooms and Ctrl+Shift vertical zooms. Grid is viewport-rendered and extensible.
+- Rates0.75/1/1.25 change cursor advance and future trigger spacing, never note
+  hold/release or sample pitch/rate. Pause/resume retains note age. Q/E pan,
+  W/S gain, A/D position; double-click edits, right-drag erases instances with
+  quick linear white-outline expansion. Keep reusable phrase in the shelf.
+- Horizontal edits use releasable magnetic alignment. Preview edits live and
+  persist gestures once. Current bounds128 rows and existing musical limits
+  remain implementation limits; existing row counts are preserved on reopen.
+  Full GUI/listening acceptance is separate from programmatic verification.
+
+## D-2026-10-26-1 · Row controls and cursor-anchored visual tempo — ACTIVE
+
+- User replaces the unbounded-left/drag-phase grid: timeline starts at zero,
+  columns have no time labels, blank dragging no longer moves the grid. Larger
+  rows have pinned controls: inline name (new default 行n), color, two-click
+  deletion, full-row selection and smooth drag reordering.
+- Selected clips or rows use Q/E pan, W/S gain, A/D fine position; two quick
+  presses of the same A/D move a total of one visual beat, clamped at zero.
+  Clip drag visuals remain continuous even when final placement is discrete.
+- Playhead is draggable while stopped or playing; a top time box follows it.
+  Square stop returns it to zero and pauses. Repair reported continue failure.
+  BPM changes apply to the background at/after the cursor; left-hand lines
+  remain unchanged and phrase audio timing remains independent.
+- Implementation choice: retain later explicit BPM markers when editing an
+  earlier section, restart grid lines at each marker, and lock the marker
+  time when entering BPM editing so typing during playback creates one section.
+  These details are reversible choices, not additional user-confirmed policy.
+- Empty phrase shelf covers the playlist with “先创建乐句把” and left arrow,
+  highlighting creation. Shelf tiles become flatter rectangles. This supersedes
+  D-2026-10-25-1's negative viewport/blank-drag phase interpretation.
+
+## D-2026-10-26-2 · Reset future grid, explicit project exit and clearer controls — ACTIVE
+
+- User clarifies BPM edits must reset ALL grid lines at/right of the playhead,
+  removing later tempo changes. This supersedes D-2026-10-26-1's provisional
+  preservation of later markers. Earlier lines and musical timing stay intact.
+- Red Exit follows Save As. User explicitly chooses returning to welcome,
+  rather than closing RootSound. Unsaved work prompts cancel, discard, or save
+  and exit. Discard restores the session opening/manual-save checkpoint;
+  unsuccessful saving/restoration keeps the project active. Editor loading
+  scaffolding is excluded from dirty detection; repeated reload cannot clear it.
+- Names use less control space; single click selects, double-click name edits.
+  User requests finer clip positions, more vivid colors and higher contrast
+  theme, empty message ending “吧”, and clicking blank timeline seeks the head.
+- Implementation choices: 24-color palette/custom colors, neutral navy theme,
+  readable light/dark text, smaller magnetic tolerance and Shift 0.1 motion
+  with no snapping. These remain refinable design choices, not visual acceptance.
+
+## D-2026-10-26-3 · Context console and project discovery — ACTIVE
+
+- User requests ordinary, simple, bright default colors instead of a decorative
+  palette. Arrangement uses light gray/white and one muted default clip color;
+  explicit user row colors remain. Row color hit area widens.
+- Add bottom context console. Instance: source BPM/duration/start-time text,
+  name double-click editing, direct phrase editor, graphical gain/pan controls
+  supporting drag/wheel. Row: name/color, bus gain and pan offset. Shelf click
+  selects all uses but console is metadata-only (name/duration/detailed editor);
+  QWEASD disabled. Double-click placed clips edits directly.
+- User first allows start-time editing, then explicitly calls it noneditable.
+  Assistant announced the latter interpretation; position remains editable by
+  timeline drag/keys. This is an interpretation, not a separately confirmed
+  user answer. Console hides when nothing is selected to keep working space.
+- Shelf metadata edits target the shared source; ordinary occurrence edits
+  retain copy-on-write. Whole-source detailed editing selects current-song
+  uses; shared identity may be reused only when all logical uses are selected
+  and no pending source edit would be hidden; otherwise retain safe forking.
+- Project title supports double-click rename; manual Save/Save+Exit updates
+  manifest display name without moving its folder (implementation choice).
+  New-project naming has Back. Open-existing lists valid direct children of
+  default project/, with final custom-folder entry. Outside folders remain
+  manually opened; catalog reading does not register or mutate projects.
+
+## D-2026-10-26-4 · No automatic placement attraction — ACTIVE
+
+- User cancels the earlier slight magnetic pause on alignment. Song clip drag,
+  shelf placement and A/D nudges now follow actual coordinates/deltas without
+  attraction to beat/bar lines or neighboring clip edges. This supersedes all
+  earlier arrangement magnetic-alignment implementation choices. Shift fine
+  movement and deliberate double-A/D one-beat commands remain distinct controls.
+
+## D-2026-10-26-5 · Song and phrase libraries with complete project files — ACTIVE
+
+- Welcome has only brand, greeting and Start. Start opens Song Library: a top
+  New tile, recognizable default-location projects as square tiles, and a bottom
+  file-picker tile. New uses the existing naming/settings flow; entering songs
+  still opens arrangement. This supersedes the two welcome buttons/dropdown.
+- Arrangement shelf + opens Phrase Library, scoped to this song and initially
+  empty; library + creates. The library keeps reusable created phrases, excludes
+  history, and is independent of which phrases are currently visible on shelf.
+- Dragging shows a translucent bottom-right trash target. Timeline trash removes
+  the dragged occurrence(s), as right-click removal does. Shelf trash hides only
+  the shelf entry, preserving library and placed references; readding reuses ID.
+- New songs use one self-contained project file directly under default project/,
+  replacing per-song folder creation. Implementation choice: .rootsound v2
+  RootSoundWorkspace envelope, embedding full material-library snapshot including
+  audio, drafts and undo. Prior folder projects remain readable/saveable; Save As
+  writes the new format. Preserve existing files, no automatic destructive migration.
+- .rsproject remains the narrower legacy graph-exchange format. File names stay
+  at their original path when display titles change; Save As chooses a new file.
+
+## D-2026-10-26-6 · Compact library cards and confirmed permanent deletion — ACTIVE
+
+Console timing and trash placement below are superseded by D-2026-10-26-7;
+the deletion rules remain active.
+
+- User clarifies that library boxes mean rectangles, not squares. Both song and
+  phrase libraries use compact rectangular cards, superseding RB55's square UI.
+- Selection console reveals after pointer release; held selections/drags hide
+  contents without changing the existing footprint. Its own sliders remain live.
+- Bottom-right trash displays the icon alone, with no visible label or tooltip;
+  accessible labels remain. Library entities also support dragging to this target.
+- Library trash asks for confirmation before permanent deletion. Song deletion
+  removes its project file and backup (or recognized legacy project files), and
+  rejects active/locked/replaced/linked/unknown-content targets. Shelf hiding and
+  timeline occurrence removal retain their previous narrower meanings.
+- Phrase deletion removes source/drafts, all current-song placements and related
+  recovery history, while retaining independent tones/samples and other songs.
+  Implementation interpretation: no normal Undo or Exit-discard resurrection.
+  The warning discloses all placements/history and saving the current project.
+  A successful permanent storage write atomically checkpoints editable state;
+  failure changes neither library/token/history nor checkpoint. Title metadata
+  still follows normal manual Save. Ordinary filesystem backups remain for
+  deliberate manual recovery; secure disk erasure was not requested.
+
+## D-2026-10-26-7 · Direct library naming and arrangement interaction — ACTIVE
+
+- Both song and phrase libraries support double-click inline rename. Single-click
+  opening/adding must not preempt renaming. Implementation choice: use the Windows
+  double-click interval plus 50 ms; when unavailable, wait 600 ms. Song-library
+  rename updates both the project display name and the actual selected song draft.
+- Row controls provide Solo and Mute icons. Solo immediately isolates this row
+  and unmutes it; a zero row gain becomes 100% (implementation interpretation of
+  making it audible). Other rows retain their own levels/mute settings. Muting a
+  solo row keeps the other rows quiet; cancelling solo restores their normal mix.
+- Double-clicking any placed phrase opens that occurrence in phrase editing.
+  Repair the earlier ineffective callback: retain the clicked node and recognize
+  consecutive stationary clicks of the same entity across redraws and small jitter,
+  without opening twice when the native double-click event also arrives.
+- Only the top ruler/head handle summons and drags the playhead. Dragging other
+  blank playlist space pans the view, horizontally by default and vertically with
+  Shift; it does not seek. This supersedes the prior blank-space seek behavior.
+- Shelf phrases can be reordered by dragging, with neighboring cards smoothly
+  moving aside. Keep the order in the song; hiding/readding, renaming, undo,
+  reopening and native Save As retain the same phrase identities.
+- The console appears immediately on selection, replacing D-2026-10-26-6's
+  release-time reveal. Add an audition icon to phrase/occurrence consoles.
+  Implementation choice: audition the source phrase, with stop/loading cancellation
+  and cleanup on selection change, navigation or song playback; row consoles have
+  no phrase audition.
+- Put the icon-only trash in the playlist's upper-right corner, without a box
+  outline, using a surrounding white fade. Library dialogs use an upper-right
+  target too. Existing hide/instance/permanent-delete scopes remain unchanged.
+- Save As asks only for a name, defaulting to the original name plus " 1", and
+  creates the independent copy in the default song-library directory. Creation's
+  separate location settings remain available; Save As no longer asks for a path.
+- Storage interpretation: library rename preserves file paths/IDs and uses the
+  application's domain transform plus a version-checked native snapshot commit.
+  Legacy two-file commits validate staged originals against that snapshot before
+  replacing anything, including late external edits and A/B/A changes.
+- Native .rootsound snapshots preserve shelf metadata exactly. The older, narrower
+  .rsproject graph exchange still does not remap display-order metadata on import;
+  it is not the complete-workspace transport. Programmatic checks do not constitute
+  acceptance of real appearance, gesture feel or listening quality.
+
+## D-2026-10-26-8 · Four-bar melody/rhythm phrase workspace — ACTIVE
+
+Length update: D-2026-10-27-6 replaces the fixed four-bar cap with a shared,
+bar-extendable phrase length. Four bars remains the initial length only.
+The blank/no-authoring description below records the RB58 shell. D-2026-10-26-9
+adds a new Melody editor while keeping the overview blank and the old editor unmounted.
+
+- User replaces the main phrase-writing interface with a song-style top bar,
+  showing the phrase name at left. Creation skips a naming dialog and chooses
+  an available 乐句 n; Save retains the phrase in this song's Phrase Library.
+- The remaining space is two equal, full-width rectangles: Melody above Rhythm,
+  separated by a horizontal line. Equal-width left controls carry their names;
+  the right canvas is shared, with no row lines, column lines or displayed notes.
+  The narrow strip above Melody holds the one shared playhead label.
+- Only that strip or the head label seeks/drags the head, including during
+  playback. Blank dragging and wheel pan horizontally; Ctrl+wheel zooms
+  horizontally. There is no vertical scrolling or Shift-specific vertical mode.
+  The window spans four bars rather than the arrangement's extensible timeline.
+- Implementation choices: four bars means16 beats; new phrases have that stored
+  length. Save/Ctrl+S remains in the workspace, Save As automatically names and
+  opens an independent same-song copy, and Exit returns to arrangement. Header
+  gain is persisted in the phrase; omitted gain in older content means unity.
+- Audition ends and resets at16 beats, with speed choices0.75/1/1.25; ordinary
+  notes retain their sound clocks. BPM changes preserve the head's beat position.
+  Only preview boundary tails are bounded; older long phrase bodies/notes and
+  full-song playback/export remain intact, without destructive shortening.
+- Existing detailed-editor source and note data remain, but the new main route
+  does not offer its old controls or an entry into it. Melody/Rhythm creative
+  tools are further work; the blank workspace is the explicitly requested shell,
+  not a claim that new note-authoring tools have been implemented. No actual
+  desktop or sound verification is implied by programmatic checks.
+
+## D-2026-10-26-9 · Melody creation, four cells per beat and fixed-second notes — ACTIVE
+
+Library update: D-2026-10-27-7 expands new-song starters from two to seven and
+replaces add-and-close with continuous library selection, undefined silent tone
+uses and explicit audition/removal controls. Other timing/editor rules remain.
+
+- User confirms four cells per beat as the common timing division for piano roll
+  and future step sequencing. Note starts use beats/cells and follow phrase BPM.
+  On changing BPM, each note keeps its original seconds duration; only starts
+  change. Pitch and timbre remain unchanged. This is distinct from arrangement's
+  background-only BPM and from the independent playback-head speed control.
+- A56px-wide Create strip at the overview Melody section's right opens this
+  phrase's new Melody editor. Keep the header and transport; show the phrase
+  name plus Melody badge and provide Back to overview. The blank overview and
+  retained legacy detailed-editor source are not the new note-authoring UI.
+- A tone shelf plus opens the compact, song-isolated Tone Library. It contains
+  current-song voices, initially including 钢琴 and 长笛, with unique per-kind
+  names. These are local synthesized starting voices, not acoustic samples;
+  repeated entry retains their identities, user changes and names. Reusing a
+  tone selects its existing part rather than creating duplicate parts. Preserve
+  existing/customized data when replacing an untouched empty generated default.
+- The continuous full-range SPN keyboard auditions the selected tone; adding
+  a note auditions it too. Notes are colored by tone; actual notes of other
+  tones are strongly dimmed references, not empty ghost notes, and still play.
+  Continuous dragging follows the pointer before release settles onto the grid.
+- Each note owns level, pitch, start, pan, seconds duration and velocity.
+  Tone selection shows only its name in the console; note selection exposes
+  editable note attributes. Q/E adjusts pan, W/S level and A/D one cell; two
+  same-direction presses within150ms move one beat in total. Do not present
+  unsupported pizzicato/bowing controls for the two supplied starting voices.
+- Compatibility implementation: optional durationSeconds stores physical length;
+  header setTempo(value,{preserveNoteDurations:true}) materializes old notes'
+  original duration before retiming starts. Old bodies remain readable without
+  forced global migration. Rhythm authoring tools remain future work. Final
+  regression/build evidence and actual GUI/listening acceptance are separate.
+
+## D-2026-10-27-1 · Tone-row rhythm creation with shared editing controls — ACTIVE
+
+Playback scope update: D-2026-10-27-5 isolates each detail editor's audition;
+the shared/full playback below now means overview, arrangement and complete output.
+
+- User adds a Create strip at the overview Rhythm section's right. It opens this
+  phrase's Rhythm editor, inheriting the phrase header and Melody's tone shelf,
+  tone library and console. Save and transport belong to the same phrase.
+- Rhythm is a roll-like step sequencer with wide rows. A row means a tone rather
+  than a pitch, and its left tone block aligns one-to-one with the right row,
+  like arrangement controls. Keep vertical movement/row sizing aligned.
+- Note placement, dragging, right-click cancellation and the existing QWEASD
+  controls work like Melody. The console follows the same selection model but
+  omits pitch. Keep four cells per beat and the confirmed BPM rule: onsets follow
+  musical cells, while held seconds, physical pitch and timbre stay unchanged.
+- Implementation interpretation: optional per-part department metadata separates
+  Melody and Rhythm authoring; old omitted metadata means Melody. Both groups
+  remain in the same phrase, save/export and play together, and use one song's
+  tone library. Reusing a tone deduplicates within a department, not across both.
+- Cross-row note drag uses the destination tone while preserving note identity,
+  pitch and other note parameters. New rhythm notes provisionally trigger C4;
+  this is an implementation starting point, not a user-approved root-note policy.
+  No pitch/root-note control is shown in Rhythm, and opening old data never
+  rewrites its pitch. Actual appearance/gesture/listening acceptance remains
+  separate from code checks.
+
+## D-2026-10-27-2 · Direct shelf editing, object labels and broader trash fade — ACTIVE
+
+- Double-clicking a phrase card in arrangement's left shelf opens its phrase
+  authoring interface. Single selection and drag behavior continue. This does
+  not repurpose double-click rename inside the song or phrase library dialogs.
+- Add a small type label after the header name: 乐曲 in song arrangement, 乐句
+  in phrase overview and both Melody/Rhythm editors. Keep department labels.
+  Implementation interpretation: the type is a separate display element so
+  inline renaming and saved names do not acquire an automatic suffix.
+- Widen the white mist around the icon-only trash. Preserve existing deletion
+  scopes; the request does not authorize broader deletion or a larger hit target.
+  Halo size, icon size and target dimensions are implementation choices, not
+  user-prescribed measurements. Headless verification remains distinct from
+  actual appearance and gesture acceptance.
+
+## D-2026-10-27-3 · Chromatic keyboard step entry in Melody — ACTIVE
+
+Activation/length update: D-2026-10-27-6 makes performance an opt-in preference,
+off by default, and uses the actual extendable phrase boundary instead of16 beats.
+Selection-context update: D-2026-10-27-4 permits continuous entry after automatic
+new-note selection; other mappings, boundaries and timing policies below remain.
+
+- In Melody, select a tone and use `c f v g b n j m k , l .` for Cn, C♯n, Dn,
+  D♯n, En, Fn, F♯n, Gn, G♯n, An, A♯n, Bn. Z/X moves one octave down/up; Space
+  enters a rest. This mode applies only to tone-only selection, not note selection
+  or Rhythm. Elsewhere Space keeps the existing play/pause behavior.
+- Implementation interpretation: the next cell is the strictly next grid line
+  right of the current head. A note begins there, and the head moves there once,
+  never a second cell for the same key. A rest advances once without a note or
+  starting transport. New notes initially hold one cell's seconds; the confirmed
+  fixed-second duration policy still applies to later BPM edits.
+- Current implementation choices: octave4 initially, n clamped to0–8 while the
+  20–5000Hz note range still applies, and tone selection retained for continuous
+  entry. Unsupported edge pitches do not write or advance. Do not treat these
+  bounds as a permanent product limit or as user acceptance of the feel.
+- Preserve text/input controls, modifier shortcuts, IME composition and dialogs;
+  held-key auto-repeat must not flood notes. Stop at the usable four-bar boundary.
+  Successful entry follows existing undo/save/project protocols; program checks
+  remain distinct from real keyboard and audio-device acceptance.
+
+## D-2026-10-27-4 · Undo, new-note focus and compact editor selection — ACTIVE
+
+Cursor update: D-2026-10-27-6 restores the cursor when undoing/redoing a
+performance-generated note; ordinary edits still do not move it. This is
+session-associated cursor metadata, not a new persisted cursor-history stream.
+
+- Backspace undoes the last edit; Delete remains explicit deletion. Implementation
+  scope: use current musical-domain history, without newly persisted cursor/view
+  history or a special head rewind. Text/value input retains native Backspace.
+- New notes become selected. Preserve continuous Melody typing with an independent
+  armed tone context: automatically selecting a new note must not end step entry.
+  Undo/redo keeps that context if its tone remains valid; manual existing-note
+  selection or right blank ends it. Space rests while armed and plays otherwise.
+- Put Melody/Rhythm consoles only beneath the right editor, not below the left
+  tone shelf. The left shelf keeps the editor's full available height.
+- Note rectangles fit their actual occupied duration without padding or a minimum
+  width stretching short notes. This does not limit long notes to one cell or
+  shorten held audio; existing beat-onset/fixed-second timing remains.
+- Right blank clears all selection and its console, including notes, tones, rows
+  and shelf phrase sources. It makes no musical edit. Right-clicking notes and
+  right-dragging their hitboxes still erases them. Program checks remain separate
+  from actual visual, gesture and listening acceptance.
+
+## D-2026-10-27-5 · Generated-note audition, section playback and octave row edges — ACTIVE
+
+- A generated note sounds once. Implementation timing: mouse press auditions the
+  temporary note immediately, release commits without replay; successful keyboard
+  entry auditions after transport positioning settles. Rests, guarded inputs and
+  held-key repeat do not audition. Pending work must not sound after its selection
+  scope changes or its editor closes. Existing note timing and duration rules remain.
+- Melody detail plays only its Melody notes; Rhythm detail plays only its Rhythm
+  notes. Overview plays both. Implementation interpretation: live view switching,
+  mix/BPM edits and pause/resume preserve that scope; an empty section runs silently.
+  The filter belongs to a temporary sound plan, never saved phrase data. Complete
+  phrase compilation, arrangement and export continue to include both sections.
+- Remove Cn–Bn from the console. Indicate the active keyboard-entry octave by
+  highlighting the corresponding pitch rows' left edges; Z/X moves that range.
+  Implementation interpretation: use the existing armed tone context, preserving
+  highlights when a new note is automatically selected, clearing on manual existing
+  note selection/right blank, and showing no octave range in Rhythm. Edge pitches
+  still obey the existing supported range. No extra text or controls are required.
+- These implementation choices and program checks are not actual appearance,
+  keyboard/gesture or sound-device acceptance.
+
+## D-2026-10-27-6 · Opt-in keyboard performance, view navigation and bar extension — ACTIVE
+
+- Put Settings immediately before Save in module top bars. Keyboard performance
+  (`c f v g b n j m k , l .`, with the existing octave/rest keys) is a persisted
+  setting, disabled by default. Closing settings refreshes the editor. Existing
+  text/value input, IME, dialogs and unrelated shortcuts remain protected.
+- Z/X changes the active octave and vertically centers its highlighted pitch-row
+  range in the visible piano roll, constrained by the supported pitch boundaries.
+- Arrows pan the piano roll, rhythm step view and song playlist. Ctrl+Up/Down
+  zooms vertically; Ctrl+Left/Right zooms horizontally. Implementation choices:
+  center-anchored zoom, Right/Up enlarge and Left/Down reduce,64px horizontal
+  pan and one current row vertical pan. Navigation alone changes no music/history.
+- Undoing a performance-generated note restores the playhead to before that
+  entry; redo restores its after-entry location. Ordinary edits do not move the
+  head. Implementation: associate these coordinates with the editor session's
+  musical undo/redo state; do not persist a separate cursor history in the project.
+- A rightmost + column in Melody and Rhythm extends their shared phrase by one
+  bar (four beats). Start with four bars; use the full length for overview,
+  preview, saving, arrangement and export. Preserve existing music and fixed-second
+  durations. Implementation choices: retain cell width and reveal the new end;
+  the current domain ceiling is64 beats/16 bars, where + becomes disabled. This
+  is a current implementation limit, not a permanent product decision.
+- These replace the earlier fixed16-beat viewport, always-active keyboard entry
+  and blanket no-cursor-rewind policies only within the scopes above. Actual
+  desktop interaction and listening acceptance remain separate from code checks.
+
+## D-2026-10-27-7 · Persistent library selection, undefined tones and bundled voices — ACTIVE
+
+Melody membership toggles below are superseded by D-2026-10-27-8; Rhythm and
+phrase-library selection retain these policies. Historical verification keeps its scope.
+
+- Tone and phrase libraries remain open while cards toggle selection; their upper
+  right return control is a right arrow. Phrase selection controls shelf visibility
+  only: hiding a source never removes its placed instances or its saved identity.
+  Preserve inline double-click rename and existing guarded permanent deletion.
+- User clarification replaces the initial assistant idea of merely hiding a tone:
+  unchecking retains its notes but leaves their tone undefined and silent. Undefined
+  parts remain visible in the left shelf. Implementation: an optional `unassigned`
+  flag defaults to assigned for older data; retain the original binding so rechecking
+  restores the same parts/notes. Its library card is unselected while undefined;
+  project saving and transfer preserve the undefined state and notes.
+- A selected left tone clears all its notes only after two Delete presses. The
+  implementation currently uses a500ms interval. Its console Delete button requires a double-click; a single click
+  does nothing. Clear the notes in one undoable edit while retaining the tone part.
+  Delete on a selected individual note retains its existing individual-note meaning.
+- Tone library cards can be dragged to an icon-only trash. Implementation scope:
+  remove matching parts and their notes only in the current phrase department, with
+  undo available. Keep the song's tone asset, other department and other phrases.
+  This is distinct from unchecking a tone, which keeps undefined notes.
+- A separate play button beside shelf and library tone cards auditions the tone
+  without changing selection, library membership or musical content. Undefined
+  shelf tones have no playable voice and their audition control is disabled.
+- New songs own seven independent bundled local synthesis starting points: 钢琴,
+  长笛, 底鼓, 踢, 弦乐, 小号 and 吉他. The two drum labels represent different sound
+  flavors. These are synthesized approximations, not recorded instruments; preserve
+  project isolation, edited names and sound data, and idempotent preparation.
+- Make tone, phrase and song cards smaller while retaining their rectangular form.
+  Support an empty phrase even after its last part is removed in the new phrase UI.
+  These rules supersede the former add-and-close libraries and two-starter palette
+  within this scope; historical verification is not reinterpreted as current proof.
+  Program checks remain separate from actual interface and listening acceptance.
+
+## D-2026-10-27-8 · Melody total-note families and a single-tone picker — ACTIVE
+
+- Melody's left sidebar is a note-family shelf. The user's term is 总音符: each
+  box controls one independent family of roll notes. Display only its contained
+  tone's name, not a separately exposed family name.
+- + still opens the current song's tone library, but this Melody context chooses
+  one tone rather than toggling membership. Implementation: choosing creates a
+  new family and returns; cancelling creates no empty family or reassignment.
+  Other families are dimmed independently, including those sharing its tone;
+  note colors remain tone-based. Multiple families may share the same tone; identical
+  visible tone labels do not mean duplicate tone entities or merged note families.
+- A selected total-note console offers 更换音色. Its single-tone picker changes
+  only this family's tone for all its notes. Preserve family and note identities,
+  onset, physical pitch, held seconds, level, pan and velocity; do not alter other
+  families, Rhythm, other phrases or the tone asset itself. Keep undo/save/transfer.
+- Implementation scope: existing phrase parts map directly to these families,
+  without forced file migration. Existing undefined families remain silent until
+  assigned a tone; choosing a replacement defines that family again. Keep the
+  shared playhead position when changing its tone.
+- This request targets Melody. Rhythm retains its tone shelf and multi-select
+  library behavior; phrase-library shelf selection also continues. Existing
+  standalone audition and guarded clearing of a family's notes remain available.
+  Actual interface/gesture and listening acceptance remain separate from checks.
+
+## D-2026-10-27-9 · Focus the audience on electronic and rhythm-game music beginners — UPDATED BY D-2026-10-27-10
+
+- User narrows RootSound's current intended audience from all beginning music
+  creators to beginners interested in electronic music and rhythm-game music.
+  This is the user decision; it is not evidence of market size or willingness to pay.
+- The purpose of reducing the friction between musical ideas and editable work
+  continues within that audience. Existing Windows-first and offline-first decisions
+  remain applicable. This does not authorize unrelated implementation or deletion.
+- Exact substyles, the first successful user task, release priorities and commercial
+  offers remain undecided. Suggestions such as starting with short editable examples
+  are assistant proposals, not accepted requirements or promised capabilities.
+
+## D-2026-10-27-10 · Rhythm-game music creation is the final purpose — ACTIVE
+
+- User explicitly changes the product's final purpose to: 使音游曲爱好者能够快速上手做出满意的音游曲
+  (enable rhythm-game music enthusiasts to get started quickly and create
+  rhythm-game music they find satisfying). This replaces the earlier universal
+  all-people/any-sound goal, not merely the marketing audience. Low learning and
+  operation friction remains a design principle serving this outcome.
+- User confirms the next milestone: first make an original passage satisfying,
+  then extend to a full song through the same workflow. A short passage is a
+  milestone, not a replacement for the complete-song final purpose.
+- User chooses `D:/Sound/temp/music/vulcanus.mp3`, 0–20 seconds, as the first
+  listening reference. The reference window does not prescribe output duration
+  or authorize claiming copyright in that recording. Earlier Vulcanus experiments
+  and their failed listening acceptance remain historical evidence, not approval.
+- Specific musical acceptance criteria, the original passage's length, style
+  scope, completion-time targets and exact assistance model remain to be agreed.
+  Do not equate all rhythm-game music with one genre, a high BPM or one preset.
+- Existing architecture, Windows/offline decisions, data protection and ownership
+  boundaries continue unless separately revised. This purpose change does not
+  authorize code deletion, a new full rebuild or arbitrary-song reverse-engineering
+  claims. Proposed priorities must be evaluated against musical results and user
+  ability to make intentional changes; program checks are not listening acceptance.

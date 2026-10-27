@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "dependencies": {
+    "net9.0-windows10.0.19041": {
+      "rootsound.referencestudio": {
+        "type": "Project"
+      }
+    }
+  }
+}

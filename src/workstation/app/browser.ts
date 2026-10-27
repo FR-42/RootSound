@@ -14,11 +14,16 @@ import { createBrowserSoundFiles, createBrowserAudioFiles, createBrowserProjectF
 import { createWorkspacePreferences } from './platform/preferences.ts';
 import { createBrowserSampleFiles } from './platform/sample-files.ts';
 import { previewSavedSample } from './sample-preview.ts';
+import { createProjectSetup, projectName } from './project-setup.ts';
+import { createProjectPhrase, copyProjectPhrase, retainProjectPhrases, readProjectPhraseInfo, readProjectPhrases, renameProjectPhrase, deleteProjectPhrase } from './project-phrases.ts';
+import { ensureProjectMelodyTimbres, listProjectTimbres, addProjectPhraseTimbre, createProjectPhraseNoteGroup, changeProjectPhraseNoteGroupTimbre, removeProjectPhraseTimbre } from './project-timbres.ts';
+import type { ProjectDirectoriesPort } from '../contracts/project-directory.ts';
 
 // Platform adapters share the same musical units and never silently switch stores.
 const STORAGE_KEY = 'rootsound.workstation.materials.v1';
 const root = document.getElementById('app')!;
 const runtime = createBrowserSoundRuntime();
+async function start(): Promise<void> {
 try {
   const platform = isDesktopOrigin() ? createDesktopPlatform() : {
     storage: { read: () => localStorage.getItem(STORAGE_KEY), write: (value: string) => localStorage.setItem(STORAGE_KEY, value) },
@@ -27,6 +32,8 @@ try {
     projectFiles: createBrowserProjectFiles(),
     sampleFiles: createBrowserSampleFiles(),
   };
+  const directories = 'projectDirectories' in platform ? platform.projectDirectories as ProjectDirectoriesPort | undefined : undefined;
+  const directoryState = await directories?.read();
   const previous = platform.storage.read();
   const contentAdapters = [createTimbreReferenceAdapter(), createPhraseReferenceAdapter(), createSongReferenceAdapter(), createCoCreationReferenceAdapter(), createSampleReferenceAdapter()];
   const library = createMaterialLibrary(platform.storage, { project: { rootKind: 'rootsound.song', adapters: contentAdapters } });
@@ -37,7 +44,7 @@ try {
   const phrasePlayback = createPhrasePlayback(library, timbrePlayback);
   const phrase = createPhraseEditor(library, timbrePlayback);
   const postProduction = createPostProduction();
-  const song = createSongEditor(library, phrasePlayback, { defaultTempoMode: 'source', postProduction });
+  const song = createSongEditor(library, phrasePlayback, { defaultTempoMode: 'source', postProduction, initialTrackCount: 7 });
   const songPlayback = createSongPlayback(library, phrasePlayback, postProduction);
   const sampling = createSampling(library, { files: platform.sampleFiles, decoder, capture: createBrowserSampleCapture() });
   const recognition = createMelodyRecognition(library, { analyzer: createBrowserMelodyAnalyzer(), currentSourceToken() {
@@ -46,7 +53,79 @@ try {
   const references = createReferenceEditing(library, contentAdapters);
   const projects = createProjectPackages(library, contentAdapters, { rootKind: 'rootsound.song' });
   const preferences = createWorkspacePreferences({ getItem: key => localStorage.getItem(key), setItem: (key, value) => localStorage.setItem(key, value) });
+  // Creating dormant editors can add their initial drafts. Finish this one-time
+  // loading phase before the user can edit; subsequent reloads cannot clear dirty state.
+  if (directoryState?.current) {
+    if (song.read().body?.tempoMode === 'song') song.setTempoMode('source');
+    await directories?.finishLoading?.();
+  }
   const studio = mountStudio(root, { timbre, phrase, song, sampling, recognition, references,
+    projectName: directoryState?.current?.name,
+    doubleClickIntervalMs: directoryState?.doubleClickIntervalMs,
+    projectSetup: directories ? createProjectSetup(directories, () => { runtime.stopAll(); location.reload(); }, {
+      read() { const text = platform.storage.read(); if (text === null) throw new Error('当前没有可以另存的项目。'); return text; },
+      songDraftId() { const id = song.read().draft?.id; if (!id) throw new Error('当前没有打开的歌曲。'); return id; },
+      name() { return song.read().draft?.name ?? directoryState?.current?.name ?? '我的歌曲'; },
+    }) : undefined,
+    onNewPhrase(timbreId) {
+      const id = song.read().draft?.id; if (!id) throw new Error('先创建或打开一个歌曲项目。');
+      phrase.openDraft(createProjectPhrase(library, id, timbreId).draftId);
+    },
+    onCopyPhrase() {
+      const songId = song.read().draft?.id; const draftId = phrase.read().draft?.id;
+      if (!songId || !draftId) throw new Error('先打开一个歌曲和乐句。');
+      phrase.openDraft(copyProjectPhrase(library, songId, draftId).draftId);
+    },
+    onPrepareMelody() {
+      const songId = song.read().draft?.id; if (!songId) throw new Error('先打开一首歌曲。');
+      ensureProjectMelodyTimbres(library, songId);
+    },
+    projectTimbres() {
+      const songId = song.read().draft?.id;
+      return songId ? listProjectTimbres(library, songId).map(({ id, name }) => ({ id, name })) : [];
+    },
+    onAddPhraseTimbre(id, section) {
+      const songId = song.read().draft?.id; const draftId = phrase.read().draft?.id;
+      if (!songId || !draftId) throw new Error('先打开一个歌曲和乐句。');
+      return addProjectPhraseTimbre(library, songId, draftId, id, section);
+    },
+    onCreateNoteGroup(id) {
+      const songId = song.read().draft?.id; const draftId = phrase.read().draft?.id;
+      if (!songId || !draftId) throw new Error('先打开一个歌曲和乐句。');
+      return createProjectPhraseNoteGroup(library, songId, draftId, id);
+    },
+    onChangeNoteGroupTimbre(partId, timbreId) {
+      const songId = song.read().draft?.id; const draftId = phrase.read().draft?.id;
+      if (!songId || !draftId) throw new Error('先打开一个歌曲和乐句。');
+      changeProjectPhraseNoteGroupTimbre(library, songId, draftId, partId, timbreId);
+    },
+    onRemovePhraseTimbre(id, section) {
+      const songId = song.read().draft?.id; const draftId = phrase.read().draft?.id;
+      if (!songId || !draftId) throw new Error('先打开一个歌曲和乐句。');
+      removeProjectPhraseTimbre(library, songId, draftId, id, section);
+    },
+    onKeepPhrases(ids) {
+      const id = song.read().draft?.id; if (!id) throw new Error('当前没有打开的歌曲。');
+      retainProjectPhrases(library, id, ids);
+    },
+    phraseInfo(id) {
+      const songId = song.read().draft?.id; if (!songId) throw new Error('先打开一个歌曲项目。');
+      return readProjectPhraseInfo(library, songId, id);
+    },
+    projectPhrases() {
+      const songId = song.read().draft?.id; if (!songId) return [];
+      return readProjectPhrases(library, songId);
+    },
+    onDeletePhrase(id) {
+      const songId = song.read().draft?.id; if (!songId) throw new Error('当前没有打开的歌曲。');
+      deleteProjectPhrase(library, songId, id);
+    },
+    onRenamePhrase(id, name, ref) {
+      const songId = song.read().draft?.id; if (!songId) throw new Error('先打开一个歌曲项目。');
+      return renameProjectPhrase(library, songId, id, name, ref);
+    },
+    onRenameProject(name) { song.rename(projectName(name)); },
+    initialEntry: directoryState ? directoryState.current ? 'song' : 'welcome' : undefined,
     catalog: createMaterialCatalog(library, { currentProject: () => song.read().draft }), preferences,
     entities: createProjectAssets(library, () => song.read().draft),
     sound: runtime, hasPrevious: previous !== null, files: platform.files, audioFiles: platform.audioFiles,
@@ -80,3 +159,5 @@ try {
   message.append(title, explanation, detail); root.replaceChildren(message);
   void runtime.dispose();
 }
+}
+void start();

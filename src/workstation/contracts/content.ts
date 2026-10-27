@@ -87,6 +87,8 @@ export interface MaterialTransaction {
   replaceDrafts?: { expected: Draft; replacement: Draft }[];
   deleteContents?: ContentRecord[];
   deleteDrafts?: Draft[];
+  /** Confirmed irreversible removal: forget deleted identities in custody and affected undo records. No undo anchor is allowed. */
+  permanentDelete?: true;
   /** Explicit project assets, distinct from history retention and playback references. */
   projectMembers?: { rootId: string; contentIds: string[] }[];
 }
@@ -112,6 +114,8 @@ export type SaveResult =
 export interface MaterialStorage {
   read(): string | null;
   write(value: string): void;
+  /** Irreversible changes also replace the session's discard checkpoint atomically. */
+  writePermanent?(value: string): void;
 }
 
 export interface MaterialLibrary {

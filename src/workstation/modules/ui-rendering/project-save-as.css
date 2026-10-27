@@ -1,0 +1,8 @@
+.project-copy-dialog { width: min(440px, calc(100vw - 40px)); padding: 24px; background: #fff; color: #263544; border: 1px solid #b7c2cc; border-radius: 7px; }
+.project-copy-dialog::backdrop { background: #26354465; }
+.project-copy-dialog .library-heading h2 { margin: 0; }
+.project-copy-field { display: flex; flex-direction: column; gap: 10px; margin-top: 22px; font-size: 13px; color: #526474; }
+.project-copy-dialog input { color: #263544; background: #f7f9fb; border-color: #b7c2cc; }
+.project-copy-dialog button { color: #32495b; background: #f1f4f6; border-color: #bdc8d2; }
+.project-copy-dialog .primary { background: #426d91; color: #fff; border-color: #426d91; }
+.project-copy-actions { display: flex; justify-content: flex-end; margin-top: 28px; }

@@ -1,0 +1,19 @@
+{
+  "name": "Vulcanus-Low-Drum",
+  "rate": 48000,
+  "channels": 2,
+  "frames": 12480,
+  "hash": "7672A4A5149386240378DDE38C9FA8EC557D3FF16093A380870EA83553EB8428",
+  "settings": {
+    "RootMidi": 36,
+    "AttackSeconds": 0.001,
+    "DecaySeconds": 0,
+    "Sustain": 1,
+    "ReleaseSeconds": 0.025,
+    "LoopEnabled": false,
+    "LoopStart": 0,
+    "LoopEnd": 0,
+    "LoopCrossfadeSeconds": 0.015,
+    "GainDb": 0
+  }
+}

@@ -53,6 +53,7 @@ export function mountSampleTimbreWorkspace(root: HTMLElement, options: {
   if (options.onExport) tools.append(button('导出音频', 'quiet', () => leave(options.onExport!)));
   if (options.onLibrary) tools.append(button('素材', 'quiet', () => leave(options.onLibrary!)));
   if (options.onSettings) tools.append(button('设置', 'quiet', () => leave(options.onSettings!)));
+  const saveControls = createSaveControls({ onSave: save }); tools.append(saveControls.element);
   toolbar.append(tools); page.append(toolbar);
   const main = node('main', 'sample-timbre-workspace');
   const navigation = node('div'); main.append(navigation);
@@ -117,9 +118,8 @@ export function mountSampleTimbreWorkspace(root: HTMLElement, options: {
   }
   const attack = slider('起音', 2, '0.005'); const release = slider('收音', 4, '0.01'); contour.append(envelopeSliders); card.append(contour);
   const footer = node('div', 'sound-card-footer'); const volumeLabel = node('label', 'volume-control', '轻一点'); const volume = node('input'); volume.type = 'range'; volume.min = '0'; volume.max = '1'; volume.step = '0.01'; volume.setAttribute('aria-label', '声音音量'); volumeLabel.append(volume, node('span', '', '响一点')); footer.append(volumeLabel);
-  const saveControls = createSaveControls({ onSave: save });
   let hasApplyElsewhere: boolean | undefined;
-  footer.append(saveControls.element); card.append(footer); main.append(card);
+  card.append(footer); main.append(card);
   const notice = node('p', 'studio-notice'); notice.setAttribute('role', 'status'); main.append(notice); page.append(main);
   let entities = options.renderEntities?.(); let entitiesSignature = '';
   if (entities) { page.classList.add('has-entity-rail'); page.append(entities); }

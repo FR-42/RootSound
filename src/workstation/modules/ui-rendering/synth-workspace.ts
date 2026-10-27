@@ -62,6 +62,7 @@ export function mountSynthWorkspace(root: HTMLElement, options: Options) {
   if (fileActions.children.length) tools.append(fileButton, fileActions);
   if (options.onLibrary) tools.append(button('素材', 'quiet', () => leave(options.onLibrary!)));
   if (options.onSettings) tools.append(button('设置', 'quiet', () => leave(options.onSettings!)));
+  const saveControls = createSaveControls({ onSave: save }); tools.append(saveControls.element);
   toolbar.append(tools); page.append(toolbar);
   const main = node('main', 'synth-workspace'); const navigation = node('div', 'synth-navigation'); main.append(navigation);
   const heading = node('header', 'synth-heading'); const title = node('div'); const name = node('input', 'sound-name');
@@ -135,7 +136,7 @@ export function mountSynthWorkspace(root: HTMLElement, options: Options) {
   });
   main.append(keyboard);
   const footer = node('footer', 'synth-footer'); range(footer, '音量', 0, 1, .01, value => value.level, (value, n) => { value.level = n; }, percent);
-  const saveControls = createSaveControls({ onSave: save }); footer.append(saveControls.element); main.append(footer);
+  main.append(footer);
   let saveControlsSignature = '';
   const notice = node('p', 'studio-notice'); notice.setAttribute('role', 'status'); main.append(notice); page.append(main);
   let entities = options.renderEntities?.(); let entitySignature = '';

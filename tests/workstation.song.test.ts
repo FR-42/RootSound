@@ -85,7 +85,7 @@ test('changing song tempo in source mode moves beat-based placement but never re
 test('track level, pan, mute and solo apply to execution without rewriting saved phrases', () => {
   const f = fixture(); const a = start(f); const b = f.song.addTrack('回应'); const c = f.song.addTrack('静静');
   f.song.addClip(a, f.first.id, 0); f.song.addClip(b, f.second.id, 0); f.song.addClip(c, f.first.id, 4);
-  f.song.updateTrack(a, { level: 0.25, pan: -0.7 }); f.song.updateTrack(b, { level: 0.5, pan: 0.6 }); f.song.updateTrack(c, { muted: true, solo: true });
+  f.song.updateTrack(a, { level: 0.25, pan: -0.7 }); f.song.updateTrack(b, { level: 0.5, pan: 0.6 }); f.song.updateTrack(c, { muted: true, solo: false });
   const originalLevel = f.phrases.planForSaved(f.first.id).events[0]!.sound.level; const before = f.raw();
   const mixed = f.song.previewPlan(); assert.equal(mixed.events.length, 2); assert.equal(mixed.events[0]!.sound.level, originalLevel * 0.25); assert.equal(mixed.events[0]!.pan, -0.7); assert.equal(mixed.events[1]!.pan, 0.6);
   assert.equal(f.raw(), before); f.song.updateTrack(b, { solo: true }); const solo = f.song.previewPlan(); assert.equal(solo.events.length, 1); assert.equal(solo.events[0]!.sound.note.frequencyHz, 330);
@@ -123,7 +123,7 @@ test('invalid controls, missing references and timeline limits preserve the comp
   for (const startBeat of [-1, NaN, Infinity, 1020]) assert.throws(() => f.song.moveClip(track, clip, track, startBeat));
   for (const changes of [{ level: 1.1 }, { pan: -2 }, { muted: 1 }, { name: '' }, { future: true }]) assert.throws(() => f.song.updateTrack(track, changes as never));
   for (const length of [0, 15, 1025, NaN]) assert.throws(() => f.song.setLength(length));
-  assert.throws(() => f.song.addClip(track, f.voice.id, 0)); assert.throws(() => f.song.addClip(track, 'missing', 0)); assert.throws(() => f.song.removeTrack(track));
+  assert.throws(() => f.song.addClip(track, f.voice.id, 0)); assert.throws(() => f.song.addClip(track, 'missing', 0)); assert.throws(() => f.song.removeTrack('missing'));
   assert.throws(() => f.song.setTempoMode('guess' as 'source')); assert.throws(() => f.song.repeatClip(track, clip, 0)); assert.throws(() => f.song.repeatClip(track, clip, 1.5));
   assert.equal(f.raw(), before); assert.deepEqual(f.song.read(), view);
 });
@@ -225,7 +225,7 @@ test('unsupported song bodies and dependency tampering are preserved and isolate
 
 test('strict song decoding rejects unknown fields, duplicate identities, booleans and nonfinite values', () => {
   assert.deepEqual(readSongBody(baseBody()), baseBody());
-  const variants: unknown[] = [null, { ...baseBody(), version: 2 }, { ...baseBody(), tempoMode: undefined }, { ...baseBody(), tracks: [] },
+  const variants: unknown[] = [null, { ...baseBody(), version: 2 }, { ...baseBody(), tempoMode: undefined }, { ...baseBody(), tracks: null },
     { ...baseBody(), tracks: [{ ...baseBody().tracks[0], pan: NaN }] }, { ...baseBody(), tracks: [{ ...baseBody().tracks[0], muted: 'yes' }] },
     { ...baseBody(), tracks: [{ ...baseBody().tracks[0], clips: [{ id: 'track-a', phraseId: 'phrase', startBeat: 0 }] }] },
     { ...baseBody(), tracks: [{ ...baseBody().tracks[0], effect: 'unknown' }] },

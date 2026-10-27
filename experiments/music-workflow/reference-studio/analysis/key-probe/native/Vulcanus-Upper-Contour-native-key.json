@@ -1,0 +1,19 @@
+{
+  "name": "Vulcanus-Upper-Contour",
+  "rate": 48000,
+  "channels": 2,
+  "frames": 129600,
+  "hash": "D07FCFA93A23A0B79B4A3396490049D9808558155FC42ACC3360ECED7497A66B",
+  "settings": {
+    "RootMidi": 70,
+    "AttackSeconds": 0.004,
+    "DecaySeconds": 0.08,
+    "Sustain": 0.6,
+    "ReleaseSeconds": 0.06,
+    "LoopEnabled": false,
+    "LoopStart": 0,
+    "LoopEnd": 0,
+    "LoopCrossfadeSeconds": 0.015,
+    "GainDb": 0
+  }
+}

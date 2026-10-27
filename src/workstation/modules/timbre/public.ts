@@ -1,7 +1,7 @@
 import type { ContentRecord, Draft, JsonValue, MaterialLibrary, SaveConfirmation } from '../../contracts/content.ts';
 import type { ReferenceAdapter } from '../../contracts/references.ts';
-import type { PlayableNotePlan, SoundPlan } from '../../contracts/sound.ts';
-import type { EditableTimbreBody, SampleTimbreBody, TimbreBody, TimbreEditorPort, TimbrePlaybackPort } from '../../contracts/timbre.ts';
+import type { BasicWaveform, PlayableNotePlan, SoundPlan } from '../../contracts/sound.ts';
+import type { EditableTimbreBody, SampleTimbreBody, SynthesizerBody, TimbreBody, TimbreEditorPort, TimbrePlaybackPort } from '../../contracts/timbre.ts';
 import { readSynthesizerBody, synthesisPlan, timbrePresets } from './synthesis.ts';
 export { readSynthesizerBody, synthesisFromBasic, timbrePresets, previewTimbrePreset } from './synthesis.ts';
 export type { SynthesizerBody, TimbrePreset } from '../../contracts/timbre.ts';
@@ -19,6 +19,58 @@ export function prepareBasicTimbre(name = '旋律的声音'): ContentRecord {
   return { id: crypto.randomUUID(), kind: KIND, owner: OWNER, schemaVersion: 1, revision: 1,
     name: name.trim(), dependencies: [], body: readTimbreBody({ model: 'basic-synth', version: 1, character: 'warm',
       attackSeconds: 0.015, releaseSeconds: 0.12, level: 0.65 }) };
+}
+
+/** Local synthesized starting voices, not sampled acoustic-instrument emulations. */
+export function prepareMelodyTimbres(): ContentRecord[] {
+  const patches: Array<{ key: string; name: string; attackSeconds: number; decaySeconds: number; sustain: number; releaseSeconds: number;
+    cutoff: number; resonance?: number; pitch?: SynthesizerBody['pitch'];
+    sources: Array<{ waveform: BasicWaveform; semitones: number; level: number; detuneCents?: number }> }> = [
+    { key: 'piano', name: '钢琴', attackSeconds: .0025, decaySeconds: 1.35, sustain: .035, releaseSeconds: .22,
+      cutoff: 4200, sources: [
+        { waveform: 'sine', semitones: 0, level: .66 }, { waveform: 'triangle', semitones: 0, level: .18 },
+        { waveform: 'sine', semitones: 12, level: .125 }, { waveform: 'sine', semitones: 24, level: .035 },
+      ] },
+    { key: 'flute', name: '长笛', attackSeconds: .045, decaySeconds: .12, sustain: .92, releaseSeconds: .14,
+      cutoff: 5000, sources: [
+        { waveform: 'sine', semitones: 0, level: .84 }, { waveform: 'sine', semitones: 12, level: .1 },
+        { waveform: 'noise', semitones: 0, level: .025 }, { waveform: 'triangle', semitones: 0, level: .035 },
+      ] },
+    { key: 'bass-drum', name: '底鼓', attackSeconds: .0015, decaySeconds: .34, sustain: 0, releaseSeconds: .09,
+      cutoff: 1700, pitch: { semitones: 19, seconds: .085 }, sources: [
+        { waveform: 'sine', semitones: -24, level: .9 }, { waveform: 'triangle', semitones: -12, level: .065 },
+        { waveform: 'noise', semitones: 0, level: .035 },
+      ] },
+    { key: 'kick', name: '踢', attackSeconds: .0005, decaySeconds: .2, sustain: 0, releaseSeconds: .045,
+      cutoff: 4600, pitch: { semitones: 32, seconds: .035 }, sources: [
+        { waveform: 'sine', semitones: -24, level: .8 }, { waveform: 'triangle', semitones: -12, level: .12 },
+        { waveform: 'noise', semitones: 0, level: .08 },
+      ] },
+    { key: 'strings', name: '弦乐', attackSeconds: .13, decaySeconds: .24, sustain: .83, releaseSeconds: .48,
+      cutoff: 3600, sources: [
+        { waveform: 'sawtooth', semitones: 0, detuneCents: -7, level: .45 },
+        { waveform: 'sawtooth', semitones: 0, detuneCents: 7, level: .4 },
+        { waveform: 'triangle', semitones: 12, level: .15 },
+      ] },
+    { key: 'trumpet', name: '小号', attackSeconds: .025, decaySeconds: .16, sustain: .72, releaseSeconds: .12,
+      cutoff: 4200, resonance: .35, pitch: { semitones: -.7, seconds: .065 }, sources: [
+        { waveform: 'sawtooth', semitones: 0, level: .54 }, { waveform: 'triangle', semitones: 0, level: .22 },
+        { waveform: 'square', semitones: 12, level: .12 }, { waveform: 'sine', semitones: 0, level: .12 },
+      ] },
+    { key: 'guitar', name: '吉他', attackSeconds: .001, decaySeconds: .8, sustain: .015, releaseSeconds: .18,
+      cutoff: 3500, sources: [
+        { waveform: 'triangle', semitones: 0, level: .45 }, { waveform: 'sine', semitones: 0, level: .395 },
+        { waveform: 'triangle', semitones: 12, level: .13 }, { waveform: 'noise', semitones: 0, level: .025 },
+      ] },
+  ];
+  return patches.map(patch => ({ id: crypto.randomUUID(), kind: KIND, owner: OWNER, schemaVersion: 1, revision: 1,
+    name: patch.name, dependencies: [], body: readSynthesizerBody({ model: 'synthesizer', version: 1,
+      sources: patch.sources.map((source, index) => ({ ...source, id: `rootsound.melody.${patch.key}.v1:${index}`,
+        enabled: true, detuneCents: source.detuneCents ?? 0 })),
+      attackSeconds: patch.attackSeconds, decaySeconds: patch.decaySeconds, sustain: patch.sustain,
+      releaseSeconds: patch.releaseSeconds, level: .65,
+      filter: { enabled: true, type: 'lowpass', frequencyHz: patch.cutoff, resonance: patch.resonance ?? .1 },
+      pitch: patch.pitch ?? { semitones: 0, seconds: .12 } }) }));
 }
 
 /** The manager need not know whether this owner uses synthesis or samples. */

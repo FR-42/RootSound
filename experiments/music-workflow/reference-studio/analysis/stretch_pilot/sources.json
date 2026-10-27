@@ -1,0 +1,14 @@
+[
+  {
+    "repository": "Signalsmith-Audio/signalsmith-stretch",
+    "commit": "88061fd4eda56a2353c5d65c74aa3f4ccf76f9da",
+    "url": "https://codeload.github.com/Signalsmith-Audio/signalsmith-stretch/zip/88061fd4eda56a2353c5d65c74aa3f4ccf76f9da",
+    "archive_sha256": "717711bcf859a9a9a8cbb4baa6a8f994ca594368335eb73430fb6ac98ff1fc04"
+  },
+  {
+    "repository": "Signalsmith-Audio/linear",
+    "commit": "7bb1c8f36794d6980080ce817c91f8da8fe56a66",
+    "url": "https://codeload.github.com/Signalsmith-Audio/linear/zip/7bb1c8f36794d6980080ce817c91f8da8fe56a66",
+    "archive_sha256": "f9a7b159488c6e2940718d6de1048996cecdb7fadac9c142b677953f52df15d4"
+  }
+]

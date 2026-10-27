@@ -3,6 +3,9 @@ import { test } from 'node:test';
 import { createMaterialLibrary, createMaterialCatalog } from '../src/workstation/modules/materials/public.ts';
 import { createWorkspacePreferences } from '../src/workstation/app/platform/preferences.ts';
 import type { SaveResult } from '../src/workstation/contracts/content.ts';
+import { registerHooks } from 'node:module';
+const settingsHook = registerHooks({ load(url, context, next) { return url.endsWith('.css') ? { format: 'module', source: '', shortCircuit: true } : next(url, context); } });
+const { showWorkspaceSettings } = await import('../src/workstation/modules/ui-rendering/settings.ts'); settingsHook.deregister();
 
 function result(value: SaveResult) { assert.equal(value.status, 'saved'); if (value.status !== 'saved') throw new Error('Expected saved'); return value.content; }
 function fixture() {
@@ -56,14 +59,14 @@ test('workspace preferences migrate last workspace and persist welcome and a sel
   const map = new Map<string, string>([['rootsound.workstation.workspace.v1', 'phrase']]);
   const storage = { getItem: (key: string) => map.get(key) ?? null, setItem: (key: string, value: string) => { map.set(key, value); } };
   const preferences = createWorkspacePreferences(storage);
-  assert.deepEqual(preferences.read(), { welcomeEnabled: true, startWorkspace: 'last', lastWorkspace: 'phrase' });
+  assert.deepEqual(preferences.read(), { keyboardPerformance: false, welcomeEnabled: true, startWorkspace: 'last', lastWorkspace: 'phrase' });
   preferences.update({ welcomeEnabled: false, startWorkspace: 'library', lastWorkspace: 'song' });
-  assert.deepEqual(createWorkspacePreferences(storage).read(), { welcomeEnabled: false, startWorkspace: 'library', lastWorkspace: 'song' });
+  assert.deepEqual(createWorkspacePreferences(storage).read(), { keyboardPerformance: false, welcomeEnabled: false, startWorkspace: 'library', lastWorkspace: 'song' });
   const view = preferences.read(); view.lastWorkspace = 'sound'; assert.equal(preferences.read().lastWorkspace, 'song');
   preferences.update({ startWorkspace: 'co-creation', lastWorkspace: 'co-creation' });
-  assert.deepEqual(createWorkspacePreferences(storage).read(), { welcomeEnabled: false, startWorkspace: 'co-creation', lastWorkspace: 'co-creation' });
+  assert.deepEqual(createWorkspacePreferences(storage).read(), { keyboardPerformance: false, welcomeEnabled: false, startWorkspace: 'co-creation', lastWorkspace: 'co-creation' });
   preferences.update({ startWorkspace: 'sampling', lastWorkspace: 'sampling' });
-  assert.deepEqual(createWorkspacePreferences(storage).read(), { welcomeEnabled: false, startWorkspace: 'sampling', lastWorkspace: 'sampling' });
+  assert.deepEqual(createWorkspacePreferences(storage).read(), { keyboardPerformance: false, welcomeEnabled: false, startWorkspace: 'sampling', lastWorkspace: 'sampling' });
 });
 test('invalid display preferences recover safe defaults, and failed updates preserve the previous in-memory setting', () => {
   const preferences = createWorkspacePreferences({ getItem: () => '{invalid', setItem: () => { throw new Error('blocked'); } });
@@ -71,4 +74,65 @@ test('invalid display preferences recover safe defaults, and failed updates pres
   assert.throws(() => preferences.update({ welcomeEnabled: false }), /未能保存/);
   assert.equal(preferences.read().welcomeEnabled, true);
   assert.throws(() => preferences.update({ startWorkspace: 'unknown' as never }), /无效/);
+});
+
+test('keyboard performance is opt-in for old preferences and persists independently of project storage', () => {
+  const map = new Map([['rootsound.workstation.preferences.v1', JSON.stringify({ version: 1, welcomeEnabled: false, startWorkspace: 'phrase', lastWorkspace: 'song' })], ['song-data', 'untouched']]);
+  let writes = 0; const storage = { getItem: (key: string) => map.get(key) ?? null, setItem(key: string, value: string) { writes++; map.set(key, value); } };
+  const preferences = createWorkspacePreferences(storage);
+  assert.equal(preferences.read().keyboardPerformance, false); assert.equal(preferences.read().startWorkspace, 'phrase');
+  preferences.update({ keyboardPerformance: true });
+  const reopened = createWorkspacePreferences(storage); assert.equal(reopened.read().keyboardPerformance, true); assert.equal(reopened.read().welcomeEnabled, false);
+  reopened.update({ keyboardPerformance: false }); assert.equal(createWorkspacePreferences(storage).read().keyboardPerformance, false);
+  assert.equal(map.get('song-data'), 'untouched'); assert.equal(writes, 2);
+  assert.throws(() => reopened.update({ keyboardPerformance: 'true' as never }), /无效/); assert.equal(writes, 2);
+  let fail = false; let raw: string | null = null;
+  const guarded = createWorkspacePreferences({ getItem: () => raw, setItem(_key, value) { if (fail) throw new Error('unavailable'); raw = value; } });
+  guarded.update({ keyboardPerformance: true }); fail = true;
+  assert.throws(() => guarded.update({ keyboardPerformance: false }), /未能保存/); assert.equal(guarded.read().keyboardPerformance, true);
+});
+
+class SettingsElement extends EventTarget {
+  children: SettingsElement[] = []; parent?: SettingsElement; attributes = new Map<string, string>();
+  className = ''; textContent = ''; type = ''; value = ''; checked = false;
+  readonly tag: string;
+  constructor(tag: string) { super(); this.tag = tag; }
+  append(...children: SettingsElement[]) { for (const child of children) { child.parent = this; this.children.push(child); } }
+  setAttribute(name: string, value: string) { this.attributes.set(name, value); }
+  remove() { if (this.parent) this.parent.children = this.parent.children.filter(child => child !== this); this.parent = undefined; }
+  querySelector(selector: string): SettingsElement | undefined { return this.children.find(child => selector[0] === '.' && child.className.split(' ').includes(selector.slice(1))) ?? this.children.map(child => child.querySelector(selector)).find(Boolean); }
+  showModal() { this.attributes.set('open', ''); }
+  close() { this.attributes.delete('open'); this.dispatchEvent(new Event('close')); }
+}
+const settingsNodes = (root: SettingsElement): SettingsElement[] => [root, ...root.children.flatMap(settingsNodes)];
+function settingsFixture(fail = false) {
+  const descriptor = Object.getOwnPropertyDescriptor(globalThis, 'document');
+  Object.defineProperty(globalThis, 'document', { configurable: true, value: { createElement: (tag: string) => new SettingsElement(tag), createTextNode(text: string) { const node = new SettingsElement('text'); node.textContent = text; return node; } } });
+  const map = new Map<string, string>(); const preferences = createWorkspacePreferences({ getItem: key => map.get(key) ?? null, setItem(key, value) { if (fail) throw new Error('read-only'); map.set(key, value); } });
+  const root = new SettingsElement('root'); let closed = 0;
+  const open = () => showWorkspaceSettings(root as unknown as HTMLElement, preferences, () => { closed++; }); open();
+  const find = (predicate: (node: SettingsElement) => boolean) => { const result = settingsNodes(root).find(predicate); assert(result); return result; };
+  return { root, preferences, open, get closed() { return closed; }, performance: () => find(node => node.attributes.get('aria-label') === '键盘演奏'),
+    submit: () => find(node => node.tag === 'form').dispatchEvent(new Event('submit', { cancelable: true })),
+    back: () => find(node => node.textContent === '返回').dispatchEvent(new Event('click')),
+    error: () => find(node => node.attributes.get('role') === 'status'),
+    cleanup() { if (descriptor) Object.defineProperty(globalThis, 'document', descriptor); else Reflect.deleteProperty(globalThis, 'document'); } };
+}
+
+test('settings exposes one opt-in keyboard switch, saves it on submit and refreshes once after close', () => {
+  const f = settingsFixture(); try {
+    assert.equal(f.performance().checked, false); assert.equal(f.preferences.read().keyboardPerformance, false);
+    f.open(); assert.equal(settingsNodes(f.root).filter(node => node.tag === 'dialog').length, 1, 'repeated settings clicks reuse the open page');
+    f.performance().checked = true; f.submit(); assert.equal(f.preferences.read().keyboardPerformance, true); assert.equal(f.root.children.length, 0); assert.equal(f.closed, 1);
+    f.open(); assert.equal(f.performance().checked, true); f.performance().checked = false; f.back();
+    assert.equal(f.preferences.read().keyboardPerformance, true, 'Back discards uncommitted switch edits'); assert.equal(f.closed, 2);
+  } finally { f.cleanup(); }
+});
+
+test('failed settings persistence keeps the page and edited switch available without enabling performance', () => {
+  const f = settingsFixture(true); try {
+    f.performance().checked = true; f.submit(); assert.equal(f.preferences.read().keyboardPerformance, false); assert.equal(f.performance().checked, true);
+    assert.match(f.error().textContent, /未能保存/); assert.equal(f.closed, 0); assert.equal(f.root.children.length, 1);
+    f.back(); assert.equal(f.closed, 1); assert.equal(f.root.children.length, 0);
+  } finally { f.cleanup(); }
 });

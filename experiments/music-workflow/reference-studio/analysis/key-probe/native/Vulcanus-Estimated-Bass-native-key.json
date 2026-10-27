@@ -1,0 +1,19 @@
+{
+  "name": "Vulcanus-Estimated-Bass",
+  "rate": 48000,
+  "channels": 2,
+  "frames": 288000,
+  "hash": "B49A4786278B331A555066945D9767A4F8398658D3C111B8C251A58FBD207215",
+  "settings": {
+    "RootMidi": 41,
+    "AttackSeconds": 0.004,
+    "DecaySeconds": 0.08,
+    "Sustain": 0.8,
+    "ReleaseSeconds": 0.06,
+    "LoopEnabled": false,
+    "LoopStart": 0,
+    "LoopEnd": 0,
+    "LoopCrossfadeSeconds": 0.015,
+    "GainDb": 0
+  }
+}

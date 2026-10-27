@@ -71,6 +71,24 @@ test('native storage failures and invalid responses cannot appear as an empty li
   assert.deepEqual(fixture.writes, []);
 });
 
+test('permanent changes use only the scoped atomic checkpoint bridge and never fall back to an ordinary write', () => {
+  const f = bridgeFixture(); const checkpoints: Array<[string, string]> = [];
+  f.bridge.storage.Read = () => JSON.stringify({ ok: true, value: null, scope: 'song-one' });
+  const storage = createDesktopPlatform(f.bridge).storage; storage.read();
+  assert.throws(() => storage.writePermanent!('deleted source'), /尚不支持永久删除/);
+  assert.deepEqual(f.writes, []);
+  f.bridge.storage.WriteScopedCheckpoint = (text, scope) => { checkpoints.push([text, scope]); return '{"ok":true}'; };
+  storage.writePermanent!('without the deleted phrase');
+  assert.deepEqual(checkpoints, [['without the deleted phrase', 'song-one']]); assert.deepEqual(f.writes, []);
+  f.bridge.storage.WriteScopedCheckpoint = () => '{"ok":false,"error":"项目已切换"}';
+  assert.throws(() => storage.writePermanent!('stale deletion'), /项目已切换/);
+  for (const invalid of ['{}', '{"ok":"true"}', 'invalid', '{"ok":false}']) {
+    f.bridge.storage.WriteScopedCheckpoint = () => invalid;
+    assert.throws(() => storage.writePermanent!('must reject'));
+  }
+  assert.deepEqual(f.writes, []);
+});
+
 test('a missing native bridge at the desktop origin fails without accessing browser storage', () => {
   let browserStorageAccessed = false;
   const restore = [

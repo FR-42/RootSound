@@ -6,6 +6,7 @@ export { createMaterialLibrary } from './library.ts';
 export { createMaterialCatalog } from './catalog.ts';
 export { createReferenceEditing } from './reference-editing.ts';
 export { createProjectPackages } from './project.ts';
+export { countUsagePositions } from './usage-positions.ts';
 export type { ProjectExport, ProjectImportResult, ProjectPackagesPort } from '../../contracts/project.ts';
 export type {
   ReferenceRoot, ReferenceContext, ReferenceSlot, ReferenceReplacement, ReferenceAdapter, ReferenceSession,

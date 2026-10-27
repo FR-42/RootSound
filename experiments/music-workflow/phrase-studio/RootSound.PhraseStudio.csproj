@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net9.0-windows10.0.19041.0</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AssemblyName>RootSound.PhraseStudio</AssemblyName>
+    <RootNamespace>RootSound.PhraseStudio</RootNamespace>
+    <PlatformTarget>x64</PlatformTarget>
+    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Remove="tests/**/*.cs" />
+    <Compile Remove="Launcher/**/*.cs" />
+    <Compile Include="../sample-editor/Audio/**/*.cs" Link="SharedAudio/%(RecursiveDir)%(Filename)%(Extension)" />
+    <Compile Include="../sample-editor/Playback/**/*.cs" Link="SharedPlayback/%(RecursiveDir)%(Filename)%(Extension)" />
+    <Compile Include="../sample-editor/Core/IAudioFrameSource.cs" Link="SharedAudio/IAudioFrameSource.cs" />
+    <Compile Include="../timbre-lab/Core/Models.cs" Link="SharedInstrument/Models.cs" />
+    <Compile Include="../timbre-lab/Instrument/AtomicFile.cs" Link="SharedInstrument/AtomicFile.cs" />
+    <Compile Include="../timbre-lab/Instrument/InstrumentRenderer.cs" Link="SharedInstrument/InstrumentRenderer.cs" />
+    <Compile Include="../timbre-lab/Instrument/InstrumentValidation.cs" Link="SharedInstrument/InstrumentValidation.cs" />
+    <Compile Include="../timbre-lab/Instrument/LoopFinder.cs" Link="SharedInstrument/LoopFinder.cs" />
+    <Compile Include="../timbre-lab/Instrument/PcmWaveExporter.cs" Link="SharedInstrument/PcmWaveExporter.cs" />
+    <Compile Include="../timbre-lab/Instrument/TimbreArchive.cs" Link="SharedInstrument/TimbreArchive.cs" />
+    <InternalsVisibleTo Include="RootSound.PhraseStudio.Tests" />
+  </ItemGroup>
+</Project>

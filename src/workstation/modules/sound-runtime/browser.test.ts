@@ -2,158 +2,73 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import type { SoundPlan, SoundRuntimeEvent, SoundSequencePlan } from '../../contracts/sound.ts';
 import { createBrowserSoundRuntime } from './browser.ts';
+import { FakeAudioContext, acquired, audio, close, fixture, longSample, phrase, plan } from './testing.ts';
 
-class FakeParam {
-  readonly changes: { kind: 'set' | 'ramp' | 'hold'; value: number; time: number }[] = [];
-  setValueAtTime(value: number, time: number): void { this.changes.push({ kind: 'set', value, time }); }
-  linearRampToValueAtTime(value: number, time: number): void { this.changes.push({ kind: 'ramp', value, time }); }
-  cancelAndHoldAtTime(time: number): void { this.changes.push({ kind: 'hold', value: 0, time }); }
-}
+test('head speed retimes triggers while samples, note holds and releases keep real seconds', async () => fixture(async () => {
+  const runtime = createBrowserSoundRuntime(); const sample = longSample();
+  const input = { ...phrase([{ atSeconds: 0, sound: sample }, { atSeconds: 2, sound: sample }], 5), transport: { positionSeconds: 0, rate: .75 } };
+  const session = await runtime.preview(input); const first = audio().sampleSources[0]!; const second = audio().sampleSources[1]!;
+  close(first.startTime, session.startedAtSeconds); close(second.startTime, session.startedAtSeconds + 2 / .75);
+  close(first.stopTime! - first.startTime!, 3.001); close(second.stopTime! - second.startTime!, 3.001);
+  close(first.playbackRate.changes[0]!.value, 1.5); close(second.playbackRate.changes[0]!.value, 1.5);
+  audio().currentTime = session.startedAtSeconds + .8;
+  runtime.update(session.id, { ...input, transport: { positionSeconds: .6, rate: 1.25 } });
+  const continued = audio().sampleSources[2]!; const future = audio().sampleSources[3]!;
+  const age = continued.startTime! - session.startedAtSeconds;
+  close(continued.offset, .2 + age * 1.5); close(continued.stopTime, session.startedAtSeconds + 3.001);
+  close(future.startTime, session.startedAtSeconds + .8 + (2 - .6) / 1.25);
+  close(future.stopTime! - future.startTime!, 3.001); close(future.playbackRate.changes[0]!.value, 1.5);
+  const envelope = audio().gains.find(gain => continued.connections.includes(gain))!;
+  assert(envelope.gain.changes.some(change => change.kind === 'ramp' && Math.abs(change.time - (session.startedAtSeconds + 3)) < 1e-10));
+  await runtime.dispose();
+}));
 
-class FakeNode {
-  disconnected = false;
-  connections: FakeNode[] = [];
-  connect(node: FakeNode): void { this.connections.push(node); }
-  disconnect(): void { this.disconnected = true; }
-}
+test('pause freezes device elapsed and resumes at the original sample and release age', async () => fixture(async () => {
+  const runtime = createBrowserSoundRuntime(); const sample = longSample();
+  const input = { ...phrase([{ atSeconds: 0, sound: sample }, { atSeconds: 4, sound: sample }], 6), transport: { positionSeconds: 0, rate: 1 } };
+  const session = await runtime.preview(input); audio().currentTime = session.startedAtSeconds + 2.4;
+  const paused = runtime.pause!(session.id); assert.equal(paused?.status, 'paused'); close(runtime.position(session.id), 2.4);
+  assert(audio().sampleSources.every(source => source.stopped && source.disconnected));
+  audio().currentTime += 20; close(runtime.position(session.id), 2.4);
+  const resumed = await runtime.resume!(session.id, { ...input, transport: { positionSeconds: 2.4, rate: 1.25 } });
+  assert.equal(resumed.id, session.id); assert.equal(resumed.status, 'playing'); close(runtime.position(session.id), 2.4);
+  const continued = audio().sampleSources[2]!; const future = audio().sampleSources[3]!;
+  close(continued.offset, .2 + 2.4 * 1.5); close(continued.playbackRate.changes[0]!.value, 1.5);
+  close(continued.stopTime! - continued.startTime!, .601);
+  close(future.startTime! - continued.startTime!, (4 - 2.4) / 1.25);
+  const envelope = audio().gains.find(gain => continued.connections.includes(gain))!;
+  assert(envelope.gain.changes.some(change => change.kind === 'ramp' && Math.abs(change.value - .5 * .595) < .001));
+  audio().currentTime = continued.startTime! + .2; close(runtime.position(session.id), 2.6);
+  runtime.stopAll(); assert(audio().sampleSources.every(source => source.stopped && source.disconnected));
+  await assert.rejects(runtime.resume!(session.id), /已经结束/); await runtime.dispose();
+}));
 
-class FakeGain extends FakeNode { readonly gain = new FakeParam(); }
-class FakePanner extends FakeNode { readonly pan = new FakeParam(); }
+test('paused live edits validate before replacing retained state, and global replacement invalidates resume', async () => fixture(async () => {
+  const runtime = createBrowserSoundRuntime(); const input = { ...phrase([{ atSeconds: 0, sound: longSample() }], 4), transport: { positionSeconds: 0, rate: 1 } };
+  const session = await runtime.preview(input); audio().currentTime = session.startedAtSeconds + .5; runtime.pause!(session.id);
+  await assert.rejects(runtime.resume!(session.id, { ...input, transport: { positionSeconds: .5, rate: 0 } }), /播放头速度/);
+  close(runtime.position(session.id), .5);
+  await runtime.preview(plan()); await assert.rejects(runtime.resume!(session.id, input), /已经结束/);
+  await runtime.dispose();
+}));
 
-class FakeOscillator extends FakeNode {
-  readonly frequency = new FakeParam();
-  type = 'sine';
-  onended: (() => void) | null = null;
-  started = false;
-  stopped = false;
-  startTime: number | undefined;
-  stopTime: number | undefined;
-  start(time?: number): void { this.started = true; this.startTime = time; }
-  stop(time?: number): void {
-    if (!this.started) throw new Error('a source must start before it can stop');
-    if (time === undefined) this.stopped = true; else this.stopTime = time;
-  }
-  end(): void { this.onended?.(); }
-}
-
-class FakeConstantSource extends FakeOscillator { readonly offset = new FakeParam(); }
-class FakeBuffer {
-  readonly data: Float32Array[];
-  readonly numberOfChannels: number;
-  readonly length: number;
-  readonly sampleRate: number;
-  constructor(numberOfChannels: number, length: number, sampleRate: number) {
-    this.numberOfChannels = numberOfChannels; this.length = length; this.sampleRate = sampleRate;
-    this.data = Array.from({ length: numberOfChannels }, () => new Float32Array(length));
-  }
-  getChannelData(channel: number): Float32Array { return this.data[channel]!; }
-}
-class FakeBufferSource extends FakeOscillator {
-  buffer: FakeBuffer | null = null;
-  readonly playbackRate = new FakeParam();
-  loop = false;
-  offset = 0;
-  sourceDuration = Infinity;
-  override start(time?: number, offset = 0, duration = Infinity): void { super.start(time); this.offset = offset; this.sourceDuration = duration; }
-}
-
-class FakeAudioContext {
-  static mode: 'normal' | 'blocked' | 'rejected' = 'normal';
-  static instances: FakeAudioContext[] = [];
-  currentTime = 1;
-  readonly sampleRate = 48000;
-  readonly destination = new FakeNode();
-  readonly oscillators: FakeOscillator[] = [];
-  readonly gains: FakeGain[] = [];
-  readonly panners: FakePanner[] = [];
-  readonly clocks: FakeConstantSource[] = [];
-  readonly sampleSources: FakeBufferSource[] = [];
-  failSampleAllocation = false;
-  failAfterOscillators = Number.POSITIVE_INFINITY;
-  allocationDelaySeconds = 0;
-  state = FakeAudioContext.mode === 'normal' ? 'running' : 'suspended';
-  onstatechange: (() => void) | null = null;
-  closeCount = 0;
-
-  constructor() { FakeAudioContext.instances.push(this); }
-  createBuffer(channels: number, frames: number, rate: number): FakeBuffer { return new FakeBuffer(channels, frames, rate); }
-  createBufferSource(): FakeBufferSource {
-    if (this.failSampleAllocation) throw new Error('sample device allocation failed');
-    const source = new FakeBufferSource(); this.sampleSources.push(source); return source;
-  }
-  createOscillator(): FakeOscillator {
-    if (this.oscillators.length >= this.failAfterOscillators) throw new Error('device allocation failed');
-    this.currentTime += this.allocationDelaySeconds;
-    const node = new FakeOscillator();
-    this.oscillators.push(node);
-    return node;
-  }
-  createGain(): FakeGain {
-    const node = new FakeGain();
-    this.gains.push(node);
-    return node;
-  }
-  createStereoPanner(): FakePanner {
-    const node = new FakePanner();
-    this.panners.push(node);
-    return node;
-  }
-  createConstantSource(): FakeConstantSource {
-    const node = new FakeConstantSource();
-    this.clocks.push(node);
-    return node;
-  }
-  resume(): Promise<void> {
-    if (FakeAudioContext.mode === 'rejected') return Promise.reject(new Error('device denied'));
-    if (FakeAudioContext.mode === 'blocked') return new Promise(() => {});
-    this.state = 'running';
-    this.onstatechange?.();
-    return Promise.resolve();
-  }
-  close(): Promise<void> {
-    this.closeCount += 1;
-    this.state = 'closed';
-    this.onstatechange?.();
-    return Promise.resolve();
-  }
-  suspend(): void {
-    this.state = 'suspended';
-    this.onstatechange?.();
-  }
-}
-
-function plan(): SoundPlan {
-  return {
-    kind: 'basic-synth', version: 1,
-    sources: [{ waveform: 'sine', frequencyRatio: 1, level: 1 }],
-    envelope: { attackSeconds: 0.01, releaseSeconds: 0.02 },
-    note: { frequencyHz: 440, holdSeconds: 0.1, velocity: 0.8 },
-    level: 0.2,
-  };
-}
-
-async function fixture(run: () => Promise<void>, mode: typeof FakeAudioContext.mode = 'normal'): Promise<void> {
-  const descriptor = Object.getOwnPropertyDescriptor(globalThis, 'AudioContext');
-  FakeAudioContext.mode = mode;
-  FakeAudioContext.instances = [];
-  Object.defineProperty(globalThis, 'AudioContext', { configurable: true, value: FakeAudioContext });
-  try { await run(); } finally {
-    if (descriptor === undefined) Reflect.deleteProperty(globalThis, 'AudioContext');
-    else Object.defineProperty(globalThis, 'AudioContext', descriptor);
-  }
-}
-
-function audio(): FakeAudioContext { return FakeAudioContext.instances[0]!; }
-
-function phrase(events: SoundSequencePlan['events'], durationSeconds = 2): SoundSequencePlan {
-  return { kind: 'sequence', version: 1, durationSeconds, events };
-}
-
-function close(actual: number | undefined, expected: number): void {
-  assert(actual !== undefined && Math.abs(actual - expected) < 1e-10, `${actual} should equal ${expected}`);
-}
-
-function acquired() { return { sampleRate: 8000, channels: [new Float32Array([0, 0.25, -0.5, 0]), new Float32Array([0.5, 0, 0, -1])] }; }
+test('live inserted notes use the actual head history even after silence and several speed changes', async () => fixture(async () => {
+  const runtime = createBrowserSoundRuntime(); const sample = longSample();
+  const input = phrase([{ atSeconds: 0, sound: sample }, { atSeconds: 4, sound: sample }], 5);
+  const session = await runtime.preview({ ...input, transport: { positionSeconds: 0, rate: 1 } });
+  audio().currentTime = session.startedAtSeconds + 1;
+  runtime.update(session.id, { ...input, transport: { positionSeconds: 1, rate: .5 } });
+  audio().currentTime = session.startedAtSeconds + 2;
+  runtime.update(session.id, { ...input, events: [], transport: { positionSeconds: 1.5, rate: 1.25 } });
+  audio().currentTime = session.startedAtSeconds + 2.2;
+  runtime.update(session.id, { ...input, events: [{ atSeconds: 1.25, sound: sample }, { atSeconds: 4, sound: sample }], transport: { positionSeconds: 1.75, rate: 1.25 } });
+  const continued = audio().sampleSources.at(-2)!; const future = audio().sampleSources.at(-1)!;
+  // Song position 1.25 was crossed at elapsed 1.5, during the half-speed segment.
+  close(continued.offset, .2 + (continued.startTime! - session.startedAtSeconds - 1.5) * 1.5);
+  close(continued.stopTime, session.startedAtSeconds + 1.5 + 3.001);
+  close(future.startTime, session.startedAtSeconds + 4);
+  await runtime.dispose();
+}));
 
 test('sample audition uses the shared device clock, copies exact channels and releases on natural completion', async () => fixture(async () => {
   const runtime = createBrowserSoundRuntime(); const input = acquired();
