@@ -1,0 +1,237 @@
+{
+  "engine": "Spotify Basic Pitch 0.4.0 (ONNX)",
+  "tracks": [
+    {
+      "name": "bass",
+      "notes": [
+        {
+          "pitch": 69,
+          "velocity": 39,
+          "start": 0.01161,
+          "end": 0.15093
+        },
+        {
+          "pitch": 69,
+          "velocity": 68,
+          "start": 0.15093,
+          "end": 0.31347
+        },
+        {
+          "pitch": 29,
+          "velocity": 59,
+          "start": 0.19737,
+          "end": 4.91359
+        },
+        {
+          "pitch": 48,
+          "velocity": 44,
+          "start": 0.25542,
+          "end": 3.21725
+        },
+        {
+          "pitch": 69,
+          "velocity": 68,
+          "start": 0.31347,
+          "end": 0.53406
+        },
+        {
+          "pitch": 69,
+          "velocity": 66,
+          "start": 0.53406,
+          "end": 0.84753
+        },
+        {
+          "pitch": 69,
+          "velocity": 62,
+          "start": 0.84753,
+          "end": 1.38159
+        },
+        {
+          "pitch": 69,
+          "velocity": 65,
+          "start": 1.38159,
+          "end": 1.71828
+        },
+        {
+          "pitch": 69,
+          "velocity": 64,
+          "start": 1.71828,
+          "end": 1.92726
+        },
+        {
+          "pitch": 69,
+          "velocity": 65,
+          "start": 1.92726,
+          "end": 2.10269
+        },
+        {
+          "pitch": 69,
+          "velocity": 68,
+          "start": 2.10269,
+          "end": 2.24201
+        },
+        {
+          "pitch": 69,
+          "velocity": 66,
+          "start": 2.24201,
+          "end": 2.63675
+        },
+        {
+          "pitch": 69,
+          "velocity": 66,
+          "start": 2.63675,
+          "end": 2.88056
+        },
+        {
+          "pitch": 69,
+          "velocity": 65,
+          "start": 2.88056,
+          "end": 3.31013
+        },
+        {
+          "pitch": 69,
+          "velocity": 61,
+          "start": 3.31013,
+          "end": 3.5075
+        },
+        {
+          "pitch": 48,
+          "velocity": 46,
+          "start": 3.35657,
+          "end": 6.51705
+        },
+        {
+          "pitch": 69,
+          "velocity": 62,
+          "start": 3.5075,
+          "end": 4.03123
+        },
+        {
+          "pitch": 69,
+          "velocity": 62,
+          "start": 4.03123,
+          "end": 4.56529
+        },
+        {
+          "pitch": 69,
+          "velocity": 61,
+          "start": 4.56529,
+          "end": 5.23867
+        },
+        {
+          "pitch": 29,
+          "velocity": 60,
+          "start": 4.9252,
+          "end": 6.90018
+        },
+        {
+          "pitch": 69,
+          "velocity": 59,
+          "start": 5.23867,
+          "end": 5.43604
+        },
+        {
+          "pitch": 69,
+          "velocity": 58,
+          "start": 5.43604,
+          "end": 5.95977
+        },
+        {
+          "pitch": 69,
+          "velocity": 63,
+          "start": 5.95977,
+          "end": 6.08748
+        },
+        {
+          "pitch": 69,
+          "velocity": 54,
+          "start": 6.08748,
+          "end": 6.93501
+        },
+        {
+          "pitch": 69,
+          "velocity": 47,
+          "start": 6.93501,
+          "end": 7.13238
+        },
+        {
+          "pitch": 70,
+          "velocity": 52,
+          "start": 7.13238,
+          "end": 7.28331
+        },
+        {
+          "pitch": 69,
+          "velocity": 40,
+          "start": 7.28331,
+          "end": 7.46907
+        },
+        {
+          "pitch": 69,
+          "velocity": 45,
+          "start": 7.46907,
+          "end": 7.66644
+        },
+        {
+          "pitch": 70,
+          "velocity": 56,
+          "start": 7.66644,
+          "end": 7.81737
+        },
+        {
+          "pitch": 69,
+          "velocity": 40,
+          "start": 7.81737,
+          "end": 7.9928
+        },
+        {
+          "pitch": 69,
+          "velocity": 53,
+          "start": 7.9928,
+          "end": 8.13212
+        }
+      ]
+    },
+    {
+      "name": "other",
+      "notes": [
+        {
+          "pitch": 69,
+          "velocity": 106,
+          "start": 0.02322,
+          "end": 4.9252
+        },
+        {
+          "pitch": 69,
+          "velocity": 105,
+          "start": 4.9252,
+          "end": 8.13212
+        }
+      ]
+    },
+    {
+      "name": "vocals",
+      "notes": [
+        {
+          "pitch": 69,
+          "velocity": 66,
+          "start": 0.02322,
+          "end": 8.12051
+        },
+        {
+          "pitch": 81,
+          "velocity": 56,
+          "start": 0.02322,
+          "end": 6.6912
+        },
+        {
+          "pitch": 88,
+          "velocity": 58,
+          "start": 0.22059,
+          "end": 6.72603
+        }
+      ]
+    }
+  ],
+  "timing": "seconds; MIDI tempo fixed at 120, not beat-quantized"
+}

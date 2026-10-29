@@ -2,10 +2,13 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import type { ContentRecord, MaterialStorage, SaveResult } from '../src/workstation/contracts/content.ts';
 import type { PhraseBody, PhraseNote } from '../src/workstation/contracts/phrase.ts';
-import type { PlayableNotePlan } from '../src/workstation/contracts/sound.ts';
-import { createMaterialLibrary } from '../src/workstation/modules/materials/public.ts';
-import { createPhraseEditor, createPhrasePlayback, readPhraseBody } from '../src/workstation/modules/phrase/public.ts';
-import { createTimbreEditor, createTimbrePlayback } from '../src/workstation/modules/timbre/public.ts';
+import { PHRASE_STEPS_PER_BEAT, phraseStepsPerBeat } from '../src/workstation/contracts/phrase.ts';
+import type { PlayableNotePlan, SoundPlan } from '../src/workstation/contracts/sound.ts';
+import { MAX_PHRASE_BEATS, MAX_PHRASE_NOTES } from '../src/workstation/contracts/phrase-limits.ts';
+import { createMaterialLibrary, createProjectPackages } from '../src/workstation/modules/materials/public.ts';
+import { createPhraseEditor, createPhrasePlayback, createPhraseReferenceAdapter, readPhraseBody } from '../src/workstation/modules/phrase/public.ts';
+import { createTimbreEditor, createTimbrePlayback, createTimbreReferenceAdapter } from '../src/workstation/modules/timbre/public.ts';
+import { createSongEditor, createSongReferenceAdapter } from '../src/workstation/modules/song/public.ts';
 import { createPhraseAudition } from '../src/workstation/modules/ui-rendering/phrase-audition.ts';
 import { createSampleAudio } from '../src/workstation/modules/sampling/public.ts';
 import { encodeBase64, encodeFloatWav, decodePcmWav } from '../src/workstation/modules/sampling/audio.ts';
@@ -50,6 +53,60 @@ function baseBody(timbreId = 'sound-a'): PhraseBody {
   return { model: 'note-phrase', version: 1, timeUnit: 'beat', tempoBpm: 120, lengthBeats: 8,
     parts: [{ id: 'part-a', name: '一个声音', timbreId, notes: [{ id: 'note-a', ...note() }] }] };
 }
+
+test('older phrases default to four cells without rewriting omitted metadata, and invalid subdivision never changes a draft', () => {
+  assert.equal(PHRASE_STEPS_PER_BEAT, 4); assert.equal(phraseStepsPerBeat(), 4); assert.equal(phraseStepsPerBeat({}), 4);
+  const legacy = readPhraseBody(baseBody()); assert.equal(phraseStepsPerBeat(legacy), 4); assert.equal(Object.hasOwn(legacy, 'stepsPerBeat'), false);
+  assert.equal(readPhraseBody({ ...legacy, stepsPerBeat: 4 }).stepsPerBeat, 4);
+  const f = fixture(); start(f); const before = f.phrase.read(), raw = f.raw(), writes = f.writes(), token = f.library.currentToken();
+  f.phrase.setStepsPerBeat(4); assert.equal(f.writes(), writes); assert.equal(f.library.currentToken(), token);
+  for (const value of [0, 1, 10, -1, 2.5, NaN, Infinity, null, '3', undefined]) {
+    assert.throws(() => f.phrase.setStepsPerBeat(value as number), /每拍格数/);
+    if (value !== undefined) assert.throws(() => readPhraseBody({ ...legacy, stepsPerBeat: value }), /每拍格数/);
+  }
+  assert.equal(f.raw(), raw); assert.equal(f.writes(), writes); assert.deepEqual(f.phrase.read(), before);
+});
+
+test('changing shared melody/rhythm subdivision preserves off-grid starts, exact held seconds and playback through durable undo', () => {
+  const f = fixture(), melody = start(f), rhythm = f.phrase.addPart(f.second.id, 'rhythm');
+  f.phrase.addNote(melody, note({ startBeat: .137, durationBeats: .347, durationSeconds: .413, level: .45, pan: -.3 }));
+  f.phrase.addNote(rhythm, note({ startBeat: 2.173, durationBeats: .129, frequencyHz: 55, velocity: .9 }));
+  const parts = structuredClone(f.phrase.read().body!.parts), plan = f.phrase.previewPlan();
+  for (const n of [2, 3, 5, 9]) {
+    const before = f.phrase.read().body!, writes = f.writes(); f.phrase.setStepsPerBeat(n);
+    assert.equal(f.writes(), writes + 1); assert.equal(phraseStepsPerBeat(f.phrase.read().body), n);
+    assert.deepEqual(f.phrase.read().body!.parts, parts); assert.deepEqual(f.phrase.previewPlan(), plan);
+    f.phrase.undo(); assert.deepEqual(f.phrase.read().body, before); f.phrase.redo(); assert.equal(f.phrase.read().body!.stepsPerBeat, n);
+    const unchanged = f.writes(); f.phrase.setStepsPerBeat(n); assert.equal(f.writes(), unchanged);
+  }
+  const content = saved(f.phrase.save('new')), reopenedLibrary = createMaterialLibrary(f.storage);
+  const reopened = createPhraseEditor(reopenedLibrary, createTimbrePlayback(reopenedLibrary)); reopened.open(content.id);
+  assert.equal(reopened.read().body!.stepsPerBeat, 9); assert.deepEqual(reopened.read().body!.parts, parts); assert.deepEqual(reopened.previewPlan(), plan);
+  reopened.undo(); assert.equal(reopened.read().body!.stepsPerBeat, 5); assert.deepEqual(reopened.previewPlan(), plan);
+  reopened.redo(); assert.equal(reopened.read().body!.stepsPerBeat, 9);
+  const before = reopened.read(), oldRaw = f.raw(); f.fail();
+  assert.throws(() => reopened.setStepsPerBeat(2), /写入失败/); assert.equal(f.raw(), oldRaw); assert.deepEqual(reopened.read(), before);
+});
+
+test('portable songs carry non-four phrase subdivisions without quantizing stored performance or changing dependency identity', () => {
+  for (const n of [2, 3, 5, 9]) {
+    const f = fixture(), melody = start(f), rhythm = f.phrase.addPart(f.second.id, 'rhythm');
+    f.phrase.addNote(melody, note({ startBeat: 1 / 7, durationBeats: .12345, durationSeconds: .27182 }));
+    f.phrase.addNote(rhythm, note({ startBeat: 1 / 3, durationBeats: .19283, durationSeconds: .09273, frequencyHz: 55 }));
+    f.phrase.setStepsPerBeat(n); const content = saved(f.phrase.save('new'));
+    const playback = createPhrasePlayback(f.library, f.playback), song = createSongEditor(f.library, playback, { defaultTempoMode: 'source' });
+    song.createFromPhrase(content.id, `每拍 ${n} 格`); const expected = song.previewPlan();
+    const adapters = [createTimbreReferenceAdapter(), createPhraseReferenceAdapter(), createSongReferenceAdapter()];
+    const packed = createProjectPackages(f.library, adapters, { rootKind: 'rootsound.song' }).exportDraft(song.read().draft!.id);
+    const target = createMaterialLibrary(), result = createProjectPackages(target, adapters, { rootKind: 'rootsound.song' }).importProject(packed.text);
+    assert.equal(result.status, 'imported'); if (result.status !== 'imported') throw new Error('Expected imported');
+    const restored = target.listContent().find(record => record.kind === 'rootsound.phrase')!, body = readPhraseBody(restored.body);
+    assert.equal(body.stepsPerBeat, n); assert.deepEqual(body.parts.map(part => part.notes), f.phrase.read().body!.parts.map(part => part.notes));
+    assert.equal(restored.dependencies.length, 2); assert(restored.dependencies.every(id => !content.dependencies.includes(id)));
+    const importedSong = createSongEditor(target, createPhrasePlayback(target, createTimbrePlayback(target)), { defaultTempoMode: 'source' }); importedSong.openDraft(result.draft.id);
+    assert.deepEqual(importedSong.previewPlan(), expected);
+  }
+});
 
 test('unselecting tones is optional, atomic and retains note identities while silencing their uses', () => {
   const f=fixture();const one=start(f);const two=f.phrase.addPart(f.first.id);const rhythm=f.phrase.addPart(f.first.id,'rhythm');
@@ -177,6 +234,32 @@ test('late individual note preparation rejects a changed sound or a different dr
   await assert.rejects(second, /声音发生变化/);
 });
 
+test('phrase readiness prepares exact unique note parameters for current, temporary and tempo-overridden playback', async () => {
+  const f = fixture(), first = start(f); f.phrase.setLength(32);
+  f.phrase.addNotes(first, [note({ durationBeats: 2, velocity: .5 }), note({ startBeat: 4, durationBeats: 2, velocity: .5 }),
+    note({ startBeat: 8, durationBeats: 1, durationSeconds: .37, frequencyHz: 330 })]);
+  const duplicate = f.phrase.addPart(f.first.id); f.phrase.addNote(duplicate, note({ startBeat: 12, durationBeats: 2, velocity: .5 }));
+  const silent = f.phrase.addPart(f.second.id); f.phrase.addNote(silent, note({ frequencyHz: 880 })); f.phrase.setPartVisible(silent, false);
+  const calls: Array<{ id: string; notes: readonly SoundPlan['note'][] }> = [];
+  const sounds = { ...f.playback, async prepareForSaved(id: string, notes: readonly SoundPlan['note'][] = []) { calls.push({ id, notes: structuredClone(notes) }); } };
+  const editor = createPhraseEditor(f.library, sounds), before = f.raw();
+  await editor.preparePreview();
+  assert.deepEqual(calls, [{ id: f.first.id, notes: [{ frequencyHz: 220, holdSeconds: 1, velocity: .5 },
+    { frequencyHz: 330, holdSeconds: .37, velocity: .7 }] }]);
+  const temporary = structuredClone(editor.read().body!); temporary.tempoBpm = 240;
+  temporary.parts[0]!.notes[0] = { ...temporary.parts[0]!.notes[0]!, frequencyHz: 660, durationSeconds: .19, velocity: .42 };
+  calls.length = 0; await editor.preparePreview(temporary);
+  const expected = [...new Set(editor.previewPlan(temporary).events.map(event => JSON.stringify(event.sound.note)))].sort();
+  assert.deepEqual(calls.flatMap(call => call.notes.map(input => JSON.stringify(input))).sort(), expected);
+  assert.equal(calls.length, 1); assert.equal(f.raw(), before, 'readiness never stores a temporary body');
+  const content = saved(f.phrase.save('new')); calls.length = 0;
+  await createPhrasePlayback(f.library, sounds).prepareForSaved(content.id, 60);
+  assert.deepEqual(calls[0]!.notes.map(input => input.holdSeconds), [2, .37], 'only beat-held notes follow the overridden tempo');
+  calls.length = 0; const key = { frequencyHz: 612, holdSeconds: .29, velocity: .42 };
+  await editor.previewNotePlan(first, key); assert.deepEqual(calls, [{ id: f.first.id, notes: [key] }]);
+  calls.length = 0; await editor.previewTimbrePlan(f.second.id, key); assert.deepEqual(calls, [{ id: f.second.id, notes: [key] }]);
+});
+
 test('a sampled voice can audition before the phrase has notes and prepares only its selected source', async () => {
   const f = fixture(); const pcm = { sampleRate: 8000, channels: [new Float32Array(8000).fill(0.3)] }; const bytes = encodeFloatWav(pcm);
   const source: ContentRecord = { id: 'note-source', kind: 'rootsound.sample', owner: 'sampling', schemaVersion: 1,
@@ -292,7 +375,7 @@ test('length changes reject cutting notes and invalid controls preserve the full
   const before = f.raw();
   const view = f.phrase.read();
   assert.throws(() => f.phrase.setLength(4), /超出乐句结尾/);
-  for (const length of [-1, 0, 65, NaN, Infinity]) assert.throws(() => f.phrase.setLength(length));
+  for (const length of [-1, 0, MAX_PHRASE_BEATS + 1, NaN, Infinity]) assert.throws(() => f.phrase.setLength(length));
   for (const tempo of [0, 39, 241, NaN, Infinity]) assert.throws(() => f.phrase.setTempo(tempo));
   for (const change of [note({ durationBeats: 0 }), note({ durationBeats: 1 / 2048 }),
     note({ frequencyHz: 19 }), note({ frequencyHz: Infinity }), note({ velocity: 2 }),
@@ -514,15 +597,38 @@ test('the current editor caps parts, total notes and draft history without disca
   assert.throws(() => f.phrase.addPart(f.second.id), /最多可使用 8/);
   assert.equal(f.raw(), before);
   const body = baseBody(f.first.id);
-  body.parts[0]!.notes = Array.from({ length: 512 }, (_, index) => ({ id: `note-${index}`, ...note() }));
-  assert.equal(readPhraseBody(body).parts[0]!.notes.length, 512);
+  body.parts[0]!.notes = Array.from({ length: MAX_PHRASE_NOTES }, (_, index) => ({ id: `note-${index}`, ...note() }));
+  assert.equal(readPhraseBody(body).parts[0]!.notes.length, MAX_PHRASE_NOTES);
   body.parts[0]!.notes.push({ id: 'too-many', ...note() });
-  assert.throws(() => readPhraseBody(body), /512/);
+  assert.throws(() => readPhraseBody(body), /50000/);
   for (let index = 0; index < 70; index++) f.phrase.rename(`第${index}次修改`);
   let undos = 0;
   while (f.phrase.read().canUndo) { f.phrase.undo(); undos++; }
   assert.equal(undos, 64);
   assert.equal(f.phrase.read().draft!.name, '第5次修改');
+});
+
+test('a long phrase with thousands of notes remains editable and retains length, exact notes and history after cold reopening', () => {
+  const f = fixture(), partId = start(f); f.phrase.setLength(MAX_PHRASE_BEATS);
+  const inputs = Array.from({ length: 5267 }, (_, index) => note({ startBeat: index / 8, durationBeats: .125,
+    durationSeconds: .0625, frequencyHz: 220 + index % 12, velocity: .6 }));
+  const beforeInputs = structuredClone(inputs), writes = f.writes();
+  const ids = f.phrase.addNotes(partId, inputs); assert.equal(f.writes() - writes, 1);
+  assert.deepEqual(inputs, beforeInputs); assert.equal(ids.length, 5267);
+  const content = saved(f.phrase.save('new'));
+  const coldLibrary = createMaterialLibrary(f.storage), cold = createPhraseEditor(coldLibrary, createTimbrePlayback(coldLibrary));
+  cold.open(content.id); assert.equal(cold.read().body!.lengthBeats, MAX_PHRASE_BEATS);
+  assert.equal(cold.previewPlan().events.length, 5267);
+  const original = cold.read().body!, lastId = ids.at(-1)!;
+  cold.updateNote(partId, lastId, { startBeat: 1000, pan: -.25 });
+  assert.equal(cold.read().body!.parts[0]!.notes.at(-1)!.startBeat, 1000);
+  cold.undo(); assert.deepEqual(cold.read().body, original); cold.redo();
+  assert.equal(cold.read().body!.parts[0]!.notes.at(-1)!.pan, -.25);
+  saved(cold.save('overwrite'));
+  const finalLibrary = createMaterialLibrary(f.storage), final = createPhraseEditor(finalLibrary, createTimbrePlayback(finalLibrary));
+  final.open(content.id); assert.equal(final.read().body!.parts[0]!.notes.length, 5267);
+  assert.equal(final.read().body!.parts[0]!.notes.at(-1)!.startBeat, 1000);
+  assert.equal(final.previewPlan().events.length, 5267);
 });
 
 test('reading and setting the same fractional length use the same floating-point boundary tolerance', () => {

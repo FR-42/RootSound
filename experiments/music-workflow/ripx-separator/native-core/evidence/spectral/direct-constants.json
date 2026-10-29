@@ -1,0 +1,175 @@
+{
+  "target": "D:\\#Software\\ripx\\RipX.exe",
+  "sha256": "5f088fa4fbbe1759ef75d8034c79f33c846e3bf5f13d5048dd95a6614d2ad441",
+  "constants": [
+    {
+      "address": "0x1406a79b8",
+      "file_offset": "0x6a6bb8",
+      "format": "d",
+      "values": [
+        0.7071067812
+      ],
+      "bytes": "1e1581669ea0e63f"
+    },
+    {
+      "address": "0x140850200",
+      "file_offset": "0x84f400",
+      "format": "d",
+      "values": [
+        8.0
+      ],
+      "bytes": "0000000000002040"
+    },
+    {
+      "address": "0x1408501f8",
+      "file_offset": "0x84f3f8",
+      "format": "d",
+      "values": [
+        6.283185307179586
+      ],
+      "bytes": "182d4454fb211940"
+    },
+    {
+      "address": "0x140850178",
+      "file_offset": "0x84f378",
+      "format": "d",
+      "values": [
+        1.0
+      ],
+      "bytes": "000000000000f03f"
+    },
+    {
+      "address": "0x140850128",
+      "file_offset": "0x84f328",
+      "format": "d",
+      "values": [
+        0.5
+      ],
+      "bytes": "000000000000e03f"
+    },
+    {
+      "address": "0x140850420",
+      "file_offset": "0x84f620",
+      "format": "4I",
+      "values": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "bytes": "00000000010000000200000003000000"
+    },
+    {
+      "address": "0x1408506e0",
+      "file_offset": "0x84f8e0",
+      "format": "2d",
+      "values": [
+        1.0,
+        1.0
+      ],
+      "bytes": "000000000000f03f000000000000f03f"
+    },
+    {
+      "address": "0x140850720",
+      "file_offset": "0x84f920",
+      "format": "2d",
+      "values": [
+        6.283185307179586,
+        6.283185307179586
+      ],
+      "bytes": "182d4454fb211940182d4454fb211940"
+    },
+    {
+      "address": "0x1408506b0",
+      "file_offset": "0x84f8b0",
+      "format": "2d",
+      "values": [
+        0.5,
+        0.5
+      ],
+      "bytes": "000000000000e03f000000000000e03f"
+    },
+    {
+      "address": "0x1406a78bc",
+      "file_offset": "0x6a6abc",
+      "format": "f",
+      "values": [
+        0.015625
+      ],
+      "bytes": "0000803c"
+    },
+    {
+      "address": "0x1406971a4",
+      "file_offset": "0x6963a4",
+      "format": "f",
+      "values": [
+        15.0
+      ],
+      "bytes": "00007041"
+    },
+    {
+      "address": "0x1406a7908",
+      "file_offset": "0x6a6b08",
+      "format": "f",
+      "values": [
+        0.5001000165939331
+      ],
+      "bytes": "8e06003f"
+    },
+    {
+      "address": "0x14098a054",
+      "storage": "zero-initialized or virtual-only; no on-disk bytes"
+    },
+    {
+      "address": "0x14098a1a8",
+      "storage": "zero-initialized or virtual-only; no on-disk bytes"
+    },
+    {
+      "address": "0x14098a154",
+      "storage": "zero-initialized or virtual-only; no on-disk bytes"
+    },
+    {
+      "address": "0x14079e740",
+      "file_offset": "0x79d940",
+      "format": "d",
+      "values": [
+        -6.283185307179586
+      ],
+      "bytes": "182d4454fb2119c0"
+    },
+    {
+      "address": "0x140850300",
+      "file_offset": "0x84f500",
+      "format": "d",
+      "values": [
+        -1.0
+      ],
+      "bytes": "000000000000f0bf"
+    },
+    {
+      "address": "0x140698da8",
+      "file_offset": "0x697fa8",
+      "format": "d",
+      "values": [
+        -3.141592653589793
+      ],
+      "bytes": "182d4454fb2109c0"
+    },
+    {
+      "address": "0x1408507c0",
+      "file_offset": "0x84f9c0",
+      "format": "d",
+      "values": [
+        -0.0
+      ],
+      "bytes": "0000000000000080"
+    }
+  ],
+  "selected_imports": {
+    "0x140689b00": "api-ms-win-crt-math-l1-1-0.dll!log",
+    "0x140689b10": "api-ms-win-crt-math-l1-1-0.dll!asinf",
+    "0x140689b18": "api-ms-win-crt-math-l1-1-0.dll!tanhf",
+    "0x140689b20": "api-ms-win-crt-math-l1-1-0.dll!sqrt",
+    "0x140689b40": "api-ms-win-crt-math-l1-1-0.dll!atan2"
+  }
+}

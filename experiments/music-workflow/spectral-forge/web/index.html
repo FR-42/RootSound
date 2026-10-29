@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; worker-src 'self'; connect-src 'self'; img-src 'self' data:; media-src 'self' blob:">
+  <title>RootSound · 精细音色生成器</title>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand"><strong>RootSound</strong><span>音色实验</span></div>
+    <input id="patch-name" class="patch-name" aria-label="音色名称" maxlength="80" spellcheck="false">
+    <div class="history-actions"><button id="undo" title="撤销 · Ctrl+Z" aria-label="撤销">↶</button><button id="redo" title="重做 · Ctrl+Y" aria-label="重做">↷</button></div>
+    <div class="file-actions"><button id="new-patch">新建</button><button id="open-patch">打开</button><button id="save-patch">保存</button><button id="export-wav" class="primary">导出 WAV</button></div>
+  </header>
+
+  <main class="studio-layout">
+    <aside class="oscillator-panel panel">
+      <div class="panel-heading"><h2>振荡器</h2><select id="preset-select" aria-label="起始音色"><option value="">起始音色…</option></select></div>
+      <div id="osc-list" class="oscillator-list"></div>
+    </aside>
+
+    <div class="workspace-panel">
+      <section class="panel spectrum-panel">
+        <div class="panel-heading"><h2>频谱</h2><div class="panel-actions"><label class="inline-field">作用量 <input id="spectrum-mix" type="range" min="0" max="1" step="0.001"><output id="spectrum-mix-value"></output></label><button id="spectrum-flat">归零</button></div></div>
+        <div id="spectrum-editor" class="curve-host" aria-label="静态频谱编辑器"></div>
+      </section>
+      <section class="panel envelope-panel">
+        <div class="panel-heading"><div class="tab-list" role="tablist" aria-label="时间包络"><button data-envelope="amplitude" role="tab" aria-selected="true">音量</button><button data-envelope="pitch" role="tab" aria-selected="false">音高</button></div><div class="panel-actions"><label class="inline-field">总长 <input id="envelope-length" type="number" min="0.01" max="60" step="0.001" aria-label="包络总时长"> s</label><button id="sustain-point">设为持续点</button></div></div>
+        <div id="envelope-editor" class="curve-host" aria-label="时间包络编辑器"></div>
+        <div class="envelope-footer"><span id="envelope-summary"></span><span id="point-frequency"></span></div>
+      </section>
+    </div>
+
+    <aside class="detail-panel">
+      <section class="panel"><div class="panel-heading"><h2>演奏</h2></div><div class="control-grid" id="master-controls"></div></section>
+      <section class="panel"><div class="panel-heading"><h2>调制</h2></div><div id="lfo-controls"></div></section>
+      <section class="panel"><div class="panel-heading"><h2>质感与空间</h2></div><div class="control-grid" id="effect-controls"></div></section>
+      <section class="panel export-panel"><div class="panel-heading"><h2>输出</h2></div><div class="control-grid">
+        <label class="control-field">采样率<select id="export-rate"><option value="44100">44.1 kHz</option><option value="48000" selected>48 kHz</option><option value="96000">96 kHz</option></select></label>
+        <label class="control-field">按住时长 / s<input id="export-hold" type="number" min="0.01" max="55" step="0.001" value="2"></label>
+        <label class="control-field">力度<input id="export-velocity" type="number" min="0.01" max="1" step="0.001" value="0.85"></label>
+        <label class="control-field">尾音 / s<input id="export-tail" type="number" min="0" max="10" step="0.01" value="2"></label>
+      </div><div class="render-status"><progress id="render-progress" hidden></progress><button id="cancel-render" hidden>取消导出</button></div></section>
+    </aside>
+  </main>
+
+  <footer class="bottom-bar">
+    <div class="audition-controls"><button id="preview-button" class="primary">持续试听</button><button id="stop-audio">停止</button><label>试听音高<select id="preview-note" aria-label="试听音高"></select></label><output id="preview-frequency"></output><button id="keyboard-toggle" aria-pressed="false">键盘演奏</button></div>
+    <div class="keyboard-row"><button id="octave-down" aria-label="降低八度">−</button><div id="piano" class="piano" aria-label="试听琴键"></div><button id="octave-up" aria-label="升高八度">＋</button></div>
+    <div class="monitor-row"><canvas id="monitor" width="600" height="48" aria-label="输出波形"></canvas><span id="peak-level">−∞ dB</span><span id="status" role="status">就绪</span><span id="dirty-mark"></span></div>
+  </footer>
+  <script type="module" src="./app.mjs"></script>
+</body>
+</html>

@@ -1,0 +1,40 @@
+RootSound project export — 2026-10-29
+
+Algorithm status:
+Runtime separation: public Demucs/HTDemucs; native RipX note extraction and resynthesis are not integrated.
+Editable note conversion: Spotify Basic Pitch ONNX CPU plus RootSound native MIDI project importer.
+GPU is used for stem separation, not this transcription/export step.
+No claim of 1:1 RipX pipeline or quality equivalence.
+
+Delivered comparisons from output/20261029-182302-5fea93:
+D:/RootSound/project/vulcanus · 分离原音.rootsound
+  6 tracks, 42 consecutive 24-second-or-shorter float32 stereo samples.
+  Original 44,100 Hz and all 7,241,472 frames per track preserved.
+  42/42 chunks checked bit-exact as float32 against stem WAVs; positions contiguous.
+  463,559,570 bytes. No external audio dependency. Residual not included by default.
+D:/RootSound/project/vulcanus · 识别音符.rootsound
+  5 melodic tracks, 3,139 editable notes. Basic Pitch does not transcribe drums.
+  712,216 bytes. Replacement synth timbres, not recovered original timbres.
+  120 BPM is a fixed time coordinate, not a detected tempo.
+
+Verification:
+RootSound source validators, library transactions, cold reopening, sample preparation and actual
+playback-plan validation executed without opening an audio device.
+Audio project: 75.055 s, maxRSS 2,711,400 KiB (Node verification process, not GUI benchmark).
+Notes project: 0.112 s, maxRSS 92,028 KiB.
+68 focused frontend/domain tests passed; 61 native project-directory checks passed.
+Hidden separator UI verified both export controls and loaded 6 stems/5 note lanes.
+Desktop build passed. Actual visible GUI interaction and listening were not performed.
+
+Implementation:
+The separator now has two export buttons, uses selected stems and per-track gains, preserves
+in-memory note edits, and saves unique names into D:/RootSound/project. Existing songs never replaced.
+Audio is embedded as native sample instruments and phrase triggers, not inferred musical notes.
+Raw PCM remains bounded at 512 MiB across a playback plan. Native workspace file budget is 512 MiB.
+Export preflights encoded audio at 480 MiB to stay below JavaScript string limits; over-budget jobs
+fail without silently truncating, resampling or converting to lower precision.
+Each sample remains subject to the existing 120-second / 64 MiB bounds.
+The .rsproject portable package export path has its pre-existing separate size limit; use native
+.rootsound project Save/Copy for this large audio project.
+Large embedded audio projects can be slow and memory intensive. Streaming/external assets are not implemented.
+Requires this RootSound source tree and configured Node runtime; not a standalone portable separator package.

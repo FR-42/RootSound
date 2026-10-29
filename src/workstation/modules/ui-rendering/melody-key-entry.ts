@@ -28,12 +28,12 @@ export type MelodyEntryStep = {
 };
 
 /** A key advances once to the strictly next cell line; it never wraps or extends the phrase. */
-export function nextMelodyEntryStep(positionSeconds: number, tempoBpm: number, lengthBeats = 16): MelodyEntryStep | undefined {
+export function nextMelodyEntryStep(positionSeconds: number, tempoBpm: number, lengthBeats = 16, stepsPerBeat = PHRASE_STEPS_PER_BEAT): MelodyEntryStep | undefined {
   if (!Number.isFinite(positionSeconds) || !Number.isFinite(tempoBpm) || tempoBpm < 40 || tempoBpm > 240
-    || !Number.isFinite(lengthBeats) || lengthBeats <= 0) return;
+    || !Number.isFinite(lengthBeats) || lengthBeats <= 0 || !Number.isInteger(stepsPerBeat) || stepsPerBeat < 2 || stepsPerBeat > 9) return;
   const limit = lengthBeats;
-  const cells = Math.max(0, positionSeconds) * tempoBpm / 60 * PHRASE_STEPS_PER_BEAT;
-  const lastCell = limit * PHRASE_STEPS_PER_BEAT;
+  const cells = Math.max(0, positionSeconds) * tempoBpm / 60 * stepsPerBeat;
+  const lastCell = limit * stepsPerBeat;
   if (cells >= lastCell - GRID_EPSILON) return;
   // Converting a head's seconds back to beats can put an exact line a few ulps
   // to either side. Treat that tiny error as the same line before moving on.
@@ -41,8 +41,8 @@ export function nextMelodyEntryStep(positionSeconds: number, tempoBpm: number, l
   const currentCell = Math.abs(cells - rounded) <= GRID_EPSILON ? rounded : Math.floor(cells);
   const nextCell = currentCell + 1;
   if (nextCell > lastCell + GRID_EPSILON) return;
-  const startBeat = nextCell / PHRASE_STEPS_PER_BEAT;
-  const durationSeconds = 60 / tempoBpm / PHRASE_STEPS_PER_BEAT;
+  const startBeat = nextCell / stepsPerBeat;
+  const durationSeconds = 60 / tempoBpm / stepsPerBeat;
   return { startBeat, seconds: startBeat * 60 / tempoBpm, durationSeconds,
     canWrite: nextCell + 1 <= lastCell + GRID_EPSILON };
 }

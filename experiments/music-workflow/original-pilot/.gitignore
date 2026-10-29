@@ -1,0 +1,10 @@
+# Local recordings and reproducible rendered artifacts are not source code.
+__pycache__/
+/assets/vocalset/
+/assets/vocalset-central-directory.json
+/analysis/reference/*.wav
+/composition/sounds/
+/delivery/
+/delivery-v1/
+/*.zip
+/packaging/.check/

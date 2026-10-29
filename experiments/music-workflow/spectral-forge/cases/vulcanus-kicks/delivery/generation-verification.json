@@ -1,0 +1,153 @@
+{
+  "release": "20261028-055644-757-e7928b",
+  "engineDirectory": "D:\\RootSound\\experiments\\music-workflow\\spectral-forge\\.builds\\20261028-055644-757-e7928b\\ui",
+  "referenceWindowSeconds": [
+    0,
+    20
+  ],
+  "source": "D:\\Sound\\temp\\music\\vulcanus.mp3",
+  "sourceAudioIncluded": false,
+  "audioInputSupported": false,
+  "construction": "Published SpectralSynth/renderPatch only. Native oscillators, pitch/volume curves and static spectrum; no external audio effect or sample.",
+  "interpretation": "Two provisional designs guided by the user dense 3–10s / sparse after10s cue. No claim of recovered original presets or proven kick identities.",
+  "listeningAccepted": false,
+  "patches": [
+    {
+      "id": "A",
+      "name": "Vulcanus-Kick-A-密集短击",
+      "midi": 60,
+      "velocity": 1,
+      "holdSeconds": 0.25,
+      "curveCounts": {
+        "spectrum": 10,
+        "amplitude": 10,
+        "pitch": 10
+      },
+      "effectivePolyphony": 4,
+      "bodyPitchHz": [
+        {
+          "seconds": 0.005,
+          "hz": 155.56349186104046
+        },
+        {
+          "seconds": 0.015,
+          "hz": 96.91382074223797
+        },
+        {
+          "seconds": 0.035,
+          "hz": 79.21928069135353
+        },
+        {
+          "seconds": 0.065,
+          "hz": 73.68171382293166
+        },
+        {
+          "seconds": 0.11,
+          "hz": 67.12878909935867
+        },
+        {
+          "seconds": 0.17,
+          "hz": 61.82462648814085
+        }
+      ],
+      "auditionPeakCalibrationDb": 5.647234664667108,
+      "sampleRate": 48000,
+      "frames": 25952,
+      "durationSeconds": 0.5406666666666666,
+      "peak": 0.699999988079071,
+      "rms": 0.1722818995472032,
+      "dcMean": -4.1553509393999526e-11,
+      "last60msPeak": 3.106855051004942e-10,
+      "maximumLeftRightDifference": 5.551115123125783e-17,
+      "tailTruncated": false
+    },
+    {
+      "id": "B",
+      "name": "Vulcanus-Kick-B-下潜重击",
+      "midi": 60,
+      "velocity": 1,
+      "holdSeconds": 0.34,
+      "curveCounts": {
+        "spectrum": 10,
+        "amplitude": 10,
+        "pitch": 10
+      },
+      "effectivePolyphony": 4,
+      "bodyPitchHz": [
+        {
+          "seconds": 0.005,
+          "hz": 251.85924432711377
+        },
+        {
+          "seconds": 0.015,
+          "hz": 139.72783836257244
+        },
+        {
+          "seconds": 0.035,
+          "hz": 84.82129841560224
+        },
+        {
+          "seconds": 0.065,
+          "hz": 62.21563357769498
+        },
+        {
+          "seconds": 0.11,
+          "hz": 53.05572895586153
+        },
+        {
+          "seconds": 0.17,
+          "hz": 48.71721355062982
+        }
+      ],
+      "auditionPeakCalibrationDb": 4.227484320674433,
+      "sampleRate": 48000,
+      "frames": 30273,
+      "durationSeconds": 0.6306875,
+      "peak": 0.699999988079071,
+      "rms": 0.19268295822420708,
+      "dcMean": -1.1828283971956232e-10,
+      "last60msPeak": 5.079743736757791e-9,
+      "maximumLeftRightDifference": 0,
+      "tailTruncated": false
+    }
+  ],
+  "files": [
+    {
+      "name": "Vulcanus-Kick-A-密集短击.rssynth",
+      "bytes": 4490,
+      "sha256": "603b06894ec29034c9472dd192cca5eadaf02797ef569693f87d15ce91d1057f"
+    },
+    {
+      "name": "Vulcanus-Kick-A-密集短击-单击.wav",
+      "bytes": 155756,
+      "sha256": "dc7069e7aad4cbf7f68af9a52864f26f6a7f6b7d68c5a939b66091f1fa7ef759"
+    },
+    {
+      "name": "Vulcanus-Kick-B-下潜重击.rssynth",
+      "bytes": 4491,
+      "sha256": "710bd82ab42e322c7a8dfeb75eae4a33aee001e0a8acb6688aa299fac3d08ff1"
+    },
+    {
+      "name": "Vulcanus-Kick-B-下潜重击-单击.wav",
+      "bytes": 181682,
+      "sha256": "f3a7bb07c44c6b7dbdbc73c3a991ee914129681a1ff62a46618cda641fe72568"
+    },
+    {
+      "name": "Vulcanus-Kick-AB-对比试听.wav",
+      "bytes": 1785644,
+      "sha256": "258e868af156dd320f0414eb97ce1a8e8af4041eb9e0cb340d44b02f06e42942"
+    }
+  ],
+  "comparison": {
+    "sampleRate": 48000,
+    "frames": 297600,
+    "durationSeconds": 6.2,
+    "peak": 0.735663652420044,
+    "rms": 0.2026671462794484,
+    "dcMean": -5.7782708803116506e-11,
+    "last60msPeak": 3.195184783422178e-9,
+    "maximumLeftRightDifference": 5.551115123125783e-17,
+    "tailTruncated": false,
+    "auditionOnly": true
+  }
+}

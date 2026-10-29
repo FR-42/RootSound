@@ -98,3 +98,13 @@ user's actual instructions.
   grounded in the user's objective, not opposition for its own sake.
 - Origin: user's timbre-strengthening request and decision to develop real
   instruments and electronic sounds together in stages, 2026-10-23.
+
+## N15 · Deliver finished music projects to the default project directory — ACTIVE
+
+- Rule: future finished music project files made by the assistant may be placed
+  directly in the application's reported default project directory, so they
+  appear in the song library. Check the current destination rather than assuming
+  a fixed path; preserve existing projects and choose a distinct name on collision.
+- Rule: this delivery preference is not listening acceptance of the music and
+  does not authorize overwriting or removing existing projects.
+- Origin: user's instruction, 2026-10-28: “以后你做出来音乐项目后，可以直接把成品项目文件放到默认目录下面。”

@@ -1,0 +1,17 @@
+2026-10-29：修复资源管理器启动时的GPU DLL加载失败
+
+已复现用户的c10_xpu.dll WinError126：把PATH清空为Windows系统目录后，旧bootstrap仍加载失败。
+仅加入本工具gpu-packages/Library/bin到子进程PATH即可加载成功，证明旧测试继承的开发环境掩盖了部署缺口。
+原实现只有os.add_dll_directory；Intel依赖的加载仍需要进程PATH。
+修正bootstrap.py，同时注册DLL目录并将本工具局部运行库目录加入进程PATH，保留句柄、去重，可被工作子进程继承。
+没有修改系统PATH、注册表或驱动。原文件备份pre-gpu-backup/bootstrap-before-clean-launch-fix.py。
+
+验证：test_clean_gpu_launch.py
+父进程构造仅Windows目录的PATH，去掉PYTHONPATH/PYTHONHOME/Conda激活变量。
+实际隐藏GUI经run_job启动engine工作进程，四轨和六轨均GPU成功；每轨88200帧、44100Hz、双声道、有限值。
+界面正确加载结果，project.json记录device=xpu，生成输入哈希未变。
+同样干净环境下运行RipX音色分离.exe --smoke，退出0。
+证据位置见last-clean-launch-test.txt。没有读取用户音乐、显示窗口、截屏或播放音频。
+
+先前GPU实测证明模型可运行，但没有覆盖不继承开发环境的桌面启动，不能作为该场景已通过的证据。
+请关闭旧窗口，重新打开上一级目录的RipX音色分离.exe再操作。

@@ -3,6 +3,23 @@ import { MAX_PCM_AUDIO_BYTES, MAX_SAMPLE_DURATION_SECONDS, type PcmAudio } from 
 
 function fail(message: string): never { throw new Error(message); }
 
+// A successful canonical check is evidence about an immutable string, not a
+// mutable record, file identity or decoded buffer. Bound retained strings by
+// both count and a conservative UTF-16 byte budget across project changes.
+const MAX_VERIFIED_PAYLOAD_BYTES = 64 * 1024 * 1024;
+const MAX_VERIFIED_PAYLOADS = 128;
+const verifiedPayloads = new Map<string, number>();
+let verifiedPayloadBytes = 0;
+function rememberVerifiedPayload(value: string, byteLength: number): void {
+  const bytes = value.length * 2;
+  if (bytes > MAX_VERIFIED_PAYLOAD_BYTES) return;
+  while (verifiedPayloads.size >= MAX_VERIFIED_PAYLOADS || verifiedPayloadBytes + bytes > MAX_VERIFIED_PAYLOAD_BYTES) {
+    const oldest = verifiedPayloads.keys().next().value!;
+    verifiedPayloads.delete(oldest); verifiedPayloadBytes -= oldest.length * 2;
+  }
+  verifiedPayloads.set(value, byteLength); verifiedPayloadBytes += bytes;
+}
+
 export function validatePcm(audio: PcmAudio): PcmAudio {
   if (!audio || !Number.isInteger(audio.sampleRate) || audio.sampleRate < 8000 || audio.sampleRate > 192000
     || !Array.isArray(audio.channels) || audio.channels.length < 1 || audio.channels.length > 8) fail('采样需要 8–192 kHz、1–8 声道的有效 PCM 音频。');
@@ -26,16 +43,34 @@ export function encodeBase64(bytes: Uint8Array): string {
   for (let offset = 0; offset < bytes.length; offset += 32766) chunks.push(btoa(String.fromCharCode(...bytes.subarray(offset, offset + 32766))));
   return chunks.join('');
 }
-export function decodeBase64(value: string, expectedLength: number): Uint8Array {
+/** Validate exact canonical file bytes without allocating or decoding their payload. */
+export function validateBase64(value: string, expectedLength: number): void {
   if (typeof value !== 'string' || !Number.isSafeInteger(expectedLength) || expectedLength < 1 || expectedLength > MAX_SAMPLE_FILE_BYTES
     || value.length !== Math.ceil(expectedLength / 3) * 4) fail('采样的原文件数据长度无效。');
+  if (verifiedPayloads.get(value) === expectedLength) {
+    verifiedPayloads.delete(value); verifiedPayloads.set(value, expectedLength); return;
+  }
+  const remainder = expectedLength % 3;
+  const padding = remainder === 0 ? 0 : 3 - remainder;
+  const dataLength = value.length - padding;
+  // A single character class scans in native code without recursive regexp
+  // groups. '=' belongs only in the exact suffix, never inside the payload.
+  if (/[^A-Za-z0-9+/]/u.test(value.slice(0, dataLength))
+    || padding > 0 && value.slice(dataLength) !== '='.repeat(padding)) fail('采样的原文件编码无效。');
+  if (padding) {
+    const last = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'.indexOf(value[dataLength - 1]!);
+    // Unused bits must be zero; atob alone would also accept aliases such as
+    // Zh== for Zg==. These checks preserve the original re-encoding guarantee.
+    if (last & (remainder === 1 ? 15 : 3)) fail('采样的原文件编码无效。');
+  }
+  rememberVerifiedPayload(value, expectedLength);
+}
+export function decodeBase64(value: string, expectedLength: number): Uint8Array {
+  validateBase64(value, expectedLength);
   let decoded: string;
   try { decoded = atob(value); } catch { return fail('采样的原文件数据已损坏。'); }
   if (decoded.length !== expectedLength) fail('采样的原文件数据与长度不一致。');
-  const bytes = Uint8Array.from(decoded, character => character.charCodeAt(0));
-  // Reject noncanonical encodings and ignored whitespace, preserving exact file identity.
-  if (encodeBase64(bytes) !== value) fail('采样的原文件编码无效。');
-  return bytes;
+  return Uint8Array.from(decoded, character => character.charCodeAt(0));
 }
 export function waveform(audio: PcmAudio, requested = 128): number[] {
   validatePcm(audio); if (!Number.isFinite(requested)) fail('波形显示长度无效。'); const frames = audio.channels[0]!.length;

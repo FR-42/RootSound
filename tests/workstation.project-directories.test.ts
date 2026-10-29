@@ -4,6 +4,7 @@ import type { ProjectDirectoriesPort } from '../src/workstation/contracts/projec
 import { createDesktopProjectDirectories, type NativeProjectDirectoriesBridge } from '../src/workstation/app/platform/project-directories.ts';
 import { createDesktopPlatform, type DesktopBridge } from '../src/workstation/app/platform/desktop.ts';
 import { createInitialProjectLibrary, createProjectCopyLibrary, createProjectSetup, renameProjectLibrary } from '../src/workstation/app/project-setup.ts';
+import { createProjectClosePreparation } from '../src/workstation/app/project-close.ts';
 import { createMaterialLibrary } from '../src/workstation/modules/materials/public.ts';
 import { createTimbrePlayback } from '../src/workstation/modules/timbre/public.ts';
 import { createPhrasePlayback } from '../src/workstation/modules/phrase/public.ts';
@@ -16,6 +17,13 @@ function directoryBridge(): NativeProjectDirectoriesBridge {
     ChooseLocation: () => raw({ status: 'cancelled' }),
     Create: () => raw({ status: 'created', project: entry }), Open: () => raw({ status: 'cancelled' }) };
 }
+
+test('successful project deletion carries a retained-copy notice through the platform and setup without retrying deletion', async () => {
+  const bridge = directoryBridge(); let calls = 0;
+  bridge.Delete = () => { calls++; return raw({ status: 'deleted', warning: '歌曲已删除，用户另外修改过的音色副本已保留。' }); };
+  const port = createDesktopProjectDirectories(bridge); const setup = createProjectSetup(port, () => { throw new Error('Deletion must not open a project.'); });
+  assert.deepEqual(await setup.remove!(entry), { warning: '歌曲已删除，用户另外修改过的音色副本已保留。' }); assert.equal(calls, 1);
+});
 
 test('library rename uses a versioned native snapshot and validates path identity and result', async () => {
   const bridge = directoryBridge(); const calls: unknown[][] = [];
@@ -120,6 +128,17 @@ test('default project listing and path opening do not invoke the custom folder p
     bridge.List = () => raw(value); await assert.rejects(port.list!(), /无效/);
   }
   await assert.rejects(port.open('  '), /不支持直接打开/); assert.equal(opened.length, 1);
+});
+
+test('Save As uses an explicit copy bridge independently of ordinary project creation', async () => {
+  const bridge = directoryBridge(); const requests: string[][] = [];
+  bridge.Create = () => { throw new Error('ordinary create must not switch a dirty project'); };
+  bridge.CreateCopy = (name, location, text) => { requests.push([name, location, text]); return raw({ status: 'created', project: { ...entry, name } }); };
+  const port = createDesktopProjectDirectories(bridge);
+  assert.equal((await port.createCopy!('副本', 'E:\\副本', 'working snapshot')).name, '副本');
+  assert.deepEqual(requests, [['副本', 'E:\\副本', 'working snapshot']]);
+  bridge.CreateCopy = () => raw({ status: 'error', message: '副本位置不可写' });
+  await assert.rejects(port.createCopy!('副本', 'E:\\副本', 'working snapshot'), /不可写/u);
 });
 
 test('manual save and save-exit pass the current project title while legacy unnamed calls remain explicit', async () => {
@@ -249,6 +268,48 @@ test('save checkpoints the original directory while save-as captures a named ind
   const decoded = JSON.parse(f.requests[0]!.text);
   assert.equal(decoded.drafts.find((draft: { id: string }) => draft.id === root).name, '原名称 1');
   assert.deepEqual(decoded.drafts.find((draft: { id: string }) => draft.id === root).body, JSON.parse(original).drafts.find((draft: { id: string }) => draft.id === root).body);
+});
+
+test('project Save, Save As and save-exit refuse unfinished phrase edits while discard remains available', async () => {
+  const original = createInitialProjectLibrary('保存边界');
+  const root = JSON.parse(original).drafts.find((draft: { kind: string }) => draft.kind === 'rootsound.song').id as string;
+  const f = fixture(); let prepares = 0, saves = 0, copies = 0; const exits: string[] = [];
+  f.directories.save = async () => { saves++; return entry; };
+  f.directories.createCopy = async () => { copies++; return entry; };
+  f.directories.exit = async mode => { exits.push(mode); };
+  const service = createProjectSetup(f.directories, () => {}, { read: () => original, songDraftId: () => root,
+    prepareSave() { prepares++; throw new Error('请先保存或放弃乐句草稿'); } });
+  await assert.rejects(service.save!(), /乐句草稿/u);
+  await assert.rejects(service.saveAs!('保存边界 1', 'E:\\副本'), /乐句草稿/u);
+  await assert.rejects(service.exit!('save'), /乐句草稿/u);
+  await service.exit!('discard');
+  assert.equal(prepares, 3); assert.equal(saves, 0); assert.equal(copies, 0); assert.equal(f.requests.length, 0); assert.deepEqual(exits, ['discard']);
+});
+
+test('Save As waits for field preparation and snapshots only the prepared working state', async () => {
+  let current = createInitialProjectLibrary('准备前');
+  const root = JSON.parse(current).drafts.find((draft: { kind: string }) => draft.kind === 'rootsound.song').id as string;
+  const f = fixture(); let savedText = ''; let ordinaryCreates = 0;
+  f.directories.create = async () => { ordinaryCreates++; return entry; };
+  f.directories.createCopy = async (_name, _location, text) => { savedText = text; return entry; };
+  const service = createProjectSetup(f.directories, () => {}, { read: () => current, songDraftId: () => root,
+    async prepareSave() { await Promise.resolve(); current = renameProjectLibrary(current, '准备后的工作名'); } });
+  await service.saveAs!('明确的副本', 'E:\\副本');
+  assert.equal(ordinaryCreates, 0);
+  assert.equal(JSON.parse(savedText).drafts.find((draft: { id: string }) => draft.id === root).name, '明确的副本');
+  assert.equal(JSON.parse(current).drafts.find((draft: { id: string }) => draft.id === root).name, '准备后的工作名');
+});
+
+test('window-close preparation flushes without saving and still allows discard when phrase saving is blocked', async () => {
+  const calls: string[] = []; let failed = false;
+  const prepare = createProjectClosePreparation({ async flush() { calls.push('flush'); await Promise.resolve(); },
+    assertSaveReady() { calls.push('check'); if (failed) throw new Error('还有乐句草稿'); }, name: () => '正在编辑的歌' });
+  assert.deepEqual(await prepare(), { ready: true, canSave: true, name: '正在编辑的歌' });
+  failed = true;
+  assert.deepEqual(await prepare(), { ready: true, canSave: false, name: '正在编辑的歌', saveMessage: '还有乐句草稿' });
+  assert.deepEqual(calls, ['flush', 'check', 'flush', 'check']);
+  const invalid = createProjectClosePreparation({ flush() { throw new Error('名称无效'); }, assertSaveReady() { throw new Error('must not run'); }, name: () => '旧名' });
+  assert.deepEqual(await invalid(), { ready: true, canSave: false, name: '旧名', saveMessage: '名称无效' });
 });
 
 test('failed save-as cannot enter the copy or mutate its source, and a failed checkpoint is not success', async () => {

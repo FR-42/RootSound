@@ -1,0 +1,131 @@
+RipX native note-boundary investigation — 2026-10-29
+
+Target: D:/#Software/ripx/RipX.exe
+SHA256: 5f088fa4fbbe1759ef75d8034c79f33c846e3bf5f13d5048dd95a6614d2ad441
+Method: retained REA Ghidra evidence only; no target execution and no media inspection.
+
+1. The correct downstream anchor is a 0x90 record, not the 0x28 harmonic trajectory.
+
+Observed in retained midi-writer.c, function 0x140304bb0:
+  lines 1549–1551: record = table[orderedIndex] * 0x90 +
+                   *(DAT_14098a5d0 + ripIndex * 0x6ab78)
+  record+0x10: start time used by MIDI path
+  record+0x14: end time used by MIDI path
+  record+0x30: associated structure pointer (instrument at +0x20;
+               flags/type at +0x21c of that associated structure)
+  record+0x44: flags; bit 0x100 suppresses export unless configuration permits
+
+The direct MIDI path at lines 1646–1659 maps these times to integer indices:
+  startIndex = int((startTime + 0.0005) / timeStep)
+  endIndex   = uint((endTime + 0.0005) / timeStep)
+  timeStep   = *(float *)(DAT_1409c3720 + ripIndex * 0x6ab78)
+Both indices stay zero if timeStep==0. Another branch calls 0x1402630f0
+instead, so this formula is not the sole mapping mode.
+The export scan considers an object active for startIndex<=frame<=endIndex.
+It enforces at least endIndex=startIndex+1 before further export handling.
+These are export consumers, not evidence for how the start/end times are detected.
+
+2. Newly reconstructed, executable handoff component: 0x140344d40 group assembly.
+
+Evidence ev_b1eebb1f2e8bef1c0712f52c249293a6f697e0282752108f4e388b83434f3810
+Source: work/ripx-analysis/final-output-commit.c and .json
+
+Per analysis frame, 0x4c harmonic records are grouped by uint32 at +0x34.
+Records whose +0x31 bit mask 2 is already set cannot start a group.
+The first record copies its raw bytes +0x34..+0x4b into the 24-byte header.
+Then 48 int32 harmonic slots follow, initialized to -1.
+Harmonic byte +0x49 selects slot index (harmonic-1). All matching later
+records are marked with bit mask 2, including records already marked before
+this scan. A duplicate harmonic slot therefore retains its LAST matching
+record index. Groups retain first-unmarked occurrence order. The visible
+capacity is 112 groups per frame, not a user-facing maximum musical polyphony.
+Each resulting record is 0x18+48*4 = 0xd8 bytes.
+The helper 0x1403449c0 is called even when the frame has zero groups. Such
+empty frames must not be dropped by a later integration: they may end ongoing
+state, although the exact effect remains unverified until its body is read.
+
+Upstream 0x1403443e0 makes its first eligibility decision by calling
+0x140318820(context, trajectory.type(+0x24), trajectory.float(+0x18)). It
+counts only trajectory frames with (frame.flags(+0x48) & 0x82)==0 and emits
+the trajectory after at least the returned count is reached. This is a
+producer-owned criterion; an arbitrary minimum-duration threshold is invalid.
+Output header bytes +0x34..+0x4b copy trajectory +0x10..+0x27, except type==1
+overwrites +0x3c with the current frame's float +0x50. Thus group header +8
+may change each frame, and must not be frozen as an entire-note constant.
+
+native_frame_groups.py implements that exact, isolated transformation.
+It returns marked input bytes separately and never mutates caller bytes.
+Malformed length/harmonic guards are explicit wrapper safety checks, not
+claims about behavior of the original on invalid internal data.
+5 unit tests passed: interleaving, duplicate slot overwrite, marked records,
+capacity coverage and invalid input. These tests are not original-RipX
+differential validation and do not prove full pipeline equivalence.
+
+3. Next queries already requested from the parent-owned REA session.
+
+0x1403449c0 receives each frame's 0xd8 group array.
+0x140370a00 follows all frame updates from 0x140344d40.
+0x140373670 is a conditional subsequent step for one finalization branch.
+0x1402630f0 consumes a real 0x90 note object and returns index boundaries.
+Incoming references to DAT_14098a5d0 can identify producers of the actual
+note table. Following those writers avoids confusing trajectories with notes.
+
+Unresolved: initial note onset/offset production, splits/merges and full
+mapping of 0xd8 frame groups to 0x90 note objects. No guessed onset detector
+or public-model replacement was added.
+
+4. Direct-instruction follow-up, separately labelled from REA evidence.
+
+REA cold provider startup timed out in the parent's session. Independent GNU
+objdump files (direct-*.asm) read original PE bytes without loading/executing
+them. A .pdata entry is NOT necessarily a whole function: 370a00 initially
+has only a 0x46-byte unwind range but the instruction body continues to about
+37277e. The retained region includes subsequent functions and is not itself
+a claim about one exact procedure extent.
+
+0x1403449c0: fully interpreted packed-data transformation, implemented as
+expand_frame_groups. True fifth argument is the raw 0x4c harmonic array
+(callee loads original RSP+0x28); the previous pseudocode missed this.
+The destination frame stride is 0x45208 = 112*0x9e0 + 8.
+Each 0x9e0 record stores frequency at +0, signed type flags at +4, and 48
+harmonic entries from +8, stride 0x34. Each entry can hold three 0x10
+components; byte +48 is count, +49 is harmonic ordinal for type=1 or zero
+otherwise. Missing harmonic gets zero component data but count=1. Metadata
+copies: group+0x10 to dest+0x9c8; group+4 to dest+0x9d0; groupID to +0x9d8;
+dest+0x9cc=48 and +0x9cd=type. Type !=1 sets 0x8000, types16/17 set mask0x4;
+types18/64 set mask0x4 only when group+4 is nonzero. It clears the destination
+group count on empty frames. It does not read/update the final note table.
+
+0x140318820: implemented native_minimum_frames.py. All numeric constants
+were extracted by section-aware PE offsets and retained in
+duration-constants.json with source SHA256. For type !=1 it returns1.
+For type1 the span follows the actual raw context settings:
+  flag91: frequency<50 ? .1 : .07
+  otherwise flag92 or mode14==1: .1
+  otherwise frequency>1000: .05
+  otherwise clamp(float32(float32(1/frequency)*20), float32(.06), float32(.1))
+Then use float32(rate98a1ac*span+.5), truncate, max(1), min(ctx24+ctx28).
+Rate initialization/physical units remain unresolved. The discontinuity at
+1000 Hz is preserved; it is not smoothed or replaced by a general DSP rule.
+
+11 total focused tests pass, covering packing bytes/metadata/type flags,
+unresolved source identity rejection, configuration priority and frequency
+threshold boundaries. No original-RipX differential execution was performed.
+
+0x140370a00 direct body: manipulates the real 0x90 note table; combines
+frequency-distance and time-window conditions. At 371f23 it calls25f6c0;
+at3720a9/20d2 calls26df10; at20ba calls36cc70; at2109 calls370070;
+at2120 calls377c10. A full reconstruction of its state machine is still needed.
+0x140370070 directly orders and merges existing start/end-index structures,
+including their harmonic component capacities. It is not itself a new-onset
+detector. Its downstream helpers remain unresolved here.
+
+0x1402630f0 has at least SIX parameters: arg5 byte enables an end-index
+scale; arg6 is rip index (negative uses global current index). note+0x38 is
+layer count, pointer at note+0x30+layerIndex*0x18. With a valid layer,
+offset=max(0,trunc((float note+0x10 + double constant68e100)/float timestep));
+start=layer.int0+offset; end=layer.int4+offset, or if arg5 nonzero,
+end=trunc(float32(layer.int4*275310(note)+.5))+offset.
+Invalid layer returns both zero. This consumes existing boundaries and
+does not establish how those layer start/end indices were produced.
+

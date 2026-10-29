@@ -1,4 +1,5 @@
 import type { PhraseEditorPort } from '../../contracts/phrase.ts';
+import type { SaveResult } from '../../contracts/content.ts';
 import type { ReferenceContext, ReferenceEditingPort, ReferenceSession } from '../../contracts/references.ts';
 import { beginOrResumeReferenceEdit } from './reference-activity.ts';
 
@@ -12,6 +13,7 @@ export function savePhraseInPlace(options: {
   references?: ReferenceEditingPort;
   selection?: PhraseSaveSelection;
   onKeep?(ids: string[]): void;
+  saveDraft?(draftId: string, mode: 'new' | 'overwrite'): SaveResult;
   /** Runs before retention, so the caller can repair scope state even when retention fails. */
   onContinuation?(continuation: PhraseSaveContinuation): void;
 }): PhraseSaveContinuation {
@@ -24,7 +26,8 @@ export function savePhraseInPlace(options: {
   if (!session && draft.sourceId && !view.changed) return complete({ id: draft.sourceId });
   if (!session && draft.sourceId && references) session = references.beginLibrary(draft.sourceId, draft.id);
   if (!session || !references) {
-    const saved = phrase.save(draft.sourceId ? 'overwrite' : 'new');
+    const mode = draft.sourceId ? 'overwrite' : 'new';
+    const saved = options.saveDraft ? options.saveDraft(draft.id, mode) : phrase.save(mode);
     if (saved.status !== 'saved') throw new Error(saved.status === 'storage-error' ? saved.message
       : saved.status === 'conflict' ? saved.reason : '乐句还未保存，请检查使用位置。');
     return complete({ id: saved.content.id });

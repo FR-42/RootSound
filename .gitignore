@@ -12,6 +12,7 @@ dist/
 /.test-output/
 /data/
 /project/
+/timbres/
 /RootSound.exe
 /RootSound.*.tmp
 bin/
@@ -20,3 +21,27 @@ obj/
 # 系统垃圾
 Thumbs.db
 .DS_Store
+
+
+# ==========================================
+# Music Workflow - 本地依赖、模型和实验输出
+# ==========================================
+
+# RipX Separator - GPU 运行依赖
+/experiments/music-workflow/ripx-separator/gpu-packages/
+/experiments/music-workflow/ripx-separator/gpu-downloads/
+
+# Python 本地安装依赖
+/experiments/music-workflow/ripx-separator/packages/
+
+# AI 模型权重
+/experiments/music-workflow/ripx-separator/models/
+
+# 音频分离输出
+/experiments/music-workflow/ripx-separator/output/
+
+# RipX 缓存
+/experiments/music-workflow/ripx-separator/.cache/
+
+# Original Pilot 缓存
+/experiments/music-workflow/original-pilot/.cache/

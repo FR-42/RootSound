@@ -30,7 +30,28 @@ export type SynthesizerBody = {
   pitch: { semitones: number; seconds: number };
 };
 export type TimbrePreset = { id: string; name: string; category: '旋律' | '低音' | '铺底' | '打击' | '音效'; body: SynthesizerBody };
-export type EditableTimbreBody = TimbreBody | SampleTimbreBody | SynthesizerBody;
+export type SpectralCurvePoint = { x: number; y: number; curve: number };
+export type SpectralPatch = {
+  format: 'RootSoundSpectralPatch'; version: 1; name: string; seed: number;
+  master: { level: number; glideSeconds: number; polyphony: number; velocitySensitivity: number };
+  oscillators: { id: string; enabled: boolean; waveform: 'sine' | 'triangle' | 'saw' | 'pulse' | 'noise';
+    level: number; pan: number; semitones: number; cents: number; phase: number; pulseWidth: number;
+    unison: number; detuneCents: number; spread: number; fmRatio: number; fmAmount: number }[];
+  spectrum: { mix: number; points: SpectralCurvePoint[] };
+  amplitude: { points: SpectralCurvePoint[]; sustainIndex: number };
+  pitch: { points: SpectralCurvePoint[]; sustainIndex: number };
+  lfos: { enabled: boolean; waveform: 'sine' | 'triangle' | 'square' | 'random'; rateHz: number;
+    depth: number; target: 'pitch' | 'amplitude' | 'pan' | 'fm' }[];
+  effects: { drive: number; delaySeconds: number; delayFeedback: number; delayMix: number;
+    chorusMix: number; chorusRateHz: number; chorusDepthMs: number };
+};
+/** Exact parameter document; ordinary synthesis controls must not flatten these curves. */
+export type SpectralTimbreBody = {
+  model: 'spectral-synth'; version: 1; patch: SpectralPatch;
+  /** Derived display metadata, validated against the patch. */
+  attackSeconds: number; releaseSeconds: number; level: number;
+};
+export type EditableTimbreBody = TimbreBody | SampleTimbreBody | SynthesizerBody | SpectralTimbreBody;
 
 export type TimbreView = {
   draft: Draft;
@@ -47,7 +68,7 @@ export type TimbreView = {
 export interface TimbrePlaybackPort {
   listSaved(): ContentRecord[];
   readSaved(contentId: string): { content: ContentRecord; body: EditableTimbreBody };
-  prepareForSaved(contentId: string): Promise<void>;
+  prepareForSaved(contentId: string, notes?: readonly SoundPlan['note'][]): Promise<void>;
   planForSaved(contentId: string, note: SoundPlan['note']): PlayableNotePlan;
 }
 
@@ -70,7 +91,7 @@ export interface TimbreEditorPort {
   setRootFrequency(frequencyHz: number): void;
   setSampleLoop(loop?: { startSeconds: number; endSeconds: number }): void;
   /** Async codec work happens explicitly before synchronous clock scheduling. */
-  preparePreview(): Promise<void>;
+  preparePreview(notes?: readonly SoundPlan['note'][]): Promise<void>;
   /** A temporary body is validated and compiled without saving an edit. */
   previewPlan(bodyOverride?: EditableTimbreBody, note?: SoundPlan['note']): PlayableNotePlan;
   save(mode: 'overwrite' | 'new', confirmation?: SaveConfirmation): SaveResult;

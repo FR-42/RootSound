@@ -30,6 +30,38 @@ function fixture() {
     raw: () => raw, writes: () => writes, fail() { broken = true; } };
 }
 
+test('the project phrase catalog scans its scope once and reuses isolated metadata until a durable edit', () => {
+  const f = fixture(); f.createWithNotes(); f.createWithNotes();
+  let views = 0, contents = 0, eligibleLists = 0;
+  const originalView = f.library.currentProjectView!, originalContent = f.library.readContent;
+  const originalEligible = f.library.listContentInfoForDraft!;
+  f.library.currentProjectView = id => { views++; return originalView(id); };
+  f.library.readContent = id => { contents++; return originalContent(id); };
+  f.library.listContentInfoForDraft = id => { eligibleLists++; return originalEligible(id); };
+  const first = readProjectPhrases(f.library, f.songId);
+  assert.equal(first.length, 2); assert.equal(views, 1); assert.equal(contents, 2); assert.equal(eligibleLists, 0);
+  const expected = structuredClone(first);
+  first[0]!.name = '调用者的临时名字'; first.pop();
+  for (let index = 0; index < 20; index++) assert.deepEqual(readProjectPhrases(f.library, f.songId), expected);
+  assert.equal(views, 1); assert.equal(contents, 2); assert.equal(eligibleLists, 0);
+});
+
+test('phrase catalog keeps saved metadata through draft rename, undo and redo until an explicit save', () => {
+  const f = fixture(), made = f.createWithNotes();
+  const original = readProjectPhrases(f.library, f.songId)[0]!;
+  f.phrase.rename('新名称');
+  assert.equal(readProjectPhrases(f.library, f.songId)[0]!.name, '乐句 1');
+  f.phrase.undo(); assert.deepEqual(readProjectPhrases(f.library, f.songId)[0], original);
+  f.phrase.redo(); assert.deepEqual(readProjectPhrases(f.library, f.songId)[0], original);
+  f.phrase.setTempo(144); saved(f.phrase.save('overwrite'));
+  const edited = readProjectPhrases(f.library, f.songId)[0]!;
+  assert.equal(edited.id, made.id); assert.equal(edited.name, '新名称'); assert.equal(edited.tempoBpm, 144);
+  assert.equal(edited.durationSeconds, 16 * 60 / 144);
+  f.song.create(); const other = f.song.read().draft!.id;
+  assert.deepEqual(readProjectPhrases(f.library, other), []);
+  assert.deepEqual(readProjectPhrases(f.library, f.songId), [edited]);
+});
+
 test('the library starts empty, lists each current private phrase once and excludes global and other-song sources', () => {
   const f = fixture(); assert.deepEqual(readProjectPhrases(f.library, f.songId), []);
   const voice = createTimbreEditor(f.library); voice.rename('公共音色'); const timbre = saved(voice.save('new'));
@@ -100,7 +132,7 @@ test('dirty editors contribute one library identity and reference forks remain d
   const f = fixture(); const made = f.createWithNotes(); const row = f.song.read().body!.tracks[0]!.id;
   f.phrase.openDraft(made.draftId); f.phrase.rename('正在细调');
   const working = readProjectPhrases(f.library, f.songId);
-  assert.deepEqual(working.map(item => [item.id, item.name]), [[made.id, '正在细调']]);
+  assert.deepEqual(working.map(item => [item.id, item.name]), [[made.id, '乐句 1']]);
   f.phrase.undo();
   const first = f.song.addClip(row, made.id, 0); f.song.addClip(row, made.id, 8);
   f.song.setPhraseShelfVisible(made.id, false);

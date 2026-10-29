@@ -3,7 +3,7 @@ import type { SongClipRef } from '../contracts/song.ts';
 import { createMaterialLibrary, createReferenceEditing, countUsagePositions } from '../modules/materials/public.ts';
 import { createTimbreEditor, createTimbrePlayback, createTimbreReferenceAdapter } from '../modules/timbre/public.ts';
 import { createPhraseEditor, createPhrasePlayback, createPhraseReferenceAdapter, readPhraseBody } from '../modules/phrase/public.ts';
-import { createSongReferenceAdapter, readSongBody } from '../modules/song/public.ts';
+import { createSongReferenceAdapter, readSongBody, songGridTempoAt } from '../modules/song/public.ts';
 import { createSampleReferenceAdapter } from '../modules/sampling/public.ts';
 
 function currentSong(library: MaterialLibrary, draftId: string) {
@@ -60,10 +60,11 @@ function privateSoundGraph(library: MaterialLibrary, scope: string, names: Map<s
   return { adopt, created };
 }
 
-/** A reusable empty phrase and its own voice enter the project in one durable write. */
-export function createProjectPhrase(library: MaterialLibrary, songDraftId: string, timbreId?: string): { id: string; draftId: string } {
+function prepareProjectPhrase(library: MaterialLibrary, songDraftId: string, timbreId?: string, tempoBpm?: number) {
   const expectedToken = library.currentToken();
   const { draft: song, view, scope } = currentSong(library, songDraftId);
+  const initialTempo = tempoBpm ?? songGridTempoAt(readSongBody(song.body), 0);
+  if (!Number.isFinite(initialTempo) || initialTempo < 40 || initialTempo > 240) throw new Error('新乐句速度必须在 40 至 240 之间。');
   const local = [...library.listContentInfo().filter(item => library.projectScopeOf?.({ type: 'content', id: item.id }) === scope),
     ...library.listDrafts().filter(item => library.projectScopeOf?.({ type: 'draft', id: item.id }) === scope),
     ...view.contents, ...view.drafts];
@@ -93,16 +94,34 @@ export function createProjectPhrase(library: MaterialLibrary, songDraftId: strin
   const phrases = createPhrasePlayback(staging, createTimbrePlayback(staging));
   const phraseEditor = createPhraseEditor(staging, createTimbrePlayback(staging));
   phraseEditor.create(voice.id); phraseEditor.rename(name);
+  phraseEditor.setTempo(initialTempo);
   phraseEditor.setLength(16);
   // Empty phrases are valid reusable entities; the old editor's explicit-save guard stays intact.
   const phrase = requireSaved(staging.saveDraft(phraseEditor.read().draft!.id, 'new'));
   phrases.readSaved(phrase.content.id);
-  committed(library.commitTransaction({ expectedToken, label: `新建${name}`,
+  return { expectedToken, song, view, created, phrase };
+}
+
+/** Explicitly create a saved reusable phrase; interactive creation uses a private draft below. */
+export function createProjectPhrase(library: MaterialLibrary, songDraftId: string, timbreId?: string, tempoBpm?: number): { id: string; draftId: string } {
+  const { expectedToken, song, view, created, phrase } = prepareProjectPhrase(library, songDraftId, timbreId, tempoBpm);
+  committed(library.commitTransaction({ expectedToken, label: `新建${phrase.content.name}`,
     createContents: [...created, phrase.content], createDrafts: [phrase.draft],
     exactNameIds: [...created.map(record => record.id), phrase.content.id, phrase.draft.id],
     projectMembers: [{ rootId: song.id, contentIds: [...new Set([...view.memberIds, phrase.content.id])] }],
   }));
   return { id: phrase.content.id, draftId: phrase.draft.id };
+}
+
+/** Start private work without publishing a phrase or adding a library tile. */
+export function beginProjectPhraseDraft(library: MaterialLibrary, songDraftId: string, timbreId?: string, tempoBpm?: number): { draftId: string } {
+  const { expectedToken, song, created, phrase } = prepareProjectPhrase(library, songDraftId, timbreId, tempoBpm);
+  const draft: Draft = { id: phrase.draft.id, projectRootId: song.id, kind: phrase.draft.kind,
+    owner: phrase.draft.owner, schemaVersion: phrase.draft.schemaVersion, name: phrase.draft.name,
+    body: structuredClone(phrase.draft.body), dependencies: [...phrase.draft.dependencies] };
+  committed(library.commitTransaction({ expectedToken, label: `开始${draft.name}草稿`,
+    createContents: created, createDrafts: [draft], exactNameIds: [...created.map(record => record.id), draft.id] }));
+  return { draftId: draft.id };
 }
 
 /** Save-as copies this edit, retaining its musical data and sharing this song's sound identities. */
@@ -183,16 +202,30 @@ export function retainProjectPhrases(library: MaterialLibrary, songDraftId: stri
 
 export type ProjectPhraseInfo = { id: string; name: string; tempoBpm: number; durationSeconds: number };
 
+// Keep one small metadata snapshot per library. Every durable edit, undo or redo
+// changes the token; returned values remain independent of the cached snapshot.
+const phraseCatalogs = new WeakMap<MaterialLibrary, { token: string; songId: string; items: ProjectPhraseInfo[] }>();
+
+function savedPhraseInfo(library: MaterialLibrary, phraseId: string): ProjectPhraseInfo {
+  const phrase = library.readContent(phraseId);
+  if (!phrase || phrase.kind !== 'rootsound.phrase' || phrase.owner !== 'phrase' || phrase.schemaVersion !== 1) throw new Error('找不到当前支持的乐句。');
+  createPhraseReferenceAdapter().slots(phrase);
+  const body = readPhraseBody(phrase.body);
+  return { id: phrase.id, name: phrase.name, tempoBpm: body.tempoBpm, durationSeconds: body.lengthBeats * 60 / body.tempoBpm };
+}
+
 /** Current reusable identities only; neither global starters nor undo custody are library tiles. */
 export function readProjectPhrases(library: MaterialLibrary, songDraftId: string): ProjectPhraseInfo[] {
+  const token = library.currentToken();
+  const cached = phraseCatalogs.get(library);
+  if (cached?.token === token && cached.songId === songDraftId) return cached.items.map(item => ({ ...item }));
   const { view, scope } = currentSong(library, songDraftId);
   const ids = new Set([...view.contents.filter(item => item.kind === 'rootsound.phrase').map(item => item.id),
     ...view.drafts.filter(item => item.kind === 'rootsound.phrase').flatMap(item => item.sourceId ? [item.sourceId] : [])]);
-  return [...ids].filter(id => library.projectScopeOf?.({ type: 'content', id }) === scope).map(id => {
-    const info = readProjectPhraseInfo(library, songDraftId, id);
-    const working = view.drafts.find(item => item.kind === 'rootsound.phrase' && item.sourceId === id);
-    return working ? { ...info, name: working.name } : info;
-  }).sort((first, second) => first.name.localeCompare(second.name, 'zh-CN') || first.id.localeCompare(second.id));
+  const items = [...ids].filter(id => library.projectScopeOf?.({ type: 'content', id }) === scope).map(id => savedPhraseInfo(library, id))
+    .sort((first, second) => first.name.localeCompare(second.name, 'zh-CN') || first.id.localeCompare(second.id));
+  phraseCatalogs.set(library, { token, songId: songDraftId, items });
+  return items.map(item => ({ ...item }));
 }
 
 /** Read the saved source actually used by the playlist, without creating an editor. */
@@ -201,14 +234,64 @@ export function readProjectPhraseInfo(library: MaterialLibrary, songDraftId: str
   const eligible = library.listContentInfoForDraft?.(songDraftId) ?? view.contents;
   const owner = library.projectScopeOf?.({ type: 'content', id: phraseId });
   if (!eligible.some(item => item.id === phraseId) || owner && owner !== scope) throw new Error('这份乐句不属于当前歌曲。');
-  const phrase = library.readContent(phraseId);
-  if (!phrase || phrase.kind !== 'rootsound.phrase' || phrase.owner !== 'phrase' || phrase.schemaVersion !== 1) throw new Error('找不到当前支持的乐句。');
-  createPhraseReferenceAdapter().slots(phrase);
-  const body = readPhraseBody(phrase.body);
-  return { id: phrase.id, name: phrase.name, tempoBpm: body.tempoBpm, durationSeconds: body.lengthBeats * 60 / body.tempoBpm };
+  return savedPhraseInfo(library, phraseId);
 }
 
 const same = (first: unknown, second: unknown): boolean => JSON.stringify(first) === JSON.stringify(second);
+
+const editableSame = (draft: Draft, source: ContentRecord): boolean => draft.name === source.name
+  && same(draft.body, source.body) && same(draft.dependencies, source.dependencies);
+function contextParent(draft: Draft): string | undefined {
+  const value = draft.editingContext;
+  if (!value || typeof value !== 'object' || Array.isArray(value) || value.format !== 'RootSoundReferenceEdit') return;
+  const context = value.context;
+  if (!context || typeof context !== 'object' || Array.isArray(context)) return;
+  const root = context.root;
+  return root && typeof root === 'object' && !Array.isArray(root) && root.type === 'draft' && typeof root.id === 'string' ? root.id : undefined;
+}
+
+/** Explicit discard restores the saved music instead of merely detaching editing context. */
+export function discardProjectPhraseDraft(library: MaterialLibrary, songDraftId: string, phraseDraftId: string): void {
+  const expectedToken = library.currentToken(); const { scope } = currentSong(library, songDraftId);
+  const draft = library.readDraft(phraseDraftId);
+  if (!draft || draft.kind !== 'rootsound.phrase' || library.projectScopeOf?.({ type: 'draft', id: draft.id }) !== scope)
+    throw new Error('这份乐句草稿不属于当前歌曲。');
+  const closing = new Set([draft.id]); const all = library.listDrafts(); let added = true;
+  while (added) {
+    added = false;
+    for (const child of all) if (!closing.has(child.id) && closing.has(contextParent(child) ?? '')) { closing.add(child.id); added = true; }
+  }
+  const deleteDrafts = all.filter(item => closing.has(item.id) && (item.id !== draft.id || !draft.sourceId));
+  const replaceDrafts: { expected: Draft; replacement: Draft }[] = [];
+  if (draft.sourceId) {
+    const source = library.readContent(draft.sourceId);
+    if (!source || source.kind !== draft.kind) throw new Error('原乐句已变化，草稿暂时保留，请重新打开。');
+    createPhraseReferenceAdapter().slots(source);
+    replaceDrafts.push({ expected: draft, replacement: { id: draft.id, sourceId: source.id, baseRevision: source.revision,
+      ...(draft.projectRootId ? { projectRootId: draft.projectRootId } : {}), kind: source.kind, owner: source.owner,
+      schemaVersion: source.schemaVersion, name: source.name, dependencies: [...source.dependencies], body: structuredClone(source.body) } });
+  }
+  committed(library.commitTransaction({ expectedToken, label: '放弃乐句草稿', deleteDrafts, replaceDrafts }));
+}
+
+/** Project save is never permission to publish another editor's pending phrase work. */
+export function assertProjectPhraseSaveReady(library: MaterialLibrary, songDraftId: string): void {
+  const { scope } = currentSong(library, songDraftId);
+  const drafts = library.listDrafts().filter(draft => library.projectScopeOf?.({ type: 'draft', id: draft.id }) === scope);
+  const phrases = drafts.filter(draft => draft.kind === 'rootsound.phrase');
+  const owners = new Set(phrases.map(draft => draft.id));
+  let added = true;
+  while (added) { added = false; for (const draft of drafts) if (!owners.has(draft.id) && owners.has(contextParent(draft) ?? '')) { owners.add(draft.id); added = true; } }
+  for (const draft of drafts) {
+    if (!owners.has(draft.id)) continue;
+    const source = draft.sourceId ? library.readContent(draft.sourceId) : undefined;
+    const context = draft.editingContext;
+    const pending = context && typeof context === 'object' && !Array.isArray(context)
+      && (Array.isArray(context.pendingActions) && context.pendingActions.length || Array.isArray(context.pendingReuses) && context.pendingReuses.length);
+    if (!source || !editableSame(draft, source) || pending)
+      throw new Error(`“${draft.name}”还有未保存的草稿。请先保存或放弃，再保存乐曲。`);
+  }
+}
 
 /** The confirmed library action removes the entity, its uses and recovery custody in one write. */
 export function deleteProjectPhrase(library: MaterialLibrary, songDraftId: string, phraseId: string): void {

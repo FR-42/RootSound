@@ -86,7 +86,8 @@ export function mountProjectLibrary(container: HTMLElement, trigger: HTMLButtonE
       item.title = project.name; grid.append(item);
     }
     const custom = tile('📁', 'project-library-custom', () => { void openProject(); }, '选择歌曲项目文件');
-    custom.title = '打开项目文件'; grid.append(custom);
+    custom.title = '打开歌曲工程或导入 MIDI（.mid、.midi）';
+    grid.append(custom);
     note.textContent = loading ? '读取项目…' : ''; note.hidden = !loading;
     problem.textContent = error; problem.hidden = !error;
   }
@@ -148,10 +149,11 @@ export function mountProjectLibrary(container: HTMLElement, trigger: HTMLButtonE
     if (!candidate || deleting || !service.remove || disposed) return;
     const target = candidate; deleting = true; cancel.disabled = true; confirm.disabled = true; warningError.hidden = true;
     try {
-      await service.remove(target);
+      const result = await service.remove(target);
       if (disposed) return;
       projects = projects.filter(item => item.path !== target.path); deleting = false; cancelDelete();
-      void load();
+      await load();
+      if (!disposed && expanded && result?.warning) { error = [error, result.warning].filter(Boolean).join('\n'); render(); }
     } catch (reason) {
       if (!disposed) { warningError.textContent = reason instanceof Error ? reason.message : String(reason); warningError.hidden = false; }
     } finally { deleting = false; if (!disposed) { cancel.disabled = false; confirm.disabled = false; if (candidate) cancel.focus(); } }

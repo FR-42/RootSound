@@ -1,0 +1,10 @@
+Traceback (most recent call last):
+  File "D:\RootSound\experiments\music-workflow\ripx-separator\engine.py", line 250, in <module>
+    try: main()
+         ~~~~^^
+  File "D:\RootSound\experiments\music-workflow\ripx-separator\engine.py", line 238, in main
+    else: apply_identified_components(request, report)
+          ~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "D:\RootSound\experiments\music-workflow\ripx-separator\native-core\native_analysis_job.py", line 91, in apply_identified_components
+    raise ValueError('尚未恢复自动谐波参数估计；必须提供明确的原生分量，绝不回退到其他识别器')
+ValueError: 尚未恢复自动谐波参数估计；必须提供明确的原生分量，绝不回退到其他识别器

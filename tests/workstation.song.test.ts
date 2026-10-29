@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import type { ContentRecord, MaterialStorage, SaveResult } from '../src/workstation/contracts/content.ts';
 import type { SongBody } from '../src/workstation/contracts/song.ts';
+import type { SoundPlan } from '../src/workstation/contracts/sound.ts';
+import { MAX_SEQUENCE_EVENTS } from '../src/workstation/contracts/playback-limits.ts';
 import { createMaterialLibrary } from '../src/workstation/modules/materials/public.ts';
 import { createTimbreEditor, createTimbrePlayback } from '../src/workstation/modules/timbre/public.ts';
 import { createPhraseEditor, createPhrasePlayback } from '../src/workstation/modules/phrase/public.ts';
@@ -80,6 +82,26 @@ test('changing song tempo in source mode moves beat-based placement but never re
   assert.deepEqual(plan.events.map(event => event.sound.note.holdSeconds), [2, 0.5]); assert.equal(plan.durationSeconds, 6);
   f.song.setTempoMode('song'); assert.equal(f.song.clipLengthBeats(f.first.id), 4);
   assert.deepEqual(f.song.previewPlan().events.map(event => event.sound.note.holdSeconds), [0.5, 0.25]);
+});
+
+test('song readiness matches actual source/song note durations for both draft and saved playback', async () => {
+  const f = fixture(), track = start(f); f.song.addClip(track, f.first.id, 0); f.song.addClip(track, f.second.id, 8); f.song.addClip(track, f.first.id, 16);
+  f.song.setTempo(240);
+  const calls: Array<readonly SoundPlan['note'][]> = [], tones = createTimbrePlayback(f.library);
+  const phrases = createPhrasePlayback(f.library, { ...tones, async prepareForSaved(_id, notes = []) { calls.push(structuredClone(notes)); } });
+  const editor = createSongEditor(f.library, phrases, { defaultTempoMode: 'source' });
+  const expectPrepared = async (prepare: () => Promise<void>, plan: () => ReturnType<typeof f.song.previewPlan>) => {
+    calls.length = 0; const before = f.raw(); await prepare();
+    const actual = [...new Set(calls.flatMap(notes => notes.map(note => JSON.stringify(note))))].sort();
+    const expected = [...new Set(plan().events.map(event => JSON.stringify(event.sound.note)))].sort();
+    assert.deepEqual(actual, expected); assert.equal(calls.length, 2, 'repeated clips prepare each source phrase once'); assert.equal(f.raw(), before);
+  };
+  await expectPrepared(() => editor.preparePreview(), () => editor.previewPlan());
+  assert.deepEqual(calls.map(notes => notes[0]!.holdSeconds), [2, .5]);
+  editor.setTempoMode('song'); await expectPrepared(() => editor.preparePreview(), () => editor.previewPlan());
+  assert.deepEqual(calls.map(notes => notes[0]!.holdSeconds), [.5, .25]);
+  const content = saved(editor.save('new')), playback = createSongPlayback(f.library, phrases);
+  await expectPrepared(() => playback.prepareForSaved(content.id), () => playback.planForSaved(content.id));
 });
 
 test('track level, pan, mute and solo apply to execution without rewriting saved phrases', () => {
@@ -240,7 +262,12 @@ test('preview refuses an unsupported execution size without corrupting or trunca
   for (let index = 0; index < 512; index++) f.phrase.addNote(part, { startBeat: 0, durationBeats: 0.25, frequencyHz: 220, velocity: 0.2 });
   const dense = saved(f.phrase.save('new')); f.song.create(); const denseTrack = f.song.read().body!.tracks[0]!.id;
   f.song.addClips(Array.from({ length: 5 }, () => ({ trackId: denseTrack, phraseId: dense.id, startBeat: 0 })));
-  const denseBefore = f.raw(); assert.throws(() => f.song.previewPlan(), /2048/); assert.equal(f.raw(), denseBefore);
+  assert.equal(f.song.previewPlan().events.length, 2560, 'ordinary songs may exceed the former 2048-note ceiling');
+  const safeCopies = Math.floor(MAX_SEQUENCE_EVENTS / 512);
+  f.song.addClips(Array.from({ length: safeCopies - 5 }, () => ({ trackId: denseTrack, phraseId: dense.id, startBeat: 0 })));
+  assert.equal(f.song.previewPlan().events.length, safeCopies * 512);
+  f.song.addClip(denseTrack, dense.id, 0);
+  const denseBefore = f.raw(); assert.throws(() => f.song.previewPlan(), /50000/); assert.equal(f.raw(), denseBefore);
 });
 
 test('empty songs cannot be saved, and another common-store editor invalidates stale undo history', () => {

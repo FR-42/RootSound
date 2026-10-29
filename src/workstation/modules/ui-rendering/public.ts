@@ -16,6 +16,7 @@ import type { WorkspaceId, WorkspacePreferencesPort } from '../../contracts/work
 import type { ReferenceApplyResult, ReferenceEditingPort, ReferenceSession } from '../../contracts/references.ts';
 import { mountPhraseComposition } from './phrase-composition.ts';
 import { savePhraseInPlace } from './phrase-save.ts';
+import { showPhraseExit } from './phrase-exit.ts';
 import { mountSongWorkspace } from './song-workspace.ts';
 import { mountCatalogWorkspace } from './catalog-workspace.ts';
 import { mountCoCreationWorkspace } from './co-creation-workspace.ts';
@@ -35,6 +36,7 @@ import { mountProjectLibrary } from './project-library.ts';
 import { timbrePresets, previewTimbrePreset } from '../timbre/public.ts';
 import { visibleWorkspace } from './visible-workspaces.ts';
 import './studio.css';
+export { showMidiImportNotice } from './midi-import-notice.ts';
 
 export interface StudioOptions {
   timbre: TimbreEditorPort;
@@ -47,14 +49,18 @@ export interface StudioOptions {
   projectSetup?: ProjectSetupPort;
   projectName?: string;
   doubleClickIntervalMs?: number;
-  onNewPhrase?(timbreId?: string): void;
+  onNewPhrase?(timbreId?: string, tempoBpm?: number): void;
   onCopyPhrase?(): void;
+  onSavePhraseDraft?(draftId: string, mode: 'new' | 'overwrite'): SaveResult;
+  onDiscardPhraseDraft?(draftId: string): void;
   onPrepareMelody?(): void | Promise<void>;
-  projectTimbres?(): Array<{ id: string; name: string }>;
+  projectTimbres?(): Array<{ id: string; name: string; requiresDeleteConfirmation?: boolean }>;
+  onImportTimbre?(): Promise<boolean>;
   onAddPhraseTimbre?(id: string, section?: PhraseSection): string;
   onCreateNoteGroup?(id: string): string;
   onChangeNoteGroupTimbre?(partId: string, timbreId: string): void;
-  onRemovePhraseTimbre?(id: string, section?: PhraseSection): void;
+  onRemovePhraseTimbre?(id: string, section?: PhraseSection | 'all'): void;
+  onReorderTimbres?(id: string, targetIndex: number): void;
   onKeepPhrases?(ids: string[]): void;
   phraseInfo?(id: string): { id: string; name: string; tempoBpm: number; durationSeconds: number };
   projectPhrases?(): Array<{ id: string; name: string; tempoBpm: number; durationSeconds: number }>;
@@ -90,12 +96,12 @@ function button(text: string, className: string, action: () => void): HTMLButton
 }
 
 /** Rendering owns DOM and pointer feedback; musical mutations use the domain port. */
-export function mountStudio(root: HTMLElement, options: StudioOptions): { dispose(): void } {
+export function mountStudio(root: HTMLElement, options: StudioOptions): { dispose(): void; prepareClose(options?: { allowProjectDialog?: boolean }): Promise<void> } {
   const { timbre, sound } = options;
   let disposed = false;
   let notice: HTMLElement | undefined;
   let fileBusy = false;
-  let phraseWorkspace: { dispose(): void; refresh?(context?: ReferenceEditorContext, onApplyElsewhere?: () => void): void; notify?(message: string, error?: boolean): void } | undefined;
+  let phraseWorkspace: { dispose(): void; flush?(): void | Promise<void>; refresh?(context?: ReferenceEditorContext, onApplyElsewhere?: () => void): void; notify?(message: string, error?: boolean): void } | undefined;
   let renderedSoundDraft: string | undefined;
   let timbreEditorMounted = false; let workspaceGeneration = 0;
   const preference = options.preferences?.read();
@@ -316,11 +322,6 @@ export function mountStudio(root: HTMLElement, options: StudioOptions): { dispos
     showPhrase();
   }
 
-  function configuredEntry(): WorkspaceId {
-    const current = options.preferences?.read();
-    return visibleWorkspace(current && current.startWorkspace !== 'last' ? current.startWorkspace : workspace);
-  }
-
   function stopSound(): void { sound.stopAll(); }
   function remember(target: WorkspaceId): void {
     workspace = target;
@@ -453,6 +454,31 @@ export function mountStudio(root: HTMLElement, options: StudioOptions): { dispos
     if (cancelled.status !== 'done') throw new Error(cancelled.status === 'conflict' ? cancelled.reason : cancelled.message);
     scopes.delete(session.draftId); repairReferenceEditors(captured);
   }
+  function saveCurrentPhrase(): void {
+    const oldSession = currentSession('phrase'); const captured = activeReferenceEditors();
+    let continued: ReferenceSession | undefined;
+    try {
+      savePhraseInPlace({ phrase: options.phrase!, references: options.references,
+        selection: oldSession ? scopes.get(oldSession.draftId) : undefined,
+        saveDraft: options.onSavePhraseDraft, onKeep: options.onKeepPhrases,
+        onContinuation(result) {
+          continued = result.session;
+          if (oldSession) scopes.delete(oldSession.draftId);
+          if (result.session && result.selection) scopes.set(result.session.draftId, result.selection);
+        } });
+    } finally {
+      try { repairReferenceEditors(captured); }
+      catch { problem('编辑器暂时无法恢复，请重新打开项目后继续。'); }
+      if (continued && options.references) {
+        const selection = scopes.get(continued.draftId);
+        if (selection) {
+          const fresh = options.references.locations(continued.draftId);
+          const currentIds = new Set(fresh.locations.map(location => location.id));
+          scopes.set(continued.draftId, { ...selection, ids: selection.ids.filter(id => currentIds.has(id)), token: fresh.token });
+        }
+      }
+    }
+  }
   let phraseSection: 'overview' | PhraseSection = 'overview';
   function showPhrase(section: 'overview' | PhraseSection = 'overview'): void {
     if (!options.phrase) return;
@@ -469,47 +495,46 @@ export function mountStudio(root: HTMLElement, options: StudioOptions): { dispos
       initialSection: section, onSectionChange: value => { phraseSection = value; },
       onPrepareMelody: options.onPrepareMelody,
       listTimbres: options.projectTimbres,
+      onImportTimbre: options.onImportTimbre,
       onAddTimbre: options.onAddPhraseTimbre,
       onCreateNoteGroup: options.onCreateNoteGroup,
       onChangeNoteGroupTimbre: options.onChangeNoteGroupTimbre,
       onRemoveTimbre: options.onRemovePhraseTimbre,
+      onReorderTimbres: options.onReorderTimbres,
       onRename: name => options.phrase!.rename(name),
-      onExit: () => {
-        closeCleanPhraseSession(currentSession('phrase'), options.phrase!.read().changed);
-        if (options.song) showSong(); else showWelcome();
-      },
-      onSave: () => {
-        const oldSession = currentSession('phrase'); const captured = activeReferenceEditors();
-        let continued: ReferenceSession | undefined;
-        try {
-          savePhraseInPlace({ phrase: options.phrase!, references: options.references,
-            selection: oldSession ? scopes.get(oldSession.draftId) : undefined,
-            onKeep: options.onKeepPhrases,
-            onContinuation(result) {
-              continued = result.session;
-              if (oldSession) scopes.delete(oldSession.draftId);
-              if (result.session && result.selection) scopes.set(result.session.draftId, result.selection);
-            } });
-        } finally {
-          try { repairReferenceEditors(captured); }
-          catch { problem('编辑器暂时无法恢复，请重新打开项目后继续。'); }
-          if (continued && options.references) {
-            const selection = scopes.get(continued.draftId);
-            if (selection) {
-              const fresh = options.references.locations(continued.draftId);
-              const currentIds = new Set(fresh.locations.map(location => location.id));
-              scopes.set(continued.draftId, { ...selection, ids: selection.ids.filter(id => currentIds.has(id)), token: fresh.token });
-            }
-          }
+      onExit: async () => {
+        const view = options.phrase!.read(); const session = currentSession('phrase');
+        const leave = () => { if (options.song) showSong(); else showWelcome(); };
+        if (!view.draft || !view.changed && !session?.pendingApplyCount && !pendingReferenceEdits(options.references, view.draft.id).length) {
+          closeCleanPhraseSession(session, view.changed); leave(); return;
         }
+        const id = view.draft.id; const generation = workspaceGeneration;
+        await showPhraseExit(root, { name: view.draft.name, active: () => !disposed && workspace === 'phrase' && workspaceGeneration === generation,
+          save() { saveCurrentPhrase(); closeCleanPhraseSession(currentSession('phrase'), options.phrase!.read().changed); },
+          discard() {
+            if (!options.onDiscardPhraseDraft) throw new Error('当前窗口暂不支持放弃草稿，请重新打开 RootSound。');
+            const captured = activeReferenceEditors(); options.onDiscardPhraseDraft(id); repairReferenceEditors(captured); scopes.delete(id);
+          }, leave });
       },
+      onSave: saveCurrentPhrase,
       onSaveAs: options.onCopyPhrase ? () => {
-        const session = currentSession('phrase'); const changed = options.phrase!.read().changed;
+        const previous = options.phrase!.read(); const session = currentSession('phrase'); const captured = activeReferenceEditors();
         options.onCopyPhrase!();
         let cleanupError: unknown;
-        try { closeCleanPhraseSession(session, changed); } catch (error) { cleanupError = error; }
+        try {
+          // Retire the old scratch work only after the new copy exists.
+          if (previous.draft && options.phrase!.read().draft?.id !== previous.draft.id && options.onDiscardPhraseDraft)
+            options.onDiscardPhraseDraft(previous.draft.id);
+          else closeCleanPhraseSession(session, previous.changed);
+          repairReferenceEditors(captured);
+        } catch (error) {
+          cleanupError = error;
+          // A failed cleanup must leave its scratch work reachable. The saved
+          // copy remains in the library while the user resolves the original.
+          if (previous.draft) { try { options.phrase!.openDraft(previous.draft.id); } catch { /* Cleanup may already have completed. */ } }
+        }
         showPhrase(phraseSection);
-        if (cleanupError) phraseWorkspace?.notify?.(`已另存新乐句，原编辑状态仍保留：${cleanupError instanceof Error ? cleanupError.message : String(cleanupError)}`, true);
+        if (cleanupError) phraseWorkspace?.notify?.(`已另存新乐句，原草稿仍待处理：${cleanupError instanceof Error ? cleanupError.message : String(cleanupError)}`, true);
       } : undefined });
   }
   function showSong(): void {
@@ -533,8 +558,8 @@ export function mountStudio(root: HTMLElement, options: StudioOptions): { dispos
         return [...new Map([...view.current, ...view.available].filter(item => item.kind === 'rootsound.phrase')
           .map(item => [item.id, options.phraseInfo?.(item.id) ?? { id: item.id, name: item.name }])).values()];
       } : undefined),
-      onNewPhrase: options.onNewPhrase ? () => {
-        try { options.onNewPhrase!(); showPhrase(); } catch (error) { problem(error instanceof Error ? error.message : String(error)); }
+      onNewPhrase: options.onNewPhrase ? tempoBpm => {
+        try { options.onNewPhrase!(undefined, tempoBpm); showPhrase(); } catch (error) { problem(error instanceof Error ? error.message : String(error)); }
       } : showProjectPhrase,
       onKeepPhrases: options.onKeepPhrases,
       onSampling: options.sampling ? () => showSampling() : undefined,
@@ -769,6 +794,17 @@ export function mountStudio(root: HTMLElement, options: StudioOptions): { dispos
 
   if (options.initialEntry === 'welcome') showWelcome();
   else if (options.initialEntry) showWorkspace(options.initialEntry);
-  else if (preference?.welcomeEnabled === false) showWorkspace(configuredEntry()); else showWelcome();
-  return { dispose() { disposed = true; stopSound(); leavePhrase(); root.replaceChildren(); } };
+  else showWelcome();
+  return {
+    async prepareClose(closeOptions = {}) {
+      const hasBlockedDialog = () => [...root.querySelectorAll<HTMLDialogElement>('dialog[open]')].some(dialog => !closeOptions.allowProjectDialog
+        || !(dialog.classList.contains('project-copy-dialog') || dialog.classList.contains('project-exit-dialog') && !dialog.classList.contains('phrase-exit-dialog')));
+      if (disposed || fileBusy || hasBlockedDialog()) throw new Error('请先完成当前窗口中的操作，再关闭 RootSound。');
+      const mounted = phraseWorkspace;
+      if (mounted?.flush) await mounted.flush();
+      else if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+      if (disposed || fileBusy || mounted !== phraseWorkspace || hasBlockedDialog()) throw new Error('当前操作尚未完成，请稍后再关闭 RootSound。');
+    },
+    dispose() { disposed = true; stopSound(); leavePhrase(); root.replaceChildren(); },
+  };
 }

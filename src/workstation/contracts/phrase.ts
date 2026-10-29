@@ -1,8 +1,15 @@
 import type { ContentRecord, Draft, SaveConfirmation, SaveResult } from './content.ts';
 import type { PlayableNotePlan, SoundPlan, SoundSequencePlan } from './sound.ts';
 
-/** The interactive step grid subdivides each beat into four cells. Stored timing remains continuous. */
+/** Legacy default. Each phrase can choose its own editing resolution without retiming notes. */
 export const PHRASE_STEPS_PER_BEAT = 4;
+
+/** Omitted older phrases retain four cells per beat; explicit choices are validated. */
+export function phraseStepsPerBeat(body?: Pick<PhraseBody, 'stepsPerBeat'>): number {
+  const steps = body?.stepsPerBeat === undefined ? PHRASE_STEPS_PER_BEAT : body.stepsPerBeat;
+  if (!Number.isInteger(steps) || steps < 2 || steps > 9) throw new Error('每拍格数必须是 2 至 9 的整数。');
+  return steps;
+}
 
 /** Musical positions use beats; tempo translates those beats to execution seconds. */
 export type PhraseNote = {
@@ -33,6 +40,8 @@ export type PhraseBody = {
   timeUnit: 'beat';
   tempoBpm: number;
   lengthBeats: number;
+  /** Editing cells per beat only; changing this never quantizes existing notes. Omitted values are four. */
+  stepsPerBeat?: number;
   /** Phrase output gain; omitted older content uses unity gain. */
   masterLevel?: number;
   parts: PhrasePart[];
@@ -44,7 +53,7 @@ export type PhraseNoteUpdate = PhraseNoteRef & { changes: Partial<Omit<PhraseNot
 export interface PhrasePlaybackPort {
   listSaved(): ContentRecord[];
   readSaved(id: string): { content: ContentRecord; body: PhraseBody };
-  prepareForSaved(id: string): Promise<void>;
+  prepareForSaved(id: string, tempoBpm?: number): Promise<void>;
   /** A tempo override is applied only when explicitly supplied by the caller. */
   planForSaved(id: string, tempoBpm?: number): SoundSequencePlan;
 }
@@ -68,6 +77,8 @@ export interface PhraseEditorPort {
   openDraft(draftId: string): void;
   rename(name: string): void;
   setTempo(tempoBpm: number, options?: { preserveNoteDurations?: boolean }): void;
+  /** Changes the shared Melody/Rhythm editing grid, preserving every stored note coordinate and duration. */
+  setStepsPerBeat(stepsPerBeat: number): void;
   setMasterLevel(level: number): void;
   setLength(lengthBeats: number): void;
   addPart(timbreId: string, section?: PhraseSection): string;
@@ -92,7 +103,8 @@ export interface PhraseEditorPort {
   redo(): void;
   /** All supported equal-tempered pitches, ascending (20–5000 Hz), A4=440 Hz; content remains exact Hz. */
   keyboard(): KeyboardPitch[];
-  preparePreview(): Promise<void>;
+  /** Prepare the same current or temporary body that previewPlan will compile. */
+  preparePreview(bodyOverride?: PhraseBody): Promise<void>;
   /** Audition one selected voice without changing or requiring any stored notes. */
   previewNotePlan(partId: string, note: SoundPlan['note']): Promise<PlayableNotePlan>;
   /** Audition an available current-project tone without adding a part or musical history. */

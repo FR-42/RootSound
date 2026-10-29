@@ -3,7 +3,7 @@ import type { SampleFilesPort } from '../../contracts/files.ts';
 import type { ReferenceAdapter } from '../../contracts/references.ts';
 import { MAX_RECORDING_SECONDS, type SampleBody, type SampleCapturePort, type SampleDecoderPort, type SampleRecording, type SampleSummary, type SamplingPort, type SamplingView } from '../../contracts/sampling.ts';
 import { MAX_PCM_AUDIO_BYTES, MAX_SAMPLE_DURATION_SECONDS, type PcmAudio } from '../../contracts/sound.ts';
-import { checkSampleBytes, copyPcm, decodeBase64, encodeBase64, encodeFloatWav, waveform } from './audio.ts';
+import { checkSampleBytes, copyPcm, decodeBase64, encodeBase64, encodeFloatWav, validateBase64, waveform } from './audio.ts';
 
 export { createBrowserSampleCapture, createBrowserSampleDecoder } from './browser.ts';
 export { createSampleAudio } from './sample-audio.ts';
@@ -30,7 +30,7 @@ export function readSampleBody(value: unknown): SampleBody {
   const name = text(source.name, '原文件名称'); const mimeType = text(source.mimeType, '原文件类型', 256);
   const audio = object(body.audio, ['encoding', 'byteLength', 'data'], '采样原文件');
   if (audio.encoding !== 'base64' || typeof audio.data !== 'string' || typeof audio.byteLength !== 'number') fail('采样原文件的编码无效。');
-  decodeBase64(audio.data, audio.byteLength);
+  validateBase64(audio.data, audio.byteLength);
   const decoded = object(body.decoded, ['sampleRate', 'channels', 'frames', 'durationSeconds'], '采样试听信息');
   const { sampleRate, channels, frames, durationSeconds } = decoded;
   if (typeof sampleRate !== 'number' || !Number.isInteger(sampleRate) || sampleRate < 8000 || sampleRate > 192000

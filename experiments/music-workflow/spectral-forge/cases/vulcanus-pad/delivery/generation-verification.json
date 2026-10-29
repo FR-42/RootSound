@@ -1,0 +1,62 @@
+{
+  "release": "20261028-055644-757-e7928b",
+  "engineDirectory": "D:\\RootSound\\experiments\\music-workflow\\spectral-forge\\.builds\\20261028-055644-757-e7928b\\ui",
+  "reference": "D:\\Sound\\temp\\music\\vulcanus.mp3",
+  "referenceSeconds": [
+    0,
+    20
+  ],
+  "sourceAudioIncluded": false,
+  "construction": "Published SpectralSynth, oscillator synthesis only, no additional audio effects",
+  "listeningAccepted": false,
+  "patchSha256": "23f39bc04d9418b8ee958e716357a560a534c2e33d5d979f706784e802abacb2",
+  "curveCounts": {
+    "spectrum": 10,
+    "amplitude": 8,
+    "pitch": 3
+  },
+  "effectivePolyphony": 6,
+  "singleNote": {
+    "midi": 60,
+    "hz": 261.6255653005986,
+    "holdSeconds": 4.5
+  },
+  "chordDemo": {
+    "midis": [
+      53,
+      56,
+      60,
+      63
+    ],
+    "holdSeconds": 4.2,
+    "label": "Fm7 voicing for timbre audition, not a verified transcription"
+  },
+  "reports": [
+    {
+      "name": "Vulcanus-铺底-C4.wav",
+      "durationSeconds": 7.581541666666666,
+      "peak": 0.2685386313071136,
+      "rms": 0.024125196204204353,
+      "sideToMidDb": -4.426699284844922,
+      "dcMean": -1.6429619150784245e-13,
+      "last100msPeak": 5.807975966831691e-8,
+      "finite": true,
+      "clipped": false,
+      "tailTruncated": false,
+      "sha256": "7f3c80a3793031184cf9dafba07d3aa2b81f77a5be1ea83395d2e64040a16c55"
+    },
+    {
+      "name": "Vulcanus-铺底-和弦试听.wav",
+      "durationSeconds": 7.281541666666667,
+      "peak": 0.3185879021530842,
+      "rms": 0.044100321463040396,
+      "sideToMidDb": -3.9060886159888235,
+      "dcMean": -1.898819027305875e-12,
+      "last100msPeak": 9.68521618460727e-8,
+      "finite": true,
+      "clipped": false,
+      "tailTruncated": false,
+      "sha256": "4ecd293c5ff03c98d1e1dd117b57a3da5f1fd2b1a43a2459c40c999c895d651f"
+    }
+  ]
+}

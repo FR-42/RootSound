@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "source": "D:\\RootSound\\experiments\\music-workflow\\ripx-separator\\tests-output\\04bb36b4\\generated A4.wav",
+  "model": "htdemucs",
+  "sample_rate": 44100,
+  "frames": 361620,
+  "duration": 8.2,
+  "stems": [
+    {
+      "name": "drums",
+      "label": "鼓",
+      "file": "drums.wav"
+    },
+    {
+      "name": "bass",
+      "label": "贝斯",
+      "file": "bass.wav"
+    },
+    {
+      "name": "other",
+      "label": "其他",
+      "file": "other.wav"
+    },
+    {
+      "name": "vocals",
+      "label": "人声",
+      "file": "vocals.wav"
+    }
+  ],
+  "residual": "residual.wav",
+  "midi": null,
+  "notes": null,
+  "midi_status": "failed",
+  "midi_error": "No module named 'chunk'"
+}

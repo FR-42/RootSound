@@ -12,12 +12,13 @@ internal static class ProjectDirectoriesSelfTests
         string run = Path.Combine(Path.GetFullPath(testRoot), "single-file-projects-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(run);
         int completed = 0;
+        var failures = new List<Exception>();
         void Case(string name, Action<string> test)
         {
             string path = Path.Combine(run, name);
             Directory.CreateDirectory(path);
-            test(path);
-            completed++;
+            try { test(path); completed++; }
+            catch (Exception error) { failures.Add(new IOException(name + ": " + error.Message, error)); }
         }
         string seed = Path.Combine(Path.GetFullPath(testRoot), "ts-seed.json");
         if (File.Exists(seed)) Case("typescript-seed", root =>
@@ -83,11 +84,11 @@ internal static class ProjectDirectoriesSelfTests
             using (var m = new ProjectDirectoryManager(root))
             {
                 a = m.Create("甲", m.DefaultLocation, Library("甲"));
-                m.WriteLibrary(Library("甲修改"));
+                m.WriteLibrary(Library("甲修改")); m.Save();
                 b = m.Create("乙", m.DefaultLocation, Library("乙"));
-                c = m.Create("乙 1", m.DefaultLocation, m.ReadLibrary().Value!);
+                c = m.CreateCopy("乙 1", m.DefaultLocation, m.ReadLibrary().Value!);
                 Check(c.Id != b.Id, "另存为新身份");
-                m.WriteLibrary(Library("副本"));
+                m.WriteLibrary(Library("副本")); m.Save();
             }
             using var r = new ProjectDirectoryManager(root);
             r.Open(a.Path);
@@ -176,12 +177,12 @@ internal static class ProjectDirectoriesSelfTests
         {
             using var m = new ProjectDirectoryManager(root);
             var p = m.Create("原子写", m.DefaultLocation, Library("一"));
-            m.WriteLibrary(Library("二"));
+            m.WriteLibrary(Library("二")); m.Save();
             byte[] before = File.ReadAllBytes(p.Path), backup = File.ReadAllBytes(p.Path + ".bak");
-            using (var blocker = new FileStream(p.Path, FileMode.Open, FileAccess.Read, FileShare.Read)) ExpectFailure(() => m.WriteLibrary(Library("不能提交")), "锁定替换拒绝");
+            using (var blocker = new FileStream(p.Path, FileMode.Open, FileAccess.Read, FileShare.Read)) { m.WriteLibrary(Library("不能提交")); ExpectFailure(() => m.Save(), "锁定替换拒绝"); }
             Check(File.ReadAllBytes(p.Path).SequenceEqual(before) && File.ReadAllBytes(p.Path + ".bak").SequenceEqual(backup), "失败保留原件及备份");
             Check(!Directory.EnumerateFiles(m.DefaultLocation, "*.tmp").Any(), "写候选清理");
-            m.WriteLibrary(Library("恢复"));
+            m.WriteLibrary(Library("恢复")); m.Save();
             Check(DiskLibrary(p.Path) == Library("恢复"), "故障后可重试");
         });
 
@@ -191,8 +192,9 @@ internal static class ProjectDirectoriesSelfTests
             var p = m.Create("外部保护", m.DefaultLocation, Library("原件"));
             WriteDiskLibrary(p.Path, Library("外部修改"));
             ExpectFailure(() => m.WriteLibrary(Library("不能覆盖")), "外部修改保护");
-            Check(m.ReadLibrary().Value == Library("外部修改"), "明确读取接纳有效版本");
-            m.WriteLibrary(Library("合并"));
+            ExpectFailure(() => m.ReadLibrary(), "普通读取不接纳外部写基线");
+            m.Open(p.Path); Check(m.ReadLibrary().Value == Library("外部修改"), "明确重开接纳有效版本");
+            m.WriteLibrary(Library("合并")); m.Save();
             Check(DiskLibrary(p.Path + ".bak") == Library("外部修改"), "备份外部版本");
             File.Delete(p.Path);
             ExpectFailure(() => m.ReadLibrary(), "缺失不能读空白");
@@ -356,12 +358,12 @@ internal static class ProjectDirectoriesSelfTests
             var bridge = new NativeProjectDirectories(m, _ => null, () => null);
             Check(Status(bridge.Read()) == "ready" && m.HasUnsavedChanges && m.List().Single().Name == "外部标题", "查询不接纳写基线");
             ExpectFailure(() => m.Save("本机标题"), "保存冲突保护");
-            ExpectFailure(() => m.Exit("discard"), "丢弃冲突保护");
             ExpectFailure(() => m.ReadLibrary(), "元信息变化须明确重开");
             Check(m.Current == p && File.ReadAllText(p.Path) == bytes, "外部字节与会话保留");
+            m.Exit("discard"); Check(m.Current is null && File.ReadAllText(p.Path) == bytes, "放弃草稿释放会话且不写外部版本");
         });
 
-        Case("failed-discard-keeps-state-and-retries", root =>
+        Case("discard-never-needs-file-write-access", root =>
         {
             using var m = new ProjectDirectoryManager(root);
             var p = m.Create("重试丢弃", m.DefaultLocation, Library("保存点"));
@@ -370,8 +372,8 @@ internal static class ProjectDirectoriesSelfTests
             string scope = m.ReadLibrary().Scope;
             using (var blocker = new FileStream(p.Path, FileMode.Open, FileAccess.Read, FileShare.Read))
             {
-                ExpectFailure(() => m.Exit("discard"), "写回失败阻止退出");
-                Check(m.Current == p && m.HasUnsavedChanges && m.ReadLibrary().Scope == scope, "失败保留会话身份");
+                m.Exit("discard");
+                Check(m.Current is null && m.ReadLibrary().Scope != scope && DiskLibrary(p.Path) == Library("保存点"), "放弃不需要写回，释放会话身份");
             }
             m.Exit("discard");
             Check(DiskLibrary(p.Path) == Library("保存点"), "解除故障可重试");
@@ -383,9 +385,9 @@ internal static class ProjectDirectoriesSelfTests
             var p = m.Create("退出保护", m.DefaultLocation, Library("原件"));
             ExpectFailure(() => m.Exit("unknown"), "未知模式拒绝");
             File.Delete(p.Path);
-            ExpectFailure(() => m.Exit("discard"), "缺失不丢弃退出");
             ExpectFailure(() => m.Exit("save"), "缺失不重建保存");
             Check(m.Current == p && !File.Exists(p.Path), "错误保持当前会话且不重建文件");
+            m.Exit("discard"); Check(m.Current is null && !File.Exists(p.Path), "明确放弃可以退出，不重建缺失文件");
         });
 
         Case("catalog-direct-valid-and-read-only", root =>
@@ -393,7 +395,7 @@ internal static class ProjectDirectoriesSelfTests
             using var m = new ProjectDirectoryManager(root);
             var a = m.Create("乙歌曲", m.DefaultLocation, Library("乙"));
             var b = m.Create("甲歌曲", m.DefaultLocation, Library("甲"));
-            m.WriteLibrary(Library("甲修改"));
+            m.WriteLibrary(Library("甲修改")); m.Save();
             string nested = Path.Combine(m.DefaultLocation, "嵌套目录");
             Directory.CreateDirectory(nested);
             m.Create("嵌套", nested, Library("嵌套"));
@@ -513,8 +515,8 @@ internal static class ProjectDirectoriesSelfTests
             string external = e.ToJsonString();
             File.WriteAllText(file, external);
             ExpectFailure(() => m.Save(), "旧元信息冲突保存保护");
-            ExpectFailure(() => m.Exit("discard"), "旧元信息冲突丢弃保护");
             Check(m.Current == p && File.ReadAllText(file) == external, "保留外部说明");
+            m.Exit("discard"); Check(m.Current is null && File.ReadAllText(file) == external, "放弃旧稿不改外部说明");
         });
 
         Case("catalog-keeps-copied-project-paths", root =>
@@ -693,17 +695,20 @@ internal static class ProjectDirectoriesSelfTests
             ExpectFailure(() => manager.Delete(project.Path, project.Id), "删除前最后检查拦住外部替换");
             Check(File.ReadAllBytes(project.Path).AsSpan().SequenceEqual(external), "不覆盖外部较新内容");
         });
-        Case("permanent-write-checkpoint-survives-discard-and-rejects-old-scope", root =>
+        Case("confirmed-delete-remains-draft-until-explicit-save", root =>
         {
             using var manager = new ProjectDirectoryManager(root);
             var project = manager.Create("永久操作", manager.DefaultLocation, Library("旧状态"));
             var storage = new NativeStorage(manager); var scope = manager.ReadLibrary().Scope;
             manager.WriteLibrary(Library("操作前其他编辑"));
-            Check(Ok(storage.WriteScopedCheckpoint(Library("已永久删除乐句"), scope)) && !manager.HasUnsavedChanges, "永久写入同时成为已保存基准");
+            Check(Ok(storage.WriteScopedCheckpoint(Library("已删除乐句草稿"), scope)) && manager.HasUnsavedChanges, "确认删除仍是未保存的工程修改");
+            Check(DiskLibrary(project.Path) == Library("旧状态") && !File.Exists(project.Path + ".bak"), "确认不顺带写入其他编辑");
             manager.WriteLibrary(Library("后来普通编辑")); Check(manager.HasUnsavedChanges, "后续普通编辑仍标脏");
             manager.Exit("discard"); manager.Open(project.Path);
-            Check(manager.ReadLibrary().Value == Library("已永久删除乐句"), "放弃后续编辑不会恢复已删乐句");
-            Check(!Ok(storage.WriteScopedCheckpoint(Library("旧页面错误保存"), scope)) && manager.ReadLibrary().Value == Library("已永久删除乐句"), "旧页面不能写永久基准");
+            Check(manager.ReadLibrary().Value == Library("旧状态"), "放弃后恢复显式保存点");
+            Check(!Ok(storage.WriteScopedCheckpoint(Library("旧页面错误保存"), scope)) && manager.ReadLibrary().Value == Library("旧状态"), "旧页面不能修改当前草稿");
+            Check(Ok(storage.WriteScopedCheckpoint(Library("显式保存的删除"), manager.ReadLibrary().Scope)), "当前页面可以编辑"); manager.Save();
+            manager.Exit("discard"); manager.Open(project.Path); Check(manager.ReadLibrary().Value == Library("显式保存的删除"), "按保存才更新正式结果");
         });
         Case("failed-permanent-write-keeps-snapshots-and-discard-baseline", root =>
         {
@@ -715,8 +720,9 @@ internal static class ProjectDirectoriesSelfTests
             try
             {
                 var storage = new NativeStorage(manager);
-                Check(!Ok(storage.WriteScopedCheckpoint(Library("不应写入的删除"), scope)), "永久保存失败明确拒绝");
-                Check(manager.ReadLibrary().Value == Library("尚未保存编辑") && manager.HasUnsavedChanges, "失败保持当前快照和脏状态");
+                Check(Ok(storage.WriteScopedCheckpoint(Library("只读原件上的草稿删除"), scope)), "草稿不需要原件写权限");
+                ExpectFailure(() => manager.Save(), "正式保存失败明确拒绝");
+                Check(manager.ReadLibrary().Value == Library("只读原件上的草稿删除") && manager.HasUnsavedChanges, "失败保持当前草稿和脏状态");
                 Check(File.ReadAllBytes(project.Path).AsSpan().SequenceEqual(original), "失败保留原文件");
             }
             finally { File.SetAttributes(project.Path, FileAttributes.Normal); }
@@ -754,8 +760,9 @@ internal static class ProjectDirectoriesSelfTests
             File.WriteAllText(manifest, replacement.ToJsonString());
             Check(!Ok(new NativeStorage(manager).WriteScopedCheckpoint(Library("不该提交的永久删除"), scope)), "说明被替换后永久写入拒绝");
             Check(File.ReadAllBytes(material).AsSpan().SequenceEqual(originalMaterial) && manager.HasUnsavedChanges, "不写资料也不清脏状态");
+            File.WriteAllBytes(manifest, originalManifest);
             Check(manager.ReadLibrary().Value == Library("未保存编辑"), "当前编辑快照不改变");
-            File.WriteAllBytes(manifest, originalManifest); manager.Exit("discard"); manager.Open(path);
+            manager.Exit("discard"); manager.Open(path);
             Check(manager.ReadLibrary().Value == Library("旧基准"), "失败没有推进退出恢复基准");
         });
         Case("library-rename-single-file", root =>
@@ -867,6 +874,59 @@ internal static class ProjectDirectoriesSelfTests
             ExpectFailure(() => racing.Rename(directory, id, "不应提交", Library("前端新资料"), snapshot.Token), "实时文件回到A也不能接受已捕获B");
             Check(File.ReadAllText(materialPath) == original && replacements == 0, "基于暂存原文token拒绝ABA，不只校验实时路径");
         });
+        Case("draft-never-rewrites-project-or-backup-and-dispose-discards", root =>
+        {
+            ProjectDirectoryInfo project; byte[] bytes, backup; DateTime stamp, backupStamp;
+            using (var manager = new ProjectDirectoryManager(root))
+            {
+                project = manager.Create("仅手动保存", manager.DefaultLocation, Library("初稿")); manager.Save();
+                bytes = File.ReadAllBytes(project.Path); backup = File.ReadAllBytes(project.Path + ".bak");
+                stamp = File.GetLastWriteTimeUtc(project.Path); backupStamp = File.GetLastWriteTimeUtc(project.Path + ".bak");
+                manager.Open(project.Path);
+                manager.WriteLibrary(Library("编辑器脚手架")); manager.FinishLoading(); Check(!manager.HasUnsavedChanges, "加载脚手架只成为逻辑干净基线");
+                manager.WriteLibrary(Library("未保存乐句与编排"));
+                Check(manager.ReadLibrary().Value == Library("未保存乐句与编排") && manager.HasUnsavedChanges, "当前会话可随意打草稿");
+                Check(File.ReadAllBytes(project.Path).SequenceEqual(bytes) && File.ReadAllBytes(project.Path + ".bak").SequenceEqual(backup), "普通编辑不改原件与备份字节");
+                Check(File.GetLastWriteTimeUtc(project.Path) == stamp && File.GetLastWriteTimeUtc(project.Path + ".bak") == backupStamp, "普通编辑不触碰保存时间");
+            }
+            using var reopened = new ProjectDirectoryManager(root); reopened.Open(project.Path);
+            Check(reopened.ReadLibrary().Value == Library("初稿"), "关闭或重启不会把未保存草稿当成作品");
+        });
+        Case("dirty-switch-rejected-and-explicit-save-as-preserves-original", root =>
+        {
+            using var manager = new ProjectDirectoryManager(root); var original = manager.Create("原曲", manager.DefaultLocation, Library("原件"));
+            var other = manager.Create("其他歌", manager.DefaultLocation, Library("其他")); manager.Open(original.Path); manager.FinishLoading();
+            manager.WriteLibrary(Library("未保存的改编")); var state = manager.ReadLibrary();
+            ExpectFailure(() => manager.Open(other.Path), "未保存草稿禁止隐式切换");
+            ExpectFailure(() => manager.Open(original.Path), "重新打开也不能悄悄丢草稿");
+            ExpectFailure(() => manager.Create("不应创建", manager.DefaultLocation, Library("空")), "新建不能抢走工作稿");
+            Check(manager.ReadLibrary() == state && !File.Exists(Path.Combine(manager.DefaultLocation, "不应创建.rootsound")), "拒绝切换不创建文件或改变草稿");
+            var copy = manager.CreateCopy("改编副本", manager.DefaultLocation, state.Value!);
+            Check(copy.Id != original.Id && DiskLibrary(original.Path) == Library("原件") && DiskLibrary(copy.Path) == Library("未保存的改编"), "明确另存只写新副本");
+        });
+        Case("legacy-draft-no-write-and-failed-two-file-save-retries", root =>
+        {
+            string path = Legacy(root, "旧工程", Library("旧曲")); string manifest = Path.Combine(path, "project.json"), material = Path.Combine(path, "materials.json");
+            byte[] oldManifest = File.ReadAllBytes(manifest), oldMaterial = File.ReadAllBytes(material); bool fail = true;
+            using var manager = new ProjectDirectoryManager(root, null, target => { if (target == manifest && fail) throw new IOException("第二文件故障"); });
+            manager.Open(path); manager.FinishLoading(); manager.WriteLibrary(Library("新草稿"));
+            Check(File.ReadAllBytes(manifest).SequenceEqual(oldManifest) && File.ReadAllBytes(material).SequenceEqual(oldMaterial), "旧格式草稿也不写盘");
+            ExpectFailure(() => manager.Save("新标题"), "两文件保存失败保留草稿");
+            Check(manager.HasUnsavedChanges && File.ReadAllBytes(manifest).SequenceEqual(oldManifest) && File.ReadAllBytes(material).SequenceEqual(oldMaterial), "失败恢复整对旧文件");
+            fail = false; manager.Save("新标题"); manager.Exit("discard"); manager.Open(path);
+            Check(manager.Current!.Name == "新标题" && manager.ReadLibrary().Value == Library("新草稿"), "可以重试正式保存并重开");
+        });
+        Case("window-close-preparation-parsing-is-conservative", root =>
+        {
+            var ready = MainWindow.ParseClosePreparation("{\"ready\":true,\"name\":\"未保存的标题\",\"canSave\":true}");
+            Check(ready.Ready && ready.CanSave && ready.Name == "未保存的标题", "保存关闭传递当前标题");
+            var pending = MainWindow.ParseClosePreparation("{\"ready\":true,\"canSave\":false,\"saveMessage\":\"先处理乐句\"}");
+            Check(pending.Ready && !pending.CanSave && pending.SaveMessage == "先处理乐句", "仍可选择放弃但不能漏掉乐句保存");
+            Check(!MainWindow.ParseClosePreparation("{\"ready\":false,\"message\":\"仍在提交\"}").Ready, "准备失败不能关窗");
+            Check(!MainWindow.ParseClosePreparation("{\"ready\":true}").CanSave, "缺失保存能力按拒绝处理");
+            ExpectFailure(() => MainWindow.ParseClosePreparation("{}"), "无效结果不能关窗");
+        });
+        if (failures.Count > 0) throw new AggregateException(failures);
         return completed;
     }
 

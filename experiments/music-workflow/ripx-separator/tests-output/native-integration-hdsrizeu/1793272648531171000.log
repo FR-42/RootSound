@@ -1,0 +1,4 @@
+{"progress": 0.02, "message": "解码为原生已确认的 16 位 PCM 分支；不改变原文件"}
+{"progress": 0.078125, "message": "原生双窗谱峰：声道 1/2，帧 1/16"}
+{"progress": 0.5281250000000001, "message": "原生双窗谱峰：声道 2/2，帧 1/16"}
+{"progress": 1, "message": "原生谱峰阶段已完成：123 个谱峰；最终音符与完整重建尚未完成", "result": "D:\\RootSound\\experiments\\music-workflow\\ripx-separator\\tests-output\\native-integration-hdsrizeu\\analysis\\native-analysis.json"}

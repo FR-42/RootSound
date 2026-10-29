@@ -1,0 +1,5 @@
+{"progress": 0.01, "message": "解码音频…", "job": "D:\\RootSound\\experiments\\music-workflow\\ripx-separator\\tests-output\\6267aa05\\split-6"}
+{"progress": 0.03, "message": "加载本地 HTDemucs 模型（CPU）…"}
+{"progress": 0.385, "message": "音轨分离 1/2 个时间窗"}
+{"progress": 0.7200000000000001, "message": "音轨分离 2/2 个时间窗"}
+{"progress": 1, "message": "完成：音轨已保存。", "result": "D:\\RootSound\\experiments\\music-workflow\\ripx-separator\\tests-output\\6267aa05\\split-6\\project.json"}

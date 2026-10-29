@@ -142,7 +142,7 @@ public sealed class SampleGraph : Control
         PointF[] handle = marker switch
         {
             TimelineMarker.Playhead => [new(x - 7, area.Top - 14), new(x + 7, area.Top - 14), new(x, area.Top - 4)],
-            TimelineMarker.SelectionStart => [new(x - 9, area.Bottom + 10), new(x, area.Bottom - 2), new(x, area.Bottom + 10)],
+            _ when marker == Timeline.BoundaryMarker(true) => [new(x - 9, area.Bottom + 10), new(x, area.Bottom - 2), new(x, area.Bottom + 10)],
             _ => [new(x + 9, area.Bottom + 10), new(x, area.Bottom - 2), new(x, area.Bottom + 10)]
         };
         g.FillPolygon(brush, handle);

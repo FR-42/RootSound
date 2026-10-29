@@ -17,7 +17,7 @@ type GraphStart =
   | { kind: 'oscillator'; node: OscillatorNode; gain: GainNode; atSeconds: number; duration: number; frequency: number; level: number; pitch?: Extract<ScheduledSound, { kind: 'basic-synth' }>['pitch'] }
   | { kind: 'noise'; node: AudioBufferSourceNode; gain: GainNode; atSeconds: number; duration: number; level: number }
   | { kind: 'sample'; node: AudioBufferSourceNode; atSeconds: number; duration: number; plan: Extract<ScheduledSound, { kind: 'sample' }> };
-interface SoundGraph {
+export interface SoundGraph {
   readonly envelopes: { atSeconds: number; plan: ScheduledSound; node: GainNode }[];
   readonly starts: GraphStart[];
   readonly pans: { atSeconds: number; node: StereoPannerNode; pan: number }[];
@@ -136,6 +136,14 @@ export function scheduleGraph(graph: SoundGraph, normalization: number, start: n
     const release = noteStart + plan.note.holdSeconds;
     const end = release + plan.envelope.releaseSeconds;
     const amplitude = plan.level * plan.note.velocity * normalization;
+    if (plan.kind === 'sample' && plan.envelopeBaked) {
+      const age = Math.max(0, fromSeconds - scheduled.atSeconds); if (age >= plan.note.holdSeconds + plan.envelope.releaseSeconds) continue;
+      const time = noteStart + age; const joined = Math.min(end, time + transitionSeconds);
+      envelope.gain.setValueAtTime(transitionSeconds > 0 ? 0 : amplitude, time);
+      if (joined > time) envelope.gain.linearRampToValueAtTime(amplitude, joined);
+      envelope.gain.setValueAtTime(0, end);
+      continue;
+    }
     if (plan.envelope.decaySeconds !== undefined) {
       const age = Math.max(0, fromSeconds - scheduled.atSeconds); if (age >= plan.note.holdSeconds + plan.envelope.releaseSeconds) continue;
       const time = noteStart + age; const joined = Math.min(plan.note.holdSeconds + plan.envelope.releaseSeconds, age + transitionSeconds);

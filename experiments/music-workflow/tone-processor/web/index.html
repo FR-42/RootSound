@@ -1,0 +1,9 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; worker-src 'self'; img-src 'self' data:; connect-src 'none'">
+<title>音色器 EQ</title><link rel="stylesheet" href="shared/styles.css"><link rel="stylesheet" href="processor.css"></head>
+<body><section class="panel">
+  <header><strong>EQ · 频率 → 强弱</strong><label>混合 <input id="mix" type="range" min="0" max="1" step="0.001" value="1"><output id="mix-value">100%</output></label>
+  <span class="spacer"></span><button id="undo" title="撤销 EQ 修改">撤销</button><button id="redo" title="重做 EQ 修改">重做</button><button id="reset">恢复平直</button></header>
+  <div id="spectrum-editor"></div><p id="eq-status" role="status">正在准备 EQ…</p>
+</section><script type="module" src="processor.mjs"></script></body></html>

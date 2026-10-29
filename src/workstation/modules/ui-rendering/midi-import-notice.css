@@ -1,0 +1,7 @@
+.midi-import-notice { position: fixed; right: 18px; bottom: 18px; z-index: 150; width: min(360px, calc(100vw - 36px)); max-height: 55vh; overflow: auto; padding: 12px 15px; border: 1px solid #aebbc5; border-radius: 5px; background: #fff; color: #263744; box-shadow: 0 5px 22px #0002; font-size: 13px; }
+.midi-import-notice-heading { display: flex; align-items: center; justify-content: space-between; gap: 15px; }
+.midi-import-notice-heading button { border: 0; padding: 0 4px; background: transparent; color: #53616d; font-size: 21px; line-height: 1; cursor: pointer; }
+.midi-import-notice p { margin: 6px 0; color: #56636e; }
+.midi-import-notice summary { cursor: pointer; color: #315f7f; }
+.midi-import-notice ul { padding-left: 19px; margin-bottom: 0; line-height: 1.6; }
+.midi-import-notice li + li { margin-top: 5px; }

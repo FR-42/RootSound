@@ -3,7 +3,8 @@ import type { SampleAudioPort, SampleBody, SampleDecoderPort } from '../../contr
 import { readSampleBody } from './public.ts';
 import { copyPcm, decodeBase64, waveform } from './audio.ts';
 
-const MAX_PREPARED_BYTES = 128 * 1024 * 1024;
+import { MAX_SEQUENCE_PCM_BYTES } from '../../contracts/playback-limits.ts';
+const MAX_PREPARED_BYTES = MAX_SEQUENCE_PCM_BYTES;
 
 /** Original files decode once per identity/revision; callers borrow prepared, read-only audio. */
 export function createSampleAudio(library: MaterialLibrary, decoder: SampleDecoderPort): SampleAudioPort {
@@ -41,7 +42,7 @@ export function createSampleAudio(library: MaterialLibrary, decoder: SampleDecod
   async function prepareGroup(ids: readonly string[]): Promise<void> {
     const group = [...new Set(ids)].map(header); const pinned = new Set(group.map(item => item.id));
     const required = group.reduce((sum, item) => sum + item.bytes, 0);
-    if (required > MAX_PREPARED_BYTES) throw new Error('这组声音解码后超过当前 128 MiB 试听容量，请减少同时使用的原始采样。');
+    if (required > MAX_PREPARED_BYTES) throw new Error('这组声音解码后超过当前 512 MiB 试听容量，请减少同时使用的原始采样。');
     for (const item of group) ready(item.id);
     const missingBytes = group.reduce((sum, item) => sum + (cache.has(item.id) ? 0 : item.bytes), 0);
     for (const [id] of cache) {

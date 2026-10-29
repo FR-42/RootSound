@@ -1,0 +1,18 @@
+4 cpu 0 8.247757399920374
+4 cpu 1 4.464812099933624
+4 cpu 2 4.559146699961275
+D:\RootSound\experiments\music-workflow\ripx-separator\gpu-packages\torch\functional.py:730: UserWarning: The operator 'aten::_fft_r2c on the XPU backend is falling back to run on the CPU. (Triggered internally at C:\actions-runner\_work\pytorch\pytorch\pytorch\build\xpu\ATen\RegisterXPU_0.cpp:53701.)
+  return _VF.stft(  # type: ignore[attr-defined]
+D:\RootSound\experiments\music-workflow\ripx-separator\packages\demucs\spec.py:38: UserWarning: The operator 'aten::_fft_c2r on the XPU backend is falling back to run on the CPU. (Triggered internally at C:\actions-runner\_work\pytorch\pytorch\pytorch\build\xpu\ATen\RegisterXPU_0.cpp:53701.)
+  x = th.istft(z,
+4 xpu 0 9.241868000011891
+4 xpu 1 0.6976232999004424
+4 xpu 2 0.742508800001815
+PASS 4 {'cpu': {'cold_seconds': 8.247757399920374, 'warm_seconds': [4.464812099933624, 4.559146699961275], 'warm_median_seconds': 4.51197939994745}, 'xpu': {'cold_seconds': 9.241868000011891, 'warm_seconds': [0.6976232999004424, 0.742508800001815], 'warm_median_seconds': 0.7200660499511287, 'peak_allocated_bytes': 594874368}, 'shape': [1, 4, 2, 343980], 'max_absolute_difference': 5.4836273193359375e-06, 'rms_difference': 1.3381248891164432e-06, 'warm_speedup': 6.266063231635043}
+6 cpu 0 2.972613999969326
+6 cpu 1 2.984791800030507
+6 cpu 2 2.858472599997185
+6 xpu 0 0.9310041000135243
+6 xpu 1 0.74519980000332
+6 xpu 2 0.6865111999213696
+PASS 6 {'cpu': {'cold_seconds': 2.972613999969326, 'warm_seconds': [2.984791800030507, 2.858472599997185], 'warm_median_seconds': 2.921632200013846}, 'xpu': {'cold_seconds': 0.9310041000135243, 'warm_seconds': [0.74519980000332, 0.6865111999213696], 'warm_median_seconds': 0.7158554999623448, 'peak_allocated_bytes': 608602112}, 'shape': [1, 6, 2, 343980], 'max_absolute_difference': 2.2292137145996094e-05, 'rms_difference': 1.3090522088532452e-06, 'warm_speedup': 4.081315572999759}

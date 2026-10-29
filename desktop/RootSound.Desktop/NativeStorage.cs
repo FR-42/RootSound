@@ -18,7 +18,7 @@ public sealed class NativeStorage
         try
         {
             var result = manager?.ReadLibrary() ?? (store!.Read(), scope);
-            return JsonSerializer.Serialize(new { ok = true, value = result.Item1, scope = result.Item2 });
+            return LargeJsonText.Serialize(new { ok = true, scope = result.Item2 }, "value", result.Item1);
         }
         catch (Exception error) { return JsonSerializer.Serialize(new { ok = false, error = error.Message }); }
     }
@@ -50,7 +50,7 @@ public sealed class NativeStorage
         catch (Exception error) { return JsonSerializer.Serialize(new { ok = false, error = error.Message }); }
     }
 
-    /// <summary>Irreversible edits become the discard baseline in the same successful disk write.</summary>
+    /// <summary>Confirmed destructive edits still remain drafts until explicit project Save.</summary>
     public string WriteScopedCheckpoint(string value, string expectedScope)
     {
         try

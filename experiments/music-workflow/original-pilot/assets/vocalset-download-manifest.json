@@ -1,0 +1,29 @@
+{
+  "source_record": "https://zenodo.org/records/1442513",
+  "license": "CC-BY-4.0",
+  "archive": "https://zenodo.org/api/records/1442513/files/VocalSet11.zip/content",
+  "downloaded_bytes": 3067087,
+  "files": [
+    {
+      "archive_entry": "FULL/female1/long_tones/straight/f1_long_straight_a.wav",
+      "file": "vocalset\\FULL__female1__long_tones__straight__f1_long_straight_a.wav",
+      "bytes": 1042802,
+      "sha256": "e1ff90d89de7e30a4dd717dd642173e57b083832f38e74eb8033d349c02bc340",
+      "zip_crc32": "a46ec217"
+    },
+    {
+      "archive_entry": "FULL/female8/long_tones/straight/f8_long_straight_a.wav",
+      "file": "vocalset\\FULL__female8__long_tones__straight__f8_long_straight_a.wav",
+      "bytes": 1327364,
+      "sha256": "4878a0446f28957dc908a096af6ffe44d6d7a5ab6680282992396f1afe9093d8",
+      "zip_crc32": "e16b27e8"
+    },
+    {
+      "archive_entry": "FULL/female3/long_tones/straight/f3_long_straight_a.wav",
+      "file": "vocalset\\FULL__female3__long_tones__straight__f3_long_straight_a.wav",
+      "bytes": 981448,
+      "sha256": "01953e7b2f44625e3ca42452620570d5f2c59158d64e4766c8f03ea80b0f5818",
+      "zip_crc32": "dd0b6eda"
+    }
+  ]
+}

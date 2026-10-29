@@ -153,7 +153,8 @@ export function createProjectPackages(
           const replacements = project.slots.get(record.id)!.map(slot => ({ slotId: slot.id, targetId: remap.get(slot.targetId)! }));
           const changes = adapter.replace(record, replacements);
           if (changes.name !== undefined && changes.name !== record.name) fail('素材解释器意外改变了名称，未导入工程。');
-          return { ...clone(record), ...clone(changes), id: remap.get(record.id)!, revision: 1 };
+          const rewritten = { ...clone(record), ...clone(changes), id: remap.get(record.id)!, revision: 1 };
+          return { ...rewritten, ...clone(adapter.remapMetadata?.(rewritten, remap) ?? {}) };
         });
         const rootId = remap.get(project.file.rootId)!;
         const memberIds = project.file.memberIds?.map(id => remap.get(id)!) ?? [];

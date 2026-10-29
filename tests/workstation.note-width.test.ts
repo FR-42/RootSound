@@ -34,3 +34,22 @@ test('longer held notes retain their real multi-cell span rather than being clip
   close(rect.x + rect.width, grid[6]!.seconds * scale);
   assert(rect.width < 6, 'short notes are never expanded by a fixed pixel minimum');
 });
+
+test('non-four subdivisions draw exact cells with independent beat/bar flags and never resize existing held notes', () => {
+  for (const n of [2, 3, 5, 9]) for (const tempo of [40, 93.7, 212, 240]) {
+    const value = { ...body(tempo), stepsPerBeat: n }, duration = value.lengthBeats * 60 / tempo;
+    const lines = melodyGrid(duration, tempo, n); assert.equal(lines.length, 16 * n + 1);
+    for (let index = 0; index <= 16 * n; index++) {
+      close(lines[index]!.seconds, index / n * 60 / tempo);
+      assert.equal(lines[index]!.beat, index % n === 0); assert.equal(lines[index]!.bar, index % (4 * n) === 0);
+    }
+    const view = { leftSeconds: 0, zoom: .25, rowHeight: 24 }, scale = melodyScale(view, 320, duration);
+    const note: PhraseNote = { id: 'cell', startBeat: 1 / n, durationBeats: 1 / n, durationSeconds: 60 / tempo / n,
+      frequencyHz: keys[0]!.frequencyHz, velocity: .75 };
+    const rect = melodyNoteRect(note, value, keys, view, 320);
+    close(rect.x, lines[1]!.seconds * scale); close(rect.x + rect.width, lines[2]!.seconds * scale);
+    const held = { ...note, startBeat: .173, durationBeats: .713, durationSeconds: .413 };
+    assert.deepEqual(melodyNoteRect(held, value, keys, view, 320), melodyNoteRect(held, { ...value, stepsPerBeat: 4 }, keys, view, 320));
+  }
+  for (const n of [0, 1, 10, -1, 2.5, NaN, Infinity, null, '3']) assert.throws(() => melodyGrid(8, 120, n as number), /每拍格数/);
+});

@@ -1,0 +1,6 @@
+{
+  "hardware_visibility_mask": "ONEAPI_DEVICE_SELECTOR=level_zero:99 (child process only)",
+  "exit_code": 1,
+  "reported_unavailable": true,
+  "no_cpu_result_written": true
+}

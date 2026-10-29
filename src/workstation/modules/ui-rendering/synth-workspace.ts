@@ -5,6 +5,7 @@ import { createLivePreview } from './live-preview.ts';
 import { createSaveControls } from './save-controls.ts';
 import { createReferenceNavigation, type ReferenceEditorContext } from './reference-ui.ts';
 import './synth.css';
+import { mountImportedSpectralWorkspace } from './imported-spectral-workspace.ts';
 
 function node<K extends keyof HTMLElementTagNameMap>(tag: K, cls = '', text = ''): HTMLElementTagNameMap[K] {
   const result = document.createElement(tag); result.className = cls; result.textContent = text; return result;
@@ -26,6 +27,7 @@ type Options = {
 /** One electronic editor also displays legacy recipes without migrating them on open. */
 export function mountSynthWorkspace(root: HTMLElement, options: Options) {
   const { timbre, sound } = options;
+  if (timbre.read().body.model === 'spectral-synth') return mountImportedSpectralWorkspace(root, options);
   let disposed = false; let session: string | undefined; let preparing = false; let generation = 0;
   let temporary: SynthesizerBody | undefined; let frequency = 220; let fieldError: unknown; let committing = false;
   let endGesture: (() => void) | undefined;
@@ -33,7 +35,7 @@ export function mountSynthWorkspace(root: HTMLElement, options: Options) {
   const initialId = timbre.read().draft.id;
   function body(): SynthesizerBody {
     const current = timbre.read().body;
-    if (current.model === 'sample-instrument') throw new Error('当前已切换为采样音色，请重新打开。');
+    if (current.model === 'sample-instrument' || current.model === 'spectral-synth') throw new Error('当前音色类型已改变，请重新打开。');
     return synthesisFromBasic(current);
   }
   const initialBody = JSON.stringify(body());

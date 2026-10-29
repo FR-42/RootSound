@@ -1,4 +1,6 @@
+using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 
 namespace RootSound.Desktop;
 
@@ -141,19 +143,99 @@ public static class FileStoreSelfTests
         Case("project-sized-library-write-and-reopen", directory =>
         {
             // This is valid opaque library JSON, not a synthetic length check.
-            // Its metadata alone exceeds the former 16 MiB library boundary.
-            const int metadataLength = 18 * 1024 * 1024;
-            var text = "{\"format\":\"RootSoundMaterialLibrary\",\"version\":1,\"contents\":[],\"drafts\":[],\"metadata\":\""
-                + new string('x', metadataLength) + "\"}";
+            // Its metadata alone exceeds the former 128 MiB library boundary.
+            const int metadataLength = 129 * 1024 * 1024;
+            const string prefix = "{\"format\":\"RootSoundMaterialLibrary\",\"version\":1,\"contents\":[],\"drafts\":[],\"metadata\":\"";
+            const string suffix = "\"}";
+            string text = string.Create(prefix.Length + metadataLength + suffix.Length, 0, (span, _) =>
+            {
+                prefix.AsSpan().CopyTo(span);
+                span.Slice(prefix.Length, metadataLength).Fill('x');
+                suffix.AsSpan().CopyTo(span[(prefix.Length + metadataLength)..]);
+            });
+            string path = Path.Combine(directory, "materials.json");
+            var timestamp = new DateTime(2026, 1, 2, 3, 4, 6, DateTimeKind.Utc);
+            byte[] HashFile() { using var file = File.OpenRead(path); return SHA256.HashData(file); }
+            byte[] originalHash;
             using (var store = new AtomicTextStore(directory))
             {
                 store.Write(text);
-                Check(new FileInfo(store.FilePath).Length > 16L * 1024 * 1024, "工程大小的实际落盘库应超过旧上限。");
+                Check(new FileInfo(path).Length > 128L * 1024 * 1024, "工程大小的实际落盘库应超过旧 128 MiB 上限。");
+                Check(new FileInfo(path).Length == Encoding.UTF8.GetByteCount(text), "大库写入必须保留所有 UTF-8 字节。");
+                originalHash = HashFile();
+                File.SetLastWriteTimeUtc(path, timestamp);
                 Check(store.Read() == text, "大工程库写入后应立即全文读回。");
+                using (var response = JsonDocument.Parse(new NativeStorage(store).Read()))
+                {
+                    Check(response.RootElement.GetProperty("ok").GetBoolean(), "大库必须通过实际原生桥接返回成功。");
+                    Check(response.RootElement.GetProperty("value").GetString() == text,
+                        "大库原生桥接的 JSON 字符串必须完整保留库文本。");
+                    Check(!string.IsNullOrWhiteSpace(response.RootElement.GetProperty("scope").GetString()),
+                        "大库原生桥接必须保留当前作用域。");
+                }
+                store.VerifyUnchanged();
+                Check(File.GetLastWriteTimeUtc(path) == timestamp, "大库读取和指纹检查不能修改保存时间。");
             }
-            using var reopened = new AtomicTextStore(directory);
-            Check(reopened.Read() == text, "关闭后重开应完整保留超过旧上限的工程库。");
+            Check(HashFile().AsSpan().SequenceEqual(originalHash) && File.GetLastWriteTimeUtc(path) == timestamp,
+                "释放大库不能写入或改变原文件及时间。");
+            using (var reopened = new AtomicTextStore(directory))
+            {
+                Check(reopened.Read() == text, "关闭后重开应完整保留超过旧 128 MiB 上限的工程库。");
+                Check(HashFile().AsSpan().SequenceEqual(originalHash) && File.GetLastWriteTimeUtc(path) == timestamp,
+                    "大库重开不能改写已保存字节或时间。");
+                // Change one byte without changing size or mtime: conflict detection
+                // must still inspect the actual content, not just file metadata.
+                using (var file = new FileStream(path, FileMode.Open, FileAccess.Write, FileShare.Read))
+                {
+                    file.Position = prefix.Length + metadataLength / 2;
+                    file.WriteByte((byte)'y');
+                    file.Flush(true);
+                }
+                File.SetLastWriteTimeUtc(path, timestamp);
+                byte[] externalHash = HashFile();
+                Check(!externalHash.AsSpan().SequenceEqual(originalHash), "大库冲突夹具必须实际修改文件内容。");
+                Expect<IOException>(() => reopened.VerifyUnchanged(), "大库等长、同时间的外部更改必须触发指纹冲突。");
+                Expect<IOException>(() => reopened.Write(text), "大库冲突不能被覆盖保存。");
+                Check(HashFile().AsSpan().SequenceEqual(externalHash) && File.GetLastWriteTimeUtc(path) == timestamp,
+                    "大库冲突失败必须保留外部版本的所有字节和时间。");
+            }
+            Check(!File.Exists(path + ".bak"), "大库仅读取和拒绝冲突不能制造替换备份。");
             Check(Directory.GetFiles(directory, "*.tmp").Length == 0, "大库保存后不能遗留候选文件。");
+        });
+
+        Case("large-json-text-serialization", _ =>
+        {
+            string controls = string.Concat(Enumerable.Range(0, 32).Select(value => (char)value));
+            string?[] values = [null, "", "plain ASCII", "单双引号 ' \" 与反斜线 \\ /",
+                controls, "中文与 emoji 🎵🌧，以及行分隔\u2028段分隔\u2029", "\r\n\t\b\f\\\"",
+                new string('x', 32767) + "🎵\"\\\n末尾", new string('x', 65535) + "🌧\u2028\u2029末尾"];
+            foreach (string field in new[] { "value", "音色\"\\\n🎵" })
+            foreach (string? value in values)
+            {
+                var metadata = new { ok = true, scope = "中文作用域 🎵", count = 3, nested = new { enabled = false } };
+                using var parsed = JsonDocument.Parse(LargeJsonText.Serialize(metadata, field, value));
+                var root = parsed.RootElement;
+                Check(root.EnumerateObject().Count() == 5 && root.GetProperty("ok").GetBoolean()
+                    && root.GetProperty("scope").GetString() == metadata.scope && root.GetProperty("count").GetInt32() == 3
+                    && !root.GetProperty("nested").GetProperty("enabled").GetBoolean(),
+                    "大文本 JSON 必须保留所有元数据且只附加一个目标字段。");
+                var actual = root.GetProperty(field);
+                using var baseline = JsonDocument.Parse(JsonSerializer.Serialize(new { value }));
+                var expected = baseline.RootElement.GetProperty("value");
+                Check(actual.ValueKind == expected.ValueKind && (value is null || actual.GetString() == expected.GetString()),
+                    "大文本 JSON 对空值、控制字符、引号、斜线及 Unicode 的语义必须与标准序列化一致。");
+            }
+            foreach (string invalid in new[] { "\ud800", "\udfff", "\ud800x", "x\udfff", "\ud800\ud800" })
+                Expect<InvalidDataException>(() => LargeJsonText.Serialize(new { ok = true }, "value", invalid),
+                    "大文本 JSON 不得悄悄替换无效 UTF-16 而损失原文。");
+            Expect<ArgumentException>(() => LargeJsonText.Serialize(new { value = "already here" }, "value", "replacement"),
+                "大文本 JSON 必须拒绝覆盖元数据中已经存在的目标字段。");
+            Expect<ArgumentException>(() => LargeJsonText.Serialize(new[] { 1, 2 }, "value", "text"),
+                "大文本 JSON 必须拒绝非对象元数据。");
+            Expect<ArgumentNullException>(() => LargeJsonText.Serialize(null!, "value", "text"),
+                "大文本 JSON 必须拒绝空元数据对象。");
+            Expect<ArgumentException>(() => LargeJsonText.Serialize(new { ok = true }, "", "text"),
+                "大文本 JSON 必须拒绝空目标字段名称。");
         });
 
         Case("utf8-bom-and-invalid-bytes", directory =>

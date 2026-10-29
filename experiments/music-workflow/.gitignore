@@ -31,3 +31,9 @@
 /reference-studio/analysis/.torch-cache/
 /拆解与改写.exe
 /拆解与改写.*.tmp
+/精细音色生成器.exe
+/精细音色生成器.*.tmp
+/音色器.exe
+/音色器.*.tmp
+/音色结构.exe
+/音色结构.*.tmp

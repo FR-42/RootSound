@@ -375,3 +375,120 @@ test('default sample saves use their committed unique names while explicit dupli
   assert.equal(sampling.read().name, first.name); assert.equal(sampling.read().changed, true);
   sampling.rename('我的采样'); assert.equal(sampling.save().name, '我的采样');
 });
+
+function unpublishedInput(rootId: string, timbreId: string, name = '未保存乐句'): NewContent & { projectRootId: string } {
+  return { projectRootId: rootId, kind: 'rootsound.phrase', owner: 'phrase', schemaVersion: 1, name, dependencies: [timbreId],
+    body: { model: 'note-phrase', version: 1, timeUnit: 'beat', tempoBpm: 120, lengthBeats: 4,
+      parts: [{ id: crypto.randomUUID(), name: '旋律', timbreId, notes: [] }] } };
+}
+
+test('unpublished child drafts have explicit song custody without becoming saved material and survive a cold working-store reload', () => {
+  const f = fixture(), song = editor(f.library); song.createFromPhrase(f.melody.id);
+  const root = song.read().draft!, voice = closure(f.library, root).find(item => item.kind === 'rootsound.timbre')!;
+  const contents = f.library.listContent(); const members = f.library.currentProjectView!(root.id)!.memberIds;
+  const draft = f.library.createDraft(unpublishedInput(root.id, voice.id));
+  assert.equal(draft.sourceId, undefined); assert.equal(draft.projectRootId, root.id);
+  assert.equal(f.library.projectScopeOf!({ type: 'draft', id: draft.id }), f.library.projectScopeOf!({ type: 'draft', id: root.id }));
+  assert.deepEqual(f.library.listContent(), contents); assert.deepEqual(f.library.currentProjectView!(root.id)!.memberIds, members);
+  assert(f.library.currentProjectView!(root.id)!.drafts.some(item => item.id === draft.id));
+  const raw = f.raw(); const restarted = createMaterialLibrary(f.storage, options());
+  assert.equal(f.raw(), raw); assert.deepEqual(restarted.readDraft(draft.id), draft);
+  assert.equal(restarted.currentProjectView!(draft.id)!.project.id, root.id);
+  assert.equal(restarted.projectScopeOf!({ type: 'draft', id: draft.id }), restarted.projectScopeOf!({ type: 'draft', id: root.id }));
+});
+
+test('a newly owned draft exposes its adopted dependency graph without publishing the draft as an entity', () => {
+  const f = fixture(), song = editor(f.library); song.create(); const root = song.read().draft!;
+  const draft = f.library.createDraft(unpublishedInput(root.id, f.voice.id));
+  const adopted = readPhraseBody(draft.body).parts[0]!.timbreId;
+  assert.notEqual(adopted, f.voice.id, 'public dependency graphs are adopted independently');
+  const view = f.library.currentProjectView!(root.id)!;
+  assert(view.drafts.some(item => item.id === draft.id)); assert(view.contents.some(item => item.id === adopted));
+  assert(f.library.listContentInfoForDraft!(draft.id).some(item => item.id === adopted));
+  assert.equal(view.memberIds.includes(draft.id), false); assert.equal(f.library.readContent(draft.id), undefined);
+  const foreign = editor(f.library); foreign.create();
+  assert(!f.library.currentProjectView!(foreign.read().draft!.id)!.drafts.some(item => item.id === draft.id));
+  assert(!f.library.listContentInfoForDraft!(foreign.read().draft!.id).some(item => item.id === adopted));
+});
+
+test('explicit saving publishes a child into its song membership and never leaks draft ownership into the content', () => {
+  const f = fixture(), song = editor(f.library); song.createFromPhrase(f.melody.id);
+  const root = song.read().draft!, voice = closure(f.library, root).find(item => item.kind === 'rootsound.timbre')!;
+  const draft = f.library.createDraft(unpublishedInput(root.id, voice.id)); const result = saved(f.library.saveDraft(draft.id, 'new'));
+  assert.equal(Object.hasOwn(result.content, 'projectRootId'), false); assert.equal(result.draft.projectRootId, root.id);
+  const scope = f.library.projectScopeOf!({ type: 'draft', id: root.id });
+  assert.equal(f.library.projectScopeOf!({ type: 'content', id: result.content.id }), scope);
+  assert(f.library.currentProjectView!(root.id)!.memberIds.includes(result.content.id));
+  assert.equal(readPhraseBody(result.content.body).parts[0]!.timbreId, voice.id);
+  const reopened = createMaterialLibrary(f.storage, options());
+  assert.equal(reopened.projectScopeOf!({ type: 'content', id: result.content.id }), scope);
+  const next = reopened.updateDraft(draft.id, { name: '正式改名' }); const updated = saved(reopened.saveDraft(next.id, 'overwrite'));
+  assert.equal(updated.content.id, result.content.id); assert.equal(updated.content.revision, 2);
+  assert.equal(Object.hasOwn(updated.content, 'projectRootId'), false);
+});
+
+test('owned draft names share one song namespace and remain independent across songs', () => {
+  const f = fixture(), song = editor(f.library); song.createFromPhrase(f.melody.id); const firstRoot = song.read().draft!;
+  const voice = closure(f.library, firstRoot).find(item => item.kind === 'rootsound.timbre')!;
+  const one = f.library.createDraft(unpublishedInput(firstRoot.id, voice.id));
+  const two = f.library.createDraft(unpublishedInput(firstRoot.id, voice.id));
+  assert.equal(two.name, '未保存乐句 2');
+  const before = f.raw(); assert.throws(() => f.library.updateDraft(two.id, { name: one.name }), /同类编辑稿|同类素材/u); assert.equal(f.raw(), before);
+  const occupied = closure(f.library, firstRoot).find(item => item.kind === 'rootsound.phrase')!;
+  assert.throws(() => f.library.updateDraft(two.id, { name: occupied.name }), /同类素材/u);
+  song.createFromPhrase(f.melody.id); const secondRoot = song.read().draft!;
+  const otherVoice = closure(f.library, secondRoot).find(item => item.kind === 'rootsound.timbre')!;
+  const other = f.library.createDraft(unpublishedInput(secondRoot.id, otherVoice.id)); assert.equal(other.name, one.name);
+});
+
+test('invalid or foreign explicit custody rejects atomically instead of borrowing another song graph', () => {
+  const f = fixture(), song = editor(f.library); song.createFromPhrase(f.melody.id); const first = song.read().draft!;
+  const voice = closure(f.library, first).find(item => item.kind === 'rootsound.timbre')!;
+  song.createFromPhrase(f.melody.id); const second = song.read().draft!;
+  const foreign = closure(f.library, second).find(item => item.kind === 'rootsound.timbre')!;
+  for (const rootId of ['', 'missing', voice.id]) {
+    const before = f.raw(), token = f.library.currentToken();
+    assert.throws(() => f.library.createDraft(unpublishedInput(rootId, voice.id)), /归属|所属歌曲/u);
+    assert.equal(f.raw(), before); assert.equal(f.library.currentToken(), token);
+  }
+  const before = f.raw(); assert.throws(() => f.library.createDraft(unpublishedInput(first.id, foreign.id)), /另一首歌曲/u); assert.equal(f.raw(), before);
+  assert.throws(() => f.library.createDraft({ sourceId: f.melody.id, projectRootId: first.id }), /尚未归属/u); assert.equal(f.raw(), before);
+  const draft = f.library.createDraft(unpublishedInput(first.id, voice.id));
+  const foreignBody = readPhraseBody(draft.body); foreignBody.parts[0]!.timbreId = foreign.id;
+  const clean = f.raw(); assert.throws(() => f.library.updateDraft(draft.id, { body: foreignBody, dependencies: [foreign.id] }), /另一首歌曲/u); assert.equal(f.raw(), clean);
+  const result = f.library.commitTransaction({ expectedToken: f.library.currentToken(), label: '错误换歌曲', replaceDrafts: [{ expected: draft, replacement: { ...draft, projectRootId: second.id } }] });
+  assert.equal(result.status, 'conflict'); assert.equal(f.raw(), clean);
+});
+
+test('owned draft creation and remembered edits retain custody through transaction undo, restart and failed writes', () => {
+  let raw: string | null = null; let broken = false;
+  const storage = { read: () => raw, write(value: string) { if (broken) throw Error('disk'); raw = value; } };
+  const library = createMaterialLibrary(storage, options()), song = editor(library); song.createFromPhrase(phrase(library, sound(library).id).id);
+  const root = song.read().draft!, voice = closure(library, root).find(item => item.kind === 'rootsound.timbre')!;
+  const draft: Draft = { ...unpublishedInput(root.id, voice.id), dependencies: [voice.id], id: crypto.randomUUID() };
+  const result = library.commitTransaction({ expectedToken: library.currentToken(), label: '新建未发布编辑稿', anchorDraftId: root.id, createDrafts: [draft] });
+  assert.equal(result.status, 'committed'); const rootAfter = library.readDraft(root.id)!;
+  library.travelDraft(root.id, 'undo', rootAfter); assert.equal(library.readDraft(draft.id), undefined);
+  const restarted = createMaterialLibrary(storage, options()); restarted.travelDraft(root.id, 'redo', restarted.readDraft(root.id)!);
+  assert.equal(restarted.readDraft(draft.id)!.projectRootId, root.id);
+  const ready = restarted.readDraft(draft.id)!; const edited = restarted.updateDraft(draft.id, { name: '草稿第二版' }, { remember: true, expected: ready });
+  restarted.travelDraft(draft.id, 'undo', edited); assert.equal(restarted.readDraft(draft.id)!.name, ready.name);
+  assert.equal(restarted.readDraft(draft.id)!.projectRootId, root.id);
+  broken = true; const before = raw; const token = restarted.currentToken();
+  assert.throws(() => restarted.createDraft(unpublishedInput(root.id, voice.id, '磁盘失败')), /写入失败/u);
+  assert.equal(raw, before); assert.equal(restarted.currentToken(), token);
+  const tampered = JSON.parse(raw!); tampered.drafts.find((item: Draft) => item.id === draft.id).projectRootId = 'missing';
+  assert.throws(() => createMaterialLibrary({ read: () => JSON.stringify(tampered), write() { throw Error('must not write'); } }, options()), /所属歌曲/u);
+});
+
+test('redo cannot restore an unpublished draft name taken while its creation was undone', () => {
+  const f = fixture(), song = editor(f.library); song.createFromPhrase(f.melody.id); const root = song.read().draft!;
+  const voice = closure(f.library, root).find(item => item.kind === 'rootsound.timbre')!;
+  const draft: Draft = { ...unpublishedInput(root.id, voice.id), dependencies: [voice.id], id: crypto.randomUUID() };
+  const result = f.library.commitTransaction({ expectedToken: f.library.currentToken(), label: '新建未发布稿', anchorDraftId: root.id, createDrafts: [draft] });
+  assert.equal(result.status, 'committed'); f.library.travelDraft(root.id, 'undo', f.library.readDraft(root.id)!);
+  const other = f.library.createDraft(unpublishedInput(root.id, voice.id)); assert.equal(other.name, draft.name);
+  const before = f.raw(), token = f.library.currentToken();
+  assert.throws(() => f.library.travelDraft(root.id, 'redo', f.library.readDraft(root.id)!), /名称已被使用/u);
+  assert.equal(f.raw(), before); assert.equal(f.library.currentToken(), token); assert.equal(f.library.readDraft(draft.id), undefined);
+});

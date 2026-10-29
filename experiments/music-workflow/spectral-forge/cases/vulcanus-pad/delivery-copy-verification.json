@@ -1,0 +1,34 @@
+{
+  "written": [
+    {
+      "path": "D:\\Sound\\temp\\tone\\Vulcanus-铺底-C4.wav",
+      "bytes": 2183528,
+      "sha256": "7f3c80a3793031184cf9dafba07d3aa2b81f77a5be1ea83395d2e64040a16c55"
+    },
+    {
+      "path": "D:\\Sound\\temp\\tone\\Vulcanus-铺底-和弦试听.wav",
+      "bytes": 2097128,
+      "sha256": "4ecd293c5ff03c98d1e1dd117b57a3da5f1fd2b1a43a2459c40c999c895d651f"
+    },
+    {
+      "path": "D:\\Sound\\temp\\tone\\Vulcanus-铺底音色-说明.txt",
+      "bytes": 679,
+      "sha256": "c70adb444962ca7791b3e2bd073be70093d64ccafdac05141265b607fdcf9794"
+    },
+    {
+      "path": "D:\\Sound\\temp\\tone\\Vulcanus-铺底音色.rssynth",
+      "bytes": 3700,
+      "sha256": "23f39bc04d9418b8ee958e716357a560a534c2e33d5d979f706784e802abacb2"
+    }
+  ],
+  "existingFiles": [
+    {
+      "name": "新的音色.rssynth",
+      "unchanged": true
+    },
+    {
+      "name": "cosmica-采样1.rstimbre",
+      "unchanged": true
+    }
+  ]
+}

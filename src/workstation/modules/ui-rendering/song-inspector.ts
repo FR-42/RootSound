@@ -1,3 +1,5 @@
+import { attachConsoleHorizontalWheel } from './console-scroll.ts';
+
 export type SongInspectorView = {
   key: string;
   kind: 'clip' | 'row' | 'phrase';
@@ -20,6 +22,7 @@ const panText = (value: number) => Math.abs(value) < .005 ? '居中' : `${value 
 /** Stable controls survive live playback/viewport paints while a slider is held. */
 export function createSongInspector(onError: (error: unknown) => void) {
   const root = document.createElement('section'); root.className = 'song-inspector'; root.setAttribute('aria-label', '编排控制台');
+  const detachWheel = attachConsoleHorizontalWheel(root);
   let view: SongInspectorView | undefined;
   let name: HTMLInputElement | undefined;
   const controls = new Map<'level' | 'pan', { input: HTMLInputElement; value: HTMLOutputElement; dirty: boolean; commit(): void }>();
@@ -131,6 +134,7 @@ export function createSongInspector(onError: (error: unknown) => void) {
     }
   }
   return { element: root, update,
+    dispose() { detachWheel(); },
     flush() { commitName(); if (dragging) controls.get(dragging)?.commit(); for (const control of controls.values()) if (control.dirty) control.commit(); },
     pointerEnd() { if (dragging) controls.get(dragging)?.commit(); },
     cancel() { dragging = undefined; for (const control of controls.values()) control.dirty = false; },

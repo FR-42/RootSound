@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType><TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable>
+    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../host/NativeFiles.cs" Link="NativeFiles.cs" />
+    <Compile Include="../host/BridgeRequest.cs" Link="BridgeRequest.cs" />
+    <Compile Include="../host/WebSecurity.cs" Link="WebSecurity.cs" />
+  </ItemGroup>
+</Project>

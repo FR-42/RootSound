@@ -1,0 +1,23 @@
+{
+  "midi_note_count": 36,
+  "4": {
+    "seconds": 14.513927699998021,
+    "reconstruction_max_error": 2.3283064365386963e-10,
+    "frames": 361620,
+    "stems": 4,
+    "midi_status": "complete"
+  },
+  "6": {
+    "seconds": 8.410343499970622,
+    "reconstruction_max_error": 1.4901161193847656e-08,
+    "frames": 361620,
+    "stems": 6,
+    "midi_status": "not_requested"
+  },
+  "source_unchanged": true,
+  "mix_reconstruction": true,
+  "invalid_note_rejected": true,
+  "source_overwrite_rejected": true,
+  "ui_load_hidden": true,
+  "total_seconds": 23.147224899963476
+}

@@ -1,0 +1,50 @@
+[
+  {
+    "patchFile": "Vulcanus铺底-柔和候选.rssynth",
+    "wavFile": "Vulcanus铺底-柔和候选-C4.wav",
+    "patchSha256": "927152fde652dbb32c3b9b4dbb8dd82ac590ede428a03d9affdd58b0c7710ab6",
+    "engine": "Original SpectralSynth and renderPatch; no postprocessing",
+    "listeningVerified": false,
+    "target": "Sustained harmony bed below the vocal, not the lead or a reverse-engineered score",
+    "curvePoints": [
+      10,
+      8,
+      3
+    ],
+    "oscillatorUnitsPerNote": 8,
+    "effectivePolyphony": 6,
+    "midi": 60,
+    "velocity": 0.85,
+    "holdSeconds": 3.4,
+    "durationSeconds": 7.300625,
+    "peak": 0.19545015162707077,
+    "rms": 0.03191337193114839,
+    "sideToMidDb": -4.659088994687882,
+    "tailTruncated": false,
+    "originalSongAudioIncluded": false
+  },
+  {
+    "patchFile": "Vulcanus铺底-明亮候选.rssynth",
+    "wavFile": "Vulcanus铺底-明亮候选-C4.wav",
+    "patchSha256": "49c638b62688cfc7c93f1ce3dea1bbc56ce72b34f7105bbe0f492d860789687b",
+    "engine": "Original SpectralSynth and renderPatch; no postprocessing",
+    "listeningVerified": false,
+    "target": "Sustained harmony bed below the vocal, not the lead or a reverse-engineered score",
+    "curvePoints": [
+      10,
+      6,
+      3
+    ],
+    "oscillatorUnitsPerNote": 8,
+    "effectivePolyphony": 6,
+    "midi": 60,
+    "velocity": 0.85,
+    "holdSeconds": 3.4,
+    "durationSeconds": 7.150625,
+    "peak": 0.25913291813789946,
+    "rms": 0.03731387403842877,
+    "sideToMidDb": -4.815000366639194,
+    "tailTruncated": false,
+    "originalSongAudioIncluded": false
+  }
+]

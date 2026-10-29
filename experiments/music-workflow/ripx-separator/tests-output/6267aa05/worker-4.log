@@ -1,0 +1,17 @@
+{"progress": 0.01, "message": "解码音频…", "job": "D:\\RootSound\\experiments\\music-workflow\\ripx-separator\\tests-output\\6267aa05\\split-4"}
+{"progress": 0.03, "message": "加载本地 HTDemucs 模型（CPU）…"}
+{"progress": 0.385, "message": "音轨分离 1/2 个时间窗"}
+{"progress": 0.7200000000000001, "message": "音轨分离 2/2 个时间窗"}
+WARNING:root:Coremltools is not installed. If you plan to use a CoreML Saved Model, reinstall basic-pitch with `pip install 'basic-pitch[coreml]'`
+WARNING:root:tflite-runtime is not installed. If you plan to use a TFLite Model, reinstall basic-pitch with `pip install 'basic-pitch tflite-runtime'` or `pip install 'basic-pitch[tf]'
+WARNING:root:Tensorflow is not installed. If you plan to use a TF Saved Model, reinstall basic-pitch with `pip install 'basic-pitch[tf]'`
+{"progress": 0.73, "message": "转录 MIDI：贝斯"}
+Predicting MIDI for D:\RootSound\experiments\music-workflow\ripx-separator\tests-output\6267aa05\split-4\.midi-njdgkjgi\chunk.wav...
+{"progress": 0.8133333333333334, "message": "MIDI：贝斯 8/8 秒"}
+{"progress": 0.8133333333333334, "message": "转录 MIDI：其他"}
+Predicting MIDI for D:\RootSound\experiments\music-workflow\ripx-separator\tests-output\6267aa05\split-4\.midi-x0g88ubg\chunk.wav...
+{"progress": 0.8966666666666666, "message": "MIDI：其他 8/8 秒"}
+{"progress": 0.8966666666666666, "message": "转录 MIDI：人声"}
+Predicting MIDI for D:\RootSound\experiments\music-workflow\ripx-separator\tests-output\6267aa05\split-4\.midi-y5ulhtwd\chunk.wav...
+{"progress": 0.98, "message": "MIDI：人声 8/8 秒"}
+{"progress": 1, "message": "完成：音轨已保存。", "result": "D:\\RootSound\\experiments\\music-workflow\\ripx-separator\\tests-output\\6267aa05\\split-4\\project.json"}

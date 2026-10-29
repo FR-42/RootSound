@@ -1,5 +1,218 @@
 # RootSound DECISIONS
 
+## D-2026-10-29-structure-gpu · Local model GPU execution — EXPERIMENT SCOPE
+
+- User explicitly requests GPU integration after learning the model used CPU.
+  This authorizes the required project-local GPU runtime installation, not
+  changing unrelated tools, global Python or graphics drivers.
+- After the measured comparison, user chooses CPU. Default all model execution
+  entry points and the dialog to CPU; do not initialize/probe GPU when opening
+  the default CPU chooser. GPU and GPU-priority Auto remain explicit options.
+- Implement Intel XPU for this machine's Arc Graphics using a separate locked
+  PyTorch/torchaudio2.7.1+xpu environment and verified official Intel dependencies.
+  Preserve CPU components and existing model weights. Worker model parameters,
+  input and returned tensors are checked on the selected device. Full float32.
+- Dialog offers Auto (GPU priority), strict GPU and CPU, for Demucs only. Report
+  detected/actual device and CPU operator cooperation. Auto may retry the same
+  model on CPU after GPU failure, explicitly reporting why; strict GPU must fail
+  without silently computing CPU results. Cancel/close terminates worker and
+  discards unfinished files, preserving current session/audio and source files.
+- GPU availability is not a speed guarantee. This machine's controlled30s mix
+  measured CPU15.69s versus GPU21.51s, with max stem RMS difference2.04e-8.
+  Mixed precision was slower and less close to CPU, so retain float32. These
+  measurements are workload-specific and do not establish real-music listening
+  acceptance. Traditional four algorithms remain CPU.
+
+## D-2026-10-29-structure-methods · Multiple selectable separation principles — EXPERIMENT SCOPE
+
+- User finds the first decomposition unsatisfactory and requests several other
+  principles with a small window for choosing a preferred method. This is a
+  request to implement alternatives, not acceptance of the original NMF quality.
+- Implementation choices: cached local Hybrid Demucs (drums/bass/vocals/other
+  residual), median-filter HPSS (sustained/percussive), bounded non-local
+  neighbor-median repetition (REPET-SIM inspired), stereo Mid/Side, and original
+  NMF with2–8 requested templates. These are distinct mechanisms, not NMF presets.
+- Initial/re-decomposition and selected-parent refinement open the method dialog.
+  Re-decomposition always uses the original input, replaces current layers and
+  saves the previous layers/mutes for undo; refinement only replaces its parent.
+  Availability/channel/layer constraints are explicit; no silent method fallback.
+- Trained model uses existing local components and verified cached weights, with
+  blocked worker network and no auto-install/download. Bounded window processing,
+  full duration/rate/channels, complementary reconstruction, cancellation and
+  source protection remain. Estimates may leak or misclassify electronic sounds.
+  Actual music listening and preference selection remain with the user.
+
+## D-2026-10-29-tone-structure · Simultaneous spectral structure layers — EXPERIMENT SCOPE
+
+- User requests a new tool resembling the unified Tone Processor, replacing its
+  polishing page with a total-spectrum view, decomposition and aligned output
+  spectra; shared playback, draggable playhead, independent active/mute, finer
+  decomposition and undo. Capture/EQ transfers selected long audio into it.
+- User clarifies outputs are simultaneous sound layers, not chronological
+  sections or deduplicated verses. They must not each duplicate the full input.
+  The graph is **frequency versus volume, changing with playback time**. Use a
+  separate shared time ruler for seeking.
+- Initial implementation choices (extended by selectable methods above): independent “音色结构.exe”; nonnegative learned
+  recurring spectral templates and complementary reconstruction, initial up to
+  four layers and selected-parent refinement. Replace parent with children,
+  all-active sum reconstructs input, original comparison is exclusive. Name
+  outputs neutrally rather than claiming exact instrument identity.
+- No guarantee of semantic instrument isolation: leakage remains possible.
+  Session-only state, explicit per-layer/mix WAV export, at most16 leaves and
+  eight decomposition undo states, disk-backed audio and cancellable work are
+  implementation choices. New input replaces current analysis after a prompt.
+
+## D-2026-10-29-blue-markers · Free crossing and continuous audition — EXPERIMENT SCOPE
+
+- User requests both blue markers in the unified Tone Processor to cross freely;
+  the interval between them is selected, with no fixed left/right identity.
+- User explicitly rejects pausing while dragging: red and audio continue without
+  pointer-driven seeking, except when the current position meets a moved edge.
+  Capture now reanchors the looping source at the existing audio clock. Ordered
+  bounds serve playback, trimming, transfers and saving; marker identities stay
+  attached to their gestures. Crossing is enabled on both unified pages.
+- A coincident pair has no playable interval; it may pause until the same gesture
+  opens a valid interval again. This empty-range handling is an implementation
+  choice. Other standalone tools retain the old default ordered-edge behavior.
+
+## D-2026-10-29-tone-unified · Merge capture and timbre polishing — EXPERIMENT SCOPE
+
+- Follow-up: user explicitly requests deleting the root `音色打磨.exe`.
+  Retain `音色器.exe` as the sole EXE entry and stop recreating the old alias
+  during builds. Historical build commands may still forward to this entry.
+- User requests one “音色器”, initially showing the existing timbre-polishing UI.
+  A boxed plus directly below its left sample list enters the former Tone
+  Processor capture/EQ page. That page's export now adds the EQ-processed blue
+  selection directly to the list; it keeps the loaded song for further captures.
+- User explicitly clarifies retention is **within the current open session**,
+  including page navigation, not restoration after closing/reopening.
+- Implemented choices: successful export returns to polishing; a back button
+  permits navigation without adding audio. First capture is primary; later
+  captures append references. Keep both page instances, markers/view/EQ/trim
+  history, independent sample snapshots, original-file protection and existing
+  30-second/eight-sample limits. Stop current audition when navigating. Legacy
+  “音色打磨” launcher/build entry forwards to the merged tool.
+- This supersedes the separate capture-page WAV-export workflow in
+  D-2026-10-29-tone-processor. Final WAV and `.rstimbre` saving remain in the
+  polishing page. Main-workstation scope is unchanged.
+
+## D-2026-10-29-tone-processor · Standalone audio processing tool — EXPERIMENT SCOPE
+
+- User requests a new independent “音色器” under `experiments/music-workflow`:
+  top-bar triangle play, square return-to-start,
+  multi-format import and WAV export; time-frequency view with draggable red
+  playhead and two blue boundaries, horizontal zoom and looping within them.
+- Import must support audio longer than 10 minutes. Cut removes audio outside
+  the blue range from the working clip and resets the boundaries to that clip.
+  Reuse the precision synthesizer's frequency/gain EQ editor unchanged; future
+  processing stages may follow. No timbre-file format is required at this stage.
+- User explicitly chooses export of **only the blue range, including EQ**.
+  Return-to-start pauses at the left blue boundary to keep the red line inside
+  the loop. This transport detail, preserving originals, reversible cut history, a flat initial EQ and streamed
+  disk-backed processing are implementation choices, not new main-workstation
+  requirements. This experiment does not change the main workstation's scope.
+
+## D-2026-10-29-5 · Wheel-adjusting a selected note's held duration — ACTIVE
+
+- User requests fine duration adjustment with the wheel when a single note is
+  selected. RB82 applies ordinary vertical wheel input over the piano roll to
+  that note; a family-only selection still navigates. Labels, ruler, modifiers
+  and horizontal-only input retain navigation.
+- Up lengthens and down shortens. Device-unit normalization, about10ms per normal
+  notch and a bounded per-event delta are implementation choices. Preserve onset,
+  pitch, timbre, mix and selection; keep real held seconds independent of BPM.
+  This edits the working draft and does not bypass explicit saving.
+
+## D-2026-10-29-4 · Explicit saving and private working drafts — ACTIVE
+
+- User rejects automatically saving phrases and songs: editing must leave room
+  for disposable drafts. Normal edits do not overwrite the formal project file.
+  Save buttons and Ctrl+S are deliberate commitments, not decorative checkpoints.
+- User clarifies the two levels: phrase Save confirms that phrase into the current
+  working project; song Save writes the whole project file. Confirming a phrase
+  does not separately write a file or implicitly save unrelated arrangement edits.
+- New phrase work remains unpublished until explicitly saved. Leaving changed
+  phrase work offers save/discard/continue; discard restores saved musical fields
+  or removes a new unpublished draft. Libraries display confirmed metadata only.
+- Project exit and window close offer save/discard/cancel for changed work. Project
+  Save/Save As must not silently publish another unfinished phrase/tone editor.
+  Confirmed phrase removal remains a working project edit until the song is saved.
+- RB81 uses in-memory native working snapshots, explicit draft-to-project custody
+  and UI flush/close preparation. Existing create/import/copy and deliberate file
+  library rename/delete actions remain explicit actions, not automatic edit saves.
+  No existing user project is deleted or retroactively rewritten by this change.
+
+## D-2026-10-29-3 · Creation overview and phrase console — ACTIVE
+
+- User replaces the Rhythm area with a phrase console, renames Melody to Creation,
+  removes the right-hand Create tile and retains the adjustable divider.
+- Clarification: keep the read-only overview; clicking the left Creation control
+  enters editing. Do not replace the overview with an always-open piano roll.
+- RB80 implementation choices: show phrase metadata and master volume below;
+  default to75% overview while retaining symmetric divider bounds. Existing
+  rhythm families remain unchanged in storage, visible/editable in unified
+  Creation and audible in the whole-phrase preview. No deletion or forced
+  rewriting of old music is implied by removing the separate Rhythm interface.
+- The exact console fields/default ratio and legacy routing are implementation
+  choices, not a separately approved long-term console design or listening result.
+
+## D-2026-10-29-2 · Gentler horizontal dragging and phrase-library opening — ACTIVE
+
+- User requests slower horizontal row-control dragging and double-clicking a
+  phrase in the phrase library to enter its composition workspace. This replaces
+  that library card's double-click-to-rename behavior; names remain editable in
+  the phrase header. Single-click shelf visibility toggling remains available.
+- RB79 uses 0.75 times pointer displacement horizontally while retaining the
+  vertical rate, bounds, visual fade progress and actual-release deletion guard.
+  The exact rate is an implementation choice, not a permanent requirement.
+- Opening a library phrase cancels pending single-click actions and uses its
+  existing identity, including phrases not currently shown on the song shelf.
+
+## D-2026-10-29 · Free two-axis row-control dragging — ACTIVE
+
+- User requests diagonal row-control dragging, horizontal bounds with the left
+  edge fixed at the control column's left edge, slower trash fade-in and progressive
+  fading of that row's beat/bar lines as it moves right.
+- RB78 removes RB77's direction lock. The right travel limit is currently one
+  actual control-column width (144px normally, 116px in the narrow layout); this
+  boundary and the squared trash-opacity curve are implementation choices.
+  Only a full-right actual release requests deletion; otherwise release reorders
+  vertically. Populated rows still require confirmation. Cancelling restores
+  display and selection without music writes or playback restarts.
+- Grid fading uses a local band on the shared grid layer. It changes display
+  only; it does not edit song timing or weaken other rows' grid contrast.
+
+## D-2026-10-28-7 · Draw notes and protect intentional removals — ACTIVE
+
+- User clarification: selecting the left total-note family enables left-drag
+  creation in blank piano-roll space; click fixes the origin and drag sets length.
+  Removing self-created/imported tones, phrases or songs must show a warning.
+- The requested n is cells per beat (2–9), not beats per bar. Expose it in the
+  shared phrase header. This supersedes a universally fixed four-cell editor.
+- A large rightward row-control drag progressively exposes a red trash block.
+  At full strength, releasing removes the row; populated rows require warning.
+- RB77 choices: default4 for older phrases, preserve existing note times and held
+  seconds when changing n, snap new draw lengths on release while previewing
+  continuously, retain explicit navigation gestures and protect partial end cells.
+  The original 140px threshold and direction lock are superseded by RB78 above.
+  Stale-row rejection and one-commit ghosts are implementation choices, not new
+  permanent product constraints.
+
+## D-2026-10-28-6 · Phrase tempo, tone-library organization and contextual wheels — ACTIVE
+
+- New phrases inherit the BPM shown by Arrangement at creation. Bundled tones
+  in an empty project can be removed from its tone library. Tone cards can be
+  dragged into a new order with neighboring cards yielding their positions.
+- Settings currently expose keyboard performance only. Over SPN labels and
+  playlist row controls, ordinary wheel navigates vertically, Ctrl zooms
+  vertically, Shift navigates horizontally and Ctrl+Shift zooms horizontally.
+  An overflowing console supports local horizontal wheel scrolling.
+- RB76 choices: inherit the current playhead's grid-tempo segment; retain copy
+  tempo and main-grid wheel behavior; persist order per song and remap metadata
+  on full import. Remove unused voices without reseeding and protect existing
+  music/edits/history. Used-tone trash retains its prior current-section meaning.
+  These details do not mandate broader deletion of referenced musical material.
+
 Active rebuild decisions. Complete pre-isolation records are preserved in
 legacy/prototype/governance/. Proposed details are not user decisions.
 The Chinese explanation in AItoHUMAN/ records the same facts.
@@ -11,7 +224,8 @@ Earlier paths in retained decisions describe their original date; the current
 archive location is legacy/.
 
 Current ultimate purpose: enable rhythm-game music enthusiasts to get started
-quickly and create rhythm-game music they find satisfying. D-2026-10-27-10
+quickly and create music they find satisfying. The audience is enthusiasts of
+rhythm-game music and adjacent styles. D-2026-10-27-10
 supersedes the earlier universal purpose and records the accepted first milestone.
 
 ## D-2026-10-22 · Workstation purpose and rebuild authorization — PURPOSE SUPERSEDED; REBUILD AUTHORIZATION ACTIVE
@@ -735,6 +949,8 @@ Length update: D-2026-10-27-6 replaces the fixed four-bar cap with a shared,
 bar-extendable phrase length. Four bars remains the initial length only.
 The blank/no-authoring description below records the RB58 shell. D-2026-10-26-9
 adds a new Melody editor while keeping the overview blank and the old editor unmounted.
+Later updates: D-2026-10-28-3 adds overview notes and linked navigation;
+D-2026-10-28-4 replaces fixed equal heights with an adjustable divider.
 
 - User replaces the main phrase-writing interface with a song-style top bar,
   showing the phrase name at left. Creation skips a naming dialog and chooses
@@ -927,8 +1143,8 @@ session-associated cursor metadata, not a new persisted cursor-history stream.
   bar (four beats). Start with four bars; use the full length for overview,
   preview, saving, arrangement and export. Preserve existing music and fixed-second
   durations. Implementation choices: retain cell width and reveal the new end;
-  the current domain ceiling is64 beats/16 bars, where + becomes disabled. This
-  is a current implementation limit, not a permanent product decision.
+  the then-current domain ceiling was64 beats/16 bars, where + became disabled.
+  RB75 supersedes that implementation limit; it was never a permanent product decision.
 - These replace the earlier fixed16-beat viewport, always-active keyboard entry
   and blanket no-cursor-rewind policies only within the scopes above. Actual
   desktop interaction and listening acceptance remain separate from code checks.
@@ -1007,11 +1223,19 @@ phrase-library selection retain these policies. Historical verification keeps it
 
 ## D-2026-10-27-10 · Rhythm-game music creation is the final purpose — ACTIVE
 
-- User explicitly changes the product's final purpose to: 使音游曲爱好者能够快速上手做出满意的音游曲
+- User's latest exact wording of the product's final purpose is: 让音游曲爱好者快速上手做出满意的音乐
   (enable rhythm-game music enthusiasts to get started quickly and create
-  rhythm-game music they find satisfying). This replaces the earlier universal
+  music they find satisfying). The audience is 音游曲及周边曲风爱好者
+  (enthusiasts of rhythm-game music and adjacent styles). This replaces the earlier universal
   all-people/any-sound goal, not merely the marketing audience. Low learning and
   operation friction remains a design principle serving this outcome.
+- User's rationale: generic beginner music tools do not offer sufficient competitive
+  distinction, RootSound currently has no irreplaceable core capability, and the user
+  is a music-production beginner whose tastes do not strongly favor mainstream pop.
+  Focusing on familiar musical interests is their chosen response. These are the
+  user's stated judgments and circumstances, not validated market size, demand or
+  willingness-to-pay findings. Questions about niche size and the difficulty of
+  helping beginners create complex music remain open; they do not approve features.
 - User confirms the next milestone: first make an original passage satisfying,
   then extend to a full song through the same workflow. A short passage is a
   milestone, not a replacement for the complete-song final purpose.
@@ -1019,6 +1243,9 @@ phrase-library selection retain these policies. Historical verification keeps it
   listening reference. The reference window does not prescribe output duration
   or authorize claiming copyright in that recording. Earlier Vulcanus experiments
   and their failed listening acceptance remain historical evidence, not approval.
+- User explicitly identifies the vocals and background melody as the important
+  features of this first reference. Prioritize their musical result in this
+  experiment; this is not listening acceptance of the generated draft.
 - Specific musical acceptance criteria, the original passage's length, style
   scope, completion-time targets and exact assistance model remain to be agreed.
   Do not equate all rhythm-game music with one genre, a high BPM or one preset.
@@ -1027,3 +1254,82 @@ phrase-library selection retain these policies. Historical verification keeps it
   authorize code deletion, a new full rebuild or arbitrary-song reverse-engineering
   claims. Proposed priorities must be evaluated against musical results and user
   ability to make intentional changes; program checks are not listening acceptance.
+
+## D-2026-10-28 · Detailed synthesis experiment with three independent curves — ACTIVE EXPERIMENT SCOPE
+
+- User requests a standalone experiment in the experiment directory, with oscillators,
+  a detailed multi-point spectrum curve, a multi-point volume envelope and further
+  precise sound-design controls. This does not approve replacing the main workstation.
+- User clarifies two different frequency-related curves: a static frequency-to-gain
+  curve, and a dynamic time-to-fundamental-pitch curve. Keep these independent of the
+  time-to-volume envelope rather than treating all three as one control.
+- User later caps each curve at 10 control points and requests a slider to adjust
+  their number. This supersedes the assistant's dense 64/32-point default and
+  512-point editing capacity for this experiment. The default of 6 and a minimum
+  of 3 when protecting an interior sustain point are implementation choices.
+- Relative semitone pitch coordinates, sustain/release semantics, component counts,
+  synthesis algorithms and the `.rssynth` format are implementation choices for
+  this experiment, not new user-confirmed product requirements or listening approval.
+
+## D-2026-10-28-2 · Import MIDI through the song library folder tile — ACTIVE
+
+- User explicitly approves selecting a `.mid` or `.midi` file from the song
+  library's existing folder tile and importing it as an editable project. This
+  applies to the main workstation, not only an independent experiment.
+- Adopted behavior: create a separate RootSound song, enter Arrangement and save
+  it in the default project directory, preserving the original MIDI. Imported
+  notes and phrases must remain editable; instrument matching provides initial
+  replacement sounds rather than claiming recovery of original audio/plugins.
+- Current supported formats, resource bounds, automatic naming, zero-gate drum
+  handling and how unsupported controls are disclosed are implementation choices.
+  Do not turn a current format/size limit or approximate instrument mapping into
+  a permanent product decision, or equate program checks with listening acceptance.
+
+## D-2026-10-28-3 · Two-axis dragging and linked phrase previews — ACTIVE
+
+- User requests dragging blank workspace space to pan horizontally and vertically
+  at the same time. Apply this navigation to Arrangement, Melody and Rhythm.
+- The phrase overview must show each department's own notes instead of remaining
+  blank. Melody and Rhythm share horizontal position and zoom, while their
+  vertical navigation remains independent.
+- Implementation choices for RB73: retain a read-only overview with Create entries;
+  use a 4px click/drag threshold, shared seconds coordinates, independent vertical
+  offsets/heights and a deterministic phrase-wide tone palette. The navigation
+  state is UI memory for the currently mounted phrase, not a new saved project
+  format or a promise to restore the view after restart. These details are not
+  additional user-mandated permanent constraints or actual gesture/listening approval.
+
+## D-2026-10-28-4 · Adjustable Melody/Rhythm overview heights — ACTIVE
+
+- User requests a draggable divider with symmetric height adjustment. When only
+  one section has no notes to preview, that empty section should default to its
+  minimum height. This supersedes the earlier fixed equal-height arrangement.
+- RB74 implementation choices: 15%–85% symmetric bounds, at least 64px per
+  section where possible and equal sharing in very small windows; both populated
+  or both empty defaults to equal heights. Undefined-tone notes count as content.
+  Keyboard adjustment, complete gesture cancellation and current-mount memory
+  are implementation choices, not new permanent product requirements.
+- The layout remains UI state: in-place Save and detailed-editor return retain
+  it, while a real newly opened draft chooses its default. No new project-format
+  or cross-restart layout-persistence promise, and no actual gesture/FPS acceptance.
+
+## D-2026-10-28-5 · Import project-owned tones and permit longer phrases — ACTIVE
+
+- User requests a + tile in the tone library to select an external tone file,
+  remembering the last picker directory. Imported tones are available to all
+  phrases in that song and isolated from other songs. Store local copies in a
+  fixed directory organized by song; never depend on the external source file.
+- User identifies short MIDI phrases and asks to increase the phrase ceiling.
+  RB75 removes fixed four-bar MIDI slicing. The 1024-beat / 50000-note ceiling,
+  tempo/resource-based splitting and preservation of leading/trailing rests are
+  implementation choices, not new permanent product limits. Existing edited
+  projects are preserved; reimport MIDI to use the new segmentation.
+- Current implementation accepts .rssynth and .rssound. .rstimbre is an earlier
+  sample-instrument archive and remains unsupported rather than approximated.
+  Mirrors live in timbres/<manifest-id>/; the self-contained .rootsound remains
+  authoritative. Mirrors exclude history, foreign songs and stale drafts and
+  can be regenerated when reopening or transferring a project.
+- Spectral parameters are preserved and independently gated notes use the same
+  synthesis engine in a background worker. Cross-note monophonic glide, shared
+  effect state and voice stealing are not reproduced. Neither program checks
+  nor exact single-note output constitutes multi-note listening acceptance.

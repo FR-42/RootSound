@@ -1,0 +1,34 @@
+Native harmonic refinement / audio reconstruction follow-up, 2026-10-29
+
+Recovered and implemented bounded stages:
+- native_harmonic_fields.py::prepare_trajectory
+  Function 0x140319940, raw evidence ev_b8b4f7a84ab6a101e94bdd905fcc94be52eea0c97692fa1f158c6c3818f97f01.
+  Caller-selected frequency slice, float32 difference -> double angular slopes,
+  zero-gap behavior and first-valid-pair/fallback seed.
+  Clock and hop are explicit inputs; no guessed global initialization/defaults.
+- output_component / encode_phase
+  Function 0x1403443e0, evidence ev_212f46e09b670006fbfcfbbf9a511843eb8e73381d1afd4a7032892cd3019552.
+  Two phase carriers, transformed strength and signed balance, plus frequency.
+  0xf570 wrap threshold is 62832. Adding 0xa90 modulo 65536 subtracts 62832.
+  These are fields within each 0x10-byte component slot inside a 0x4c record.
+  No complete .rip record, note object or stream format is claimed.
+
+Verification:
+python -m unittest discover -s work/ripx-native-next/resynthesis -p test_native_harmonic_fields.py
+5 tests passed. Tests cover gap continuity, clock scaling, phase wrap/unsigned
+representation, silence, balanced/one-sided amplitudes, unsupported configuration.
+These establish implementation invariants, not original-runtime equivalence.
+No RipX process, authorization mechanism, media resource or GUI was accessed.
+
+Next native dependencies requested from the parent's single REA session:
+- 0x14031b830: actual per-channel phase/amplitude solver used by 319940.
+- 0x14032aef0: optional local frequency re-estimation used by 319940.
+- 0x1403190b0: actual PCM component subtractor called by 31c500. The caller
+  passes negative transformed amplitude and frequency/phase, then may average
+  two residual channels. This is a stronger reconstruction lead than guessing
+  a generic sinusoidal renderer.
+
+Still absent: full local solver dependencies, verified time/global initialization,
+native output reconstruction path, all interference correction branches,
+original-runtime differential tests. Do not advertise this module as a completed
+RipX resynthesizer or use a generic waveform formula to fill those gaps.

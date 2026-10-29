@@ -1,0 +1,131 @@
+[
+  {
+    "file": "vocalset\\FULL__female1__long_tones__straight__f1_long_straight_a.wav",
+    "samplerate": 44100,
+    "durationSeconds": 11.82265,
+    "windows": [
+      {
+        "start": 1.1946,
+        "end": 3.374,
+        "midi": 60,
+        "frequencyHz": 261.2143,
+        "centsStd": 12.66
+      },
+      {
+        "start": 4.6776,
+        "end": 6.8802,
+        "midi": 72,
+        "frequencyHz": 525.1287,
+        "centsStd": 20.16
+      },
+      {
+        "start": 7.6729,
+        "end": 10.6651,
+        "midi": 77,
+        "frequencyHz": 707.9779,
+        "centsStd": 8.72
+      }
+    ],
+    "note": "Signal-estimated stable pitch windows, not a listening or loop-quality acceptance."
+  },
+  {
+    "file": "vocalset\\FULL__female3__long_tones__straight__f3_long_straight_a.wav",
+    "samplerate": 44100,
+    "durationSeconds": 11.12703,
+    "windows": [
+      {
+        "start": 0.8927,
+        "end": 3.3276,
+        "midi": 60,
+        "frequencyHz": 264.1655,
+        "centsStd": 11.55
+      },
+      {
+        "start": 4.0738,
+        "end": 4.744,
+        "midi": 73,
+        "frequencyHz": 545.8757,
+        "centsStd": 8.04
+      },
+      {
+        "start": 4.8169,
+        "end": 6.8106,
+        "midi": 73,
+        "frequencyHz": 543.8424,
+        "centsStd": 10.82
+      },
+      {
+        "start": 7.3711,
+        "end": 7.6929,
+        "midi": 78,
+        "frequencyHz": 723.3112,
+        "centsStd": 10.38
+      },
+      {
+        "start": 7.9051,
+        "end": 9.3183,
+        "midi": 78,
+        "frequencyHz": 720.4068,
+        "centsStd": 2.64
+      }
+    ],
+    "note": "Signal-estimated stable pitch windows, not a listening or loop-quality acceptance."
+  },
+  {
+    "file": "vocalset\\FULL__female8__long_tones__straight__f8_long_straight_a.wav",
+    "samplerate": 44100,
+    "durationSeconds": 15.04898,
+    "windows": [
+      {
+        "start": 0.7766,
+        "end": 1.0752,
+        "midi": 60,
+        "frequencyHz": 261.6664,
+        "centsStd": 31.32
+      },
+      {
+        "start": 1.1481,
+        "end": 1.7486,
+        "midi": 60,
+        "frequencyHz": 265.2789,
+        "centsStd": 10.27
+      },
+      {
+        "start": 2.9825,
+        "end": 4.5582,
+        "midi": 60,
+        "frequencyHz": 266.0421,
+        "centsStd": 7.19
+      },
+      {
+        "start": 5.258,
+        "end": 9.4112,
+        "midi": 72,
+        "frequencyHz": 530.2845,
+        "centsStd": 8.17
+      },
+      {
+        "start": 10.0181,
+        "end": 12.1976,
+        "midi": 77,
+        "frequencyHz": 715.4251,
+        "centsStd": 9.96
+      },
+      {
+        "start": 12.2705,
+        "end": 13.9159,
+        "midi": 77,
+        "frequencyHz": 715.2703,
+        "centsStd": 5.65
+      },
+      {
+        "start": 14.012,
+        "end": 14.4267,
+        "midi": 77,
+        "frequencyHz": 715.7571,
+        "centsStd": 20.75
+      }
+    ],
+    "note": "Signal-estimated stable pitch windows, not a listening or loop-quality acceptance."
+  }
+]

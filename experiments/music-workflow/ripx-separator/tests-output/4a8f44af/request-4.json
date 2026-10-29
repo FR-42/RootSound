@@ -1,0 +1,7 @@
+{
+  "action": "separate",
+  "input": "D:\\RootSound\\experiments\\music-workflow\\ripx-separator\\tests-output\\4a8f44af\\generated A4.wav",
+  "mode": "4",
+  "midi": true,
+  "job": "D:\\RootSound\\experiments\\music-workflow\\ripx-separator\\tests-output\\4a8f44af\\split-4"
+}

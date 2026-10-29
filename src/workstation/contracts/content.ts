@@ -26,6 +26,8 @@ export type CurrentProjectView = {
 
 export interface Draft<T = JsonValue> {
   id: string;
+  /** Explicit custody for an unpublished child draft; never part of saved musical content. */
+  projectRootId?: string;
   sourceId?: string;
   baseRevision?: number;
   name: string;
@@ -123,7 +125,7 @@ export interface MaterialLibrary {
   currentToken(): string;
   /** All record changes and the optional composite undo step persist in one write. */
   commitTransaction(transaction: MaterialTransaction): MaterialTransactionResult;
-  createDraft(input: NewContent | { sourceId: string }): Draft;
+  createDraft(input: (NewContent | { sourceId: string }) & { projectRootId?: string }): Draft;
   readDraft(id: string): Draft | undefined;
   listDrafts(): Draft[];
   /** Plain external writes invalidate history; remembered edits persist history atomically. */

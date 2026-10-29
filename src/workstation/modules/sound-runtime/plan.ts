@@ -1,12 +1,14 @@
 import type { BasicWaveform, PcmAudio, SampleSoundPlan, SoundPlan } from '../../contracts/sound.ts';
 import type { OutputProcessingPlan } from '../../contracts/post-production.ts';
 import { pcmShape, readPcmSnapshot, samePcm, type PcmSnapshot } from './pcm.ts';
+import { MAX_SEQUENCE_EVENTS, MAX_SEQUENCE_SECONDS } from '../../contracts/playback-limits.ts';
 
 const WAVEFORMS: readonly BasicWaveform[] = ['sine', 'triangle', 'sawtooth', 'square', 'noise'];
 const MAX_SOURCES = 8;
-const MAX_EVENTS = 2048;
 const MAX_SIMULTANEOUS_SOURCES = 256;
-const MAX_PLAN_PCM_BYTES = 128 * 1024 * 1024;
+const MAX_LOOKAHEAD_SOURCES = 4096;
+import { MAX_SEQUENCE_PCM_BYTES } from '../../contracts/playback-limits.ts';
+const MAX_PLAN_PCM_BYTES = MAX_SEQUENCE_PCM_BYTES;
 
 export type SampleSourceSnapshot = SampleSoundPlan['source'] & {
   readonly key: string;
@@ -50,7 +52,8 @@ function fields(value: Record<string, unknown>, allowed: readonly string[], labe
 function readPlan(value: unknown, readSample: (value: unknown) => SampleSourceSnapshot): ScheduledSound {
   const plan = object(value, '声音执行计划');
   if (plan.kind === 'sample' && plan.version === 1) {
-    fields(plan, ['kind', 'version', 'source', 'startSeconds', 'endSeconds', 'playbackRate', 'envelope', 'note', 'level', 'loop'], '采样声音执行计划');
+    fields(plan, ['kind', 'version', 'source', 'startSeconds', 'endSeconds', 'playbackRate', 'envelope', 'note', 'level', 'loop', 'envelopeBaked'], '采样声音执行计划');
+    if (plan.envelopeBaked !== undefined && plan.envelopeBaked !== true) throw new Error('生成音色的包络标记无效。');
     const source = readSample(plan.source); const duration = source.audio.channels[0]!.length / source.audio.sampleRate;
     const startSeconds = number(plan.startSeconds, '采样开始位置', 0, duration);
     const endSeconds = number(plan.endSeconds, '采样结束位置', 0, duration);
@@ -63,7 +66,8 @@ function readPlan(value: unknown, readSample: (value: unknown) => SampleSourceSn
     }
     const common = readControls(plan);
     return { kind: 'sample', version: 1, source, startSeconds, endSeconds,
-      playbackRate: number(plan.playbackRate, '采样播放倍率', 1 / 256, 256), ...common, ...(loop ? { loop } : {}) };
+      playbackRate: number(plan.playbackRate, '采样播放倍率', 1 / 256, 256), ...common, ...(loop ? { loop } : {}),
+      ...(plan.envelopeBaked ? { envelopeBaked: true as const } : {}) };
   }
   if (plan.kind !== 'basic-synth' || plan.version !== 1) {
     throw new Error('当前声音运行仅支持第 1 版基础合成计划。');
@@ -106,7 +110,7 @@ function readControls(plan: Record<string, unknown>): Pick<SoundPlan, 'envelope'
   fields(envelope, ['attackSeconds', 'releaseSeconds', 'decaySeconds', 'sustain'], '音量变化');
   fields(note, ['frequencyHz', 'holdSeconds', 'velocity'], '试听音符');
   const attackSeconds = number(envelope.attackSeconds, '起音时间（秒）', 0, 10);
-  const releaseSeconds = number(envelope.releaseSeconds, '收音时间（秒）', 0, 10);
+  const releaseSeconds = number(envelope.releaseSeconds, '收音时间（秒）', 0, plan.kind === 'sample' ? 120 : 10);
   const holdSeconds = number(note.holdSeconds, '持续时间（秒）', 0.0001, 120);
   return {
     envelope: { attackSeconds, releaseSeconds,
@@ -143,13 +147,13 @@ function sourceReader(previous?: ScheduledPreview): { read(value: unknown): Samp
       const reusable = previousSources.get(identity);
       if (reusable && samePcm(audio, reusable.audio)) snapshot = { audio: reusable.audio, bytes: shape.bytes, peak: reusable.peak, hash: reusable.hash };
       else {
-        if (totalBytes + shape.bytes > MAX_PLAN_PCM_BYTES) throw new Error('这段乐曲的独立采样合计超出当前 128 MiB 执行范围，请减少同时载入的素材。');
+        if (totalBytes + shape.bytes > MAX_PLAN_PCM_BYTES) throw new Error('这段乐曲的独立采样合计超出当前 512 MiB 执行范围，请减少同时载入的素材。');
         snapshot = readPcmSnapshot(audio);
       }
       snapshots.set(audio, snapshot);
     }
     if (!counted.has(snapshot.audio)) {
-      if (totalBytes + snapshot.bytes > MAX_PLAN_PCM_BYTES) throw new Error('这段乐曲的独立采样合计超出当前 128 MiB 执行范围，请减少同时载入的素材。');
+      if (totalBytes + snapshot.bytes > MAX_PLAN_PCM_BYTES) throw new Error('这段乐曲的独立采样合计超出当前 512 MiB 执行范围，请减少同时载入的素材。');
       counted.add(snapshot.audio); totalBytes += snapshot.bytes;
     }
     const result: SampleSourceSnapshot = { id: source.id, revision: source.revision as number, audio: snapshot.audio, peak: snapshot.peak, hash: snapshot.hash,
@@ -204,14 +208,14 @@ export function readPreview(value: unknown, options: { allowEmptySequence?: bool
     output = { level: number(settings.level, '总输出音量', 0, 1), fadeInSeconds: number(settings.fadeInSeconds, '淡入秒数', 0, 30),
       fadeOutSeconds: number(settings.fadeOutSeconds, '淡出秒数', 0, 30) };
   }
-  const duration = number(input.durationSeconds, '乐句时长（秒）', 0.0001, 600);
+  const duration = number(input.durationSeconds, '乐句时长（秒）', 0.0001, MAX_SEQUENCE_SECONDS);
   let transport: ScheduledPreview['transport'];
   if (input.transport !== undefined) {
     const settings = object(input.transport, '播放头设置'); fields(settings, ['positionSeconds', 'rate'], '播放头设置');
     transport = { positionSeconds: number(settings.positionSeconds, '播放头位置', 0, duration), rate: number(settings.rate, '播放头速度', .25, 4) };
   }
-  if (!Array.isArray(input.events) || (input.events.length < 1 && !options.allowEmptySequence) || input.events.length > MAX_EVENTS) {
-    throw new Error(`乐句试听需要 1 至 ${MAX_EVENTS} 个音符，空乐句暂时无法试听。`);
+  if (!Array.isArray(input.events) || (input.events.length < 1 && !options.allowEmptySequence) || input.events.length > MAX_SEQUENCE_EVENTS) {
+    throw new Error(`乐句试听需要 1 至 ${MAX_SEQUENCE_EVENTS} 个音符，空乐句暂时无法试听。`);
   }
   const elapsed = options.transportElapsed ?? 0;
   let durationSeconds = transport ? elapsed + (duration - transport.positionSeconds) / transport.rate : duration;
@@ -261,6 +265,15 @@ export function readPreview(value: unknown, options: { allowEmptySequence?: bool
     if (sources > MAX_SIMULTANEOUS_SOURCES) {
       throw new Error(`当前试听最多同时运行 ${MAX_SIMULTANEOUS_SOURCES} 个波形声源，请减少同时发声的音符。`);
     }
+  }
+  // The total song budget is independent of an extreme burst. Bound upcoming
+  // allocations too, even when ultra-short, non-overlapping notes evade polyphony.
+  const onsets = scheduled.map(event => ({ time: event.atSeconds, sources: event.sound.kind === 'sample' ? 1 : event.sound.sources.length })).sort((a, b) => a.time - b.time);
+  let begin = 0; let upcomingSources = 0;
+  for (let index = 0; index < onsets.length; index++) {
+    upcomingSources += onsets[index]!.sources;
+    while (onsets[index]!.time - onsets[begin]!.time > .35) upcomingSources -= onsets[begin++]!.sources;
+    if (upcomingSources > MAX_LOOKAHEAD_SOURCES) throw new Error('音符过于密集：任意 0.35 秒内最多支持 4096 个波形声源，请减少极短音符。');
   }
   return { events: scheduled, durationSeconds, normalization: 1 / peak, sequence: true, samples: sampleReader.sources, ...(output ? { output } : {}), ...(transport ? { transport, transportClock } : {}) };
 }

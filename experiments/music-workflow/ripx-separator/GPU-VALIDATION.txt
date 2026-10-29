@@ -1,0 +1,63 @@
+Intel GPU 接入与实际验证 — 2026-10-29
+
+结论
+应用默认使用本机 Intel(R) Arc(TM) Graphics，PyTorch 2.7.1+xpu / Level-Zero。
+Demucs 神经网络实际在 xpu:0 执行，保持 FP32，没有使用半精度、量化或替换模型。
+此版本的 aten::_fft_r2c / aten::_fft_c2r 在CPU执行，因此准确说法是GPU神经网络+CPU FFT。
+界面和project.json明确标记这一点；整个任务不是所有步骤都在GPU。
+显式选择GPU但GPU不可用时直接失败，不会静默切回CPU。可在界面主动选择CPU。
+
+实际硬件/版本
+Intel Arc，128 EU，驱动显示32.0.101.8864；Level-Zero报告1.15.38308。
+PyTorch XPU报告可用共享显存约16810 MB，这不是独立显存容量。
+PyTorch/Torchaudio 2.7.1+xpu与Intel SYCL组件全部位于本工具gpu-packages。
+没有修改系统驱动、全局Python、全局PATH或RootSound共享CPU库。
+runtime.json原配置、app/engine/bootstrap原文件保存于pre-gpu-backup。
+
+性能对照
+同一PyTorch 2.7.1+xpu分别选择CPU/XPU；CPU固定4线程；同一7.8秒立体声
+生成A4及谐波输入；同一模型/归一化/FP32/shifts=0/split=False；输出长度343980。
+测量前Ghidra分析进程已退出。每个设备首轮1次、后续2次，XPU显式同步后计时。
+
+                   CPU后续两轮中位数     XPU后续两轮中位数     比值
+四轨                 4.512 秒               0.720 秒          6.27倍
+六轨                 2.922 秒               0.716 秒          4.08倍
+
+四轨GPU首轮9.242秒，CPU首轮8.248秒。初始化/编译会抵消短任务的加速。
+六轨在同一进程四轨之后运行，其首轮0.931秒不代表全新进程冷启动。
+这些是模型阶段的受控计时，不包括解码、模型加载、文件保存和进程启动。
+不能据此声称整首歌曲完整任务必然提高6倍，或保证任何输入均取得该比例。
+
+数值对照与资源
+四轨CPU/XPU最大绝对差5.48e-6，RMS差1.34e-6；GPU峰值分配594874368字节。
+六轨CPU/XPU最大绝对差2.23e-5，RMS差1.31e-6；GPU峰值分配608602112字节。
+输出尺寸一致且全部有限。这是数值一致性检查，不是对真实音乐听感的验收。
+
+最终应用端到端验证
+实际通过engine.py + runtime.json + gpu_backend.py处理8.2秒生成信号，四轨和
+六轨均明确记录device=xpu。新进程完整任务分别15.37秒、14.68秒，包含启动/加载。
+分轨加残余的最大重建误差分别2.33e-10、1.49e-8，原输入哈希保持不变。
+隐藏创建并载入最终界面：默认GPU，Basic Pitch默认不勾选且明确“非RipX”。
+通过子进程ONEAPI_DEVICE_SELECTOR=level_zero:99隐藏GPU：退出码1，明确报告
+“GPU后端不可用”，没有产生CPU结果。没有修改机器全局设备可见性。
+没有读取用户音乐、播放音频或观察用户屏幕。
+
+证据文件
+gpu-validation.json：CPU/XPU同输入计时、输出差异、设备和GPU峰值分配。
+gpu-benchmark.log：完整计时与两个FFT回退算子的运行记录。
+tests-output/gpu-02ac9909/results.json：最终应用四轨/六轨、隐藏界面、输入保护。
+tests-output/gpu-02ac9909/split-4/project.json与split-6/project.json：实际设备。
+tests-output/gpu-02ac9909/gpu-unavailable.json及.log：GPU不可用时不静默回退。
+gpu-dependencies.json与gpu-downloads/*provenance.json：版本、官方URL、哈希。
+
+功能边界
+此次完成的是已实现Demucs分离阶段的GPU接入，不是完成RipX原生音符核心复刻。
+Basic Pitch保留为明确可选的实验功能，默认关闭，其MIDI转录仍使用CPU。
+RipX原生音符检测、跟踪、音频重建的解析和复刻由独立工作继续。
+
+官方来源
+https://raw.githubusercontent.com/pytorch/pytorch/v2.7.1/docs/source/notes/get_start_xpu.rst
+该版本文档列出Windows10/11与Meteor Lake Intel Arc支持。
+官方包索引：https://download.pytorch.org/whl/xpu
+
+桌面启动修正：旧测试未覆盖干净PATH启动；该缺口已复现并修复，详见GPU-LAUNCH-FIX.txt及last-clean-launch-test.txt。

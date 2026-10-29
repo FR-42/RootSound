@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RestoreIgnoreFailedSources>true</RestoreIgnoreFailedSources>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../../../../../desktop/RootSound.Desktop/ProjectDirectoryManager.cs" Link="ProjectDirectoryManager.cs" />
+    <Compile Include="../../../../../desktop/RootSound.Desktop/AtomicTextStore.cs" Link="AtomicTextStore.cs" />
+  </ItemGroup>
+</Project>

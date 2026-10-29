@@ -1,0 +1,32 @@
+{
+  "release": "20261028-055644-757-e7928b",
+  "coldPatchRoundtrip": true,
+  "pcm24Stereo48k": true,
+  "referenceUnchanged": true,
+  "sourceHash": "fd358c65504e24fb95173f825ffe50ad5b4f5458ae3067513a8e1a72f3729926",
+  "sourceAudioIncluded": false,
+  "realAudioDeviceOpened": false,
+  "listeningAccepted": false,
+  "files": [
+    {
+      "name": "Vulcanus-铺底-C4.wav",
+      "bytes": 2183528,
+      "sha256": "7f3c80a3793031184cf9dafba07d3aa2b81f77a5be1ea83395d2e64040a16c55"
+    },
+    {
+      "name": "Vulcanus-铺底-和弦试听.wav",
+      "bytes": 2097128,
+      "sha256": "4ecd293c5ff03c98d1e1dd117b57a3da5f1fd2b1a43a2459c40c999c895d651f"
+    },
+    {
+      "name": "Vulcanus-铺底音色-说明.txt",
+      "bytes": 679,
+      "sha256": "c70adb444962ca7791b3e2bd073be70093d64ccafdac05141265b607fdcf9794"
+    },
+    {
+      "name": "Vulcanus-铺底音色.rssynth",
+      "bytes": 3700,
+      "sha256": "23f39bc04d9418b8ee958e716357a560a534c2e33d5d979f706784e802abacb2"
+    }
+  ]
+}

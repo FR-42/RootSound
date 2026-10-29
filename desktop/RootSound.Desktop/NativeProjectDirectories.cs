@@ -43,10 +43,21 @@ public sealed class NativeProjectDirectories
     public string Create(string name, string parentPath, string libraryText) => Run(() =>
         JsonSerializer.Serialize(new { status = "created", project = manager.Create(name, parentPath, libraryText) }));
 
+    public string CreateCopy(string name, string parentPath, string libraryText) => Run(() =>
+        JsonSerializer.Serialize(new { status = "created", project = manager.CreateCopy(name, parentPath, libraryText) }));
+
     public string Open() => Run(() =>
     {
         string? path = chooseProject();
-        return path is null ? Cancelled() : JsonSerializer.Serialize(new { status = "opened", project = manager.Open(path) });
+        if (path is null) return Cancelled();
+        if (NativeMidiFiles.IsMidiPath(path))
+        {
+            byte[] bytes = NativeMidiFiles.ReadBytes(path);
+            // Selection is only a read: the application validates and converts
+            // the complete MIDI before it creates or activates a new project.
+            return JsonSerializer.Serialize(new { status = "midi", name = Path.GetFileName(path), base64 = Convert.ToBase64String(bytes) });
+        }
+        return JsonSerializer.Serialize(new { status = "opened", project = manager.Open(path) });
     });
 
     public string List() => Run(() =>
@@ -58,13 +69,13 @@ public sealed class NativeProjectDirectories
     public string Delete(string path, string expectedId) => Run(() =>
     {
         manager.Delete(path, expectedId);
-        return "{\"status\":\"deleted\"}";
+        return JsonSerializer.Serialize(new { status = "deleted", warning = manager.LastTimbreCleanupWarning });
     });
 
     public string Inspect(string path, string expectedId) => Run(() =>
     {
         var snapshot = manager.Inspect(path, expectedId);
-        return JsonSerializer.Serialize(new { status = "snapshot", project = snapshot.Project, libraryText = snapshot.LibraryText, token = snapshot.Token });
+        return LargeJsonText.Serialize(new { status = "snapshot", project = snapshot.Project, token = snapshot.Token }, "libraryText", snapshot.LibraryText);
     });
 
     public string Rename(string path, string expectedId, string name, string libraryText, string token) => Run(() =>
@@ -100,8 +111,8 @@ public sealed class NativeProjectDirectories
     {
         using var dialog = new OpenFileDialog
         {
-            Title = "打开 RootSound 歌曲项目",
-            Filter = "RootSound 歌曲项目 (*.rootsound)|*.rootsound|旧版项目说明 (project.json)|project.json",
+            Title = "打开歌曲项目或 MIDI",
+            Filter = "歌曲项目或 MIDI (*.rootsound;*.mid;*.midi)|*.rootsound;*.mid;*.midi|RootSound 歌曲项目 (*.rootsound)|*.rootsound|MIDI 文件 (*.mid;*.midi)|*.mid;*.midi|旧版项目说明 (project.json)|project.json",
             InitialDirectory = Directory.Exists(manager.DefaultLocation) ? manager.DefaultLocation : Path.GetDirectoryName(manager.DefaultLocation),
             CheckFileExists = true, Multiselect = false,
         };

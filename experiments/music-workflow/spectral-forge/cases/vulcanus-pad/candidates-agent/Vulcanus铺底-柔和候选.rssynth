@@ -1,0 +1,223 @@
+{
+  "format": "RootSoundSpectralPatch",
+  "version": 1,
+  "name": "Vulcanus铺底-柔和候选",
+  "master": {
+    "level": 0.94,
+    "glideSeconds": 0.045,
+    "polyphony": 6,
+    "velocitySensitivity": 0.25
+  },
+  "oscillators": [
+    {
+      "id": "osc-1",
+      "enabled": true,
+      "waveform": "saw",
+      "level": 0.85,
+      "pan": -0.12,
+      "semitones": 0,
+      "cents": -2.7,
+      "phase": 0,
+      "pulseWidth": 0.5,
+      "unison": 3,
+      "detuneCents": 6,
+      "spread": 0.82,
+      "fmRatio": 1,
+      "fmAmount": 0
+    },
+    {
+      "id": "osc-2",
+      "enabled": true,
+      "waveform": "pulse",
+      "level": 0.38,
+      "pan": 0.16,
+      "semitones": 0,
+      "cents": 3.4,
+      "phase": 0.29,
+      "pulseWidth": 0.47,
+      "unison": 3,
+      "detuneCents": 4.2,
+      "spread": 0.9,
+      "fmRatio": 1,
+      "fmAmount": 0
+    },
+    {
+      "id": "osc-3",
+      "enabled": true,
+      "waveform": "triangle",
+      "level": 0.12,
+      "pan": 0.03,
+      "semitones": 12,
+      "cents": -0.8,
+      "phase": 0.13,
+      "pulseWidth": 0.5,
+      "unison": 1,
+      "detuneCents": 0,
+      "spread": 0,
+      "fmRatio": 1,
+      "fmAmount": 0
+    },
+    {
+      "id": "osc-4",
+      "enabled": true,
+      "waveform": "noise",
+      "level": 0.006,
+      "pan": -0.04,
+      "semitones": 0,
+      "cents": 0,
+      "phase": 0,
+      "pulseWidth": 0.5,
+      "unison": 1,
+      "detuneCents": 0,
+      "spread": 0,
+      "fmRatio": 1,
+      "fmAmount": 0
+    }
+  ],
+  "spectrum": {
+    "mix": 1,
+    "points": [
+      {
+        "x": 20,
+        "y": -72,
+        "curve": 0
+      },
+      {
+        "x": 70,
+        "y": -38,
+        "curve": 0
+      },
+      {
+        "x": 150,
+        "y": -12,
+        "curve": 0
+      },
+      {
+        "x": 330,
+        "y": 0,
+        "curve": 0
+      },
+      {
+        "x": 800,
+        "y": -1,
+        "curve": 0
+      },
+      {
+        "x": 1450,
+        "y": -5,
+        "curve": 0
+      },
+      {
+        "x": 2500,
+        "y": -11,
+        "curve": 0
+      },
+      {
+        "x": 4200,
+        "y": -22,
+        "curve": 0
+      },
+      {
+        "x": 8000,
+        "y": -42,
+        "curve": 0
+      },
+      {
+        "x": 20000,
+        "y": -72,
+        "curve": 0
+      }
+    ]
+  },
+  "amplitude": {
+    "points": [
+      {
+        "x": 0,
+        "y": 0,
+        "curve": -0.1
+      },
+      {
+        "x": 0.03,
+        "y": 0.008,
+        "curve": -0.1
+      },
+      {
+        "x": 0.12,
+        "y": 0.14,
+        "curve": -0.2
+      },
+      {
+        "x": 0.36,
+        "y": 0.74,
+        "curve": -0.12
+      },
+      {
+        "x": 0.72,
+        "y": 1,
+        "curve": 0.12
+      },
+      {
+        "x": 1.1,
+        "y": 0.91,
+        "curve": 0.12
+      },
+      {
+        "x": 1.7,
+        "y": 0.87,
+        "curve": 0.08
+      },
+      {
+        "x": 3.55,
+        "y": 0,
+        "curve": 0
+      }
+    ],
+    "sustainIndex": 6
+  },
+  "pitch": {
+    "points": [
+      {
+        "x": 0,
+        "y": 0,
+        "curve": 0
+      },
+      {
+        "x": 0.4,
+        "y": 0,
+        "curve": 0
+      },
+      {
+        "x": 1.8,
+        "y": 0,
+        "curve": 0
+      }
+    ],
+    "sustainIndex": 1
+  },
+  "lfos": [
+    {
+      "enabled": true,
+      "waveform": "sine",
+      "rateHz": 0.16,
+      "depth": 0.018,
+      "target": "pitch"
+    },
+    {
+      "enabled": true,
+      "waveform": "sine",
+      "rateHz": 0.11,
+      "depth": 0.1,
+      "target": "pan"
+    }
+  ],
+  "effects": {
+    "drive": 0,
+    "delaySeconds": 0.212,
+    "delayFeedback": 0.34,
+    "delayMix": 0.11,
+    "chorusMix": 0.3,
+    "chorusRateHz": 0.29,
+    "chorusDepthMs": 6.5
+  },
+  "seed": 837219
+}

@@ -4,6 +4,7 @@ import type {
 } from '../../contracts/content.ts';
 import { createProjectScopePolicy, validateProjectScopes, type ProjectPolicy, type ProjectScopes } from './project-scope.ts';
 import { countUsagePositions } from './usage-positions.ts';
+import { copyJson, sameJson } from './json-value.ts';
 
 type HistoryStep = DraftSnapshot & { transactionId?: string };
 type HistoryEntry = { draftId: string; past: HistoryStep[]; future: HistoryStep[] };
@@ -30,7 +31,7 @@ const MAX_HISTORY = 64;
 function snapshot(draft: Pick<Draft, 'name' | 'dependencies' | 'body'>): DraftSnapshot {
   return clone({ name: draft.name, dependencies: draft.dependencies, body: draft.body });
 }
-function same(a: unknown, b: unknown): boolean { return JSON.stringify(a) === JSON.stringify(b); }
+const same = sameJson;
 function historyFor(state: State, draftId: string): HistoryEntry | undefined {
   return state.editHistory?.entries.find(entry => entry.draftId === draftId);
 }
@@ -65,7 +66,7 @@ function forgetDeletedIdentities(state: State, ids: Set<string>): void {
 }
 
 function fail(message: string): never { throw new Error(`素材库：${message}`); }
-function clone<T>(value: T): T { return JSON.parse(JSON.stringify(value)) as T; }
+const clone = copyJson;
 function isObject(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
@@ -92,6 +93,7 @@ function validateFields(value: unknown): asserts value is NewContent & { depende
   if (new Set(value.dependencies).size !== value.dependencies.length) fail('依赖不能重复。');
   if (!validJson(value.body)) fail('内容必须是完整、有限且无循环的 JSON 数据。');
   if (value.editingContext !== undefined && !validJson(value.editingContext)) fail('编辑上下文必须是有效 JSON。');
+  if (value.projectRootId !== undefined && (typeof value.projectRootId !== 'string' || !value.projectRootId.trim())) fail('编辑稿的歌曲归属标识无效。');
 }
 function validateDependencies(contents: ContentRecord[], candidate: ContentRecord): void {
   const records = new Map(contents.map(record => [record.id, record]));
@@ -110,7 +112,7 @@ function validateDependencies(contents: ContentRecord[], candidate: ContentRecor
   }
   visit(candidate.id);
 }
-function restore(raw: string): State {
+function restore(raw: string, projectRootKind = 'rootsound.song'): State {
   let value: unknown;
   try { value = JSON.parse(raw); } catch { return fail('已保存的数据损坏，未清空或覆盖原数据。'); }
   if (!isObject(value) || value.format !== 'RootSoundMaterialLibrary' || value.version !== 1
@@ -126,10 +128,15 @@ function restore(raw: string): State {
   const state = value as unknown as State;
   validateProjectScopes(value.projectScopes);
   for (const record of state.contents) {
+    if (Object.hasOwn(record, 'projectRootId')) fail('编辑稿归属不能写入已保存素材。');
     if (!Number.isSafeInteger(record.revision) || record.revision < 1) fail('已保存修订无效。');
     validateDependencies(state.contents, record);
   }
   for (const draft of state.drafts) {
+    if (draft.projectRootId !== undefined) {
+      const root = state.drafts.find(item => item.id === draft.projectRootId);
+      if (!root || root.id === draft.id || root.kind !== projectRootKind || draft.kind === projectRootKind) fail('编辑稿缺少有效的所属歌曲。');
+    }
     if (draft.sourceId === undefined && draft.baseRevision === undefined) continue;
     const source = state.contents.find(record => record.id === draft.sourceId);
     if (!source || !Number.isSafeInteger(draft.baseRevision) || Number(draft.baseRevision) < 1
@@ -240,7 +247,8 @@ export function createMaterialLibrary(storage?: MaterialStorage, options?: { pro
   try { raw = storage?.read() ?? null; } catch (error) { fail(`读取失败：${String(error)}`); }
   let state: State = raw === null
     ? { format: 'RootSoundMaterialLibrary', version: 1, contents: [], drafts: [] }
-    : restore(raw);
+    : restore(raw, options?.project?.rootKind);
+  projectPolicy?.validateDraftOwnership(state);
   let token = crypto.randomUUID();
   function commit(next: State, permanent = false): void {
     collectJournals(next);
@@ -266,7 +274,7 @@ export function createMaterialLibrary(storage?: MaterialStorage, options?: { pro
         if (!newIds.has(dependency) && (oldIds.has(dependency) || changedDrafts.has(draft.id))) fail('仍有编辑稿引用将被移除或不存在的素材。');
       }
     }
-    restore(JSON.stringify(next));
+    restore(JSON.stringify(next), options?.project?.rootKind);
   }
   function commitTransaction(transaction: MaterialTransaction): MaterialTransactionResult {
     if (transaction.expectedToken !== token) return { status: 'conflict', reason: '素材或使用位置已变化，请重新查看后再应用。' };
@@ -289,7 +297,7 @@ export function createMaterialLibrary(storage?: MaterialStorage, options?: { pro
           if (typeof record.id !== 'string' || !record.id || seen.has(record.id)) fail('事务包含重复或无效的内容标识。');
           seen.add(record.id);
           if (saved && (!Number.isSafeInteger((record as ContentRecord).revision) || (record as ContentRecord).revision < 1)) fail('事务中的素材修订无效。');
-          if (saved && Object.hasOwn(record, 'editingContext')) fail('编辑上下文不能写入音乐素材。');
+          if (saved && (Object.hasOwn(record, 'editingContext') || Object.hasOwn(record, 'projectRootId'))) fail('编辑上下文或稿件归属不能写入音乐素材。');
         }
         for (const group of [creates, replacements, deletes]) if (group !== undefined && !Array.isArray(group)) fail('事务操作必须为列表。');
         for (const record of creates ?? []) {
@@ -407,13 +415,14 @@ export function createMaterialLibrary(storage?: MaterialStorage, options?: { pro
     try { commit(next, transaction.permanentDelete); } catch (error) { return { status: 'storage-error', message: String(error) }; }
     return { status: 'committed', transactionId };
   }
-  function createDraft(input: NewContent | { sourceId: string }): Draft {
+  function createDraft(input: (NewContent | { sourceId: string }) & { projectRootId?: string }): Draft {
     let draft: Draft;
     if ('sourceId' in input) {
       const source = state.contents.find(record => record.id === input.sourceId);
       if (!source) fail('找不到要编辑的内容。');
       const { revision, id, ...fields } = source;
-      draft = { ...clone(fields), id: crypto.randomUUID(), sourceId: id, baseRevision: revision };
+      draft = { ...clone(fields), id: crypto.randomUUID(), sourceId: id, baseRevision: revision,
+        ...(input.projectRootId === undefined ? {} : { projectRootId: input.projectRootId }) };
     } else {
       const fields = { ...input, dependencies: input.dependencies ?? [] };
       validateFields(fields);
@@ -422,6 +431,7 @@ export function createMaterialLibrary(storage?: MaterialStorage, options?: { pro
     const next = clone(state);
     next.drafts.push(draft);
     projectPolicy?.normalize(state, next);
+    if (draft.projectRootId) checkCandidate(next, new Set([draft.id]));
     commit(next);
     return clone(next.drafts.find(item => item.id === draft.id)!);
   }
@@ -578,7 +588,7 @@ export function createMaterialLibrary(storage?: MaterialStorage, options?: { pro
           confirmation: { expectedRevision: source.revision, impactToken } };
       }
     }
-    const { id: draftId, sourceId: _sourceId, baseRevision: _baseRevision, editingContext: _editingContext, ...fields } = draft;
+    const { id: draftId, sourceId: _sourceId, baseRevision: _baseRevision, editingContext: _editingContext, projectRootId: _projectRootId, ...fields } = draft;
     const content: ContentRecord = { ...clone(fields), id: mode === 'overwrite' && source ? source.id : crypto.randomUUID(),
       revision: mode === 'overwrite' && source ? source.revision + 1 : 1 };
     try { validateDependencies(state.contents, content); }
@@ -587,9 +597,10 @@ export function createMaterialLibrary(storage?: MaterialStorage, options?: { pro
     const index = next.contents.findIndex(item => item.id === content.id);
     if (index < 0) next.contents.push(content); else next.contents[index] = content;
     const savedDraft: Draft = { ...clone(fields), id: draftId, sourceId: content.id, baseRevision: content.revision,
+      ...(draft.projectRootId === undefined ? {} : { projectRootId: draft.projectRootId }),
       ...(draft.editingContext !== undefined ? { editingContext: clone(draft.editingContext) } : {}) };
     next.drafts[next.drafts.findIndex(item => item.id === draftId)] = savedDraft;
-    try { projectPolicy?.normalize(state, next); }
+    try { projectPolicy?.normalize(state, next); checkCandidate(next, new Set([draft.id])); }
     catch (error) { return { status: 'conflict', reason: String(error) }; }
     try { commit(next); } catch (error) { return { status: 'storage-error', message: String(error) }; }
     return { status: 'saved', content: clone(next.contents.find(item => item.id === content.id)!), draft: clone(next.drafts.find(item => item.id === draftId)!) };
@@ -600,6 +611,7 @@ export function createMaterialLibrary(storage?: MaterialStorage, options?: { pro
     if (root) return root.scopeId;
     if (reference.type === 'content') return state.projectScopes?.contents.find(item => item.id === reference.id)?.scopeId;
     const draft = state.drafts.find(item => item.id === reference.id); if (!draft) return undefined;
+    if (draft.projectRootId) return projectScopeOf({ type: 'draft', id: draft.projectRootId }, visited);
     const context = draft.editingContext;
     if (isObject(context) && context.format === 'RootSoundReferenceEdit' && isObject(context.context) && isObject(context.context.root)) {
       const parent = context.context.root;
@@ -626,8 +638,10 @@ export function createMaterialLibrary(storage?: MaterialStorage, options?: { pro
       if (!draft.sourceId || draft.kind === rootKind) continue;
       const candidates = work.get(draft.sourceId) ?? []; candidates.push(draft); work.set(draft.sourceId, candidates);
     }
-    const contents: CurrentProjectView['contents'] = []; const drafts: Draft[] = 'revision' in project ? [] : [project];
-    const reached = new Set<string>(); const pending = [...project.dependencies, ...memberIds];
+    const unpublished = state.drafts.filter(draft => !draft.sourceId && !!draft.projectRootId
+      && projectScopeOf({ type: 'draft', id: draft.id }) === scopeId);
+    const contents: CurrentProjectView['contents'] = []; const drafts: Draft[] = [...('revision' in project ? [] : [project]), ...unpublished];
+    const reached = new Set<string>(); const pending = [...project.dependencies, ...memberIds, ...unpublished.flatMap(draft => draft.dependencies)];
     if ('revision' in project) { const { body: _body, ...info } = project; contents.push(info); }
     while (pending.length) {
       const id = pending.pop()!; if (reached.has(id) || id === project.id || 'sourceId' in project && id === project.sourceId) continue;

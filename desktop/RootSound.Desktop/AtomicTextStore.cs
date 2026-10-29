@@ -6,7 +6,7 @@ namespace RootSound.Desktop;
 /// <summary>Owns one local text library; musical content is interpreted by the workstation.</summary>
 public sealed class AtomicTextStore : IDisposable
 {
-    public const int MaximumBytes = 128 * 1024 * 1024;
+    public const int MaximumBytes = 512 * 1024 * 1024;
     private static readonly UTF8Encoding Utf8 = new(false, true);
     private readonly object gate = new();
     private readonly string directory;
@@ -46,7 +46,7 @@ public sealed class AtomicTextStore : IDisposable
         }
         try
         {
-            observedHash = Fingerprint(ReadBytes());
+            observedHash = ReadFingerprint();
         }
         catch
         {
@@ -89,8 +89,7 @@ public sealed class AtomicTextStore : IDisposable
         lock (gate)
         {
             ThrowIfDisposed();
-            RequireUnchanged();
-            if (ReadBytes() is null) throw new IOException("当前项目资料已被移走，本次没有重建它。");
+            if (RequireUnchanged() is null) throw new IOException("当前项目资料已被移走，本次没有重建它。");
         }
     }
 
@@ -158,6 +157,21 @@ public sealed class AtomicTextStore : IDisposable
         }
     }
 
+    // Conflict checks need the complete hash, not another full-size byte array.
+    // FileShare.Read prevents a writer from changing bytes during this read.
+    private byte[]? ReadFingerprint()
+    {
+        FileStream stream;
+        try { stream = new FileStream(FilePath, FileMode.Open, FileAccess.Read, FileShare.Read); }
+        catch (FileNotFoundException) { return null; }
+        using (stream)
+        {
+            if (stream.Length > MaximumBytes)
+                throw new InvalidDataException($"声音库超过当前 {MaximumBytes / (1024 * 1024)} MiB 的文件大小上限，原文件已保留。");
+            return SHA256.HashData(stream);
+        }
+    }
+
     private static string Decode(byte[] bytes)
     {
         // Accept a UTF-8 BOM from an external text editor without inserting it into JSON.
@@ -171,12 +185,13 @@ public sealed class AtomicTextStore : IDisposable
 
     private static byte[]? Fingerprint(byte[]? bytes) => bytes is null ? null : SHA256.HashData(bytes);
 
-    private void RequireUnchanged()
+    private byte[]? RequireUnchanged()
     {
-        byte[]? actual = Fingerprint(ReadBytes());
+        byte[]? actual = ReadFingerprint();
         if ((actual is null) != (observedHash is null)
             || (actual is not null && observedHash is not null && !actual.AsSpan().SequenceEqual(observedHash)))
             throw new IOException("声音库已被其他程序修改或移走。为保护这些更改，本次没有覆盖保存；请重新打开声音库后再编辑。");
+        return actual;
     }
 
     private void ThrowIfDisposed() => ObjectDisposedException.ThrowIf(disposed, this);

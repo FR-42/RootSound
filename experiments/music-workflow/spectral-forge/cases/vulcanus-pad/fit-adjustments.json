@@ -1,0 +1,447 @@
+{
+  "spectrumPoints": [
+    {
+      "x": 20,
+      "y": -66.0,
+      "curve": 0
+    },
+    {
+      "x": 90,
+      "y": -35.0,
+      "curve": 0
+    },
+    {
+      "x": 160,
+      "y": -10.0,
+      "curve": 0
+    },
+    {
+      "x": 300,
+      "y": -4.89,
+      "curve": 0
+    },
+    {
+      "x": 650,
+      "y": 0.196,
+      "curve": 0
+    },
+    {
+      "x": 1400,
+      "y": 1.166,
+      "curve": 0
+    },
+    {
+      "x": 3000,
+      "y": 0.0,
+      "curve": 0
+    },
+    {
+      "x": 6000,
+      "y": -5.0,
+      "curve": 0
+    },
+    {
+      "x": 12000,
+      "y": -15.0,
+      "curve": 0
+    },
+    {
+      "x": 20000,
+      "y": -35.0,
+      "curve": 0
+    }
+  ],
+  "adjustments": {
+    "chorusMix": 0.36,
+    "masterLevel": 0.94
+  },
+  "method": "Bounded broad SIDE-mixture profile correction; two stationary test chord voicings, 610ms median. Not isolated-timbre matching.",
+  "relativeProfileRmsDbBefore": 4.449615894420503,
+  "predictedRelativeProfileRmsDbAfter": 2.8199069731652036,
+  "rows": [
+    {
+      "hz": 80.0,
+      "referenceSideMixtureDb": -39.641,
+      "syntheticDb": -133.49252368251365,
+      "correctionDb": 0.0
+    },
+    {
+      "hz": 87.019,
+      "referenceSideMixtureDb": -39.891,
+      "syntheticDb": -131.95685345621445,
+      "correctionDb": 0.0
+    },
+    {
+      "hz": 94.654,
+      "referenceSideMixtureDb": -40.795,
+      "syntheticDb": -129.14314411151048,
+      "correctionDb": 0.0
+    },
+    {
+      "hz": 102.959,
+      "referenceSideMixtureDb": -48.707,
+      "syntheticDb": -127.18310947320359,
+      "correctionDb": 0.0
+    },
+    {
+      "hz": 111.992,
+      "referenceSideMixtureDb": -49.136,
+      "syntheticDb": -122.5424135990657,
+      "correctionDb": 0.0
+    },
+    {
+      "hz": 121.818,
+      "referenceSideMixtureDb": -49.196,
+      "syntheticDb": -117.28435123515533,
+      "correctionDb": 0.0
+    },
+    {
+      "hz": 132.506,
+      "referenceSideMixtureDb": -49.44,
+      "syntheticDb": -108.80121164537928,
+      "correctionDb": 0.0
+    },
+    {
+      "hz": 144.132,
+      "referenceSideMixtureDb": -49.634,
+      "syntheticDb": -95.0838924639435,
+      "correctionDb": 0.0
+    },
+    {
+      "hz": 156.778,
+      "referenceSideMixtureDb": -47.669,
+      "syntheticDb": -58.062384378086676,
+      "correctionDb": 0.0
+    },
+    {
+      "hz": 170.533,
+      "referenceSideMixtureDb": -46.661,
+      "syntheticDb": -57.5779684719328,
+      "correctionDb": -0.49595563128887704
+    },
+    {
+      "hz": 185.495,
+      "referenceSideMixtureDb": -47.196,
+      "syntheticDb": -54.04200376981734,
+      "correctionDb": -1.150169661482023
+    },
+    {
+      "hz": 201.77,
+      "referenceSideMixtureDb": -51.578,
+      "syntheticDb": -54.25513159327557,
+      "correctionDb": -1.8043946305971381
+    },
+    {
+      "hz": 219.473,
+      "referenceSideMixtureDb": -51.764,
+      "syntheticDb": -52.52261002299801,
+      "correctionDb": -2.4586217464961457
+    },
+    {
+      "hz": 238.729,
+      "referenceSideMixtureDb": -47.981,
+      "syntheticDb": -52.40450291699764,
+      "correctionDb": -3.1128412075626413
+    },
+    {
+      "hz": 259.675,
+      "referenceSideMixtureDb": -48.28,
+      "syntheticDb": -52.461089022568366,
+      "correctionDb": -3.7670764794258433
+    },
+    {
+      "hz": 282.458,
+      "referenceSideMixtureDb": -47.598,
+      "syntheticDb": -48.289582008772925,
+      "correctionDb": -4.421289861851969
+    },
+    {
+      "hz": 307.241,
+      "referenceSideMixtureDb": -48.2,
+      "syntheticDb": -48.91017466392568,
+      "correctionDb": -4.763962366961992
+    },
+    {
+      "hz": 334.197,
+      "referenceSideMixtureDb": -43.992,
+      "syntheticDb": -47.82453110326487,
+      "correctionDb": -4.319537028222953
+    },
+    {
+      "hz": 363.519,
+      "referenceSideMixtureDb": -44.028,
+      "syntheticDb": -50.15062504715342,
+      "correctionDb": -3.875097198063182
+    },
+    {
+      "hz": 395.413,
+      "referenceSideMixtureDb": -45.995,
+      "syntheticDb": -52.14447301260793,
+      "correctionDb": -3.430666365797034
+    },
+    {
+      "hz": 430.106,
+      "referenceSideMixtureDb": -41.778,
+      "syntheticDb": -51.95208192715392,
+      "correctionDb": -2.9862266630278658
+    },
+    {
+      "hz": 467.843,
+      "referenceSideMixtureDb": -42.432,
+      "syntheticDb": -54.54314295186794,
+      "correctionDb": -2.5417860197548845
+    },
+    {
+      "hz": 508.89,
+      "referenceSideMixtureDb": -42.469,
+      "syntheticDb": -55.36989929580397,
+      "correctionDb": -2.097355765937268
+    },
+    {
+      "hz": 553.539,
+      "referenceSideMixtureDb": -45.133,
+      "syntheticDb": -54.26922325134072,
+      "correctionDb": -1.6529190988913767
+    },
+    {
+      "hz": 602.106,
+      "referenceSideMixtureDb": -45.674,
+      "syntheticDb": -55.66895581051081,
+      "correctionDb": -1.2084772953378673
+    },
+    {
+      "hz": 654.933,
+      "referenceSideMixtureDb": -43.96,
+      "syntheticDb": -54.217829133987266,
+      "correctionDb": -0.7845875040412619
+    },
+    {
+      "hz": 712.396,
+      "referenceSideMixtureDb": -45.777,
+      "syntheticDb": -57.90877548575767,
+      "correctionDb": -0.56865026070586
+    },
+    {
+      "hz": 774.9,
+      "referenceSideMixtureDb": -45.254,
+      "syntheticDb": -55.69122690642756,
+      "correctionDb": -0.352715441324309
+    },
+    {
+      "hz": 842.888,
+      "referenceSideMixtureDb": -46.631,
+      "syntheticDb": -56.680121885945695,
+      "correctionDb": -0.13678049516867585
+    },
+    {
+      "hz": 916.842,
+      "referenceSideMixtureDb": -47.617,
+      "syntheticDb": -57.53213419074065,
+      "correctionDb": 0.07915692749252268
+    },
+    {
+      "hz": 997.283,
+      "referenceSideMixtureDb": -47.397,
+      "syntheticDb": -60.63852300437419,
+      "correctionDb": 0.2950901360051541
+    },
+    {
+      "hz": 1084.783,
+      "referenceSideMixtureDb": -47.681,
+      "syntheticDb": -61.7575281676292,
+      "correctionDb": 0.5110265281417916
+    },
+    {
+      "hz": 1179.96,
+      "referenceSideMixtureDb": -47.063,
+      "syntheticDb": -61.211999387871415,
+      "correctionDb": 0.726962683737647
+    },
+    {
+      "hz": 1283.487,
+      "referenceSideMixtureDb": -46.38,
+      "syntheticDb": -60.963502866266445,
+      "correctionDb": 0.9428975055117039
+    },
+    {
+      "hz": 1396.097,
+      "referenceSideMixtureDb": -47.921,
+      "syntheticDb": -62.82056359305821,
+      "correctionDb": 1.1588319172892545
+    },
+    {
+      "hz": 1518.588,
+      "referenceSideMixtureDb": -48.909,
+      "syntheticDb": -63.189524577871694,
+      "correctionDb": 1.2549750795433474
+    },
+    {
+      "hz": 1651.826,
+      "referenceSideMixtureDb": -51.134,
+      "syntheticDb": -64.48578286571178,
+      "correctionDb": 1.3470050450417437
+    },
+    {
+      "hz": 1796.754,
+      "referenceSideMixtureDb": -51.559,
+      "syntheticDb": -65.37688660395104,
+      "correctionDb": 1.439034982095797
+    },
+    {
+      "hz": 1954.397,
+      "referenceSideMixtureDb": -50.837,
+      "syntheticDb": -65.5726908034569,
+      "correctionDb": 1.531064526766683
+    },
+    {
+      "hz": 2125.872,
+      "referenceSideMixtureDb": -52.158,
+      "syntheticDb": -67.40205151554157,
+      "correctionDb": 1.6230944684745183
+    },
+    {
+      "hz": 2312.392,
+      "referenceSideMixtureDb": -51.674,
+      "syntheticDb": -66.62577140310675,
+      "correctionDb": 1.7151244652050432
+    },
+    {
+      "hz": 2515.276,
+      "referenceSideMixtureDb": -52.492,
+      "syntheticDb": -68.56842711547115,
+      "correctionDb": 1.8071540647145927
+    },
+    {
+      "hz": 2735.962,
+      "referenceSideMixtureDb": -53.401,
+      "syntheticDb": -69.33501824232168,
+      "correctionDb": 1.8991842324038424
+    },
+    {
+      "hz": 2976.009,
+      "referenceSideMixtureDb": -54.254,
+      "syntheticDb": -70.77910538534631,
+      "correctionDb": 1.9912138077457973
+    },
+    {
+      "hz": 3237.118,
+      "referenceSideMixtureDb": -55.659,
+      "syntheticDb": -71.69162501943987,
+      "correctionDb": 2.0
+    },
+    {
+      "hz": 3521.136,
+      "referenceSideMixtureDb": -56.909,
+      "syntheticDb": -73.17994430490502,
+      "correctionDb": 2.0
+    },
+    {
+      "hz": 3830.074,
+      "referenceSideMixtureDb": -58.239,
+      "syntheticDb": -74.45104755599515,
+      "correctionDb": 2.0
+    },
+    {
+      "hz": 4166.117,
+      "referenceSideMixtureDb": -59.852,
+      "syntheticDb": -75.68037184647596,
+      "correctionDb": 2.0
+    },
+    {
+      "hz": 4531.643,
+      "referenceSideMixtureDb": -60.915,
+      "syntheticDb": -76.80604774730276,
+      "correctionDb": 2.0
+    },
+    {
+      "hz": 4929.24,
+      "referenceSideMixtureDb": -62.401,
+      "syntheticDb": -78.54742109793438,
+      "correctionDb": 2.0
+    },
+    {
+      "hz": 5361.722,
+      "referenceSideMixtureDb": -62.986,
+      "syntheticDb": -79.78614296814192,
+      "correctionDb": 2.0
+    },
+    {
+      "hz": 5832.148,
+      "referenceSideMixtureDb": -63.51,
+      "syntheticDb": -81.1295110655696,
+      "correctionDb": 2.0
+    },
+    {
+      "hz": 6343.849,
+      "referenceSideMixtureDb": -64.445,
+      "syntheticDb": -82.99392072851893,
+      "correctionDb": 2.0
+    },
+    {
+      "hz": 6900.445,
+      "referenceSideMixtureDb": -65.096,
+      "syntheticDb": -84.56638128177681,
+      "correctionDb": 2.0
+    },
+    {
+      "hz": 7505.876,
+      "referenceSideMixtureDb": -66.152,
+      "syntheticDb": -86.92960519723675,
+      "correctionDb": 2.0
+    },
+    {
+      "hz": 8164.427,
+      "referenceSideMixtureDb": -67.126,
+      "syntheticDb": -88.686839691026,
+      "correctionDb": 2.0
+    },
+    {
+      "hz": 8880.757,
+      "referenceSideMixtureDb": -68.394,
+      "syntheticDb": -90.79349466082866,
+      "correctionDb": 2.0
+    },
+    {
+      "hz": 9659.936,
+      "referenceSideMixtureDb": -69.532,
+      "syntheticDb": -92.7123218348926,
+      "correctionDb": 2.0
+    },
+    {
+      "hz": 10507.48,
+      "referenceSideMixtureDb": -70.576,
+      "syntheticDb": -94.73900223662712,
+      "correctionDb": 2.0
+    },
+    {
+      "hz": 11429.384,
+      "referenceSideMixtureDb": -71.494,
+      "syntheticDb": -97.06008487260632,
+      "correctionDb": 2.0
+    },
+    {
+      "hz": 12432.175,
+      "referenceSideMixtureDb": -72.604,
+      "syntheticDb": -99.84969232334015,
+      "correctionDb": 1.8614743714148407
+    },
+    {
+      "hz": 13522.949,
+      "referenceSideMixtureDb": -74.084,
+      "syntheticDb": -103.67648095124554,
+      "correctionDb": 1.5322023297784457
+    },
+    {
+      "hz": 14709.425,
+      "referenceSideMixtureDb": -76.213,
+      "syntheticDb": -108.7049535244693,
+      "correctionDb": 1.2029303717953446
+    },
+    {
+      "hz": 16000.0,
+      "referenceSideMixtureDb": -79.443,
+      "syntheticDb": -115.09768928635792,
+      "correctionDb": 0.8736584107473473
+    }
+  ]
+}

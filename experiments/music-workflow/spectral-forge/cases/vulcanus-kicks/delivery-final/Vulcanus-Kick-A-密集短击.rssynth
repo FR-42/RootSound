@@ -1,0 +1,268 @@
+{
+  "format": "RootSoundSpectralPatch",
+  "version": 1,
+  "name": "Vulcanus Kick A · 密集段短击",
+  "master": {
+    "level": 0.96,
+    "glideSeconds": 0,
+    "polyphony": 4,
+    "velocitySensitivity": 0.3
+  },
+  "oscillators": [
+    {
+      "id": "osc-1",
+      "enabled": true,
+      "waveform": "sine",
+      "level": 1,
+      "pan": 0,
+      "semitones": -22,
+      "cents": 0,
+      "phase": 0.035,
+      "pulseWidth": 0.5,
+      "unison": 1,
+      "detuneCents": 0,
+      "spread": 0,
+      "fmRatio": 2,
+      "fmAmount": 0.06
+    },
+    {
+      "id": "osc-2",
+      "enabled": true,
+      "waveform": "triangle",
+      "level": 0.14,
+      "pan": 0,
+      "semitones": -10,
+      "cents": 0,
+      "phase": 0.929,
+      "pulseWidth": 0.5,
+      "unison": 1,
+      "detuneCents": 0,
+      "spread": 0,
+      "fmRatio": 2,
+      "fmAmount": 0
+    },
+    {
+      "id": "osc-3",
+      "enabled": true,
+      "waveform": "sine",
+      "level": 0.24,
+      "pan": 0,
+      "semitones": 14,
+      "cents": 0,
+      "phase": 0.108,
+      "pulseWidth": 0.5,
+      "unison": 1,
+      "detuneCents": 0,
+      "spread": 0,
+      "fmRatio": 2,
+      "fmAmount": 0
+    },
+    {
+      "id": "osc-4",
+      "enabled": true,
+      "waveform": "noise",
+      "level": 0.003,
+      "pan": 0,
+      "semitones": 0,
+      "cents": 0,
+      "phase": 0,
+      "pulseWidth": 0.5,
+      "unison": 1,
+      "detuneCents": 0,
+      "spread": 0,
+      "fmRatio": 2,
+      "fmAmount": 0
+    }
+  ],
+  "spectrum": {
+    "mix": 1,
+    "points": [
+      {
+        "x": 20,
+        "y": -66.29869412664428,
+        "curve": 0
+      },
+      {
+        "x": 38,
+        "y": -12.298694126644277,
+        "curve": 0
+      },
+      {
+        "x": 65,
+        "y": 11.701305873355723,
+        "curve": 0
+      },
+      {
+        "x": 95,
+        "y": 9.701305873355723,
+        "curve": 0
+      },
+      {
+        "x": 170,
+        "y": 3.7013058733557234,
+        "curve": 0
+      },
+      {
+        "x": 400,
+        "y": -8.298694126644277,
+        "curve": 0
+      },
+      {
+        "x": 1000,
+        "y": -24.29869412664428,
+        "curve": 0
+      },
+      {
+        "x": 2800,
+        "y": -2.2986941266442766,
+        "curve": 0
+      },
+      {
+        "x": 7000,
+        "y": -19.29869412664428,
+        "curve": 0
+      },
+      {
+        "x": 20000,
+        "y": -66.29869412664428,
+        "curve": 0
+      }
+    ]
+  },
+  "amplitude": {
+    "points": [
+      {
+        "x": 0,
+        "y": 0,
+        "curve": 0
+      },
+      {
+        "x": 0.0006,
+        "y": 1,
+        "curve": 0
+      },
+      {
+        "x": 0.005,
+        "y": 0.95,
+        "curve": 0
+      },
+      {
+        "x": 0.018,
+        "y": 0.8,
+        "curve": 0
+      },
+      {
+        "x": 0.04,
+        "y": 0.65,
+        "curve": 0
+      },
+      {
+        "x": 0.07,
+        "y": 0.45,
+        "curve": 0
+      },
+      {
+        "x": 0.105,
+        "y": 0.21,
+        "curve": 0
+      },
+      {
+        "x": 0.145,
+        "y": 0.05,
+        "curve": 0
+      },
+      {
+        "x": 0.185,
+        "y": 0,
+        "curve": 0
+      },
+      {
+        "x": 0.235,
+        "y": 0,
+        "curve": 0
+      }
+    ],
+    "sustainIndex": 8
+  },
+  "pitch": {
+    "points": [
+      {
+        "x": 0,
+        "y": 39,
+        "curve": -0.2
+      },
+      {
+        "x": 0.0015,
+        "y": 24,
+        "curve": -0.15
+      },
+      {
+        "x": 0.005,
+        "y": 13,
+        "curve": -0.1
+      },
+      {
+        "x": 0.013,
+        "y": 5.8,
+        "curve": -0.15
+      },
+      {
+        "x": 0.029,
+        "y": 1.9,
+        "curve": -0.12
+      },
+      {
+        "x": 0.055,
+        "y": 0.45,
+        "curve": 0
+      },
+      {
+        "x": 0.095,
+        "y": -1.1,
+        "curve": 0
+      },
+      {
+        "x": 0.145,
+        "y": -2.6,
+        "curve": 0
+      },
+      {
+        "x": 0.185,
+        "y": -3.2,
+        "curve": 0
+      },
+      {
+        "x": 0.235,
+        "y": -3.2,
+        "curve": 0
+      }
+    ],
+    "sustainIndex": 8
+  },
+  "lfos": [
+    {
+      "enabled": false,
+      "waveform": "sine",
+      "rateHz": 5,
+      "depth": 0.1,
+      "target": "pitch"
+    },
+    {
+      "enabled": false,
+      "waveform": "sine",
+      "rateHz": 5,
+      "depth": 0.1,
+      "target": "pitch"
+    }
+  ],
+  "effects": {
+    "drive": 0.1,
+    "delaySeconds": 0.25,
+    "delayFeedback": 0.2,
+    "delayMix": 0,
+    "chorusMix": 0,
+    "chorusRateHz": 0.3,
+    "chorusDepthMs": 5
+  },
+  "seed": 281037
+}

@@ -145,7 +145,7 @@ test('many uses share one owned snapshot, one device buffer and a compact finger
   assert.ok(previewFingerprint(checked).length < 300000);
   const reused = readPreview(plan, { previous: checked }); assert.equal(reused.samples[0]!.audio, checked.samples[0]!.audio, 'fully checked unchanged sources reuse their owned PCM snapshot');
   const runtime = createBrowserSoundRuntime(); const session = await runtime.preview(plan);
-  assert.equal(audio().buffers.length, 1); assert.equal(audio().samples.length, 512); runtime.stop(session.id);
+  assert.equal(audio().buffers.length, 1); assert(audio().samples.length > 0 && audio().samples.length < 64, 'only the upcoming time window is allocated'); runtime.stop(session.id);
   assert.ok(audio().samples.every(node => node.disconnected && node.stopped)); await runtime.preview(input);
   assert.equal(audio().buffers.length, 2, 'the released graph must not retain an unused buffer forever'); await runtime.dispose();
 }));
@@ -250,9 +250,9 @@ test('pending device starts can be cancelled without late sampled notes', async 
 
 test('unique sample capacity is bounded before device allocation, with repeated identities counted once', () => {
   const channel = new Float32Array(4 * 1024 * 1024).fill(0.25);
-  const sounds = [1, 2, 3].map(id => ({ ...sample({ sampleRate: 192000, channels: [channel, channel, channel, channel] }), source: { id: `large-${id}`, revision: 1,
+  const sounds = Array.from({ length: 9 }, (_, id) => id).map(id => ({ ...sample({ sampleRate: 192000, channels: [channel, channel, channel, channel] }), source: { id: `large-${id}`, revision: 1,
     audio: { sampleRate: 192000, channels: [channel, channel, channel, channel] } } }));
-  assert.throws(() => readPreview({ kind: 'sequence', version: 1, durationSeconds: 2, events: sounds.map(sound => ({ atSeconds: 0, sound })) }), /128 MiB/);
+  assert.throws(() => readPreview({ kind: 'sequence', version: 1, durationSeconds: 2, events: sounds.map(sound => ({ atSeconds: 0, sound })) }), /512 MiB/);
 });
 
 test('offline WAV contains the trimmed, pitched sample through the same envelopes and pan as live playback', async () => fixture(async () => {

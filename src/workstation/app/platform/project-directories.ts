@@ -1,9 +1,11 @@
 import type { ProjectDirectoriesPort, ProjectDirectory } from '../../contracts/project-directory.ts';
+import { MAX_MIDI_FILE_BYTES } from '../../contracts/midi.ts';
 
 export interface NativeProjectDirectoriesBridge {
   Read(): Promise<unknown>;
   ChooseLocation(current: string): Promise<unknown>;
   Create(name: string, location: string, libraryText: string): Promise<unknown>;
+  CreateCopy?(name: string, location: string, libraryText: string): Promise<unknown>;
   Open(): Promise<unknown>;
   List?(): Promise<unknown>;
   Delete?(path: string, expectedId: string): Promise<unknown>;
@@ -35,6 +37,25 @@ function project(value: unknown): ProjectDirectory {
   return { id: item.id, name: item.name, path: item.path };
 }
 
+function midiBytes(name: unknown, base64: unknown): { name: string; bytes: Uint8Array } {
+  if (typeof name !== 'string' || !name.trim() || name.length > 255 || /[\\/\u0000-\u001f]/u.test(name) || !/\.midi?$/iu.test(name))
+    return fail('MIDI 文件名称无效，尚未创建歌曲项目。');
+  if (typeof base64 !== 'string' || !base64 || base64.length > Math.ceil(MAX_MIDI_FILE_BYTES / 3) * 4
+    || base64.length % 4 !== 0 || !/^[A-Za-z0-9+/]*={0,2}$/u.test(base64))
+    return fail('MIDI 文件传输内容无效或超过 10 MiB，尚未创建歌曲项目。');
+  let binary: string;
+  try { binary = atob(base64); }
+  catch { return fail('MIDI 文件传输内容无法读取，尚未创建歌曲项目。'); }
+  if (binary.length < 14 || binary.length > MAX_MIDI_FILE_BYTES || btoa(binary) !== base64)
+    return fail('MIDI 文件传输内容无效或超过 10 MiB，尚未创建歌曲项目。');
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < bytes.length; index++) bytes[index] = binary.charCodeAt(index);
+  const length = new DataView(bytes.buffer).getUint32(4, false);
+  if (binary.slice(0, 4) !== 'MThd' || length < 6 || length > bytes.length - 8)
+    return fail('这个文件没有有效的 MIDI 文件头，尚未创建歌曲项目。');
+  return { name, bytes };
+}
+
 export function createDesktopProjectDirectories(bridge: NativeProjectDirectoriesBridge): ProjectDirectoriesPort {
   return {
     async read() {
@@ -58,6 +79,11 @@ export function createDesktopProjectDirectories(bridge: NativeProjectDirectories
       if (result.status !== 'created') return fail();
       return project(result.project);
     },
+    ...(bridge.CreateCopy ? { async createCopy(name: string, location: string, libraryText: string) {
+      const result = await call(() => bridge.CreateCopy!(name, location, libraryText));
+      if (result.status !== 'created') return fail();
+      return project(result.project);
+    } } : {}),
     async list() {
       if (!bridge.List) return fail('当前窗口尚不支持项目列表，请关闭旧窗口后重新打开 RootSound。');
       const result = await call(() => bridge.List!());
@@ -70,6 +96,10 @@ export function createDesktopProjectDirectories(bridge: NativeProjectDirectories
       if (path !== undefined && (!path.trim() || !bridge.OpenKnown)) return fail('当前窗口尚不支持直接打开这个项目，请重新打开 RootSound。');
       const result = await call(() => path === undefined ? bridge.Open() : bridge.OpenKnown!(path));
       if (result.status === 'cancelled') return { status: 'cancelled' };
+      if (result.status === 'midi') {
+        if (path !== undefined) return fail('乐曲库项目入口不能被替换为 MIDI 选择结果。');
+        return { status: 'midi', ...midiBytes(result.name, result.base64) };
+      }
       if (result.status !== 'opened') return fail();
       return { status: 'opened', project: project(result.project) };
     },
@@ -78,6 +108,7 @@ export function createDesktopProjectDirectories(bridge: NativeProjectDirectories
       if (!bridge.Delete) return fail('当前窗口尚不支持删除歌曲，请关闭旧窗口后重新打开 RootSound。');
       const result = await call(() => bridge.Delete!(target.path, target.id));
       if (result.status !== 'deleted') return fail();
+      if (typeof result.warning === 'string' && result.warning.trim()) return { warning: result.warning };
     },
     async inspect(selected) {
       const target = project(selected);

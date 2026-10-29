@@ -1,0 +1,97 @@
+RipX spectral front end — static reconstruction, 2026-10-29
+
+Target: D:/#Software/ripx/RipX.exe
+SHA256: 5f088fa4fbbe1759ef75d8034c79f33c846e3bf5f13d5048dd95a6614d2ad441
+
+Implementation: native_spectral.py
+Input is a bounded mono PCM callback, output is a generator of spectral-peak
+frames. No Demucs, Basic Pitch, model download or target execution occurs.
+The output is not musical notes, stems, or reconstructed audio.
+
+REA evidence reused:
+ev_fe806f1622cce01d8567300962445237f3a52a618ce47c229230d114364dd389
+  0x140326880; work/ripx-analysis/spectral-frame-analysis.c/.json.
+Related existing preprocessing evidence: 0x140343da0 copies task+0x10 float
+buffers into context+0x18 input; no arithmetic scaling in that copy.
+
+New independent static observations (GNU objdump and format-aware PE reads,
+not falsely presented as REA Evidence IDs):
+
+1. Window/Hop initialization recovered, not guessed
+  hop-config-direct.asm: 0x140365f70
+    t = trunc(float32(float32(Fs)*float32(1/64)))+1
+    H = highest power of two <= t, with observed min 2/max 32768.
+  window-config-direct.asm: 0x14031f5a0, 31f673..31f6e9
+    t = trunc(float32(float32(float32(Fs)/15)+float32(0.5001)))
+    N = same bounded power-of-two selection.
+  44100 and 48000 Hz: N=2048, H=512. 96000 Hz: N=4096, H=1024.
+  Fs is WAVEFORMATEX+4, copied to global 0x14098a150 by 368410 and read at
+  0x14098a154. Format-reading function .pdata range begins 0x1403681c0.
+  N/H/Fs globals are virtual-only/zero initialized on disk; these formulas
+  describe runtime assignments, not alleged fixed file defaults.
+  direct-constants.json preserves byte offsets and values for 1/64,15,0.5001.
+
+2. Window is symmetric Hann
+  spectral-helpers-direct.asm: 0x1406145a0
+    w[i] = 0.5 * (1 - cos(2*pi*i/(L-1)))
+  Scalar and two-lane vector constants agree; full bytes in direct-constants.
+  614580: sqrt(re*re+im*im), confirmed through sqrt IAT 0x140689b20.
+  614560: atan2(im,re), confirmed through atan2 IAT 0x140689b40.
+  Phase output added by reconstruction is explicitly center_bin_phase_radians.
+  326880 does not itself copy phase into its 16-byte output peak slots.
+  This extra phase is NOT the later harmonic-refinement/final-note phase.
+
+3. Peak extraction preserves native branch/rounding behavior
+  326880 uses N and 2N effective input, padded to 2N/4N transforms.
+  Cache/extraction alignment max(H,N/4) is distinct from the H frame clock.
+  Out-of-range PCM input is zero. Float32 PCM is widened for double windowing.
+  Mode 2 only contributes center frequencies strictly less than 220 Hz.
+  Peak score uses scale 2 and 1 for the two levels, compares local neighbors,
+  and applies threshold float32(2*retained_bins*0.7071067812*8).
+  Peaks sharing a base slot replace only on strictly greater score.
+  Frequency is a three-bin magnitude centroid, not parabolic interpolation.
+  spectral-frame-direct.asm 327197..3271ba confirms separate mulss/addss,
+  not FMA. All boundary comparisons and float32 operations are explicit.
+
+4. Main-executable PCM amplitude units are proven for the 16-bit path
+  pcm-submit-exe-direct.asm / bitdepth-references-direct.asm:
+  317fa0 checks bit depth ==16; 317faa reads context+0x258 int16 buffer;
+  317fb5 sign-extends, 317fbd converts to float32; 317fc0 jumps directly to
+  317fef/317ff4 store. No divide by 32768 or other normalization occurs.
+  3180c4 loads that float buffer and 3180c9 stores into task record+0x10.
+  Existing 343da0 copies this same field to the 326880 input buffer.
+  Therefore this verified path uses [-32768,32767]-scale PCM floats.
+  Do not multiply arbitrary normalized input by 32767 and claim an exact
+  import pipeline. A new front-end adapter can explicitly decode int16 PCM
+  and preserve integer values as float32; its codec/channel policy remains
+  an adapter choice unless independently aligned with the original reader.
+  DLL sibling corroboration: 18004ad10 produces int16; 180022770 22852..22889
+  sign-extends/converts/stores similarly. The EXE proof above is independent.
+
+API:
+  native_configuration(sample_rate) -> {sample_rate,base_window,hop}
+  iter_pcm_spectral_frames(read_pcm, sample_count=..., sample_rate=...,
+                           start_frame=0, stop_frame=None)
+    read_pcm(start,count) returns exactly count finite mono native-unit samples.
+    Each record includes frame_index, sample_index, time_seconds, windows and
+    peaks. Convert each SpectralPeak with dataclasses.asdict for JSON.
+    Last spectra at each resolution are reused; input reads are bounded to 2N.
+
+Executed verification:
+  python -m unittest discover -s work/ripx-native-next/spectral -v
+  9 tests passed: silence/DC, asymmetric centroid, 220Hz cutoff, strict tie,
+  inclusive amplitude threshold, invalid values, cache alignment, boundaries,
+  recovered config/window, generated 440/880Hz PCM, and truncated-reader rejection.
+  Generated 2 seconds @44100:173 frames/347 raw peaks,0.988s processing in one
+  warm NumPy process. This is not a benchmark on user music or original RipX.
+
+Remaining limits:
+  Uses NumPy unnormalized float64 FFT as mathematical numerical primitive.
+  326510 passes 528f50 output then mirrors conjugates without a scaling stage;
+  528f50/610a90 real/complex FFT kernels still need complete scale/roundoff audit.
+  No original-runtime differential validation. SIMD cosine/FFT roundoff may differ.
+  The task-specific preceding/following context padding and actual producer's
+  frame-range selection are not fully reconstructed; sample-clock range is
+  explicit at this API boundary rather than guessed.
+  No peak-refinement, harmonic assignment, final note segmentation, or audio
+  resynthesis is substituted. Those remain separate work required for a full core.

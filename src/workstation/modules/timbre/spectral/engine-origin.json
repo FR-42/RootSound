@@ -1,0 +1,22 @@
+{
+  "purpose": "RB75 exact Spectral Forge synthesis engine, copied without algorithm changes to honor main workstation module boundaries",
+  "upstream": "RootSound spectral-forge experiment, 2026-10-28",
+  "files": [
+    {
+      "file": "model.mjs",
+      "source": "experiments/music-workflow/spectral-forge/web/model.mjs",
+      "sha256": "136da7a5d7ece430fe73f72179f4075f77de04a021b795f82aa7556e6a194d91"
+    },
+    {
+      "file": "dsp.mjs",
+      "source": "experiments/music-workflow/spectral-forge/web/dsp.mjs",
+      "sha256": "9bd27769fb26a101cd65f44a0530225e62586473b0bb87ae0cf6c563bc4afe5b"
+    },
+    {
+      "file": "curve-density.mjs",
+      "source": "experiments/music-workflow/spectral-forge/web/curve-density.mjs",
+      "sha256": "b09e20890aeb65306a3729982579eab3aa2b01a8876bd4738c62088dfc4ced56"
+    }
+  ],
+  "synchronization": "Tests compare these vendored engines byte-for-byte with the experiment sources; update deliberately together."
+}

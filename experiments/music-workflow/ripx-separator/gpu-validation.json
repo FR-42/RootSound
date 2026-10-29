@@ -1,0 +1,67 @@
+{
+  "torch": "2.7.1+xpu",
+  "device": "_XpuDeviceProperties(name='Intel(R) Arc(TM) Graphics', platform_name='Intel(R) oneAPI Unified Runtime over Level-Zero', type='gpu', driver_version='1.15.38308', total_memory=16810MB, max_compute_units=128, gpu_eu_count=128, gpu_subslice_count=16, max_work_group_size=1024, max_num_sub_groups=128, sub_group_sizes=[8 16 32], has_fp16=1, has_fp64=1, has_atomic64=1)",
+  "source": "D:\\RootSound\\experiments\\music-workflow\\ripx-separator\\tests-output\\6267aa05\\generated A4.wav",
+  "source_sha256": "4e0f4887a7925e002ddd4402ffe2f8d417b370c6fb3d42451522707d82ffe14a",
+  "samples_per_channel": 343980,
+  "rate": 44100,
+  "precision": "float32; no autocast",
+  "modes": {
+    "4": {
+      "cpu": {
+        "cold_seconds": 8.247757399920374,
+        "warm_seconds": [
+          4.464812099933624,
+          4.559146699961275
+        ],
+        "warm_median_seconds": 4.51197939994745
+      },
+      "xpu": {
+        "cold_seconds": 9.241868000011891,
+        "warm_seconds": [
+          0.6976232999004424,
+          0.742508800001815
+        ],
+        "warm_median_seconds": 0.7200660499511287,
+        "peak_allocated_bytes": 594874368
+      },
+      "shape": [
+        1,
+        4,
+        2,
+        343980
+      ],
+      "max_absolute_difference": 5.4836273193359375e-06,
+      "rms_difference": 1.3381248891164432e-06,
+      "warm_speedup": 6.266063231635043
+    },
+    "6": {
+      "cpu": {
+        "cold_seconds": 2.972613999969326,
+        "warm_seconds": [
+          2.984791800030507,
+          2.858472599997185
+        ],
+        "warm_median_seconds": 2.921632200013846
+      },
+      "xpu": {
+        "cold_seconds": 0.9310041000135243,
+        "warm_seconds": [
+          0.74519980000332,
+          0.6865111999213696
+        ],
+        "warm_median_seconds": 0.7158554999623448,
+        "peak_allocated_bytes": 608602112
+      },
+      "shape": [
+        1,
+        6,
+        2,
+        343980
+      ],
+      "max_absolute_difference": 2.2292137145996094e-05,
+      "rms_difference": 1.3090522088532452e-06,
+      "warm_speedup": 4.081315572999759
+    }
+  }
+}

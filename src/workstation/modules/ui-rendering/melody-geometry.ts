@@ -1,4 +1,5 @@
 import type { KeyboardPitch, PhraseBody, PhraseNote } from '../../contracts/phrase.ts';
+import { PHRASE_STEPS_PER_BEAT, phraseStepsPerBeat } from '../../contracts/phrase.ts';
 import { phrasePitchRow } from './phrase-viewport.ts';
 
 export type MelodyView = { leftSeconds: number; zoom: number; rowHeight: number };
@@ -28,8 +29,9 @@ export function melodyNoteRect(note: PhraseNote, body: PhraseBody, keys: readonl
     width: Math.max(0, (note.durationSeconds ?? melodySeconds(note.durationBeats, body.tempoBpm)) * scale), height: view.rowHeight - 2 };
 }
 /** The grid tempo is a visual ruler; note positions always use the phrase's own clock. */
-export function melodyGrid(duration: number, tempo: number): Array<{ seconds: number; beat: boolean; bar: boolean }> {
-  const cell = 60 / melodyClamp(tempo, 40, 240) / 4; const result: Array<{ seconds: number; beat: boolean; bar: boolean }> = [];
-  for (let index = 0; index * cell <= duration + 1e-8; index++) result.push({ seconds: index * cell, beat: index % 4 === 0, bar: index % 16 === 0 });
+export function melodyGrid(duration: number, tempo: number, stepsPerBeat = PHRASE_STEPS_PER_BEAT): Array<{ seconds: number; beat: boolean; bar: boolean }> {
+  const steps = phraseStepsPerBeat({ stepsPerBeat });
+  const cell = 60 / melodyClamp(tempo, 40, 240) / steps; const result: Array<{ seconds: number; beat: boolean; bar: boolean }> = [];
+  for (let index = 0; index * cell <= duration + 1e-8; index++) result.push({ seconds: index * cell, beat: index % steps === 0, bar: index % (steps * 4) === 0 });
   return result;
 }

@@ -4,11 +4,14 @@ import { test } from 'node:test';
 import type { ProjectSetupPort } from '../src/workstation/contracts/project-directory.ts';
 import type { TimbreEditorPort } from '../src/workstation/contracts/timbre.ts';
 import type { SoundRuntimePort } from '../src/workstation/contracts/sound.ts';
+import { createProjectSetup } from '../src/workstation/app/project-setup.ts';
+import { createDesktopProjectDirectories } from '../src/workstation/app/platform/project-directories.ts';
+import type { MidiImportNotice } from '../src/workstation/contracts/project-directory.ts';
 
 const hook = registerHooks({ load(url, context, next) {
   return url.endsWith('.css') ? { format: 'module', source: '', shortCircuit: true } : next(url, context);
 } });
-const { mountStudio } = await import('../src/workstation/modules/ui-rendering/public.ts'); hook.deregister();
+const { mountStudio, showMidiImportNotice } = await import('../src/workstation/modules/ui-rendering/public.ts'); hook.deregister();
 
 /** A small event DOM exercises application navigation without observing or controlling Windows. */
 class Element extends EventTarget {
@@ -109,4 +112,39 @@ test('a late song catalog cannot overwrite the naming page after choosing new du
     assert.equal(all(f.root).some(node => node.className === 'project-library-overlay'), false);
     assert.deepEqual(f.opened, []); assert.deepEqual(f.created, []);
   } finally { f.cleanup(); }
+});
+
+test('the welcome folder tile follows the real MIDI bridge, conversion and new-project path', async () => {
+  const bytes=Uint8Array.from([77,84,104,100,0,0,0,6,0,0,0,1,1,224,
+    77,84,114,107,0,0,0,13,0,144,60,100,131,96,128,60,0,0,255,47,0]);
+  const writes:Array<{name:string;location:string;text:string}>=[], notices:MidiImportNotice[]=[];let selected=0;
+  const raw=(value:unknown)=>Promise.resolve(JSON.stringify(value));
+  const directories=createDesktopProjectDirectories({
+    Read:()=>raw({status:'ready',defaultLocation:'D:/RootSound/project'}),ChooseLocation:()=>raw({status:'cancelled'}),
+    List:()=>raw({status:'listed',projects:[]}),
+    Open:()=>{selected++;return raw({status:'midi',name:'文件夹导入.midi',base64:Buffer.from(bytes).toString('base64')});},
+    Create:(name,location,text)=>{writes.push({name,location,text});return raw({status:'created',project:{id:'imported',name,path:`${location}/${name}.rootsound`}});},
+  });
+  const setup=createProjectSetup(directories,notice=>{if(notice)notices.push(notice);});
+  const f=fixture(setup);
+  try {
+    fire(f.button('开始'));await settle();assert.equal(selected,0);
+    fire(f.button('选择歌曲项目文件'));await settle();await settle();
+    assert.equal(selected,1);assert.equal(writes.length,1);assert.equal(writes[0]!.name,'文件夹导入');
+    assert.equal(writes[0]!.location,'D:/RootSound/project');assert.match(writes[0]!.text,/rootsound.song/);
+    assert.equal(notices.length,1);assert.equal(notices[0]!.noteCount,1);
+  } finally {f.cleanup();}
+});
+
+test('MIDI completion details stay collapsed and render warning text safely without disturbing the workspace', () => {
+  const f=fixture();
+  try {
+    const panel=showMidiImportNotice(f.root as unknown as HTMLElement,{projectId:'p',name:'song',trackCount:2,noteCount:99,warnings:['<script>source text</script>']});
+    const nodes=all(f.root);assert(nodes.some(node=>node.textContent==='2 个声部 · 99 个音符'));
+    assert(nodes.some(node=>node.tagName==='li'&&node.textContent==='<script>source text</script>'));
+    assert.equal(nodes.some(node=>node.tagName==='script'),false);
+    const details=nodes.find(node=>node.tagName==='details');assert(details);assert.equal(details.attributes.has('open'),false);
+    fire(f.button('关闭导入提示'));assert.equal(all(f.root).some(node=>node.className==='midi-import-notice'),false);
+    assert(visible(f.root).some(node=>node.textContent==='开始'));panel.dispose();
+  } finally {f.cleanup();}
 });

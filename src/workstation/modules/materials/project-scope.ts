@@ -1,5 +1,6 @@
 import type { ContentRecord, Draft, JsonValue } from '../../contracts/content.ts';
 import type { ReferenceAdapter } from '../../contracts/references.ts';
+import { copyJson, sameJson } from './json-value.ts';
 
 export type ProjectPolicy = { rootKind: string; adapters: ReferenceAdapter[] };
 export type ProjectScopes = {
@@ -12,8 +13,8 @@ export type ProjectScopes = {
   members?: { id: string; scopeId: string }[];
 };
 export type ProjectState = { contents: ContentRecord[]; drafts: Draft[]; projectScopes?: ProjectScopes };
-const same = (a: unknown, b: unknown): boolean => JSON.stringify(a) === JSON.stringify(b);
-const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
+const same = sameJson;
+const clone = copyJson;
 const key = (kind: string, name: string): string => JSON.stringify([kind, name.trim().normalize('NFC').toLocaleLowerCase('en-US')]);
 function fail(message: string): never { throw new Error(`歌曲素材：${message}`); }
 
@@ -77,7 +78,7 @@ export function createProjectScopePolicy(policy: ProjectPolicy) {
     const boundDrafts = new Set(state.projectScopes?.roots.filter(item => item.type === 'draft').map(item => item.id) ?? []);
     function belongs(draft: Draft, seen = new Set<string>()): boolean {
       if (seen.has(draft.id)) return false; seen.add(draft.id);
-      if (draft.kind === policy.rootKind || boundDrafts.has(draft.id) || draft.sourceId && scopeByContent.has(draft.sourceId)) return true;
+      if (draft.projectRootId || draft.kind === policy.rootKind || boundDrafts.has(draft.id) || draft.sourceId && scopeByContent.has(draft.sourceId)) return true;
       const value = draft.editingContext;
       if (!value || typeof value !== 'object' || Array.isArray(value) || value.format !== 'RootSoundReferenceEdit') return false;
       const nested = value.context; if (!nested || typeof nested !== 'object' || Array.isArray(nested)) return false;
@@ -85,14 +86,15 @@ export function createProjectScopePolicy(policy: ProjectPolicy) {
       return root.type === 'draft' ? !!state.drafts.find(item => item.id === root.id && belongs(item, seen))
         : state.contents.some(item => item.id === root.id && item.kind === policy.rootKind);
     }
-    return [...state.contents.filter(item => item.kind === policy.rootKind).map(record => ({ type: 'content' as const, record })),
+    const published = new Set(state.drafts.filter(draft => draft.projectRootId && draft.sourceId).map(draft => draft.sourceId));
+    return [...state.contents.filter(item => item.kind === policy.rootKind || published.has(item.id)).map(record => ({ type: 'content' as const, record })),
       ...state.drafts.filter(item => belongs(item)).map(record => ({ type: 'draft' as const, record }))];
   }
   function assertDraftName(state: ProjectState, draft: Draft, name: string): void {
     if (key(draft.kind, name) === key(draft.kind, draft.name)) return;
     assertPublicName(state, draft, name);
     const contents = new Map(state.contents.map(record => [record.id, record]));
-    let contextRoot: Draft | ContentRecord = draft; const visited = new Set<string>();
+    let contextRoot: Draft | ContentRecord = draft.projectRootId ? state.drafts.find(item => item.id === draft.projectRootId)! : draft; const visited = new Set<string>();
     while (contextRoot && !visited.has(contextRoot.id)) {
       visited.add(contextRoot.id);
       const context: JsonValue | undefined = 'editingContext' in contextRoot ? contextRoot.editingContext : undefined;
@@ -104,7 +106,8 @@ export function createProjectScopePolicy(policy: ProjectPolicy) {
       const parent: ContentRecord | Draft | undefined = root.type === 'draft' ? state.drafts.find(item => item.id === root.id) : contents.get(root.id);
       if (!parent) break; contextRoot = parent;
     }
-    const scopeId = state.projectScopes?.contents.find(item => item.id === draft.sourceId)?.scopeId;
+    const scopeId = state.projectScopes?.contents.find(item => item.id === draft.sourceId)?.scopeId
+      ?? state.projectScopes?.roots.find(item => item.type === 'draft' && item.id === draft.projectRootId)?.scopeId;
     const candidates = contextRoot.kind === policy.rootKind ? [{ record: contextRoot }] : roots(state).filter(({ type, record }) => {
       const binding = state.projectScopes?.roots.find(item => item.type === type && item.id === record.id);
       if (scopeId) return binding?.scopeId === scopeId;
@@ -121,10 +124,18 @@ export function createProjectScopePolicy(policy: ProjectPolicy) {
         fail(`这首歌曲已经有同类素材“${other.name}”，请换一个名称。你的修改仍然保留。`);
       }
     }
+    for (const other of state.drafts) {
+      if (other.id === draft.id || other.sourceId && other.sourceId === draft.sourceId) continue;
+      const otherScope = state.projectScopes?.roots.find(item => item.type === 'draft' && item.id === other.id)?.scopeId;
+      if (otherScope && candidateScopes.has(otherScope) && key(other.kind, other.name) === key(draft.kind, name)) {
+        fail(`这首歌曲已经有同类编辑稿“${other.name}”，请换一个名称。你的修改仍然保留。`);
+      }
+    }
   }
   function isPublic(state: ProjectState, record: ContentRecord | Draft): boolean {
     if (record.kind === policy.rootKind) return false;
     if ('revision' in record) return !state.projectScopes?.contents.some(item => item.id === record.id);
+    if (record.projectRootId) return false;
     return !state.projectScopes?.roots.some(item => item.type === 'draft' && item.id === record.id)
       && (!record.sourceId || !state.projectScopes?.contents.some(item => item.id === record.sourceId));
   }
@@ -138,13 +149,46 @@ export function createProjectScopePolicy(policy: ProjectPolicy) {
       }
     }
   }
+  /** Explicit unpublished custody may never adopt material owned by another song. */
+  function validateDraftOwnership(state: ProjectState): void {
+    const contents = new Map(state.contents.map(record => [record.id, record]));
+    for (const draft of state.drafts) {
+      if (draft.projectRootId === undefined) continue;
+      const root = state.drafts.find(item => item.id === draft.projectRootId);
+      if (!root || root.id === draft.id || root.kind !== policy.rootKind || draft.kind === policy.rootKind) fail('编辑稿缺少有效的所属歌曲。');
+      const scope = state.projectScopes?.roots.find(item => item.type === 'draft' && item.id === root.id)?.scopeId
+        ?? state.projectScopes?.roots.find(item => item.type === 'content' && item.id === root.sourceId)?.scopeId ?? root.id;
+      const recorded = state.projectScopes?.roots.find(item => item.type === 'draft' && item.id === draft.id)?.scopeId;
+      if (recorded && recorded !== scope) fail('编辑稿的歌曲归属记录不一致。');
+      for (const record of [...closure(draft, contents), ...(draft.sourceId && contents.has(draft.sourceId) ? [contents.get(draft.sourceId)!] : [])]) {
+        const ownerScope = state.projectScopes?.contents.find(item => item.id === record.id)?.scopeId;
+        if (ownerScope && ownerScope !== scope) fail('编辑稿不能引用另一首歌曲的素材。');
+      }
+    }
+  }
   function normalize(before: ProjectState, next: ProjectState, exactNameIds = new Set<string>()): void {
+    validateDraftOwnership(next);
     const oldContents = new Map(before.contents.map(record => [record.id, record]));
     const oldDrafts = new Map(before.drafts.map(record => [record.id, record]));
     const contents = new Map(next.contents.map(record => [record.id, record]));
     const scopes: ProjectScopes = clone(next.projectScopes ?? { version: 1, roots: [], contents: [] });
     const bindings = new Map(scopes.roots.map(item => [`${item.type}:${item.id}`, item.scopeId]));
     const ownership = new Map(scopes.contents.map(item => [item.id, item.scopeId]));
+    for (const draft of next.drafts) if (draft.projectRootId) {
+      const previous = oldDrafts.get(draft.id);
+      if (previous?.projectRootId && previous.projectRootId !== draft.projectRootId) fail('编辑稿不能更换所属歌曲。');
+      const root = next.drafts.find(item => item.id === draft.projectRootId)!;
+      const scope = bindings.get(`draft:${root.id}`) ?? (root.sourceId ? bindings.get(`content:${root.sourceId}`) : undefined) ?? root.id;
+      bindings.set(`draft:${root.id}`, scope); bindings.set(`draft:${draft.id}`, scope);
+      if (draft.sourceId) {
+        const source = contents.get(draft.sourceId); if (!source) fail('编辑稿来源不存在。');
+        const existing = ownership.get(source.id); if (existing && existing !== scope) fail('编辑稿来源属于另一首歌曲。');
+        if (!existing && oldContents.has(source.id)) fail('编辑稿来源尚未归属于当前歌曲。');
+        ownership.set(source.id, scope); bindings.set(`content:${source.id}`, scope);
+        scopes.members ??= [];
+        if (!scopes.members.some(item => item.id === source.id && item.scopeId === scope)) scopes.members.push({ id: source.id, scopeId: scope });
+      }
+    }
     const adoptionKey = (scopeId: string, sourceId: string, graphToken: string) => JSON.stringify([scopeId, sourceId, graphToken]);
     const imports = new Map((scopes.imports ?? []).map(item => [adoptionKey(item.scopeId, item.sourceId, item.graphToken), item]));
     const graphTokens = new Map<string, string>();
@@ -168,6 +212,7 @@ export function createProjectScopePolicy(policy: ProjectPolicy) {
     function draftScope(draft: Draft, seen = new Set<string>()): string | undefined {
       if (seen.has(draft.id)) return undefined; seen.add(draft.id);
       if (draft.kind === policy.rootKind) return draft.sourceId ? bindings.get(`content:${draft.sourceId}`) : bindings.get(`draft:${draft.id}`);
+      if (draft.projectRootId) return bindings.get(`draft:${draft.projectRootId}`);
       const context = draft.editingContext;
       if (context && typeof context === 'object' && !Array.isArray(context) && context.format === 'RootSoundReferenceEdit') {
         const nested = context.context;
@@ -206,6 +251,16 @@ export function createProjectScopePolicy(policy: ProjectPolicy) {
       const nameKey = key(record.kind, record.name); const other = names.get(nameKey);
       if (other && other !== id) fail(`这首歌曲已经有同类素材“${record.name}”，请换一个名称。`);
       names.set(nameKey, id);
+    }
+    for (const draft of next.drafts.filter(item => item.projectRootId)) {
+      const scopeId = bindings.get(`draft:${draft.id}`)!;
+      const names = scopeNames.get(scopeId) ?? new Map<string, string>(); scopeNames.set(scopeId, names);
+      const identity = draft.sourceId ?? draft.id; const proposed = draft.name.trim(); let name = proposed; let suffix = 2;
+      const previous = oldDrafts.get(draft.id); const manual = previous && key(draft.kind, previous.name) !== key(draft.kind, proposed);
+      const conflicts = () => names.has(key(draft.kind, name)) && names.get(key(draft.kind, name)) !== identity;
+      if (conflicts() && (manual || exactNameIds.has(draft.id))) fail(`这首歌曲已经有同类素材“${proposed}”，请换一个名称。`);
+      while (conflicts()) name = `${proposed} ${suffix++}`;
+      draft.name = name; names.set(key(draft.kind, name), identity);
     }
     for (const { type, record: root } of projectRoots) {
       const previous = type === 'draft' ? oldDrafts.get(root.id) : oldContents.get(root.id);
@@ -316,6 +371,20 @@ export function createProjectScopePolicy(policy: ProjectPolicy) {
     }
   }
   function assertRestoredNames(before: ProjectState, next: ProjectState): void {
+    validateDraftOwnership(next);
+    for (const draft of next.drafts.filter(item => item.projectRootId)) {
+      const scope = next.projectScopes?.roots.find(item => item.type === 'draft' && item.id === draft.projectRootId)?.scopeId ?? draft.projectRootId;
+      const identity = draft.sourceId ?? draft.id;
+      for (const other of [...next.contents, ...next.drafts]) {
+        const otherIdentity = 'revision' in other ? other.id : other.sourceId ?? other.id;
+        const otherScope = 'revision' in other ? next.projectScopes?.contents.find(item => item.id === other.id)?.scopeId
+          : next.projectScopes?.roots.find(item => item.type === 'draft' && item.id === other.id)?.scopeId
+            ?? next.projectScopes?.contents.find(item => item.id === other.sourceId)?.scopeId;
+        if (otherIdentity !== identity && otherScope === scope && key(other.kind, other.name) === key(draft.kind, draft.name)) {
+          fail(`这首歌曲中“${draft.name}”的名称已被使用，请调整冲突名称后再重做。`);
+        }
+      }
+    }
     const previous = new Map([...before.contents, ...before.drafts].map(record => [record.id, record]));
     for (const record of [...next.contents, ...next.drafts]) {
       const old = previous.get(record.id);
@@ -332,5 +401,5 @@ export function createProjectScopePolicy(policy: ProjectPolicy) {
       }
     }
   }
-  return { normalize, assertDraftName, assertPublicName, assertRestoredNames };
+  return { normalize, assertDraftName, assertPublicName, assertRestoredNames, validateDraftOwnership };
 }

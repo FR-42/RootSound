@@ -1,0 +1,62 @@
+{
+  "name": "余焰 · 第一稿",
+  "tempo": 212,
+  "bodySeconds": 18.11320754716981,
+  "instruments": 21,
+  "notes": 356,
+  "tracks": [
+    {
+      "name": "女声 · 啊",
+      "notes": 23
+    },
+    {
+      "name": "背景旋律",
+      "notes": 97
+    },
+    {
+      "name": "和声铺底",
+      "notes": 24
+    },
+    {
+      "name": "低音",
+      "notes": 56
+    },
+    {
+      "name": "低频鼓",
+      "notes": 34
+    },
+    {
+      "name": "轻拍",
+      "notes": 20
+    },
+    {
+      "name": "细节节奏",
+      "notes": 93
+    },
+    {
+      "name": "高处回应",
+      "notes": 9
+    }
+  ],
+  "vocalProcessing": {
+    "source": "D:\\RootSound\\experiments\\music-workflow\\original-pilot\\assets\\vocalset\\FULL__female1__long_tones__straight__f1_long_straight_a.wav",
+    "sha256": "e1ff90d89de7e30a4dd717dd642173e57b083832f38e74eb8033d349c02bc340",
+    "method": "Experimental pitch-synchronous grains from two registers of one singer; no reference-song audio is used.",
+    "regions": [
+      {
+        "sourceStartSeconds": 1.3064399092970522,
+        "sourceEndSeconds": 2.046439909297052,
+        "estimatedSourceHz": 261.4779562337504,
+        "estimatedSourceMidi": 59.99022962611639,
+        "stableScore": 0.9178261687727368
+      },
+      {
+        "sourceStartSeconds": 4.866439909297052,
+        "sourceEndSeconds": 5.606439909297052,
+        "estimatedSourceHz": 530.6216093114115,
+        "estimatedSourceMidi": 72.24215887294811,
+        "stableScore": 0.8082737554347402
+      }
+    ]
+  }
+}

@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import type { ContentRecord, MaterialLibrary, SaveResult } from '../src/workstation/contracts/content.ts';
-import { createProjectPhrase, retainProjectPhrases } from '../src/workstation/app/project-phrases.ts';
-import { createMaterialLibrary, createProjectPackages } from '../src/workstation/modules/materials/public.ts';
+import { copyProjectPhrase, createProjectPhrase, beginProjectPhraseDraft, discardProjectPhraseDraft, assertProjectPhraseSaveReady, readProjectPhrases, retainProjectPhrases } from '../src/workstation/app/project-phrases.ts';
+import { createMaterialLibrary, createProjectPackages, createReferenceEditing } from '../src/workstation/modules/materials/public.ts';
 import { createTimbreEditor, createTimbrePlayback, createTimbreReferenceAdapter } from '../src/workstation/modules/timbre/public.ts';
 import { createPhraseEditor, createPhrasePlayback, createPhraseReferenceAdapter, readPhraseBody } from '../src/workstation/modules/phrase/public.ts';
 import { createSongEditor, createSongReferenceAdapter } from '../src/workstation/modules/song/public.ts';
@@ -139,4 +139,75 @@ test('empty phrases remain explicit project members through packaging and saved-
   assert.equal(importedAssets.read().current.filter(item => item.kind === 'rootsound.phrase').length, 1);
   const phrase = importedAssets.read().current.find(item => item.kind === 'rootsound.phrase')!;
   assert.deepEqual(readPhraseBody(target.readContent(phrase.id)!.body).parts[0]!.notes, []);
+});
+
+test('only new phrases inherit the arrangement grid tempo, accepting the displayed section tempo explicitly', () => {
+  const f = fixture(); f.song.setTempo(100); f.song.setGridTempo(153); f.song.setGridTempo(212, 8);
+  const original = createProjectPhrase(f.library, f.songId);
+  assert.equal(f.phrases.readSaved(original.id).body.tempoBpm, 153, 'fallback uses the visual grid at zero, not song playback coordinates');
+  const localVoice = f.phrases.readSaved(original.id).body.parts[0]!.timbreId;
+  const later = createProjectPhrase(f.library, f.songId, localVoice, 212);
+  assert.equal(f.phrases.readSaved(later.id).body.tempoBpm, 212);
+  assert.equal(f.phrases.readSaved(later.id).body.parts[0]!.timbreId, localVoice, 'the existing third sound argument stays compatible');
+  f.song.setGridTempo(80); f.phrase.openDraft(later.draftId);
+  const copied = copyProjectPhrase(f.library, f.songId, later.draftId);
+  assert.equal(f.phrases.readSaved(copied.id).body.tempoBpm, 212, 'save-as retains the copied music tempo');
+  assert.equal(f.phrases.readSaved(original.id).body.tempoBpm, 153, 'existing phrases are not retimed');
+  const raw = f.raw(), token = f.library.currentToken();
+  for (const tempo of [NaN, Infinity, 39, 241]) assert.throws(() => createProjectPhrase(f.library, f.songId, undefined, tempo), /速度必须/);
+  assert.equal(f.raw(), raw); assert.equal(f.library.currentToken(), token);
+  const reopened = createMaterialLibrary(f.storage, f.policy);
+  const playback = createPhrasePlayback(reopened, createTimbrePlayback(reopened));
+  assert.equal(playback.readSaved(original.id).body.tempoBpm, 153); assert.equal(playback.readSaved(later.id).body.tempoBpm, 212);
+});
+
+test('interactive phrase creation stays unpublished until explicit save, including empty drafts', () => {
+  const f = fixture(); const before = f.library.listContent().filter(item => item.kind === 'rootsound.phrase');
+  const created = beginProjectPhraseDraft(f.library, f.songId, undefined, 165); f.phrase.openDraft(created.draftId);
+  const draft = f.phrase.read().draft!;
+  assert.equal(draft.sourceId, undefined); assert.equal(draft.projectRootId, f.songId);
+  assert.equal(f.library.projectScopeOf!({ type: 'draft', id: draft.id }), f.library.projectScopeOf!({ type: 'draft', id: f.songId }));
+  assert.equal(f.phrase.read().body!.tempoBpm, 165);
+  assert.deepEqual(f.library.listContent().filter(item => item.kind === 'rootsound.phrase'), before);
+  assert.deepEqual(readProjectPhrases(f.library, f.songId), []);
+  assert.throws(() => assertProjectPhraseSaveReady(f.library, f.songId), /未保存的草稿/u);
+  const record = saved(f.library.saveDraft(draft.id, 'new')); retainProjectPhrases(f.library, f.songId, [record.id]);
+  assert.equal(readProjectPhrases(f.library, f.songId)[0]!.id, record.id);
+  assert.equal(readPhraseBody(record.body).parts[0]!.notes.length, 0);
+  assert.doesNotThrow(() => assertProjectPhraseSaveReady(f.library, f.songId));
+});
+
+test('unpublished phrase discard deletes its nested edits atomically without publishing a library item', () => {
+  const f = fixture(); const created = beginProjectPhraseDraft(f.library, f.songId); f.phrase.openDraft(created.draftId);
+  const draft = f.phrase.read().draft!; const part = f.phrase.read().body!.parts[0]!;
+  f.phrase.addNote(part.id, { startBeat: 1, durationBeats: 1, frequencyHz: 440, velocity: .8 });
+  const references = createReferenceEditing(f.library, f.adapters); const nested = references.begin({ root: { type: 'draft', id: draft.id }, path: [part.id] });
+  const tone = f.library.readDraft(nested.draftId)!; f.library.updateDraft(tone.id, { name: '未保存的音色名' }, { remember: true, expected: tone });
+  const writes = f.writes(); discardProjectPhraseDraft(f.library, f.songId, draft.id);
+  assert.equal(f.writes(), writes + 1); assert.equal(f.library.readDraft(draft.id), undefined); assert.equal(f.library.readDraft(tone.id), undefined);
+  assert.equal(references.sessions().length, 0); assert.deepEqual(readProjectPhrases(f.library, f.songId), []);
+  assert.doesNotThrow(() => assertProjectPhraseSaveReady(f.library, f.songId));
+  const cold = createMaterialLibrary(f.storage, f.policy); assert.equal(cold.readDraft(draft.id), undefined); assert.equal(cold.readDraft(tone.id), undefined);
+});
+
+test('discard restores an adopted phrase to saved fields, clears its undo and never overlays a draft name into the library', () => {
+  const f = fixture(); const created = createProjectPhrase(f.library, f.songId); f.phrase.openDraft(created.draftId);
+  const original = f.library.readContent(created.id)!;
+  const references = createReferenceEditing(f.library, f.adapters); references.beginLibrary(created.id, created.draftId);
+  f.phrase.rename('随手草稿名'); f.phrase.setTempo(180);
+  assert.equal(readProjectPhrases(f.library, f.songId)[0]!.name, original.name);
+  assert.throws(() => assertProjectPhraseSaveReady(f.library, f.songId), /未保存的草稿/u);
+  const writes = f.writes(); discardProjectPhraseDraft(f.library, f.songId, created.draftId);
+  assert.equal(f.writes(), writes + 1); assert.equal(f.phrase.read().changed, false);
+  assert.deepEqual(f.phrase.read().body, readPhraseBody(original.body)); assert.equal(f.phrase.read().draft!.name, original.name);
+  assert.equal(f.library.readDraft(created.draftId)!.editingContext, undefined); assert.deepEqual(f.library.readDraftHistory(created.draftId), { past: [], future: [] });
+  assert.deepEqual(f.library.readContent(created.id), original); assert.doesNotThrow(() => assertProjectPhraseSaveReady(f.library, f.songId));
+});
+
+test('failed phrase discard leaves the complete draft, nested session and original content untouched', () => {
+  const f = fixture(); const created = createProjectPhrase(f.library, f.songId); f.phrase.openDraft(created.draftId);
+  const references = createReferenceEditing(f.library, f.adapters); references.beginLibrary(created.id, created.draftId);
+  f.phrase.setTempo(177); const raw = f.raw(); const token = f.library.currentToken(); f.fail();
+  assert.throws(() => discardProjectPhraseDraft(f.library, f.songId, created.draftId), /写入失败/u);
+  assert.equal(f.raw(), raw); assert.equal(f.library.currentToken(), token); assert.equal(f.phrase.read().body!.tempoBpm, 177); assert(references.resume(created.draftId));
 });

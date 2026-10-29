@@ -1,0 +1,41 @@
+{
+  "format": "RipXStaticNativeAnalysis",
+  "version": 1,
+  "source": "D:\\RootSound\\experiments\\music-workflow\\ripx-separator\\tests-output\\native-integration-p2o32usm\\generated.wav",
+  "source_sha256": "bc65f935a9db7c1aa751fa22622705f38b8d6e0cd50fe65f9da5e42b4920fd2b",
+  "reference_binary_sha256": "5f088fa4fbbe1759ef75d8034c79f33c846e3bf5f13d5048dd95a6614d2ad441",
+  "algorithm": "ripx-static-native-spectral",
+  "public_model_used": false,
+  "device": "cpu",
+  "fft_backend": "recovered-fft-numba-strict-no-cache",
+  "native_runtime_differential_verified": false,
+  "configuration": {
+    "sample_rate": 44100,
+    "base_window": 2048,
+    "hop": 512
+  },
+  "frames": 8192,
+  "channels": 2,
+  "analysis_frames_per_channel": 16,
+  "spectral_peaks": 123,
+  "completed_stages": [
+    "signed-int16 input representation",
+    "native N/H selection",
+    "symmetric window",
+    "two-resolution FFT",
+    "native spectral peak selection"
+  ],
+  "unavailable_stages": [
+    "full candidate/trajectory pipeline",
+    "final musical note segmentation",
+    "complete note-level audio resynthesis",
+    "native-equivalent MIDI from input audio"
+  ],
+  "limitations": [
+    "Static-derived, not verified against an original RipX run.",
+    "FFT uses recovered radix-4/2 and packed-real recombination; standard sin/cos roundoff is not original-runtime verified.",
+    "Task-specific leading/trailing context is not reconstructed; file boundaries are zero-padded.",
+    "FFT-bin phase is not final refined harmonic phase.",
+    "This output is spectral analysis, not a separated-stem or note project."
+  ]
+}

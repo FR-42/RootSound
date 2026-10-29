@@ -1,0 +1,3 @@
+/analysis/*.wav
+/analysis/*.npz
+/**/*.f32

@@ -1,0 +1,12 @@
+{
+  "passed": true,
+  "analysis_seconds": 1.4902328999014571,
+  "frames_per_channel": 16,
+  "public_model_imports_blocked": true,
+  "original_source_unchanged": true,
+  "pcm_kernel_roundtrip": true,
+  "overwrite_rejected": true,
+  "empty_components_rejected": true,
+  "hidden_ui_native_action": true,
+  "output": "D:\\RootSound\\experiments\\music-workflow\\ripx-separator\\tests-output\\native-integration-hdsrizeu"
+}

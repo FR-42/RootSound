@@ -3,6 +3,7 @@ import { test } from 'node:test';
 import { createMaterialLibrary, createMaterialCatalog } from '../src/workstation/modules/materials/public.ts';
 import { createWorkspacePreferences } from '../src/workstation/app/platform/preferences.ts';
 import type { SaveResult } from '../src/workstation/contracts/content.ts';
+import type { WorkspacePreferences } from '../src/workstation/contracts/workspace.ts';
 import { registerHooks } from 'node:module';
 const settingsHook = registerHooks({ load(url, context, next) { return url.endsWith('.css') ? { format: 'module', source: '', shortCircuit: true } : next(url, context); } });
 const { showWorkspaceSettings } = await import('../src/workstation/modules/ui-rendering/settings.ts'); settingsHook.deregister();
@@ -105,14 +106,16 @@ class SettingsElement extends EventTarget {
   close() { this.attributes.delete('open'); this.dispatchEvent(new Event('close')); }
 }
 const settingsNodes = (root: SettingsElement): SettingsElement[] => [root, ...root.children.flatMap(settingsNodes)];
-function settingsFixture(fail = false) {
+function settingsFixture(fail = false, initial?: Record<string, unknown>) {
   const descriptor = Object.getOwnPropertyDescriptor(globalThis, 'document');
   Object.defineProperty(globalThis, 'document', { configurable: true, value: { createElement: (tag: string) => new SettingsElement(tag), createTextNode(text: string) { const node = new SettingsElement('text'); node.textContent = text; return node; } } });
-  const map = new Map<string, string>(); const preferences = createWorkspacePreferences({ getItem: key => map.get(key) ?? null, setItem(key, value) { if (fail) throw new Error('read-only'); map.set(key, value); } });
+  const map = new Map<string, string>(initial ? [['rootsound.workstation.preferences.v1', JSON.stringify(initial)]] : []); const preferences = createWorkspacePreferences({ getItem: key => map.get(key) ?? null, setItem(key, value) { if (fail) throw new Error('read-only'); map.set(key, value); } });
+  const updates: Partial<WorkspacePreferences>[] = []; const update = preferences.update;
+  preferences.update = changes => { updates.push({ ...changes }); return update(changes); };
   const root = new SettingsElement('root'); let closed = 0;
   const open = () => showWorkspaceSettings(root as unknown as HTMLElement, preferences, () => { closed++; }); open();
   const find = (predicate: (node: SettingsElement) => boolean) => { const result = settingsNodes(root).find(predicate); assert(result); return result; };
-  return { root, preferences, open, get closed() { return closed; }, performance: () => find(node => node.attributes.get('aria-label') === '键盘演奏'),
+  return { root, preferences, map, updates, open, get closed() { return closed; }, performance: () => find(node => node.attributes.get('aria-label') === '键盘演奏'),
     submit: () => find(node => node.tag === 'form').dispatchEvent(new Event('submit', { cancelable: true })),
     back: () => find(node => node.textContent === '返回').dispatchEvent(new Event('click')),
     error: () => find(node => node.attributes.get('role') === 'status'),
@@ -122,11 +125,39 @@ function settingsFixture(fail = false) {
 test('settings exposes one opt-in keyboard switch, saves it on submit and refreshes once after close', () => {
   const f = settingsFixture(); try {
     assert.equal(f.performance().checked, false); assert.equal(f.preferences.read().keyboardPerformance, false);
+    assert.equal(settingsNodes(f.root).filter(node => node.tag === 'input').length, 1);
+    assert.equal(settingsNodes(f.root).filter(node => node.tag === 'select' || node.tag === 'option').length, 0);
+    assert(!settingsNodes(f.root).some(node => /欢迎|工作区|直接进入/u.test(node.textContent)), 'removed entry controls and explanatory text are absent');
     f.open(); assert.equal(settingsNodes(f.root).filter(node => node.tag === 'dialog').length, 1, 'repeated settings clicks reuse the open page');
     f.performance().checked = true; f.submit(); assert.equal(f.preferences.read().keyboardPerformance, true); assert.equal(f.root.children.length, 0); assert.equal(f.closed, 1);
+    assert.deepEqual(f.updates, [{ keyboardPerformance: true }], 'the sole setting cannot reset any unrelated preference');
     f.open(); assert.equal(f.performance().checked, true); f.performance().checked = false; f.back();
     assert.equal(f.preferences.read().keyboardPerformance, true, 'Back discards uncommitted switch edits'); assert.equal(f.closed, 2);
   } finally { f.cleanup(); }
+});
+
+test('saving the only visible setting preserves retired entry data and unrelated same-version preferences', () => {
+  const initial = { version: 1, keyboardPerformance: false, welcomeEnabled: false, startWorkspace: 'sampling', lastWorkspace: 'song', unrelated: { retained: '原有偏好' } };
+  const f = settingsFixture(false, initial); try {
+    f.performance().checked = true; f.submit();
+    const stored = JSON.parse(f.map.get('rootsound.workstation.preferences.v1')!);
+    assert.deepEqual(stored, { ...initial, keyboardPerformance: true });
+    assert.deepEqual(f.updates, [{ keyboardPerformance: true }]);
+    assert.equal(createWorkspacePreferences({ getItem: key => f.map.get(key) ?? null, setItem() { throw new Error('read only'); } }).read().keyboardPerformance, true);
+  } finally { f.cleanup(); }
+});
+
+test('keyboard setting migrates independently of missing or invalid retired controls without rewriting music', () => {
+  for (const retired of [{}, { welcomeEnabled: 'invalid', startWorkspace: 'removed-workspace' }]) {
+    const key = 'rootsound.workstation.preferences.v1'; const map = new Map([[key, JSON.stringify({ version: 1, keyboardPerformance: true, lastWorkspace: 'phrase', ...retired })], ['song-data', '完整工程原文']]);
+    const writes: string[] = []; const storage = { getItem: (name: string) => map.get(name) ?? null, setItem(name: string, value: string) { writes.push(name); map.set(name, value); } };
+    const preferences = createWorkspacePreferences(storage);
+    assert.equal(preferences.read().keyboardPerformance, true); assert.equal(preferences.read().lastWorkspace, 'phrase');
+    assert.equal(preferences.read().welcomeEnabled, true); assert.equal(preferences.read().startWorkspace, 'last'); assert.deepEqual(writes, [], 'reading preferences does not cause a migration write');
+    preferences.update({ keyboardPerformance: false });
+    assert.deepEqual(writes, [key]); assert.equal(map.get('song-data'), '完整工程原文');
+    assert.equal(createWorkspacePreferences(storage).read().keyboardPerformance, false);
+  }
 });
 
 test('failed settings persistence keeps the page and edited switch available without enabling performance', () => {

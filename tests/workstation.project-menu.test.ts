@@ -45,6 +45,19 @@ function transfer() {
 function named(root: Element, className: string): Element {
   const result = flatten(root).find(node => node.className.split(' ').includes(className)); assert(result); return result;
 }
+
+test('a deleted song disappears while a retained external tone-copy notice remains visible in the library', async () => {
+  let projects = [{ id: 'one', name: '第一首', path: 'D:/RootSound/project/第一首.rootsound' }]; let removals = 0;
+  const f = fixture({ list: async () => projects, remove: async () => { removals++; projects = []; return { warning: '歌曲已删除，外部修改过的音色副本已保留。' }; } });
+  try {
+    f.menu.open(); await settle(); const item = f.button('第一首'); const data = transfer();
+    dragEvent(item, 'dragstart', data); dragEvent(named(f.root, 'project-library-trash'), 'drop', data);
+    f.button('确认彻底删除乐曲').dispatchEvent(new Event('click')); await settle();
+    assert.equal(removals, 1); assert(!visible(f.root).some(node => node.textContent === '第一首'));
+    const notice = named(f.root, 'project-library-error'); assert.equal(notice.hidden, false); assert.match(notice.textContent, /歌曲已删除.*副本已保留/);
+    assert.equal(named(f.root, 'project-delete-overlay').hidden, true);
+  } finally { f.cleanup(); }
+});
 test('song library discovers default files with new first, song tiles in between and file picker last', async t => {
   t.mock.timers.enable({ apis: ['setTimeout'] });
   const f = fixture(); try {

@@ -15,6 +15,8 @@ internal sealed class AudioPlot : Control
     [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
     internal bool Analyzing { get; set; }
     internal event EventHandler? ViewChanged, SelectionChanged, SeekRequested, SeekStarted, SeekEnded;
+    internal event EventHandler? SelectionStarted, SelectionEnded;
+    private bool keyboardSelection;
     private AnalysisFrame? analysis;
     private Bitmap? spectrum;
     private TimelineMarker active = TimelineMarker.Playhead;
@@ -140,7 +142,7 @@ internal sealed class AudioPlot : Control
         PointF[] triangle = marker switch
         {
             TimelineMarker.Playhead => [new(x - 7, area.Top - 12), new(x + 7, area.Top - 12), new(x, area.Top)],
-            TimelineMarker.SelectionStart => [new(x - 11, area.Bottom + 2), new(x, area.Bottom - 10), new(x, area.Bottom + 13)],
+            _ when marker == Timeline.BoundaryMarker(true) => [new(x - 11, area.Bottom + 2), new(x, area.Bottom - 10), new(x, area.Bottom + 13)],
             _ => [new(x + 11, area.Bottom + 2), new(x, area.Bottom - 10), new(x, area.Bottom + 13)]
         };
         g.FillPolygon(fill, triangle);
@@ -168,16 +170,22 @@ internal sealed class AudioPlot : Control
         if (e.Button != MouseButtons.Left) return;
         var area = PlotBounds;
         if (e.X < area.Left - 12 || e.X > area.Right + 12) return;
-        active = HitMarker(e.Location) ?? TimelineMarker.Playhead;
+        BeginGesture(e.Location); Capture = true;
+    }
+    internal void BeginGesture(Point point)
+    {
+        var area = PlotBounds;
+        active = HitMarker(point) ?? TimelineMarker.Playhead;
         drag = active;
         if (active == TimelineMarker.Playhead)
         {
             SeekStarted?.Invoke(this, EventArgs.Empty);
-            if (HitMarker(e.Location) is null)
-                Timeline.Move(active, Math.Round(Timeline.FrameAt((e.X - area.Left) / (double)area.Width)));
+            if (HitMarker(point) is null)
+                Timeline.Move(active, Math.Round(Timeline.FrameAt((point.X - area.Left) / (double)area.Width)));
             SeekRequested?.Invoke(this, EventArgs.Empty);
         }
-        Timeline.BeginDrag(active, e.X); Capture = true; Invalidate();
+        else SelectionStarted?.Invoke(this, EventArgs.Empty);
+        Timeline.BeginDrag(active, point.X); Invalidate();
     }
     protected override void OnMouseEnter(EventArgs e)
     { base.OnMouseEnter(e); if (FindForm()?.ContainsFocus == true) Focus(); }
@@ -191,14 +199,11 @@ internal sealed class AudioPlot : Control
         }
         if (drag is { } marker)
         {
-            Timeline.Drag(e.X, PlotBounds.Width, (ModifierKeys & Keys.Shift) != 0);
-            if (marker == TimelineMarker.Playhead) SeekRequested?.Invoke(this, EventArgs.Empty);
-            else SelectionChanged?.Invoke(this, EventArgs.Empty);
-            Invalidate(); return;
+            MoveGesture(e.X, (ModifierKeys & Keys.Shift) != 0); return;
         }
         var hit = Timeline.HasAudio ? HitMarker(e.Location) : null;
         Cursor = hit is not null ? Cursors.SizeWE : Cursors.Cross;
-        string? text = hit switch { TimelineMarker.Playhead => "播放位置 · 拖动 / Shift 精调", TimelineMarker.SelectionStart => "采样起点 · 拖动 / Shift 精调", TimelineMarker.SelectionEnd => "采样终点 · 拖动 / Shift 精调", _ => null };
+        string? text = hit switch { TimelineMarker.Playhead => "播放位置 · 拖动 / Shift 精调", not null => "蓝线 · 拖动 / Shift 精调", _ => null };
         if (text != currentTip) { currentTip = text; tip.SetToolTip(this, text); }
     }
     protected override void OnMouseUp(MouseEventArgs e)
@@ -208,11 +213,21 @@ internal sealed class AudioPlot : Control
     }
     protected override void OnMouseCaptureChanged(EventArgs e)
     { base.OnMouseCaptureChanged(e); if (!Capture) EndGesture(); }
-    private void EndGesture()
+    internal void MoveGesture(int x, bool precise)
+    {
+        if (drag is not { } marker) return;
+        Timeline.Drag(x, PlotBounds.Width, precise);
+        if (marker == TimelineMarker.Playhead) SeekRequested?.Invoke(this, EventArgs.Empty);
+        else SelectionChanged?.Invoke(this, EventArgs.Empty);
+        Invalidate();
+    }
+    internal void EndGesture()
     {
         bool wasSeeking = drag == TimelineMarker.Playhead;
+        bool wasSelecting = drag is TimelineMarker.SelectionStart or TimelineMarker.SelectionEnd;
         drag = null; panning = false; Timeline.EndDrag(); Capture = false; Cursor = Cursors.Cross;
         if (wasSeeking) SeekEnded?.Invoke(this, EventArgs.Empty);
+        else if (wasSelecting) SelectionEnded?.Invoke(this, EventArgs.Empty);
     }
     protected override void OnMouseWheel(MouseEventArgs e)
     {
@@ -228,11 +243,23 @@ internal sealed class AudioPlot : Control
         base.OnKeyDown(e); if (!Timeline.HasAudio) return;
         if (e.KeyCode is not (Keys.Left or Keys.Right or Keys.Home or Keys.End)) return;
         if (active == TimelineMarker.Playhead) SeekStarted?.Invoke(this, EventArgs.Empty);
+        else if (!keyboardSelection) { keyboardSelection = true; SelectionStarted?.Invoke(this, EventArgs.Empty); }
         if (e.KeyCode is Keys.Home or Keys.End) Timeline.Move(active, e.KeyCode == Keys.Home ? 0 : Timeline.FrameCount);
         else Timeline.Nudge(active, e.KeyCode == Keys.Left ? -1 : 1, e.Shift);
         if (active == TimelineMarker.Playhead) { SeekRequested?.Invoke(this, EventArgs.Empty); SeekEnded?.Invoke(this, EventArgs.Empty); }
         else SelectionChanged?.Invoke(this, EventArgs.Empty);
         Invalidate(); e.Handled = true; e.SuppressKeyPress = true;
+    }
+    protected override void OnKeyUp(KeyEventArgs e)
+    {
+        base.OnKeyUp(e);
+        if (e.KeyCode is Keys.Left or Keys.Right or Keys.Home or Keys.End) EndKeyboardSelection();
+    }
+    protected override void OnLostFocus(EventArgs e) { base.OnLostFocus(e); EndKeyboardSelection(); }
+    private void EndKeyboardSelection()
+    {
+        if (!keyboardSelection) return;
+        keyboardSelection = false; SelectionEnded?.Invoke(this, EventArgs.Empty);
     }
     private static Bitmap MakeBitmap(AnalysisFrame value)
     {

@@ -120,6 +120,32 @@ function auditionPhrase() {
   return phrase;
 }
 
+test('audition scope sync reuses its supplied view but async completion still checks the live phrase', async () => {
+  const phrase = auditionPhrase();
+  const initial = phrase.read();
+  const partId = initial.body!.parts[0]!.id;
+  const timbreId = initial.body!.parts[0]!.timbreId;
+  let reads = 0;
+  const view = { ...phrase, read() { reads++; return phrase.read(); } };
+  const heard: number[] = []; const errors: string[] = [];
+  const audition = createPhraseAudition(view, { async audition(plan) { heard.push(plan.note.frequencyHz); }, cancelAudition() {} },
+    () => partId, error => errors.push(error));
+  audition.sync(initial);
+  assert.equal(reads, 0, 'synchronous selection/paint must not reread the whole phrase');
+  const ready = deferred();
+  const pending = audition.request(440, .2, .7, ready.promise);
+  await settle();
+  phrase.create(timbreId);
+  audition.sync(initial); // A late view cannot authorize playback in a different draft.
+  assert.equal(reads, 1);
+  ready.resolve(); await pending;
+  assert.equal(reads, 2); assert.deepEqual(heard, []); assert.deepEqual(errors, []);
+  reads = 0;
+  await audition.requestTimbre(timbreId);
+  assert.equal(reads, 2, 'one live snapshot per synchronous side of timbre preparation');
+  assert.equal(heard.length, 1); assert.deepEqual(errors, []); audition.cancel();
+});
+
 test('a generated-note audition survives live head movement by waiting for the main player restart', async () => simulatedDevice(async () => {
   const phrase = auditionPhrase(); const part = phrase.read().body!.parts[0]!.id;
   phrase.addNote(part, { startBeat: 0, durationBeats: 4, frequencyHz: 440, velocity: .75 });

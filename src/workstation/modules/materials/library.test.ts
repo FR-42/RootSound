@@ -2,9 +2,55 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { createMaterialLibrary } from './public.ts';
 import type { ContentRecord, Draft, MaterialLibrary, NewContent, SaveResult } from './public.ts';
+import { copyJson, sameJson } from './json-value.ts';
 
 const input = (name = '柔和音色', dependencies: string[] = []): NewContent => ({
   kind: 'timbre', schemaVersion: 1, owner: 'timbre', name, dependencies, body: { gain: 0.4 },
+});
+
+test('JSON snapshots retain independent objects, JSON key order and safe special property names', () => {
+  const value = JSON.parse('{"__proto__":{"unchanged":true},"constructor":{"value":3},"items":[1,{"n":4},null]}');
+  const copied = copyJson(value);
+  assert.deepEqual(copied, value);
+  assert.equal(Object.getPrototypeOf(copied), Object.prototype);
+  assert.equal(Object.hasOwn(copied, '__proto__'), true);
+  copied.__proto__.unchanged = false; copied.items[1].n = 8;
+  assert.equal(value.__proto__.unchanged, true); assert.equal(value.items[1].n, 4);
+  const optional = { first: 1, absent: undefined, callback() {}, token: Symbol('not JSON'), values: [undefined, -0, () => 1, Symbol('array')] };
+  assert.deepEqual(copyJson(optional), JSON.parse(JSON.stringify(optional)));
+  for (const [left, right] of [[optional, { first: 1, values: [null, 0, null, null] }],
+    [{ a: 1, b: [2, 3] }, { a: 1, b: [2, 3] }], [{ a: 1, b: 2 }, { b: 2, a: 1 }],
+    [[1, 2], [1, 3]], [value, copyJson(value)]]) {
+    assert.equal(sameJson(left, right), JSON.stringify(left) === JSON.stringify(right));
+  }
+});
+
+test('large embedded strings are never serialized by snapshot reads and only once by a small persisted edit', t => {
+  let raw: string | null = null; let writes = 0;
+  const library = createMaterialLibrary({ read: () => raw, write(value) { raw = value; writes++; } });
+  const large = saved(library.saveDraft(library.createDraft({ ...input('large audio'),
+    body: { encoded: 'A'.repeat(1024 * 1024), nested: { value: 1 } } }).id, 'new'));
+  const small = library.createDraft({ ...input('small phrase', [large.id]), body: { notes: [{ beat: 0, pitch: 440 }] } });
+  let largeSerializations = 0;
+  const stringify = JSON.stringify;
+  t.mock.method(JSON, 'stringify', (value: unknown, ...args: unknown[]) => {
+    const result = Reflect.apply(stringify, JSON, [value, ...args]) as string | undefined;
+    if (result && result.length > 1024 * 1024) largeSerializations++;
+    return result;
+  });
+  const copy = library.readContent(large.id)!;
+  (copy.body as { nested: { value: number } }).nested.value = 99;
+  library.readDraft(small.id); library.listDrafts(); library.listContent();
+  library.readContentInfo(large.id); library.listContentInfo(); library.readDraftHistory(small.id);
+  assert.equal(largeSerializations, 0, 'read-only snapshots must not stringify embedded source audio');
+  assert.equal((library.readContent(large.id)!.body as { nested: { value: number } }).nested.value, 1);
+  const beforeWrites = writes;
+  library.updateDraft(small.id, { body: { notes: [{ beat: .25, pitch: 450 }] } }, { remember: true, expected: small });
+  assert.equal(writes, beforeWrites + 1);
+  assert.equal(largeSerializations, 1, 'only durable serialization may visit the large source string');
+  const reopened = createMaterialLibrary({ read: () => raw, write() { throw new Error('read only'); } });
+  assert.deepEqual(reopened.readDraft(small.id)!.body, { notes: [{ beat: .25, pitch: 450 }] });
+  assert.equal((reopened.readContent(large.id)!.body as { encoded: string }).encoded.length, 1024 * 1024);
 });
 function saved(result: SaveResult) {
   assert.equal(result.status, 'saved');

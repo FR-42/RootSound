@@ -11,6 +11,8 @@ export interface ReferenceAdapter {
   kind: string;
   slots(record: ContentRecord | Draft): ReferenceSlot[];
   replace(record: ContentRecord | Draft, replacements: ReferenceReplacement[]): DraftChanges;
+  /** Rewrite non-musical identity metadata when a complete graph receives new ids. */
+  remapMetadata?(record: ContentRecord | Draft, identities: ReadonlyMap<string, string>): Pick<DraftChanges, 'body'>;
   /** The owner verifies which content kinds each slot can consume. */
   validateTarget?(record: ContentRecord | Draft, slotId: string, target: ContentRecord): void;
 }

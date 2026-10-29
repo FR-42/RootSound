@@ -1,9 +1,487 @@
 # RootSound TODO
 
+## RB83 Large native project opening — IMPLEMENTED 2026-10-29
+
+- Fix the reported128MiB rejection for the463,559,570-byte native project.
+  Current512MiB file budget is an implementation bound, not a permanent product
+  decision. Standard JSON-compatible large-text encoding avoids System.Text.Json's
+  separate token limit in storage Read, Inspect, Create/Copy, Save and Rename.
+  Strict Unicode/control escaping and final UTF8 size checks remain.
+- Stream full-content fingerprints; no equal-size/mtime shortcut. Retain only
+  detached envelope metadata, not the giant raw JSON document. Existing locking,
+  external-change protection, atomic backup and explicit-saving policy remain.
+- Final release `20261029-110855-201-33ecdb`:1109 application checks and135 actual
+  native checks pass (61 project,21 timbre,14 MIDI,39 file).129MiB real write/read/
+  bridge/reopen and same-size/same-mtime external conflicts covered; JSON semantics,
+  invalid Unicode and unknown metadata verified.6 UI assets, launcher and tested
+  native DLL hashes match. Build succeeds; one Vite size notice, .NET0 warnings.
+- Actual supplied original read-only SHA256/mtime/backup unchanged. Native Read's
+  JSON response passes production TS platform/library restoration and full6-track,
+  42-sample/42-trigger playback preparation (164.215714s). An isolated full-size copy
+  passes scoped draft update without disk writes, explicit save/backup/cold reopen
+  and Save As. No visible UI, physical audio or actual COM marshaling tested.
+  Large inline-audio projects still incur substantial time/memory; do not claim
+  a GUI speed or listening result. Evidence `.test-output/rb83/` and `real/`.
+
+## EXP GPU execution / CPU default — IMPLEMENTED 2026-10-29
+
+- Installed separate, officially verified PyTorch/torchaudio2.7.1+xpu and locked
+  Intel dependencies under `.cache/tone-structure-gpu`; actual Arc GPU tensor and
+  multi-window Demucs inference pass. CPU packages/weights and other tools kept.
+  GPU/Auto/CPU radio choices, asynchronous detection, real device reporting,
+  strict-GPU errors and disclosed Auto CPU retries, cancellation cleanup.
+- User selects CPU after timings: all entry points/dialog now default CPU and
+  default chooser does not initialize GPU. GPU remains an explicit option.
+  Partial XPU operator CPU fallback is disclosed; retain float32.30s controlled
+  mix: CPU15.69s/GPU21.51s; max stem RMS difference2.04e-8. Not a universal
+  speed result or real-music listening acceptance.
+- Final release `20261029-095103-643-f6dd4e`:28 final UI/default checks including
+  real direct-CPU inference with GPU installed.100 backend checks and2471 shared
+  native/21 JS from full run `20261029-094450-786-ec8ae7`; worker/shared DLL
+  byte-identical. GPU/CPU numeric agreement, stereo/mono, actual cancellation,
+  failure/retry, mode selection and offscreen chooser verified. Final main/shared
+  DLLs and worker match tested files;10 assets/launcher hashes checked.
+- Evidence `.test-output/tone-structure/20261029-095103-643-f6dd4e/`, plus full
+  backend directory and30s benchmark. No user desktop or physical audio device
+  used. Final build has only NU1900 audit-feed warnings. Manual reproducible
+  `tone-structure/Setup-Gpu.ps1` does not alter global Python or graphics drivers.
+
+## EXP Selectable separation methods — IMPLEMENTED 2026-10-29; listening pending
+
+- Five genuinely different choices in a small dialog: cached Hybrid Demucs,
+  HPSS, non-local repetition, stereo Mid/Side, original NMF (2–8 requested layers).
+  Describes use/limits and disables unsupported choices. No silent fallback.
+  Model lookup covers the actual launcher's module directory as well as experiment
+  roots; worker is packaged in the release and its verified local weights load
+  with weights_only. No downloads or worker network connections.
+- Re-decomposition uses original input and replaces the full current result;
+  undo restores exact prior layers/mutes. Refinement can use another principle,
+  replacing only its selected parent and inheriting its mute state. Existing
+  shared clock, original comparison, source protection and WAV paths remain.
+- Release `20261029-090259-774-aa8f82`:80 structure checks,2471 shared native
+  assertions and21 JS checks pass. Controlled sustained/attack, repetition/one-off
+  and mid/side content checks; long721s reference/tail analysis; actual cached
+  model inference in mono16000Hz and multi-window stereo22050Hz, complementary
+  reconstruction <=2.98e-8, model cancellation, chooser and undo/refinement.
+- Evidence `.test-output/tone-structure/20261029-090259-774-aa8f82/`: metrics,
+  offscreen chooser/layout PNGs, full build and release verification. Main/shared
+  DLLs, worker,10 UI assets and launcher match tested files; existing Tone entry
+  and selected release unchanged, legacy entry absent. NU1900 audit-feed warnings
+  only. No user desktop window shown or physical audio device used. These
+  controlled checks are not real-music separation or listening acceptance.
+
+## EXP Tone Structure — IMPLEMENTED 2026-10-29; real-music listening pending
+
+- New independent `experiments/music-workflow/音色结构.exe`: shared capture/EQ
+  transfers long selections into a structure page. Learned similar/repeating
+  spectral templates produce aligned simultaneous layers; complementary residual
+  reconstruction avoids duplicating the full input across outputs. Selected-parent
+  refinement replaces that parent; eight undo states and16 current layers.
+- Shared playback clock and seek ruler, independent active/mute, exclusive original
+  comparison, live frequency-versus-dBFS lines with exactly aligned axes, individual
+  layer/active-mix WAV export, cancellable bounded-memory disk processing. Retains
+  capture state; new analysis replacement prompts; closing cleans owned caches.
+- Release `20261029-082851-912-0a8d89`: 41 structure checks pass, including controlled
+  component concentration and max sum error2.98e-8, refinement/undo, shared-clock
+  playback, cancellation,721s input,40s real capture transfer, hidden WebView2 and
+  offscreen layout/paused-seek refresh. These are synthetic checks, not semantic
+  instrument-separation accuracy claims. Real music may leak across layers.
+- 2471 shared native assertions and21 JS checks reused from full run
+  `20261029-082453-646-85f042`; shared DLL byte-identical. Tested main/shared DLLs,
+  ten UI assets and launcher verified. Existing Tone Processor release unchanged.
+  Build only has NU1900 audit-feed warnings; no code errors.
+- Evidence `.test-output/tone-structure/20261029-082851-912-0a8d89/`: verification,
+  structure checks/metrics, final/shared build logs and reviewed offscreen PNGs.
+  No user desktop window shown or physical audio device used. Musical usefulness,
+  leakage and actual listening remain for user evaluation.
+
+## EXP Blue markers — IMPLEMENTED 2026-10-29; real listening pending
+
+- Both unified pages allow blue-marker crossing with stable marker identities
+  and ordered selection bounds for editing/saving. Earlier/later numeric fields
+  resolve the current spatial boundary. Capture dragging reanchors the looping
+  source at the existing device clock, without pause, seek or device restart;
+  red/audio continue until a changed edge is reached. Empty ranges cannot play.
+- Release `20261029-072844-107-70b070`: 21 JS, 2471 native assertions including
+  102 blue-marker assertions, 79 timbre groups and 60 sample-editor groups pass.
+  Real PlaybackEngine plus simulated device verifies clock advance and unchanged
+  seek/reset/stop counts. Ten assets, tested DLL and sole launcher hashes match;
+  removed legacy alias remains absent. NU1900 audit-feed warning remains.
+- Evidence `.test-output/tone-processor/20261029-072844-107-70b070/` and
+  `.test-output/tone-processor/blue-sample-editor-regression/`. No user window
+  shown or physical audio device opened; actual listening/drag feel pending.
+
+## EXP Unified Tone Processor — IMPLEMENTED 2026-10-29; real use pending
+
+- “音色器” opens on timbre polishing. The boxed plus below the sample list
+  enters song capture/EQ; export transfers the processed blue selection directly
+  into the list and returns. Later captures append references without replacing
+  the primary. A back button also returns without adding audio.
+- Both pages stay alive through navigation, retaining song/cache, markers,
+  view, EQ and trim undo history; captured samples own independent PCM. Keep
+  existing 30-second/eight-sample limits and source-file identity protection.
+  User confirms retention only during the current open session, not reopening.
+  Follow-up: user removes the legacy `音色打磨.exe` entry. Only `音色器.exe`
+  remains and builds no longer recreate the old alias; historical build commands
+  still forward to the merged tool. The two-launcher verification below is the
+  historical merge-release result.
+- Release `20261029-070259-090-f46dbd`: 21 JS checks, 2369 native assertions
+  (27 new unified-workflow checks) and all 79 prior timbre groups pass. Includes
+  hidden WebView2 actual EQ transfer, -12 dB samples, repeated navigation,
+  failed/full/canceled transfers, independent snapshots and shutdown cleanup.
+  Ten assets, tested DLL and both launcher hashes match; build-script parsing
+  and Windows encoding checked. NU1900 audit-feed access warning remains.
+- Evidence: `.test-output/tone-processor/20261029-070259-090-f46dbd/` with
+  `release-build.log` and `release-verification.json`. No desktop window shown
+  or physical sound device opened; actual listening and mouse feel pending.
+
+## EXP Tone Processor — IMPLEMENTED 2026-10-29; listening acceptance pending
+
+- Independent `experiments/music-workflow/tone-processor` and `音色器.exe`:
+  multi-format long import, draggable spectrogram markers and zoom, selection
+  looping, play/pause and return, trim/undo, unchanged shared Spectral Forge EQ
+  editor/DSP, processed frequency overlay, and blue-range-only 24-bit WAV export.
+  Inputs remain protected; no timbre/project format added. Import/export folders
+  are remembered separately; audio processing is bounded and disk-backed.
+- Release `20261029-003347-724-8db1f6`: 21 JS checks and 2342 native assertions
+  passed. Actual WAV/MP3/FLAC/M4A decoders, 721-second import/full export, EQ
+  sample comparisons, selection/loop/reset/cancellation and hidden WebView2
+  worker/bridge validated. Ten UI/shared assets, tested DLL and launcher hashes
+  match. Build has the existing NU1900 feed/audit access warning; no code errors.
+- Evidence: `.test-output/tone-processor/20261029-003347-724-8db1f6/` including
+  `release-build.log`, `release-verification.json`, spectrogram and audio fixtures.
+  No user desktop window was shown and no physical audio device was used.
+  Actual listening, drag feel and musical acceptance remain for the user.
+
+## RB82 Wheel duration fine adjustment — IMPLEMENTED 2026-10-29; real use pending
+
+- A selected note receives ordinary vertical wheel input over the roll; up
+  lengthens/down shortens, about10ms per normalized notch with fractional input.
+  Onset/pitch/mix/selection/view/head stay intact; width, console and live callback
+  update, undo works, explicit saving remains required. Labels/ruler/modifiers,
+  pure horizontal input and family-only selection retain navigation.
+- Preserve tiny notes, natural tails and long legacy beat notes; normalize device
+  units, limit large deltas, re-read after pending-field flush and protect modal/
+  invalid input/failure paths. Five new checks;71 editor targets and1109 full tests pass.
+- Release `20261029-000655-082-02a1de`, six UI assets and launcher hashes match.
+  TypeScript/desktop pass; .NET zero warnings/errors, one Vite size notice. DLL
+  matches RB81:134 prior native results reused, no native rerun. Evidence
+  `.test-output/rb82/`; no desktop/device/user-project operations.
+
+## RB81 Explicit saving and disposable drafts — IMPLEMENTED 2026-10-29; real use pending
+
+- Native edits/checkpoints now change working memory only. Formal file bytes,
+  modification times, backups and mirrors remain unchanged until explicit save.
+  Discard releases the working state without rewriting the original. Dirty opens
+  and new creates cannot silently switch projects; explicit CreateCopy saves a copy.
+- Phrase Save confirms into the working song; song Save persists the whole file,
+  as explicitly confirmed by the user. New work has projectRootId custody but no
+  phrase Content/member/library tile until Save. Library metadata stays confirmed.
+- Phrase exit offers save/discard/continue, restoring adopted drafts or removing
+  unpublished work plus children; history is cleared, failed writes preserve work.
+  Save As retires old scratch state; failed cleanup returns to an accessible original.
+- Project save/copy/close-save reject unfinished phrase work. Window close flushes
+  fields through an awaited handshake, with save/discard/cancel; blocked saves do
+  not prevent explicit discard. Confirmed phrase deletion no longer checkpoints disk.
+- 1104 full-suite checks pass; final type refinement reruns43 integration checks.
+  Custody156, phrase product64, root library/directory37 targets pass. Final release
+  `20261028-232852-347-cd9d33` reruns134 native checks:61 project,21 tone,14 MIDI,
+  38 storage/audio/project/sample. No native evidence reused. Six UI assets and root
+  launcher hashes match; TypeScript/desktop pass, .NET zero warnings/errors and one
+  Vite size notice. Evidence `.test-output/rb81/` and draft-project-ownership logs.
+  No GUI, sound device or user-project writes; actual window-close UX remains open.
+
+## RB80 Creation overview and phrase console — IMPLEMENTED 2026-10-29; real use pending
+
+- Keep the read-only upper overview and enter unified Creation through its left
+  control. Remove right Create tiles and the separate Rhythm interface. Replace
+  the lower area with phrase metadata/master volume. Retain the divider limits,
+  cancellation, keyboard control and mounted ratio memory; default upper ratio75%.
+- Legacy rhythm parts keep their IDs, markers, pitches and timing. Unified preview,
+  piano-roll editing, family rebinding, whole-phrase playback/save/undo work for
+  every part. Tone removal can address all current-phrase uses in one transaction;
+  the song's shared asset and other phrases retain their protections.
+- Console volume shares the existing live preview and one-commit history; cancel
+  restores both controls, and console gestures do not pan or seek the overview.
+- 1082 full-suite checks pass, with90 unified-edit/helper,87 shell/production and13
+  preview/split checks. Release `20261028-225000-650-e494a9`, six UI assets/root
+  launcher match. TypeScript/desktop build pass; .NET zero warnings/errors, one
+  Vite size notice. Native DLL unchanged:130 earlier checks reused, none rerun.
+  Evidence `.test-output/rb80/` and `.test-output/rb80-ui-final.log`; no desktop,
+  audio device or user-project writes. Visual and gesture acceptance remains open.
+
+## RB79 Gentler row dragging and phrase-library opening — IMPLEMENTED 2026-10-29; real use pending
+
+- Horizontal row movement uses75% of pointer displacement; vertical movement,
+  bounds and full-release deletion protection remain. Fractional movement,
+  narrow layouts, release reversal and cancellation pass their targeted checks.
+- Phrase-library double-click opens the original phrase, including hidden ones,
+  cancelling all pending single-click toggles. Single-click visibility toggling
+  and drag-delete warnings remain. Failed opening stays retryable; navigation
+  avoids stealing focus from the new page. Renaming remains in the phrase header.
+- 1070 full-suite checks pass, including128 library/studio checks and11 targeted
+  row checks. Production integration opens a hidden phrase with unchanged song
+  visibility/source content. Release `20261028-223403-850-2f282b`, six UI assets
+  and root launcher match. TypeScript/desktop build pass; .NET zero warnings/errors,
+  Vite one size notice. Native DLL unchanged:130 prior checks reused, none rerun.
+  Evidence `.test-output/rb79/`; no desktop/audio-device/user-project operations.
+
+## RB78 Diagonal row dragging and coordinated fading — IMPLEMENTED 2026-10-29; real use pending
+
+- Row controls follow both axes continuously. Horizontal travel is bounded from
+  zero to one actual control-column width, including the narrow layout. Neighbors
+  yield vertically; release animates both axes into place. This replaces the
+  original direction lock and fixed140px deletion threshold.
+- Trash opacity rises more slowly (squared progress); only the dragged row's
+  visible grid band fades with rightward travel. Returning left restores it.
+  Only an actual full-right release requests deletion, with the existing populated
+  row warning. Cancel/lost capture/Escape/wheel/save/refresh/disposal clear previews
+  without committing provisional row movement or interrupting playback.
+- 1065 full-suite checks pass, including93 playlist/performance checks. Release
+  `20261028-222504-709-90af35`; six UI files and root launcher hashes match.
+  TypeScript/desktop build pass; .NET zero warnings/errors, Vite one size notice.
+  Native DLL matches RB77: reuse130 previous native checks, none rerun this batch.
+  Evidence `.test-output/rb78/`; no desktop, audio device or user-project writes.
+  Real gesture smoothness remains for user evaluation.
+
+## RB77 Drag drawing, subdivisions and removal confirmation — IMPLEMENTED 2026-10-28; real use pending
+
+- User clarified that selecting the left total-note family enables drag drawing
+  on blank space. The ghost has continuous width; release commits/auditions once.
+  Unselected/Alt/middle navigation and existing-note move/resize remain available.
+- Per-phrase stepsPerBeat accepts integers2–9, omitted older values mean4. Both
+  departments share it; editing the grid never retimes existing notes. Dynamic
+  mouse/typing/rest/nudge fields use it and protect incomplete final cells.
+- Custom/imported/edited tone removal asks first, including unsaved parameter
+  changes. Existing phrase/song library warnings remain. Right-swiping a row
+  reveals the red trash; the current140px threshold is an implementation choice.
+  Only actual release can delete: empty rows immediately, populated rows after
+  confirmation and unchanged-row validation. Cancelling preserves playback/data.
+- 1062 full-suite checks pass; release `20261028-113909-491-547a50`, six UI assets
+  and launcher match. .NET zero warnings/errors; Vite one bundle-size notice.
+  Native DLL matches RB76: reuse130 prior checks, no native rerun this batch.
+  Evidence `.test-output/rb77/`; no desktop/device/FPS/listening acceptance or user-project writes.
+
+## RB76 Library organization and contextual navigation — IMPLEMENTED 2026-10-28; real use pending
+
+- New phrases inherit the Arrangement grid BPM displayed at creation, including
+  the current tempo segment. Copies retain their own tempo. Unused bundled tones
+  can leave the library without reseeding; referenced tones and unfinished edits
+  retain their existing protections. Library drag order is song-wide and portable.
+- Settings expose keyboard performance only. Retired entry preferences remain
+  compatibility data, not hidden startup controls. Label/control-block wheels use
+  vertical navigation by default, horizontal with Shift, and zoom with Ctrl;
+  main-grid mappings remain unchanged. Overflowing consoles scroll locally while
+  range controls keep their own wheel adjustment.
+- Tone-library metadata rebases only the corresponding non-musical occurrence
+  snapshots; musical conflicts still fail. 1025 full-suite checks pass. Release
+  `20261028-105314-011-85d7f3`: .NET zero warnings/errors, Vite one bundle-size notice.
+  Six UI assets and launcher match. The native DLL matches RB75: 21 tone checks
+  rerun using the new deleted/reordered fixture; 109 other checks reuse RB75 evidence.
+  Evidence `.test-output/rb76/`; no desktop/device/FPS/listening acceptance or user-project writes.
+
+## RB75 Tone file import and continuous MIDI phrases — IMPLEMENTED 2026-10-28; real use pending
+
+- Import song-wide tones through the library + tile, remember the picker directory, preserve complete
+  `.rssynth`/`.rssound` graphs and independent song scopes; no automatic notes.
+  Legacy `.rstimbre` sample archives remain unsupported, without approximation.
+  Exact per-note pitch/velocity/gate are prepared in a background worker; cross-note
+  glide and global nonlinear mixing differ from the experiment's multi-note engine.
+- Recoverable mirrors: `D:/RootSound/timbres/<manifestGUID>/`; self-contained
+  `.rootsound` remains authoritative. Current-root/member/valid-draft projection
+  excludes foreign/history/stale data. Modified/additional files are preserved;
+  project deletion cleans only unchanged managed copies, reporting warnings.
+- Current choices: 1024 beats / 256 bars, 50000 notes per phrase; MIDI lanes stay
+  contiguous except real tempo/resource boundaries. Actual Vulcanus: 225→17 clips,
+  5267 notes / 164.0213 seconds, exact timing and portable edit/undo/save verified.
+  Existing songs are not auto-rewritten/resegmented; reimport MIDI for this layout.
+  Runtime still bounds 600 seconds, 256 waveform sources and 128 MiB spectral work.
+- 1001 full-suite checks pass; subsequent save-field refinement passes 27 affected
+  UI checks/type checking. Eleven spectral checks include actual worker evidence.
+  Release `20261028-101232-024-28ef6a`: .NET 0 warnings/errors, TypeScript/Vite pass
+  with one nonblocking JS bundle-over-500KB notice. Final binary reruns 130 native
+  checks (21+57+14+38), without reused binary evidence; 6 UI assets/launcher match.
+  Both source hashes remain unchanged. Evidence: `.test-output/timbre-import/`
+  `final-full-tests.log`, `final-editor-tests.log`, `desktop-build.log`,
+  `release-verification.json`, `spectral-actual.json`, `native/` reports, and
+  `.test-output/midi-phrase-length/actual-conversion.json`. No GUI/device/FPS/listening acceptance.
+
+## RB74 Resizable phrase sections — IMPLEMENTED 2026-10-28; real use pending
+
+- The overview divider resizes Melody/Rhythm symmetrically and aligns their left
+  controls. On initial opening, exactly one empty section defaults to minimum;
+  both populated or both empty defaults to half each. Undefined-tone notes count.
+  The 15%–85% bounds, 64px minimum when space permits, equal sharing in very small
+  windows, keyboard arrows/Home/End and mounted-memory storage are implementation
+  choices, not additional permanent user requirements.
+- Same-draft refresh, in-place Save continuation and detailed-editor return retain
+  layout; a real new draft recomputes its default. Resize clamps displayed size
+  without discarding the desired ratio, and zero height preserves that preference.
+  Escape/pointer cancellation restores the starting ratio and both vertical
+  offsets; lost capture ends adjustment. Frame-coalesced resizing does not write
+  music, prepare audio or interrupt playback. Shared time and independent vertical
+  navigation remain intact; layout is not added to the project format.
+- Final verification: 970 program checks pass; release
+  `20261028-092408-127-7b6e7e`, build 0 warnings / 0 errors. All 5 UI files and
+  the root launcher match their hashes. The DLL is byte-identical to RB73;
+  existing 14+57+38 native results are reused, not rerun. Nine new targeted checks
+  are included in the full suite, including cancellation of ratio and both tops.
+  Evidence under `.test-output/phrase-divider/`: `final-full-tests.log`,
+  `targeted-tests.log`, `cancel-targeted-tests.log` and `release-verification.json`.
+  No real desktop, sound-device or FPS acceptance was performed.
+
+## RB73 two-axis navigation and phrase overview notes — IMPLEMENTED 2026-10-28; real use pending
+
+- Blank dragging pans both axes together in Arrangement, Melody and Rhythm.
+  The phrase overview now previews each section's real notes, replacing its old
+  blank state: full pitch rows for Melody, section part rows for Rhythm, with
+  undefined tones dimmed. Horizontal seconds/zoom are shared; vertical offsets
+  and row heights belong to each section. The overview stays read-only and uses
+  the existing Create entry for detailed editing.
+- Implementation choices: a 4px click/drag threshold, frame-coalesced view updates,
+  clipped/reused note nodes and one deterministic phrase-wide eight-color palette.
+  Entering/returning from detailed editing and in-place Save retain the current
+  navigation in mounted UI memory, not in the project format or across app restarts.
+  BPM changes move note onsets while explicit held seconds stay fixed; preview
+  snapshots reflect editing, tone replacement, deletion and extension.
+- Final verification: 961 program checks pass; release
+  `20261028-085938-686-f0e69d`, build 0 warnings / 0 errors. All 5 UI files and
+  the root launcher match their hashes. The DLL is byte-identical to RB72;
+  existing 14+57+38 native results are reused, not rerun. Seven renderer tests,
+  real mountStudio integration, diagonal Arrangement dragging and child-editor
+  navigation/click handling are covered. View operations preserve the complete
+  draft/token and the same playing session with one visible head. BPM changes
+  preserve fixed-second note widths; added/deleted/recolored notes update correctly.
+  Evidence under `.test-output/two-axis-navigation/`: `full-tests.log`,
+  `desktop-build.log` and `release-verification.json`. No real desktop, sound-device,
+  listening or FPS acceptance was performed.
+
+## RB72 Arrangement scrolling performance — IMPLEMENTED 2026-10-28; real use pending
+
+- Pan/zoom uses current song and phrase metadata snapshots. Animation frames
+  coalesce consecutive wheel input; visible clip/grid/row nodes are reused.
+  Scrolling does not rebuild row controls, the shelf or the inspector. Returning
+  rows refresh names, colors, solo/mute and selection, including stale offscreen
+  selection. Visible rename inputs retain their nodes; genuinely offscreen
+  inputs blur and save before removal.
+- The app scans current project membership once, reads authorized phrases in
+  one batch and keeps one small metadata cache per library/song/token. Edits,
+  undo/redo and song changes refresh it; callers receive independent copies.
+  Current-song and history isolation remain strict, with independent ownership
+  validation for single-item reads. Actual 225-phrase offline list calls fall
+  from about 250 to 7.23 ms cold and 0.0063 ms at the same token; the warm figure
+  excludes an additional song.read call. These are call timings, not FPS.
+- Final verification: 943 program checks pass (`final-full-tests.log`), release
+  `20261028-082554-119-721963`, build 0 warnings / 0 errors. All 5 UI files and
+  the root launcher match their hashes. The DLL is byte-identical to RB71;
+  its existing 14+57+38 native results are reused, not rerun this time.
+  Independent headless measurement on the actual 17-row / 225-clip / 5267-note
+  fixture: 30 wheel events before one animation frame reduce phrase-list calls
+  150→0, new DOM nodes 3649→0 and row-control rebuilds 30→0, using one frame.
+  Arrow-key pan/zoom reads no song/material data. Fixture hash is unchanged.
+  Evidence under `.test-output/playlist-performance/`: `before-domain.json`,
+  `after-domain.json`, `before-ui.json`, `after-ui.json`, `final-full-tests.log`
+  and `release-verification.json`. No desktop, real sound-device or FPS acceptance.
+
+## RB71 full-song MIDI capacity — IMPLEMENTED 2026-10-28; real use pending
+
+- Replaces the old 2048-note whole-song guard with one shared 50000 sounding-note
+  budget for MIDI conversion, song plans, audition and WAV export. Long sequences
+  prepare short windows ahead of the device clock and promptly release finished
+  nodes. Pause/resume/live replacement and offline batches retain that clock;
+  sustained notes span window boundaries. This does not change MIDI instrument
+  approximation or restore unsupported controllers.
+- Still bounded: 10 minutes, 256 simultaneous waveform sources, at most 4096
+  upcoming waveform sources in any 0.35-second interval, 128 rows, 512 clips, and
+  512 notes / 64 beats per phrase. Excess resources are rejected, not truncated;
+  the 50000 total budget is not unlimited capacity.
+- Verification: 935 program checks pass; release `20261028-075611-023-8c2aa1`,
+  build 0 warnings / 0 errors. All 5 UI files and the root launcher match their
+  hashes. The host DLL is byte-identical to RB70, so its 14+57+38 native checks
+  are reused, not rerun. Actual `Vulcanus.mid`: 5267 notes / 164.02 seconds,
+  17 rows / 225 clips; every onset and held duration, portable reopening,
+  arrangement move/undo/redo and phrase edit/save/cold-open verified; source hash
+  unchanged. The 48 kHz plan reaches 152 simultaneous waveform sources. Fake-device
+  full-clock simulation schedules all 21068 sources at their original onsets,
+  retains at most 264 sources including lookahead and releases all nodes.
+  Evidence under `.test-output/midi-capacity/`: `full-tests.log`,
+  `actual-conversion.json`, `actual-runtime-validation.json`,
+  `actual-windowed-verification.json` and `release-verification.json`.
+  No real GUI, sound-device or listening acceptance was performed.
+
+## RB70 MIDI import — IMPLEMENTED 2026-10-28; real use pending
+
+- User-confirmed route: choose `.mid` or `.midi` through the song library's folder
+  tile. It creates a new `.rootsound` in the default directory, avoids existing
+  display names and actual filenames, then enters Arrangement. The source is read
+  only; invalid or unsupported imports do not create a partial song.
+- Standard MIDI format 0/1, PPQ timing. Tracks/channels/programs become editable
+  lanes and phrases; percussion enters Rhythm. Actual note onsets/durations,
+  velocity, start-time volume/expression/pan, tempo changes and sustain-pedal
+  lifetimes are converted. Same-tick drum strikes receive an explained 0.12-second
+  gate. Replacement instruments use existing local synthesizers, not the source's
+  audio, plugins or complete mix. The import notice describes unavailable bends,
+  pressure, continuous controller changes and other unsupported information.
+- Bounds at RB70 release (the 2048-note guard is superseded by RB71): read at most 10 MiB, then apply the workstation's 2048 sounding
+  notes / 10 minutes, 128 lanes, 512 clips and 64 beats per phrase. Format 2,
+  SMPTE, malformed files and excess resources are rejected as a whole, not
+  truncated. Off-beat tempo changes may restart the visual grid phase while
+  actual note seconds remain unchanged. These are current implementation limits,
+  not permanent product rules. No real desktop, sound-device or listening
+  acceptance is claimed.
+- Final verification: 923 program checks pass; release
+  `20261028-073219-333-6af978`, build 0 warnings / 0 errors. Against the final host,
+  14 native MIDI, 57 project-directory and 38 file/audio/project/sample checks
+  pass. All 5 published UI files and the root launcher match their SHA256
+  evidence. Reports: `.test-output/midi-import-all-tests.log`,
+  `midi-import-final-native/{midi,projects,files}/`, and
+  `midi-import-release-verification.json`. No GUI/sound-device run or manual
+  native-file-picker acceptance was performed.
+
+## Precise synthesis experiment — BUILT; user audition PENDING 2026-10-28
+
+- Vulcanus pad asset: user confirms the target is the sustained notes/chords below
+  the vocal in 0–20 seconds. Delivered `Vulcanus-铺底音色.rssynth`, a C4 WAV and a
+  short chord audition to `D:/Sound/temp/tone/`, with a brief text guide. Synthesized
+  through the published tool's exact DSP, with no source-song samples. This is a
+  first approximation, not an isolated source stem or verified timbre match.
+  Cold reopening the patch reproduces the C4 WAV byte-for-byte; PCM24/48k stereo,
+  finite samples, headroom and complete tails verified. Existing two target files
+  and the source MP3 are unchanged. Evidence and authoring files are under
+  `spectral-forge/cases/vulcanus-pad/`. Musical acceptance remains pending.
+
+- Independent tool: `experiments/music-workflow/精细音色生成器.exe`, sources and
+  guide in `spectral-forge/`. Four oscillators; separate static frequency/gain,
+  dynamic time/pitch and time/volume curves (10 points maximum each); fine numeric and
+  curvature editing, undo/redo, live audition, unison/PM, two LFOs and effects.
+- Native `.rssynth` open/save/recovery and PCM24 WAV export (44.1/48/96 kHz).
+  Output stays in the experiment directory. Nine editable example patches and
+  four measured offline WAVs are in `spectral-forge/output/examples-2026-10-28T05-19-15-000Z/`.
+- User correction supersedes the 64/32-point implementation: each curve now has
+  6 points by default and a maximum of 10. A count slider replaces the density
+  button; range is 2–10, with a minimum of 3 when an interior sustain anchor is
+  protected. One complete gesture is one undo step and uses its original curve
+  as the fitting reference. Endpoints/sustain are preserved; reduction approximates
+  important peaks and turns rather than truncating the curve. Legacy files up to
+  512 points are fully validated then simplified on import; disk files are only
+  rewritten by an explicit save.
+- Release `20261028-055644-757-e7928b`: 69 Node + 35 native checks pass; all
+  12 UI source/release hashes and launcher hash match. Evidence:
+  `.test-output/spectral-forge/{count-slider-build.log,count-slider-release-verification.json}`.
+  Build has 0 errors; NU1900 reports unavailable online vulnerability metadata,
+  without disabling the audit. No desktop or sound-device operation was performed.
+- Implementation limits: static 48-oscillator-unit budget, with effective polyphony
+  displayed; 8192-point spectral FIR; 2x oversampling. Extreme settings/retriggers
+  can still exceed a realtime block deadline. This is not device latency or
+  listening acceptance. Main workstation RB69 and its saved projects are unchanged;
+  native `.rssynth` integration was outside that batch; RB75 subsequently adds it
+  to the workstation with the limitations recorded above.
+
 ## Product direction — purpose and next milestone CONFIRMED 2026-10-27
 
 - User-confirmed final purpose: enable rhythm-game music enthusiasts to get started
-  quickly and create rhythm-game music they find satisfying. This replaces the old
+  quickly and create music they find satisfying (让音游曲爱好者快速上手做出满意的音乐).
+  The audience is enthusiasts of rhythm-game music and adjacent styles. This replaces the old
   universal zero-friction music/any-sound mission. Low learning and operation burden
   remains a design method; reference analysis and musical understanding serve creation.
 - User-confirmed next milestone: first make one original excerpt satisfying, then
@@ -24,7 +502,84 @@
 - The mission change adds no delivered capability or audio/GUI acceptance. RB67's
   existing 867 program checks and release evidence below remain unchanged.
 
+## Original passage pilot — first draft GENERATED, listening acceptance PENDING 2026-10-27
+
+- User prioritizes the vocals and background melody of the selected reference.
+  `experiments/music-workflow/original-pilot/delivery-v1/` contains the editable
+  `原始交付/余焰 · 第一稿.rootsound`, full preview `01-余焰-完整试听.wav`, and focused preview
+  `02-人声与背景旋律.wav`. The draft has 212 BPM, 16 bars, about 18.84 seconds including
+  release, 8 tracks, 356 independent notes, 21 sample instruments and 30 segmented phrases.
+- Notes and synthetic sounds are newly authored; the female1 vowel derives from
+  VocalSet under CC BY 4.0 with attribution. No reference-song audio is sampled.
+  Official API construction/portable roundtrip/cold decoding and matching playback
+  after identity remapping pass. Native file opening, 356 MIDI note-on/off pairs,
+  and embedded vocal WAV attribution/license retention pass; evidence JSON files
+  are retained in that delivery directory.
+- Listening WAVs are rendered offline from the compiled official playback plan;
+  a uniform +6.81 dB listening gain gives about −16 LUFS without clipping. This
+  adjustment is for audition volume, not a hidden change to notes or instruments.
+- The musical playback mechanism is unchanged. Vocal transitions are baked into sample audio;
+  editing notes does not automatically recompute general legato. No real GUI or
+  sound-device audition, user listening acceptance or independent-user completion
+  is claimed. Next: collect listening feedback, especially vocals/background melody,
+  and revise the same editable draft. Final 356/97 total/background-note counts
+  supersede the preparation version's 371/112; do not mix their audit evidence.
+  The existing working copy gained a timbre draft; its 73 saved content records
+  still match the packaged original. Preserve that working copy. The untouched
+  baseline above was extracted from `original-pilot/余焰-第一稿-完整交付.zip`
+  (about 41.7 MB), without overwriting or deleting working data.
+- A later editing-performance fix is recorded as RB68 below. Actual delivered-project
+  checks edit pitch/time/level/pan in one phrase from each of the 8 tracks, preserve
+  unrelated notes, and restore exactly through undo/redo. The whole offline suite
+  takes about 33.10 seconds including repeated reads/writes; it is not a single
+  interaction time or evidence of real UI smoothness. See delivery-v1's
+  `实际工程编辑核验.json`. RB67's 867 checks remain historical evidence.
+- 2026-10-28: under the user's delivery preference, the untouched original is now
+  also at `project/余焰 · 第一稿.rootsound`, recognized directly by the default song
+  library. Its SHA256 is `5bec7b2e01026a57dd9088fe0cb11a65c2796edfa1a49e3a5768742850a42aa0`.
+  Existing `kkkk`, its backup and experimental working edits were not overwritten.
+  This changes delivery location, not the pending listening verdict.
+
 ## Rebuild scope — current work, 2026-10-22
+
+### RB69 · Melody piano-roll data and drawing performance — IMPLEMENTED 2026-10-28
+
+- Material structure copy/comparison preserves immutable sample strings instead of
+  repeatedly round-tripping the whole library through JSON for small edits. Successful
+  canonical sample-payload validation is reused only for the exact immutable string
+  and expected byte length; an LRU is bounded by both 128 entries and 64 MiB using
+  conservative UTF-16 accounting. Structural and changed-invalid data still validate.
+- Parent/child editors share PhraseView; synchronous audition updates reuse the
+  current view while asynchronous completion retains live-state guards. A single-note
+  drag updates only its active DOM, reads geometry once, and reuses grid nodes.
+  Playhead frames perform no content or layout reads. Pitch range, note count and
+  editing precision remain intact.
+- All 880 checks pass; desktop build has zero warnings/errors. Release:
+  `20261028-042505-312-303b5b` matches all 5 UI files and the root launcher. The native
+  DLL matches RB68 (`nativeMatchesRB68=true`); reuse its 38+57 native-check evidence,
+  without rerunning those checks this batch. The same 17.58 MB original measures, in offline ms:
+  open 869.84→171.93; eight reads 12.44→7.66; edit 776.89→48.12; undo 772.20→46.68.
+  These are program-path measurements, not screen FPS, audio-device latency or
+  listening acceptance. No real GUI or sound-device verification is claimed.
+- Evidence under `.test-output/`: `melody-performance-full-tests.log`,
+  `melody-performance-desktop-build.log`, `melody-performance-release-verification.json`,
+  `material-read-performance/{before,final}.json`, `melody-render-regressions.log` (55),
+  `melody-parent-performance-tests.log` (89), `melody-payload-validation-tests.log` (23).
+
+### RB68 · Sample metadata validation performance — IMPLEMENTED 2026-10-27
+
+- Remove full Base64 decode/re-encode from sample metadata validation while retaining
+  equivalent canonical character, length, padding and unused-low-bit checks. No cache,
+  project-format change or musical-content change is introduced.
+- All 871 application checks pass; desktop build has zero warnings/errors. Selected
+  release `20261027-104313-571-c14ec7` matches all 5 UI files and the root launcher.
+  The current native DLL differs from RB67; fresh checks against this actual DLL pass:
+  38 file/audio/project/sample checks and 57 project-directory checks. Keep the factual
+  `nativeMatchesPriorRelease=false` result; do not substitute RB67 native evidence.
+- Evidence: `.test-output/original-pilot-full-tests.log`, `original-pilot-desktop-build.log`,
+  `original-pilot-release-verification.json`, `original-pilot-native-files/file-store-report.json`
+  and `original-pilot-native-projects/project-directories-report.json`. No real GUI,
+  sound-device listening or user musical acceptance is claimed.
 
 ### RB67 · Melody total-note families and single tone reassignment — IMPLEMENTED 2026-10-27
 - D-2026-10-27-8 replaces Melody's tone shelf with independent total-note families.
@@ -240,7 +795,8 @@
 
 ### RB58 · Shared four-bar melody/rhythm phrase workspace — IMPLEMENTED 2026-10-26
 - Historical scope: the no-note-authoring shell below is extended by RB59's new
-  Melody editor; the overview stays blank and legacy detailed editor stays unmounted.
+  Melody editor; RB73 subsequently replaces the blank overview with note previews
+  and independent vertical views. The legacy detailed editor stays unmounted.
 - D-2026-10-26-8 replaces the main phrase route with the song-style header,
   equal Melody/Rhythm halves and left controls, and one shared blank canvas/head.
   No row/column grid, notes, legacy note toolbar or legacy detailed-editor entry
@@ -1715,3 +2271,58 @@ docs/REBUILD_PLAN.md, with undecided details in docs/REBUILD_ARCHITECTURE.md.
   Build: zero errors, one NU1900 warning because the package audit feed could not
   be reached. Restore/build succeeded with locked dependencies; no audit success
   is claimed. The UTF-8-BOM build script preserves the Chinese Windows entry name.
+
+### 2026-10-28 · Vulcanus kick synthesis delivery — DELIVERED, LISTENING PENDING
+- User requests two kicks from vulcanus.mp3 0–20s using the detailed synthesis
+  experiment; clarifies dense hits at3–10s and fewer clear hits after10s.
+- This environment cannot receive audio input. Compare mixture onset/body/glide
+  evidence and author two provisional native designs: shorter/higher A and
+  deeper/longer B. Do not claim verified kick identities, number or sonic match.
+- Use selected SpectralForge release20261028-055644-757-e7928b unmodified, curves
+ 10 points each, four native oscillator layers, no source sample or external FX.
+  Deliver2 editable patches,2 single-hit PCM24/48k stereo WAVs, an A/B audition
+  and notes to D:/Sound/temp/tone. The audition rhythm is not a transcription.
+- Cold patch reload→WAV is byte-exact; key holding self-decays. Peaks0.70, no
+  clipping/truncation/nonfinite samples, PCM error1.20e-7,99%energy at145/220ms.
+  Reference and all6 prior target files unchanged. Proof: spectral-forge/cases/
+  vulcanus-kicks/delivery-final/{generation-verification,delivery-verification,
+  audio-measurements}.json and delivery-copy-verification.json. No GUI, device
+  or main-workstation change. Musical listening acceptance remains unperformed.
+
+### 2026-10-28 · SpectralForge remembers the open folder — IMPLEMENTED
+- User requests Open to start in the previous folder rather than fixed output.
+  Store the last file pick's parent separately from recovery, preserve it across
+  restarts/build updates, and use output only initially or when unavailable.
+  Cancelled selection does not replace the remembered folder. Preference read/
+  write failure remains optional and does not block opening the selected sound.
+-44 native checks pass, including new restart/Unicode/latest-choice/fallback/
+  corrupt/relative/locked-state/recovery-cleanup cases. Selected release
+  20261028-085914-279-8eb9f2 has12 UI assets byte-identical to the prior69-check
+  release; those unchanged Node tests were not rerun. Entry/launcher hashes match.
+  Build0errors,1NU1900 audit feed warning. Evidence: .test-output/spectral-forge/
+  open-directory-build.log, open-directory-20261028-085810/host-report.json and
+  open-directory-release-verification.json. No desktop or audio-device operation.
+
+### 2026-10-29 · SpectralForge output overlays in all three graphs — IMPLEMENTED
+- User explicitly chooses actual spectrum, amplitude evolution and measured main
+  pitch in their respective graph editors. Add read-only magenta output paths
+  behind editable curves, with matching zoom/pan/sustain/release coordinates.
+  Stop retains the current capture; new notes/patch edits reset it. Analysis never
+  changes the patch, control-point count, history or export.
+- Implementation: combined-channel8192 FFT, bounded peak history, confidence-
+  gated periodicity measurement with high-frequency alias protection and explicit
+  keyboard-relative pitch units. Known multi-key attacks stay pitch-empty through
+  release; noise/silence/short/unstable windows are blank. Refresh at most20Hz;
+  reuse plot nodes. No multi-instrument pitch or instantaneous measurement claim.
+-84 Node checks pass: analytic tones32.7–10000Hz, harmonics/noise/DC/silence,
+  native synthesized transposition, lifecycle/history bounds, real-controller
+  measured overlays/tab switching/save isolation, geometry/zoom/read-only DOM,
+  and same-pitch key clock regression. Release20261028-224430-525-f64420 has13
+  UI files matching source and entry/launcher hashes matching. Host DLL is byte-
+  identical to the previous44-native-check release (not rerun); synthesis DSP
+  unchanged. Build0errors,1NU1900 audit metadata warning.
+- Evidence: .test-output/spectral-forge/analysis-overlays-tests.log,
+  analysis-overlays-build.log and analysis-overlays-release-verification.json,
+  plus controller HTML/SVG coordinate snapshots rasterized via Pillow. Headless
+  browser failed, so these are not real browser/app screenshots. No desktop
+  observation/control or real audio-device use.

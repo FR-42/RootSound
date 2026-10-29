@@ -1,0 +1,7 @@
+{"progress": 0.01, "message": "解码音频…", "job": "D:\\RootSound\\experiments\\music-workflow\\ripx-separator\\tests-output\\gpu-02ac9909\\split-6"}
+{"progress": 0.03, "message": "加载本地 HTDemucs 模型：Intel(R) Arc(TM) Graphics / XPU（FFT 在 CPU）", "device": "xpu", "device_name": "Intel(R) Arc(TM) Graphics / XPU（FFT 在 CPU）"}
+D:\RootSound\experiments\music-workflow\ripx-separator\gpu-packages\torch\functional.py:730: UserWarning: Aten Op fallback from XPU to CPU happends. This may have performance implications. If need debug the fallback ops please set environment variable `PYTORCH_DEBUG_XPU_FALLBACK=1`  (Triggered internally at C:\actions-runner\_work\pytorch\pytorch\pytorch\build\xpu\ATen\RegisterXPU_0.cpp:53696.)
+  return _VF.stft(  # type: ignore[attr-defined]
+{"progress": 0.385, "message": "音轨分离 1/2 个时间窗"}
+{"progress": 0.7200000000000001, "message": "音轨分离 2/2 个时间窗"}
+{"progress": 1, "message": "完成：音轨已保存。", "result": "D:\\RootSound\\experiments\\music-workflow\\ripx-separator\\tests-output\\gpu-02ac9909\\split-6\\project.json"}

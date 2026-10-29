@@ -1,0 +1,18 @@
+{
+  "launch_environment": "PATH contains only Windows directories before bootstrap; no Conda/PYTHONPATH activation",
+  "modes": {
+    "4": {
+      "device": "xpu",
+      "device_name": "Intel(R) Arc(TM) Graphics / XPU（FFT 在 CPU）",
+      "frames": 88200,
+      "ui_result_loaded": true
+    },
+    "6": {
+      "device": "xpu",
+      "device_name": "Intel(R) Arc(TM) Graphics / XPU（FFT 在 CPU）",
+      "frames": 88200,
+      "ui_result_loaded": true
+    }
+  },
+  "source_unchanged": true
+}

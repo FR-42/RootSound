@@ -54,6 +54,8 @@ export interface SampleSoundPlan {
   readonly playbackRate: number;
   readonly loop?: { readonly startSeconds: number; readonly endSeconds: number };
   readonly envelope: SoundPlan['envelope'];
+  /** Generated PCM already contains its complete amplitude/FX tail; do not apply it twice. */
+  readonly envelopeBaked?: true;
   readonly note: SoundPlan['note'];
   readonly level: number;
 }

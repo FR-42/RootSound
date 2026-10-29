@@ -81,3 +81,37 @@ test('short legacy phrase bounds and invalid coordinates never create an out-of-
   for (const tempo of [NaN, Infinity, 0, -1, 39, 241]) assert.equal(nextMelodyEntryStep(0, tempo), undefined);
   for (const length of [NaN, Infinity, 0, -1]) assert.equal(nextMelodyEntryStep(0, 120, length), undefined);
 });
+
+test('two, three, five and nine cells per beat share precise note/rest advances and four-beat bar boundaries', () => {
+  for (const n of [2, 3, 5, 9]) for (const tempo of [40, 93.7, 212, 240]) {
+    const cellSeconds = 60 / tempo / n;
+    let position = 0;
+    for (let cell = 1; cell <= 16 * n; cell++) {
+      const step = nextMelodyEntryStep(position, tempo, 16, n)!;
+      assert.equal(step.startBeat, cell / n); close(step.seconds, cell * cellSeconds); close(step.durationSeconds, cellSeconds);
+      assert.equal(step.canWrite, cell < 16 * n);
+      position = step.seconds; // Both a played key and a rest move to this same boundary.
+    }
+    assert.equal(nextMelodyEntryStep(position, tempo, 16, n), undefined);
+    const extended = nextMelodyEntryStep(position, tempo, 20, n)!; assert.equal(extended.startBeat, (16 * n + 1) / n);
+    close(extended.durationSeconds, cellSeconds);
+    const changedGrid = nextMelodyEntryStep(.25 * 60 / tempo, tempo, 16, n)!;
+    assert.equal(changedGrid.startBeat, (Math.floor(.25 * n) + 1) / n, 'a different resolution advances from the current head without moving it first');
+  }
+});
+
+test('non-four entry tolerates tiny time round trips and respects partial tails and invalid resolutions', () => {
+  for (const n of [2, 3, 5, 9]) for (const tempo of [93.7, 212]) for (const cell of [1, n + 1, n * 8 - 2]) {
+    const seconds = cell / n * 60 / tempo;
+    for (const error of [-1e-11, 0, 1e-11]) {
+      const next = nextMelodyEntryStep(seconds + error / n * 60 / tempo, tempo, 16, n)!;
+      assert.equal(next.startBeat, (cell + 1) / n);
+    }
+    const before = nextMelodyEntryStep(seconds - 1e-5 / n * 60 / tempo, tempo, 16, n)!;
+    assert.equal(before.startBeat, cell / n);
+  }
+  const partial = nextMelodyEntryStep(0, 120, .3, 5)!; close(partial.startBeat, .2); assert.equal(partial.canWrite, false);
+  assert.equal(nextMelodyEntryStep(partial.seconds, 120, .3, 5), undefined);
+  assert.equal(nextMelodyEntryStep(0, 120, .3, 3), undefined);
+  for (const n of [0, 1, 10, -1, 2.5, NaN, Infinity, null, '3']) assert.equal(nextMelodyEntryStep(0, 120, 16, n as number), undefined);
+});

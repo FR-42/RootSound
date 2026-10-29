@@ -1,0 +1,29 @@
+{
+  "items": [
+    {
+      "id": "A",
+      "quantizationMaximumError": 1.1920928955078125e-07,
+      "energy99Seconds": 0.14539583333333334,
+      "windowPeakHz": {
+        "0-0.025": 121.582,
+        "0.025-0.08": 79.102,
+        "0.08-0.17": 68.848
+      },
+      "peak": 0.6999999284744263,
+      "last60msPeak": 0.0
+    },
+    {
+      "id": "B",
+      "quantizationMaximumError": 1.1920928955078125e-07,
+      "energy99Seconds": 0.22035416666666666,
+      "windowPeakHz": {
+        "0-0.025": 162.598,
+        "0.025-0.08": 77.637,
+        "0.08-0.17": 55.664
+      },
+      "peak": 0.6999999284744263,
+      "last60msPeak": 0.0
+    }
+  ],
+  "subjectiveMatchVerified": false
+}

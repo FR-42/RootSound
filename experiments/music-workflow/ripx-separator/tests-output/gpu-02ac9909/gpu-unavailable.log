@@ -1,0 +1,15 @@
+D:\RootSound\experiments\music-workflow\ripx-separator\gpu-packages\torch\xpu\__init__.py:60: UserWarning: XPU device count is zero! (Triggered internally at C:\actions-runner\_work\pytorch\pytorch\pytorch\c10\xpu\XPUFunctions.cpp:115.)
+  return torch._C._xpu_getDeviceCount()
+Traceback (most recent call last):
+  File "D:\RootSound\experiments\music-workflow\ripx-separator\engine.py", line 242, in <module>
+    try: main()
+         ~~~~^^
+  File "D:\RootSound\experiments\music-workflow\ripx-separator\engine.py", line 232, in main
+    if action=='separate': separate(request)
+                           ~~~~~~~~^^^^^^^^^
+  File "D:\RootSound\experiments\music-workflow\ripx-separator\engine.py", line 59, in separate
+    device, device_name = select_device(request.get('device', 'gpu'))
+                          ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\RootSound\experiments\music-workflow\ripx-separator\gpu_backend.py", line 13, in select_device
+    raise RuntimeError('GPU 后端不可用。请检查本工具的 GPU 运行库和显卡驱动；如需 CPU，请在界面显式选择 CPU。')
+RuntimeError: GPU 后端不可用。请检查本工具的 GPU 运行库和显卡驱动；如需 CPU，请在界面显式选择 CPU。

@@ -12,6 +12,7 @@ import { noteDuration, previewFingerprint, readPreview, samePreviewSamples, vali
 import { allocateGraph, releaseGraph, scheduleGraph, startGraphSource, type GraphResources } from './graph.ts';
 import { renderOffline } from './offline.ts';
 import { readPcmAudio } from './pcm.ts';
+import { WindowedGraph, WINDOWED_EVENT_THRESHOLD } from './windowed.ts';
 
 const DEVICE_RESUME_TIMEOUT_MS = 3000;
 const LIVE_TRANSITION_SECONDS = 0.005;
@@ -19,6 +20,7 @@ let runtimeSequence = 0;
 
 interface ActiveVoice {
   audioSource?: AudioBufferSourceNode;
+  windowed?: WindowedGraph;
   session: PlaybackSession;
   readonly oscillators: OscillatorNode[];
   readonly samples: AudioBufferSourceNode[];
@@ -34,7 +36,7 @@ interface ActiveVoice {
   fingerprint: string;
   preview?: ScheduledPreview;
   startTimes: Map<AudioScheduledSourceNode, number>;
-  readonly retiring: Set<{ resources: GraphResources; clock: ConstantSourceNode; until: number }>;
+  readonly retiring: Set<{ resources: GraphResources; clock: ConstantSourceNode; until: number; windowed?: WindowedGraph }>;
   originSeconds: number;
   clockFloorSeconds?: number;
   pausedElapsed?: number;
@@ -140,6 +142,7 @@ export function createBrowserSoundRuntime(): SoundRuntimePort {
   }
 
   function clearVoice(voice: ActiveVoice): void {
+    voice.windowed?.dispose(); voice.windowed = undefined;
     if (voice.audioSource) {
       voice.audioSource.onended = null;
       try { voice.audioSource.stop(); } catch { /* The sample may already have ended. */ }
@@ -152,6 +155,7 @@ export function createBrowserSoundRuntime(): SoundRuntimePort {
     }
     releaseGraph(voice);
     for (const retiring of voice.retiring) {
+      retiring.windowed?.dispose();
       retiring.clock.onended = null;
       try { retiring.clock.stop(); } catch { /* It may have completed. */ }
       retiring.clock.disconnect();
@@ -261,21 +265,24 @@ export function createBrowserSoundRuntime(): SoundRuntimePort {
     try {
       if (preview.sequence) voice.completion = audio.createConstantSource();
       const generation = voice.generation;
-      const graph = allocateGraph(audio, preview, voice, () => {
+      if (preview.sequence && preview.events.length > WINDOWED_EVENT_THRESHOLD) voice.windowed = new WindowedGraph(audio, preview, voice, mainMix ?? audio.destination);
+      voice.windowed?.prime(0);
+      const graph = voice.windowed?.graph ?? allocateGraph(audio, preview, voice, () => {
         if (voice.generation !== generation) return;
         voice.remaining -= 1;
         if (voice.remaining === 0 && !preview.sequence) finish(voice, 'ended');
       }, mainMix ?? audio.destination);
-      voice.fadeGains = graph.envelopes.map(envelope => envelope.node);
+      voice.fadeGains = voice.windowed ? [voice.windowed.fade] : graph.envelopes.map(envelope => envelope.node);
       // Allocate the graph before choosing a start, so large phrases do not consume
       // their first notes while nodes are still being built. The small lead also
       // leaves room to send the following automation commands to the audio device.
-      const lead = preview.sequence ? 0.01 + graph.starts.length * 0.00004 + graph.envelopes.length * 0.00002 : 0.005;
+      const lead = voice.windowed?.leadSeconds ?? (preview.sequence ? 0.01 + graph.starts.length * 0.00004 + graph.envelopes.length * 0.00002 : 0.005);
       const start = audio.currentTime + lead;
       session = Object.freeze({ ...session, startedAtSeconds: start });
       voice.session = session;
       voice.originSeconds = start;
       scheduleGraph(graph, preview.normalization, start);
+      voice.windowed?.prepare(start, 0);
       if (audio.currentTime >= start) throw new Error('当前乐句的声音调度未能及时完成，请减少同时使用的声音后重试。');
       voice.remaining = voice.oscillators.length + voice.samples.length;
       if (active !== null) finish(active, 'stopped');
@@ -300,6 +307,7 @@ export function createBrowserSoundRuntime(): SoundRuntimePort {
       finish(voice, 'failed', message(error));
       throw new Error(`试听启动失败：${message(error)}`);
     }
+    voice.windowed?.run(error => { if (active === voice) finish(voice, 'failed', message(error)); });
     emit({ type: 'session', session });
     deviceChanged();
     return voice.session;
@@ -398,6 +406,7 @@ export function createBrowserSoundRuntime(): SoundRuntimePort {
     const resources: GraphResources = { oscillators: [], samples: [], bufferReleases: [], gains: [], panners: [] };
     let completion: ConstantSourceNode | null = null;
     let retiringClock: ConstantSourceNode | null = null;
+    let windowed: WindowedGraph | undefined;
     const origin = voice.originSeconds;
     try {
       const position = Math.max(0, audio.currentTime - origin);
@@ -405,17 +414,20 @@ export function createBrowserSoundRuntime(): SoundRuntimePort {
         ...preview,
         events: preview.events.filter(event => event.atSeconds + noteDuration(event.sound) > position),
       };
-      const graph = allocateGraph(audio, remaining, resources, undefined, mainMix ?? audio.destination);
+      if (voice.windowed || preview.events.length > WINDOWED_EVENT_THRESHOLD) windowed = new WindowedGraph(audio, preview, resources, mainMix ?? audio.destination);
+      windowed?.prime(position);
+      const graph = windowed?.graph ?? allocateGraph(audio, remaining, resources, undefined, mainMix ?? audio.destination);
       if (audio.currentTime >= origin + voice.session.durationSeconds! + 0.001) {
-        releaseGraph(resources);
+        windowed?.dispose(); releaseGraph(resources);
         finish(voice, 'ended');
         return undefined;
       }
       completion = audio.createConstantSource();
       retiringClock = audio.createConstantSource();
-      const cutover = Math.max(origin, audio.currentTime + 0.005 + graph.starts.length * 0.000002 + graph.envelopes.length * 0.000001);
+      const cutover = Math.max(origin, audio.currentTime + (windowed?.leadSeconds ?? 0.005) + graph.starts.length * 0.000002 + graph.envelopes.length * 0.000001);
       const fromSeconds = cutover - origin;
       scheduleGraph(graph, preview.normalization, origin, fromSeconds, LIVE_TRANSITION_SECONDS);
+      windowed?.prepare(origin, fromSeconds, LIVE_TRANSITION_SECONDS);
       const until = cutover + LIVE_TRANSITION_SECONDS + 0.002;
       completion.offset.setValueAtTime(0, cutover);
       completion.connect(audio.destination);
@@ -439,7 +451,7 @@ export function createBrowserSoundRuntime(): SoundRuntimePort {
       // invalid plan or allocation failure therefore leaves the old music intact.
       const retired = {
         resources: { oscillators: [...voice.oscillators], samples: [...voice.samples], bufferReleases: [...voice.bufferReleases], gains: [...voice.gains], panners: [...voice.panners], outputBuses: [...(voice.outputBuses ?? [])], filters: [...(voice.filters ?? [])] },
-        clock: retiringClock, until,
+        clock: retiringClock, until, windowed: voice.windowed,
       };
       for (const gain of voice.fadeGains) {
         gain.gain.cancelAndHoldAtTime(cutover);
@@ -451,11 +463,12 @@ export function createBrowserSoundRuntime(): SoundRuntimePort {
         const stop = (voice.startTimes.get(oscillator) ?? cutover) >= cutover ? cutover : cutover + LIVE_TRANSITION_SECONDS + 0.001;
         try { oscillator.stop(stop); } catch { /* A note may have expired during graph preparation without starting. */ }
       }
+      voice.windowed?.retire(cutover, until);
       voice.retiring.add(retired);
       retiringClock.onended = () => {
         retiringClock!.onended = null;
         retiringClock!.disconnect();
-        releaseGraph(retired.resources);
+        retired.windowed?.dispose(); releaseGraph(retired.resources);
         voice.retiring.delete(retired);
       };
       if (voice.completion !== null) {
@@ -470,17 +483,19 @@ export function createBrowserSoundRuntime(): SoundRuntimePort {
       voice.panners.splice(0, voice.panners.length, ...resources.panners);
       voice.outputBuses = resources.outputBuses;
       voice.filters = resources.filters;
-      voice.completion = completion;
+      voice.completion = completion; voice.windowed = windowed;
       voice.generation += 1;
-      voice.fadeGains = graph.envelopes.map(envelope => envelope.node);
+      voice.fadeGains = windowed ? [windowed.fade] : graph.envelopes.map(envelope => envelope.node);
       voice.fingerprint = fingerprint;
       voice.preview = preview;
       voice.startTimes = startTimes;
       voice.remaining = resources.oscillators.length + resources.samples.length;
       voice.session = Object.freeze({ ...voice.session, durationSeconds: preview.durationSeconds });
+      windowed?.run(error => { if (active === voice) finish(voice, 'failed', message(error)); });
       emit({ type: 'session', session: voice.session });
       return voice.session;
     } catch (error) {
+      windowed?.dispose();
       for (const clock of [completion, retiringClock]) {
         if (clock === null) continue;
         clock.onended = null;
@@ -519,13 +534,17 @@ export function createBrowserSoundRuntime(): SoundRuntimePort {
     validateFrequency(preview, audio.sampleRate);
     const resources: GraphResources = { oscillators: [], samples: [], bufferReleases: [], gains: [], panners: [] };
     let completion: ConstantSourceNode | null = null;
+    let windowed: WindowedGraph | undefined;
     try {
       const remaining = { ...preview, events: preview.events.filter(event => event.atSeconds + noteDuration(event.sound) > fromSeconds) };
-      const graph = allocateGraph(audio, remaining, resources, undefined, mainMix ?? audio.destination);
+      if (preview.events.length > WINDOWED_EVENT_THRESHOLD) windowed = new WindowedGraph(audio, preview, resources, mainMix ?? audio.destination);
+      windowed?.prime(fromSeconds);
+      const graph = windowed?.graph ?? allocateGraph(audio, remaining, resources, undefined, mainMix ?? audio.destination);
       completion = audio.createConstantSource();
-      const start = audio.currentTime + .01 + graph.starts.length * .00004 + graph.envelopes.length * .00002;
+      const start = audio.currentTime + (windowed?.leadSeconds ?? .01) + graph.starts.length * .00004 + graph.envelopes.length * .00002;
       const origin = start - fromSeconds;
       scheduleGraph(graph, preview.normalization, origin, fromSeconds, LIVE_TRANSITION_SECONDS);
+      windowed?.prepare(origin, fromSeconds, LIVE_TRANSITION_SECONDS);
       completion.offset.setValueAtTime(0, start); completion.connect(audio.destination);
       completion.start(start); completion.stop(Math.max(start, origin + preview.durationSeconds) + .001);
       const clock = completion;
@@ -535,12 +554,14 @@ export function createBrowserSoundRuntime(): SoundRuntimePort {
       if (audio.currentTime >= start) throw new Error('当前声音续播未能及时完成，请减少同时使用的声音后重试。');
       voice.oscillators.push(...resources.oscillators); voice.samples.push(...resources.samples);
       voice.bufferReleases.push(...resources.bufferReleases); voice.gains.push(...resources.gains); voice.panners.push(...resources.panners);
-      voice.outputBuses = resources.outputBuses; voice.filters = resources.filters; voice.completion = completion;
-      voice.fadeGains = graph.envelopes.map(item => item.node); voice.startTimes = starts;
+      voice.outputBuses = resources.outputBuses; voice.filters = resources.filters; voice.completion = completion; voice.windowed = windowed;
+      voice.fadeGains = windowed ? [windowed.fade] : graph.envelopes.map(item => item.node); voice.startTimes = starts;
       voice.preview = preview; voice.fingerprint = previewFingerprint(preview); voice.originSeconds = origin; voice.clockFloorSeconds = fromSeconds; voice.pausedElapsed = undefined;
       voice.session = Object.freeze({ ...voice.session, status: 'playing', durationSeconds: preview.durationSeconds });
+      windowed?.run(error => { if (active === voice) finish(voice, 'failed', message(error)); });
       emit({ type: 'session', session: voice.session }); return voice.session;
     } catch (error) {
+      windowed?.dispose();
       if (completion) { completion.onended = null; try { completion.stop(); } catch { /* Allocation may have failed before start. */ } completion.disconnect(); }
       releaseGraph(resources);
       throw new Error(`声音续播失败：${message(error)}`);

@@ -1,0 +1,39 @@
+RootSound original-passage pilot — source recordings
+Accessed: 2026-10-27
+
+VocalSet: A Singing Voice Dataset
+Creators: Julia Wilkins, Prem Seetharaman, Alison Wahl, Bryan Pardo
+Official record: https://zenodo.org/records/1442513
+DOI: https://doi.org/10.5281/zenodo.1442513
+Archive used: VocalSet11.zip
+Official archive size: 2,077,243,579 bytes
+License: Creative Commons Attribution 4.0 International (CC BY 4.0)
+License URL: https://creativecommons.org/licenses/by/4.0/
+Saved full license: LICENSE-VocalSet-CC-BY-4.0.txt
+Saved official record: vocalset-record-1442513.json
+
+Only three WAV entries were extracted by verified HTTP byte ranges. The
+download-manifest records each original archive entry, SHA256 and ZIP CRC32.
+No complete dataset archive was downloaded. Network data for that extraction
+was 3,067,087 bytes, including directory and ZIP headers. A further 474 bytes
+were read to extract the archive's 859-byte readme-anon.txt and verify its CRC.
+
+Original entries:
+- FULL/female1/long_tones/straight/f1_long_straight_a.wav
+- FULL/female3/long_tones/straight/f3_long_straight_a.wav
+- FULL/female8/long_tones/straight/f8_long_straight_a.wav
+
+The dataset's original readme identifies f1 and f3 as soprano and f8 as
+mezzo-soprano. Their identities are anonymous. They are recordings of
+individual female singers sustaining the vowel a, not text-to-speech.
+Each original WAV includes multiple long notes separated by pauses.
+
+The downloaded WAVs are unmodified. Derived instruments/audio in the pilot
+may trim, tune, loop, change pitch/duration, add effects and mix these
+recordings. Such processing is a modification and does not imply endorsement
+by the dataset creators or performers. Keep this attribution and the license
+with any distributed project or derived sample instrument using these sounds.
+
+vocalset-pitch-windows.json contains signal-estimated windows and frequencies.
+These are production aids, not a listening verdict or proof of naturalness.
+No real audio output device was opened during source inspection.

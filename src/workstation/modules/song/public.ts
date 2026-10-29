@@ -4,6 +4,7 @@ import type { SongBody, SongClip, SongEditorPort, SongPlaybackPort, SongTempoMod
 import type { SoundSequencePlan } from '../../contracts/sound.ts';
 import type { PostProductionPort, PostProductionSettings } from '../../contracts/post-production.ts';
 import type { ReferenceAdapter } from '../../contracts/references.ts';
+import { MAX_SEQUENCE_EVENTS, MAX_SEQUENCE_SECONDS } from '../../contracts/playback-limits.ts';
 
 export type { SongBody, SongClip, SongEditorPort, SongPlaybackPort, SongTempoMode, SongTrack, SongView } from '../../contracts/song.ts';
 export { songGridTempoAt, songGridSegments } from './grid.ts';
@@ -14,8 +15,6 @@ const OWNER = 'song';
 const MAX_TRACKS = 128;
 const MAX_CLIPS = 512;
 const MAX_LENGTH = 1024;
-const MAX_EVENTS = 2048;
-const MAX_SECONDS = 600;
 
 function object(value: unknown, label: string): Record<string, unknown> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error(`${label}不是有效对象。原内容已保留。`);
@@ -76,13 +75,20 @@ export function createSongReferenceAdapter(): ReferenceAdapter {
       }
       return { body, dependencies: references(body) };
     },
+    remapMetadata(record, identities) {
+      const body = validate(record);
+      for (const key of ['hiddenPhraseIds', 'phraseShelfOrder', 'timbreLibraryOrder'] as const) {
+        if (body[key] !== undefined) body[key] = [...new Set(body[key]!.flatMap(id => identities.has(id) ? [identities.get(id)!] : []))];
+      }
+      return { body };
+    },
   };
 }
 
 /** Unknown formats are preserved rather than reinterpreted as this first timeline model. */
 export function readSongBody(value: unknown): SongBody {
   const body = object(value, '歌曲');
-  fields(body, ['model', 'version', 'timeUnit', 'tempoBpm', 'tempoMode', 'gridTempoBpm', 'gridTempoChanges', 'gridOffsetSeconds', 'masterLevel', 'hiddenPhraseIds', 'phraseShelfOrder', 'lengthBeats', 'tracks', 'postProduction'], '歌曲');
+  fields(body, ['model', 'version', 'timeUnit', 'tempoBpm', 'tempoMode', 'gridTempoBpm', 'gridTempoChanges', 'gridOffsetSeconds', 'masterLevel', 'hiddenPhraseIds', 'phraseShelfOrder', 'timbreLibraryOrder', 'melodyTimbresSeeded', 'lengthBeats', 'tracks', 'postProduction'], '歌曲');
   if (body.model !== 'phrase-arrangement' || body.version !== 1 || body.timeUnit !== 'beat') throw new Error('暂不支持这份歌曲的格式或版本。原内容已保留。');
   const tempoBpm = finite(body.tempoBpm, '歌曲速度', 40, 240);
   const tempoMode = mode(body.tempoMode);
@@ -97,6 +103,12 @@ export function readSongBody(value: unknown): SongBody {
     if (!Array.isArray(body.phraseShelfOrder)) throw new Error('乐句栏顺序需要是标识列表。');
     const order = body.phraseShelfOrder.map(id => text(id, '乐句栏顺序标识'));
     if (new Set(order).size !== order.length) throw new Error('乐句栏顺序包含重复标识。');
+    return order;
+  })();
+  const timbreLibraryOrder = body.timbreLibraryOrder === undefined ? undefined : (() => {
+    if (!Array.isArray(body.timbreLibraryOrder)) throw new Error('音色库顺序需要是标识列表。');
+    const order = body.timbreLibraryOrder.map(id => text(id, '音色库顺序标识'));
+    if (new Set(order).size !== order.length) throw new Error('音色库顺序包含重复标识。');
     return order;
   })();
   if (!Array.isArray(body.tracks) || body.tracks.length > MAX_TRACKS) throw new Error(`当前歌曲最多支持 ${MAX_TRACKS} 行。`);
@@ -140,6 +152,8 @@ export function readSongBody(value: unknown): SongBody {
     ...(body.masterLevel === undefined ? {} : { masterLevel: finite(body.masterLevel, '总音量', 0, 1) }),
     ...(hiddenPhraseIds === undefined ? {} : { hiddenPhraseIds }),
     ...(phraseShelfOrder === undefined ? {} : { phraseShelfOrder }),
+    ...(timbreLibraryOrder === undefined ? {} : { timbreLibraryOrder }),
+    ...(body.melodyTimbresSeeded === undefined ? {} : { melodyTimbresSeeded: boolean(body.melodyTimbresSeeded, '默认音色准备状态') }),
     ...(body.postProduction === undefined ? {} : { postProduction: readPostProduction(body.postProduction) }) };
 }
 
@@ -180,6 +194,7 @@ function compileSong(body: SongBody, phrases: PhrasePlaybackPort, allowSilence =
   const hasSolo = body.tracks.some(track => track.solo);
   const events: Array<SoundSequencePlan['events'][number]> = [];
   const phraseHasNotes = new Map<string, boolean>();
+  const phrasePlans = new Map<string, SoundSequencePlan>();
   let durationSeconds = extent(body, phrases) * secondsPerBeat;
   for (const track of body.tracks) {
     if (track.muted || track.level === 0 || hasSolo && !track.solo) continue;
@@ -194,17 +209,21 @@ function compileSong(body: SongBody, phrases: PhrasePlaybackPort, allowSilence =
       // placement still extends the song, but independent phrase audition's
       // no-note guard must not prevent the rest of an arrangement from playing.
       if (!hasNotes) continue;
-      const plan = phrases.planForSaved(clip.phraseId, body.tempoMode === 'song' ? body.tempoBpm : undefined);
+      let plan = phrasePlans.get(clip.phraseId);
+      if (!plan) {
+        plan = phrases.planForSaved(clip.phraseId, body.tempoMode === 'song' ? body.tempoBpm : undefined);
+        phrasePlans.set(clip.phraseId, plan);
+      }
       const offset = clip.startBeat * secondsPerBeat;
       durationSeconds = Math.max(durationSeconds, offset + plan.durationSeconds);
       for (const event of plan.events) events.push({ atSeconds: offset + event.atSeconds,
         sound: { ...event.sound, level: event.sound.level * track.level * (clip.level ?? 1) * (body.masterLevel ?? 1) },
         pan: Math.max(-1, Math.min(1, (event.pan ?? 0) + (clip.pan ?? track.pan) + (track.panOffset ?? 0))) });
-      if (events.length > MAX_EVENTS) throw new Error(`这首歌曲超过当前 ${MAX_EVENTS} 个发声音符的试听范围，请缩短编排。`);
+      if (events.length > MAX_SEQUENCE_EVENTS) throw new Error(`这首歌曲超过当前 ${MAX_SEQUENCE_EVENTS} 个发声音符的试听范围，请缩短编排。`);
     }
   }
   if (!events.length && !allowSilence) throw new Error('先放入有音符的乐句，并开启至少一条轨道，再听整首歌吧。');
-  if (durationSeconds > MAX_SECONDS) throw new Error('当前歌曲试听与导出支持最长 10 分钟，请缩短编排。');
+  if (durationSeconds > MAX_SEQUENCE_SECONDS) throw new Error('当前歌曲试听与导出支持最长 10 分钟，请缩短编排。');
   events.sort((a, b) => a.atSeconds - b.atSeconds);
   const plan: SoundSequencePlan = { kind: 'sequence', version: 1, durationSeconds, events };
   if (!body.postProduction) return plan;
@@ -218,7 +237,8 @@ export function createSongPlayback(library: MaterialLibrary, phrases: PhrasePlay
   }
   return { listSaved: () => library.listContentInfo().filter(content => content.kind === KIND).map(content => library.readContent(content.id)!), readSaved,
     async prepareForSaved(id) {
-      const before = readSaved(id); await Promise.all(references(before.body).map(phraseId => phrases.prepareForSaved(phraseId)));
+      const before = readSaved(id); await Promise.all(references(before.body).map(phraseId => phrases.prepareForSaved(phraseId,
+        before.body.tempoMode === 'song' ? before.body.tempoBpm : undefined)));
       if (!same(readSaved(id).content, before.content)) throw new Error('准备期间歌曲发生变化，请重新试听。');
     },
     planForSaved(id) { return compileSong(readSaved(id).body, phrases, false, postProduction); } };
@@ -464,7 +484,8 @@ export function createSongEditor(library: MaterialLibrary, phrases: PhrasePlayba
     clipLengthBeats(phraseId) { return clipLength(current().body, phraseId); },
     undo() { travel('undo'); }, redo() { travel('redo'); },
     async preparePreview() {
-      const before = current(); await Promise.all(references(before.body).map(id => phrases.prepareForSaved(id)));
+      const before = current(); await Promise.all(references(before.body).map(id => phrases.prepareForSaved(id,
+        before.body.tempoMode === 'song' ? before.body.tempoBpm : undefined)));
       if (!same(current().draft, before.draft)) throw new Error('准备期间歌曲发生变化，请重新试听。');
     },
     previewPlan(bodyOverride, options = {}) {

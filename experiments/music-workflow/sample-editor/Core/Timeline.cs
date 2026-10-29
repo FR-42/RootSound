@@ -7,8 +7,22 @@ public sealed class Timeline
     public long FrameCount { get; private set; }
     public int SampleRate { get; private set; }
     public double Playhead { get; private set; }
-    public long SelectionStart { get; private set; }
-    public long SelectionEnd { get; private set; }
+    private long blueA, blueB;
+    private bool allowSelectionCrossing;
+    public long SelectionStart => Math.Min(blueA, blueB);
+    public long SelectionEnd => Math.Max(blueA, blueB);
+    /// <summary>Keep marker identities while exposing the chronologically ordered selection.</summary>
+    public bool AllowSelectionCrossing
+    {
+        get => allowSelectionCrossing;
+        set
+        {
+            allowSelectionCrossing = value;
+            if (!value && blueA > blueB) (blueA, blueB) = (blueB, blueA);
+        }
+    }
+    public TimelineMarker BoundaryMarker(bool earlier) => earlier == (blueA <= blueB)
+        ? TimelineMarker.SelectionStart : TimelineMarker.SelectionEnd;
     public double ViewStart { get; private set; }
     public double ViewLength { get; private set; }
     public double ViewEnd => ViewStart + ViewLength;
@@ -21,14 +35,14 @@ public sealed class Timeline
     {
         if (frames < 1 || sampleRate < 1) throw new ArgumentOutOfRangeException(nameof(frames));
         FrameCount = frames; SampleRate = sampleRate;
-        Playhead = SelectionStart = 0; SelectionEnd = frames;
+        Playhead = 0; blueA = 0; blueB = frames;
         ViewStart = 0; ViewLength = frames; dragging = null;
     }
     public double Position(TimelineMarker marker) => marker switch
     {
         TimelineMarker.Playhead => Playhead,
-        TimelineMarker.SelectionStart => SelectionStart,
-        TimelineMarker.SelectionEnd => SelectionEnd,
+        TimelineMarker.SelectionStart => blueA,
+        TimelineMarker.SelectionEnd => blueB,
         _ => throw new ArgumentOutOfRangeException(nameof(marker))
     };
     public void Move(TimelineMarker marker, double frame)
@@ -38,8 +52,8 @@ public sealed class Timeline
         switch (marker)
         {
             case TimelineMarker.Playhead: Playhead = frame; break;
-            case TimelineMarker.SelectionStart: SelectionStart = Math.Min(SelectionEnd, (long)Math.Round(frame)); break;
-            case TimelineMarker.SelectionEnd: SelectionEnd = Math.Max(SelectionStart, (long)Math.Round(frame)); break;
+            case TimelineMarker.SelectionStart: blueA = AllowSelectionCrossing ? (long)Math.Round(frame) : Math.Min(blueB, (long)Math.Round(frame)); break;
+            case TimelineMarker.SelectionEnd: blueB = AllowSelectionCrossing ? (long)Math.Round(frame) : Math.Max(blueA, (long)Math.Round(frame)); break;
             default: throw new ArgumentOutOfRangeException(nameof(marker));
         }
     }
@@ -70,8 +84,8 @@ public sealed class Timeline
         double change = (x - lastX) * ViewLength / pixelWidth * (precise ? .1 : 1);
         lastX = x;
         dragPosition = Math.Clamp(dragPosition + change, 0, FrameCount);
-        if (marker == TimelineMarker.SelectionStart) dragPosition = Math.Min(dragPosition, SelectionEnd);
-        else if (marker == TimelineMarker.SelectionEnd) dragPosition = Math.Max(dragPosition, SelectionStart);
+        if (!AllowSelectionCrossing && marker == TimelineMarker.SelectionStart) dragPosition = Math.Min(dragPosition, SelectionEnd);
+        else if (!AllowSelectionCrossing && marker == TimelineMarker.SelectionEnd) dragPosition = Math.Max(dragPosition, SelectionStart);
         Move(marker, dragPosition);
     }
     public void EndDrag() => dragging = null;

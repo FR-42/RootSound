@@ -232,17 +232,18 @@ test('Backspace ignores editing fields and a failed undo preserves the selected 
  }finally{f.cleanup();}
 });
 
-test('generating a mouse note auditions once on press in either department, with no replay on release',async()=>{
+test('a blank click auditions once when released in either department and a cancelled press stays silent',async()=>{
  for(const rhythm of [false,true])for(const bpm of [120,240]){const f=fixture({rhythm});try{
   f.phrase.setTempo(bpm);f.workspace.refresh();
   f.selectTone();const pitches=f.phrase.keyboard().slice().reverse(),row=rhythm?0:pitches.findIndex(pitch=>pitch.label==='A4');
   const at={target:f.root.querySelector('.melody-canvas'),clientX:312,clientY:100+row*(rhythm?72:24)+12-f.scroll.scrollTop};
   f.scroll.emit('pointerdown',at);await settle();
-  assert.equal(f.notes().length,0,'the press is still a temporary editing gesture');assert.equal(f.auditions.length,1,'the generated note sounds before release');
+  assert.equal(f.notes().length,0,'a press may still become a viewport drag');assert.equal(f.auditions.length,0,'a pending click remains silent');
+  f.document.emit('pointerup');await settle();assert.equal(f.notes().length,1);assert.equal(f.auditions.length,1,'a confirmed click sounds once');
   assert(Math.abs(f.auditions[0]!.note.frequencyHz-(rhythm?261.6255653005986:440))<1e-9);assert.equal(f.auditions[0]!.note.holdSeconds,60/bpm/4);
-  f.document.emit('pointerup');await settle();assert.equal(f.notes().length,1);assert.equal(f.auditions.length,1,'committing does not play a second copy');
-  f.scroll.emit('pointerdown',{...at,clientX:512});await settle();assert.equal(f.auditions.length,2);f.document.emit('pointercancel');await settle();
-  assert.equal(f.notes().length,1);assert.equal(f.auditions.length,2,'cancelling the new gesture does not replay anything');
+  f.document.emit('pointerup');await settle();assert.equal(f.auditions.length,1,'another release does not play a second copy');
+  f.scroll.emit('pointerdown',{...at,clientX:512});await settle();assert.equal(f.auditions.length,1);f.document.emit('pointercancel');await settle();
+  assert.equal(f.notes().length,1);assert.equal(f.auditions.length,1,'cancelling the new gesture stays silent');
  }finally{f.cleanup();}}
 });
 
@@ -321,7 +322,8 @@ test('the plus column extends either roll one measure, reveals editable late cel
   f.selectTone();const keys=f.phrase.keyboard().slice().reverse(),row=rhythm?0:keys.findIndex(key=>key.label==='A4');
   f.scroll.emit('pointerdown',{target:f.root.querySelector('.melody-canvas'),clientX:912,clientY:100+row*(rhythm?72:24)+12-f.scroll.scrollTop});f.document.emit('pointerup');
   assert.equal(f.notes().at(-1)!.startBeat,18);assert.equal(f.root.querySelectorAll('.melody-note').length,2);f.press('Backspace');f.press('Backspace');assert.equal(f.phrase.read().body!.lengthBeats,16);assert.deepEqual(f.notes(),original);
-  for(let index=0;index<20;index++)plus.emit('click');assert.equal(f.phrase.read().body!.lengthBeats,64);assert.equal(plus.disabled,true);assert.deepEqual(f.notes(),original);
+  for(let index=0;index<20;index++)plus.emit('click');assert.equal(f.phrase.read().body!.lengthBeats,96);assert.equal(plus.disabled,false);assert.deepEqual(f.notes(),original);
+  f.phrase.setLength(1020);f.workspace.refresh();plus.emit('click');assert.equal(f.phrase.read().body!.lengthBeats,1024);assert.equal(plus.disabled,true);plus.emit('click');assert.equal(f.phrase.read().body!.lengthBeats,1024);assert.deepEqual(f.notes(),original);
  }finally{f.cleanup();}}
 });
 

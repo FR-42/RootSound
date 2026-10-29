@@ -15,6 +15,7 @@ import { libraryClickDelay } from './library-click.ts';
 import './song.css';
 
 const DOUBLE_NUDGE_WINDOW_MS = 150;
+const ROW_HORIZONTAL_DRAG_RATE = .75;
 
 function node<K extends keyof HTMLElementTagNameMap>(tag: K, className = '', text = ''): HTMLElementTagNameMap[K] {
   const result = document.createElement(tag); result.className = className; result.textContent = text; return result;
@@ -22,12 +23,13 @@ function node<K extends keyof HTMLElementTagNameMap>(tag: K, className = '', tex
 function action(label: string, className: string, callback: () => void): HTMLButtonElement {
   const button = node('button', className, label); button.type = 'button'; button.addEventListener('click', callback); return button;
 }
-function icon(kind: 'play' | 'pause' | 'stop' | 'tempo' | 'volume' | 'solo' | 'mute'): SVGSVGElement {
+function icon(kind: 'play' | 'pause' | 'stop' | 'tempo' | 'volume' | 'solo' | 'mute' | 'trash'): SVGSVGElement {
   const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
   svg.setAttribute('viewBox', '0 0 24 24'); svg.setAttribute('aria-hidden', 'true');
   const paths = { play: 'M8 5v14l11-7z', pause: 'M7 5h3v14H7zM14 5h3v14h-3z', stop: 'M6 6h12v12H6z',
     tempo: 'M9 3h6l5 18H4zM12 6v10m-3-4 7-5M8 18h8', volume: 'M4 9h4l5-4v14l-5-4H4zM16 8q5 4 0 8M19 5q7 7 0 14',
-    solo: 'M4 9h4l5-4v14l-5-4H4zM17 8v8m3-10v12', mute: 'M4 9h4l5-4v14l-5-4H4zM17 9l5 6m0-6-5 6' };
+    solo: 'M4 9h4l5-4v14l-5-4H4zM17 8v8m3-10v12', mute: 'M4 9h4l5-4v14l-5-4H4zM17 9l5 6m0-6-5 6',
+    trash: 'M4 6h16M9 6V3h6v3M6 6l1 15h10l1-15M10 10v7m4-7v7' };
   const path = document.createElementNS('http://www.w3.org/2000/svg', 'path'); path.setAttribute('d', paths[kind]);
   path.setAttribute('fill', ['play', 'pause', 'stop'].includes(kind) ? 'currentColor' : 'none');
   path.setAttribute('stroke', 'currentColor'); path.setAttribute('stroke-width', '1.5'); path.setAttribute('stroke-linejoin', 'round'); svg.append(path); return svg;
@@ -39,10 +41,13 @@ function timeLabel(seconds: number): string {
 type PickedClip = SongClipRef & { clip: SongClip; trackIndex: number };
 type Point = { x: number; y: number };
 type DragMove = { trackId: string; seconds: number };
+type PhraseDisplay = { id: string; name: string; tempoBpm?: number; durationSeconds?: number };
+type RowSelection = { draftId?: string; clips: string[]; trackId?: string; phraseId?: string };
 type Gesture =
   | { kind: 'head'; pointerId: number }
   | { kind: 'pan'; pointerId: number; last: Point }
-  | { kind: 'row'; pointerId: number; from: Point; trackId: string; sourceIndex: number; targetIndex: number; deltaY: number; moved: boolean; nameClicked: boolean }
+  | { kind: 'row'; pointerId: number; from: Point; trackId: string; sourceIndex: number; targetIndex: number; deltaY: number; deltaX: number;
+      moved: boolean; nameClicked: boolean; selection: RowSelection; snapshot: SongBody['tracks'][number] }
   | { kind: 'erase'; pointerId: number; previous: Point; refs: Map<string, SongClipRef> }
   | { kind: 'clip'; pointerId: number; from: Point; lastX: number; rawDeltaX: number; clips: PickedClip[]; anchor: PickedClip; moved: boolean; valid: boolean; moves: Map<string, DragMove>; deltaX: number; deltaY: number };
 
@@ -56,19 +61,25 @@ export function mountSongWorkspace(root: HTMLElement, options: {
   doubleClickIntervalMs?: number;
   phrases?(): Array<{ id: string; name: string; tempoBpm?: number; durationSeconds?: number }>;
   onRenamePhrase?(id: string, name: string, ref?: SongClipRef): void | { id: string } | Promise<void | { id: string }>; onOpenPhrase?(id: string): void;
-  onNewPhrase?(): void; onKeepPhrases?(ids: string[]): void;
+  onNewPhrase?(tempoBpm?: number): void; onKeepPhrases?(ids: string[]): void;
   onDeletePhrase?(id: string): void | Promise<void>;
   onPreviewPhrase?(id: string, signal: AbortSignal): Promise<PlaybackSession>;
   referenceContext?: ReferenceEditorContext; onSave?(): void; onApplyElsewhere?(): void;
   onEditPhrase?(ref: SongClipRef, chooseLocations?: boolean): void; renderEntities?(): HTMLElement;
-}): { dispose(): void; refresh(context?: ReferenceEditorContext, onApplyElsewhere?: () => void): void; notify(message: string, error?: boolean): void } {
+}): { dispose(): void; refresh(context?: ReferenceEditorContext, onApplyElsewhere?: () => void): void; notify(message: string, error?: boolean): void; flush(): void } {
   const { song, sound } = options;
   let disposed = false; let current = song.read(); let draftId = current.draft?.id;
   let view: PlaylistViewport = { leftSeconds: 0, top: 0, pixelsPerSecond: 88, rowHeight: 60 };
   let selected = new Set<string>(); let selectedTrack: string | undefined; let selectedPhrase: string | undefined; let gesture: Gesture | undefined;
   let viewport: HTMLElement; let content: HTMLElement; let ruler: HTMLElement; let erasures: HTMLElement;
-  let notice: HTMLElement; let playButton: HTMLButtonElement; let playhead: HTMLElement; let headHandle: HTMLElement; let clock: HTMLElement; let rowControls: HTMLElement;
+  let notice: HTMLElement; let playButton: HTMLButtonElement; let playhead: HTMLElement; let headHandle: HTMLElement; let clock: HTMLElement; let rowControls: HTMLElement; let rowTrash: HTMLElement;
   const clipNodes = new Map<string, HTMLElement>(); const rowNodes = new Map<string, HTMLElement[]>();
+  const rowCache = new Map<string, { row: HTMLElement; control: HTMLElement; track?: SongBody['tracks'][number]; armed?: boolean }>();
+  let phraseSnapshot: PhraseDisplay[] = []; let phraseById = new Map<string, PhraseDisplay>();
+  const phraseDurations = new Map<string, number>();
+  let gridLayer: HTMLElement; let gridNodes: HTMLElement[] = []; let addTrackButton: HTMLButtonElement; let dropPreviewNode: HTMLElement;
+  let createSongButton: HTMLButtonElement | undefined;
+  let viewFrame = 0;
   let tempoInput: HTMLInputElement; let masterInput: HTMLInputElement;
   let frame = 0; let noticeTimer = 0; let observer: ResizeObserver | undefined;
   let fieldCommitError: string | undefined; let pendingCommit: (() => void) | undefined;
@@ -81,6 +92,7 @@ export function mountSongWorkspace(root: HTMLElement, options: {
   let paletteList: HTMLElement; let newPhraseButton: HTMLElement; const phraseCards = new Map<string, HTMLElement>();
   let trash: HTMLElement; let phraseLibrary: HTMLDialogElement | undefined;
   let libraryDragId: string | undefined; let phraseDeleteDialog: HTMLDialogElement | undefined;
+  let rowDeleteDialog: HTMLDialogElement | undefined;
   let lastClipPointer: SongClipRef | undefined;
   let previousClipPointer: (SongClipRef & { at: number; point: Point }) | undefined;
   let lastPointerActivation: (SongClipRef & { at: number }) | undefined;
@@ -148,6 +160,16 @@ export function mountSongWorkspace(root: HTMLElement, options: {
   function tick(): void { if (disposed) return; positionPlayhead(); if (transportState.playing) frame = requestAnimationFrame(tick); }
   function sync(): void {
     current = song.read();
+    phraseSnapshot = options.phrases?.() ?? current.availablePhrases;
+    phraseById = new Map(phraseSnapshot.map(phrase => [phrase.id, phrase])); phraseDurations.clear();
+    const phraseIds = new Set([...phraseById.keys(), ...current.body?.tracks.flatMap(track => track.clips.map(clip => clip.phraseId)) ?? []]);
+    for (const id of phraseIds) {
+      const beats = current.clipLengths?.[id]; const sourceSeconds = phraseById.get(id)?.durationSeconds;
+      const seconds = beats !== undefined ? playlistSeconds(beats, current.body?.tempoBpm ?? 120)
+        : sourceSeconds !== undefined && (!current.body || current.body.tempoMode === 'source') ? sourceSeconds
+          : current.body ? playlistSeconds(song.clipLengthBeats(id), current.body.tempoBpm) : 0;
+      phraseDurations.set(id, seconds);
+    }
     if (draftId !== current.draft?.id) {
       draftId = current.draft?.id; selected.clear(); selectedTrack = undefined; selectedPhrase = undefined; mixPreview = undefined; inspector.cancel(); view = { ...view, leftSeconds: 0, top: 0 }; transport.stop();
     }
@@ -162,9 +184,9 @@ export function mountSongWorkspace(root: HTMLElement, options: {
     catch (error) { fieldCommitError = error instanceof Error ? error.message : String(error); report(fieldCommitError, true); sync(); paint(); return false; }
   }
   function duration(phraseId: string): number {
-    return playlistSeconds(current.clipLengths?.[phraseId] ?? song.clipLengthBeats(phraseId), current.body?.tempoBpm ?? 120);
+    return phraseDurations.get(phraseId) ?? 0;
   }
-  function phrases(): Array<{ id: string; name: string; tempoBpm?: number; durationSeconds?: number }> { return options.phrases?.() ?? current.availablePhrases; }
+  function phrases(): PhraseDisplay[] { return phraseSnapshot; }
   function orderedPhrases() {
     const all = phrases().slice().sort((a, b) => a.name.localeCompare(b.name, 'zh-CN') || a.id.localeCompare(b.id));
     const order = new Map((current.body?.phraseShelfOrder ?? []).map((id, index) => [id, index]));
@@ -193,7 +215,7 @@ export function mountSongWorkspace(root: HTMLElement, options: {
       : song.updateClip(trackId, clipId!, { [field]: value }));
   }
   function phraseInfo(id: string) {
-    const item = phrases().find(phrase => phrase.id === id);
+    const item = phraseById.get(id);
     return { id, name: item?.name ?? '乐句', tempoBpm: item?.tempoBpm, durationSeconds: item?.durationSeconds ?? duration(id) };
   }
   function editPhrase(ref: SongClipRef): void {
@@ -341,12 +363,12 @@ export function mountSongWorkspace(root: HTMLElement, options: {
     inspector.flush(); finishGesture(false); audition?.stop(); transport.pause();
     const dialog = node('dialog', 'song-phrase-library'); phraseLibrary = dialog;
     dialog.setAttribute('aria-label', '乐句库'); const heading = node('header', 'song-library-heading');
-    let renaming = false; let renameInput: HTMLInputElement | undefined; const addTimers = new Map<string, number>();
-    const cancelAdd = (id?: string) => { for (const [key, timer] of addTimers) if (!id || key === id) { window.clearTimeout(timer); addTimers.delete(key); } };
-    heading.append(node('h2', '', '乐句库'), action('→', 'song-library-close', () => { if (!renaming) dialog.close(); }));
+    let opening = false; const addTimers = new Map<string, { timer: number }>();
+    const cancelAdd = (id?: string) => { for (const [key, pending] of addTimers) if (!id || key === id) { window.clearTimeout(pending.timer); addTimers.delete(key); } };
+    heading.append(node('h2', '', '乐句库'), action('→', 'song-library-close', () => { if (!opening) dialog.close(); }));
     heading.querySelector('button')!.setAttribute('aria-label', '返回歌曲编排');
     const grid = node('div', 'song-library-grid'); let suppressClickUntil = 0;
-    const renameError = node('p', 'song-library-rename-error'); renameError.setAttribute('role', 'alert'); renameError.hidden = true;
+    const openError = node('p', 'song-library-open-error'); openError.setAttribute('role', 'alert'); openError.hidden = true;
     const active = () => !disposed && phraseLibrary === dialog;
     const resetDrag = () => { libraryDragId = undefined; hideTrash(); updateInspector(); };
     const refreshLibrary = () => {
@@ -355,7 +377,7 @@ export function mountSongWorkspace(root: HTMLElement, options: {
       for (const phrase of phrases()) {
         const tile = node('div', 'song-library-phrase', phrase.name); tile.tabIndex = 0; tile.setAttribute('role', 'button');
         const toggle = () => {
-          addTimers.delete(phrase.id); if (!active() || renaming || renameInput || phraseDeleteDialog || libraryDragId) return;
+          addTimers.delete(phrase.id); if (!active() || opening || phraseDeleteDialog || libraryDragId) return;
           const shown = shelfPhrases().some(item => item.id === phrase.id);
           const focused = document.activeElement === tile;
           if (mutate(() => { song.setPhraseShelfVisible(phrase.id, !shown); if (shown && selectedPhrase === phrase.id) selectedPhrase = undefined; }, false)) {
@@ -363,42 +385,30 @@ export function mountSongWorkspace(root: HTMLElement, options: {
           }
         };
         tile.addEventListener('click', () => {
-          if (!active() || renaming || renameInput || phraseDeleteDialog || libraryDragId || Date.now() < suppressClickUntil) return;
-          cancelAdd(phrase.id); addTimers.set(phrase.id, window.setTimeout(toggle, libraryClickDelay(options.doubleClickIntervalMs)));
+          if (!active() || opening || phraseDeleteDialog || libraryDragId || Date.now() < suppressClickUntil) return;
+          cancelAdd(phrase.id); const pending = { timer: 0 };
+          pending.timer = window.setTimeout(() => { if (addTimers.get(phrase.id) === pending) toggle(); }, libraryClickDelay(options.doubleClickIntervalMs));
+          addTimers.set(phrase.id, pending);
         });
-        tile.addEventListener('keydown', event => { if (!renameInput && (event.key === 'Enter' || event.key === ' ')) { event.preventDefault(); cancelAdd(phrase.id); toggle(); } });
+        tile.addEventListener('keydown', event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); cancelAdd(phrase.id); toggle(); } });
         tile.addEventListener('dblclick', event => {
-          event.preventDefault(); event.stopPropagation(); cancelAdd(phrase.id);
-          if (!active() || renaming || renameInput || phraseDeleteDialog || !options.onRenamePhrase) return;
-          const input = node('input', 'song-library-rename'); input.value = phrase.name; input.maxLength = 80; input.setAttribute('aria-label', '乐句名称');
-          renameInput = input; tile.draggable = false; tile.textContent = ''; tile.replaceChildren(input); renameError.hidden = true;
-          let done = false;
-          const commit = async () => {
-            if (done || !active()) return; const name = input.value.trim();
-            if (!name || name === phrase.name) { done = true; renameInput = undefined; refreshLibrary(); return; }
-            done = true; renaming = true; input.disabled = true; pendingRename++;
-            try {
-              const result = await options.onRenamePhrase!(phrase.id, name);
-              if (!active()) return;
-              if (result && selectedPhrase === phrase.id) selectedPhrase = result.id;
-              renameInput = undefined; sync(); paint(); refreshLibrary();
-            } catch (reason) {
-              if (active()) { done = false; input.disabled = false; renameError.textContent = reason instanceof Error ? reason.message : String(reason); renameError.hidden = false; input.focus(); }
-            } finally { renaming = false; pendingRename--; }
-          };
-          input.addEventListener('click', event => event.stopPropagation()); input.addEventListener('dblclick', event => event.stopPropagation());
-          input.addEventListener('blur', () => { void commit(); }); input.addEventListener('keydown', event => {
-            event.stopPropagation(); if (event.key === 'Enter') { event.preventDefault(); void commit(); }
-            if (event.key === 'Escape' && !renaming) { event.preventDefault(); done = true; renameInput = undefined; refreshLibrary(); }
-          });
-          input.focus(); input.select?.();
+          event.preventDefault(); event.stopPropagation(); cancelAdd();
+          if (!active() || opening || phraseDeleteDialog || libraryDragId || Date.now() < suppressClickUntil || !phrases().some(item => item.id === phrase.id)) return;
+          opening = true; openError.hidden = true;
+          try {
+            if (!options.onOpenPhrase) throw new Error('当前窗口暂不支持打开乐句，请重新打开 RootSound。');
+            prepareFileAction(); options.onOpenPhrase(phrase.id);
+            if (active()) dialog.close();
+          } catch (reason) {
+            if (active()) { openError.textContent = reason instanceof Error ? reason.message : String(reason); openError.hidden = false; }
+          } finally { opening = false; }
         });
         tile.draggable = true; tile.dataset.phraseId = phrase.id; tile.title = phrase.name; tile.classList.toggle('is-on-shelf', visible.has(phrase.id));
         tile.classList.toggle('is-selected', visible.has(phrase.id)); tile.setAttribute('aria-pressed', String(visible.has(phrase.id)));
         tile.setAttribute('aria-label', `${visible.has(phrase.id) ? '隐藏' : '显示'}${phrase.name}`);
         tile.addEventListener('dragstart', event => {
           cancelAdd();
-          if (!active() || renaming || renameInput || phraseDeleteDialog || !event.dataTransfer) { event.preventDefault(); return; }
+          if (!active() || opening || phraseDeleteDialog || !event.dataTransfer) { event.preventDefault(); return; }
           libraryDragId = phrase.id; suppressClickUntil = Date.now() + 250; updateInspector();
           event.dataTransfer.effectAllowed = 'move'; event.dataTransfer.setData('application/x-rootsound-library-phrase', phrase.id); showTrash('library');
         });
@@ -406,9 +416,13 @@ export function mountSongWorkspace(root: HTMLElement, options: {
         grid.append(tile);
       }
       const create = action('+', 'song-library-new', () => {
-        cancelAdd(); if (!active() || renaming || renameInput || phraseDeleteDialog || libraryDragId) return;
-        dialog.close();
-        try { (options.onNewPhrase ?? options.onPhrase)(); }
+        cancelAdd(); if (!active() || opening || phraseDeleteDialog || libraryDragId) return;
+        try {
+          prepareFileAction();
+          const tempoBpm = current.body ? songGridTempoAt(current.body, transport.position()) : 120;
+          dialog.close();
+          if (options.onNewPhrase) options.onNewPhrase(tempoBpm); else options.onPhrase();
+        }
         catch (error) { report(error instanceof Error ? error.message : String(error), true); }
       });
       create.setAttribute('aria-label', '新建乐句'); grid.append(create);
@@ -418,7 +432,7 @@ export function mountSongWorkspace(root: HTMLElement, options: {
       const phrase = phrases().find(item => item.id === id); if (!phrase) return;
       const warning = node('dialog', 'song-library-delete-dialog'); phraseDeleteDialog = warning;
       warning.setAttribute('aria-label', '彻底删除乐句'); warning.append(node('h2', '', '彻底删除乐句？'),
-        node('p', '', `“${phrase.name}”将被删除。所有使用位置和相关撤销记录将清除，并保存当前工程。此操作无法撤销。`));
+        node('p', '', `“${phrase.name}”及其使用位置将从当前工程移除，相关撤销记录会清除。保存工程后生效；保存前仍可退出并放弃本次修改。`));
       const error = node('p', 'song-library-delete-error'); error.hidden = true; error.setAttribute('role', 'alert');
       let busy = false;
       const cancel = action('取消', 'song-library-delete-cancel', () => { if (!busy) warning.close(); });
@@ -448,13 +462,13 @@ export function mountSongWorkspace(root: HTMLElement, options: {
       resetDrag(); requestDelete(id);
     };
     trash.addEventListener('drop', libraryDrop);
-    refreshLibrary(); dialog.append(heading, grid, renameError, trash);
-    dialog.addEventListener('cancel', event => { if (renaming) event.preventDefault(); });
-    dialog.addEventListener('click', event => { if (!renaming && event.target === dialog) dialog.close(); });
+    refreshLibrary(); dialog.append(heading, grid, openError, trash);
+    dialog.addEventListener('cancel', event => { if (opening) event.preventDefault(); });
+    dialog.addEventListener('click', event => { if (!opening && event.target === dialog) dialog.close(); });
     dialog.addEventListener('close', () => {
       cancelAdd(); resetDrag(); trash.removeEventListener('drop', libraryDrop); phraseDeleteDialog?.close();
       viewport.append(trash); dialog.remove();
-      if (phraseLibrary === dialog) phraseLibrary = undefined; if (!disposed) newPhraseButton?.focus();
+      if (phraseLibrary === dialog) phraseLibrary = undefined; if (!disposed && !opening) newPhraseButton?.focus();
     }, { once: true });
     root.append(dialog); dialog.showModal();
   }
@@ -502,8 +516,11 @@ export function mountSongWorkspace(root: HTMLElement, options: {
       target.refs.set(clip.id, { trackId: track.id, clipId: clip.id }); selected.delete(clip.id); flashErase(ref);
     })); paint(); if (target.refs.size !== previousCount) transport.refresh();
   }
-  function finishGesture(commit = true, toTrash = false): void {
+  function finishGesture(commit = true, toTrash = false, rowReleased = false): void {
     const finished = gesture; gesture = undefined; viewport?.classList.remove('is-erasing', 'is-moving-clip', 'is-moving-row');
+    viewport?.classList.remove('is-deleting-row');
+    if (gridLayer) gridLayer.style.maskImage = '';
+    if (rowTrash) { rowTrash.hidden = true; rowTrash.style.opacity = '0'; rowTrash.classList.remove('is-armed'); }
     if (!dragPhraseId) hideTrash();
     if (!finished) return;
     if (viewport.hasPointerCapture?.(finished.pointerId)) viewport.releasePointerCapture(finished.pointerId);
@@ -526,6 +543,12 @@ export function mountSongWorkspace(root: HTMLElement, options: {
       return;
     }
     if (finished.kind === 'row' && finished.moved) lastNamePointer = undefined;
+    if (finished.kind === 'row' && (!commit || !rowReleased || finished.deltaX >= rowTravelLimit())) {
+      if (!commit || !rowReleased) restoreRowSelection(finished.selection);
+      settleRowDrag(finished);
+      if (commit && rowReleased && finished.deltaX >= rowTravelLimit()) requestRowDeletion(finished.trackId, finished.snapshot, finished.selection);
+      return;
+    }
     const oldRects = new Map([...clipNodes].map(([id, element]) => [id, element.getBoundingClientRect()]));
     const oldRows = new Map([...rowNodes].map(([id, elements]) => [id, elements.slice(0, 2).map(element => element.getBoundingClientRect())]));
     if (commit && finished.kind === 'erase' && finished.refs.size) removeRefs([...finished.refs.values()], false);
@@ -543,9 +566,28 @@ export function mountSongWorkspace(root: HTMLElement, options: {
     }
     if (!reduceMotion && finished.kind === 'row') for (const [id, elements] of rowNodes) elements.slice(0, 2).forEach((element, index) => {
       const previous = oldRows.get(id)?.[index]; if (!previous) return; const next = element.getBoundingClientRect();
-      element.animate?.([{ transform: `translateY(${previous.top - next.top}px)` }, { transform: 'translateY(0)' }], { duration: 130, easing: 'ease-out' });
+      element.animate?.([{ transform: `translate(${previous.left - next.left}px, ${previous.top - next.top}px)` }, { transform: 'translate(0, 0)' }], { duration: 130, easing: 'ease-out' });
     });
     if (finished.kind !== 'row') transport.refresh();
+  }
+  function rowTravelLimit(): number { return rowControls.getBoundingClientRect().width || rowControls.clientWidth || 144; }
+  function settleRowDrag(active: Extract<Gesture, { kind: 'row' }>): void {
+    const before = new Map([...rowNodes.values()].flat().map(element => [element, element.getBoundingClientRect()]));
+    paint();
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches || !active.moved) return;
+    for (const [element, previous] of before) {
+      if (!element.parentElement) continue;
+      const next = element.getBoundingClientRect();
+      element.animate?.([{ transform: `translate(${previous.left - next.left}px, ${previous.top - next.top}px)` }, { transform: 'translate(0, 0)' }], { duration: 130, easing: 'ease-out' });
+    }
+  }
+  function updateRowDrag(active: Extract<Gesture, { kind: 'row' }>, event: Pick<PointerEvent, 'clientX' | 'clientY'>): void {
+    const dx = event.clientX - active.from.x; const dy = event.clientY - active.from.y;
+    if (!active.moved && Math.hypot(dx, dy) < 3) return;
+    active.moved = true;
+    active.deltaX = clampPlaylist(dx * ROW_HORIZONTAL_DRAG_RATE, 0, rowTravelLimit());
+    active.deltaY = clampPlaylist(dy, -active.sourceIndex * view.rowHeight, (current.body!.tracks.length - 1 - active.sourceIndex) * view.rowHeight);
+    active.targetIndex = clampPlaylist(active.sourceIndex + Math.round(active.deltaY / view.rowHeight), 0, current.body!.tracks.length - 1);
   }
   function updateSelection(): void {
     for (const [id, block] of clipNodes) {
@@ -579,7 +621,7 @@ export function mountSongWorkspace(root: HTMLElement, options: {
     selectRow(trackId); name.readOnly = false; name.focus(); name.select?.();
   }
   function pointerDown(event: PointerEvent): void {
-    if (exiting || !current.body || (event.button !== 0 && event.button !== 2)) return;
+    if (disposed || exiting || rowDeleteDialog || !current.body || (event.button !== 0 && event.button !== 2)) return;
     const target = event.target as Element;
     const rowName = target.closest<HTMLInputElement>('.song-row-name');
     if (target.closest('.song-add-track') || (rowName && !rowName.readOnly) || target.closest('.song-row-color') || target.closest('.song-row-delete') || target.closest('.song-row-mix-button') || target.closest('.song-empty-curtain')) return;
@@ -593,9 +635,12 @@ export function mountSongWorkspace(root: HTMLElement, options: {
     } else if (target.closest('.song-row-control')) {
       previousClipPointer = undefined;
       if (event.button !== 0) return; event.preventDefault(); viewport.focus({ preventScroll: true });
+      const selection = readRowSelection();
       const id = target.closest<HTMLElement>('.song-row-control')!.dataset.trackId!; selectRow(id);
       const index = current.body.tracks.findIndex(track => track.id === id);
-      gesture = { kind: 'row', pointerId: event.pointerId, from: point, trackId: id, sourceIndex: index, targetIndex: index, deltaY: 0, moved: false, nameClicked: !!rowName };
+      gesture = { kind: 'row', pointerId: event.pointerId, from: { x: event.clientX, y: event.clientY }, trackId: id,
+        sourceIndex: index, targetIndex: index, deltaX: 0, deltaY: 0, moved: false, nameClicked: !!rowName,
+        selection, snapshot: structuredClone(current.body.tracks[index]!) };
     } else {
       if (point.x < 0 || point.y < 0 || !phrases().length) return;
       event.preventDefault(); viewport.focus({ preventScroll: true }); selectedTrack = undefined; selectedPhrase = undefined; deleteArmed = undefined;
@@ -615,7 +660,7 @@ export function mountSongWorkspace(root: HTMLElement, options: {
           gesture = { kind: 'clip', pointerId: event.pointerId, from: point, lastX: point.x, rawDeltaX: 0, clips, anchor, moved: false, valid: true, moves: new Map(), deltaX: 0, deltaY: 0 }; viewport.classList.add('is-moving-clip');
         } else {
           previousClipPointer = undefined;
-          selected.clear(); gesture = { kind: 'pan', pointerId: event.pointerId, last: point }; viewport.classList.add('is-panning');
+          selected.clear(); gesture = { kind: 'pan', pointerId: event.pointerId, last: { x: event.clientX, y: event.clientY } }; viewport.classList.add('is-panning');
         }
         lastNamePointer = undefined;
         doubleNudge = undefined; updateSelection();
@@ -630,29 +675,48 @@ export function mountSongWorkspace(root: HTMLElement, options: {
       block.style.transform = `translate(${active.deltaX}px, ${active.deltaY}px)`;
       block.classList.toggle('is-dragging', active.moved); block.classList.toggle('is-invalid', !active.valid);
     }
-    if (active.kind === 'row') current.body!.tracks.forEach((track, index) => {
+    if (active.kind === 'row') {
+      const limit = rowTravelLimit(); active.deltaX = clampPlaylist(active.deltaX, 0, limit);
+      const progress = active.deltaX / limit;
+      const top = active.sourceIndex * view.rowHeight - view.top + active.deltaY;
+      rowTrash.hidden = progress === 0;
+      viewport.classList.toggle('is-deleting-row', progress > 0);
+      if (progress > 0) {
+        rowTrash.style.top = `${top}px`; rowTrash.style.height = `${view.rowHeight}px`;
+        rowTrash.style.opacity = String(progress ** 2);
+        rowTrash.classList.toggle('is-armed', progress >= 1);
+      }
+      // The beat lines share one reused layer. Mask only the dragged row's
+      // visible band, so the other rows retain their full grid contrast.
+      const bandTop = Math.max(0, top); const bandBottom = Math.max(bandTop, top + view.rowHeight);
+      const ink = `rgba(0, 0, 0, ${1 - progress})`;
+      gridLayer.style.maskImage = progress > 0 ? `linear-gradient(to bottom, #000 0px, #000 ${bandTop}px, ${ink} ${bandTop}px, ${ink} ${bandBottom}px, #000 ${bandBottom}px, #000 100%)` : '';
+      current.body!.tracks.forEach((track, index) => {
       let shift = 0;
       if (track.id === active.trackId) shift = active.deltaY;
       else if (active.targetIndex > active.sourceIndex && index > active.sourceIndex && index <= active.targetIndex) shift = -view.rowHeight;
       else if (active.targetIndex < active.sourceIndex && index >= active.targetIndex && index < active.sourceIndex) shift = view.rowHeight;
-      for (const element of rowNodes.get(track.id) ?? []) { element.style.transform = `translateY(${shift}px)`; element.classList.toggle('is-row-dragging', track.id === active.trackId && active.moved); }
-    });
+      for (const element of rowNodes.get(track.id) ?? []) {
+        element.style.transform = track.id === active.trackId ? `translate(${active.deltaX}px, ${shift}px)` : `translateY(${shift}px)`;
+        element.classList.toggle('is-row-dragging', track.id === active.trackId && active.moved);
+      }
+      });
+    }
   }
   function pointerMove(event: PointerEvent): void {
     if (shelfPress?.pointerId === event.pointerId && Math.hypot(event.clientX - shelfPress.from.x, event.clientY - shelfPress.from.y) > 6) { shelfPress.moved = true; previousShelfPointer = undefined; suppressShelfClick = true; }
     const active = gesture; if (!active || active.pointerId !== event.pointerId) return;
-    event.preventDefault(); const point = localPoint(event);
-    if (active.kind === 'head') { transport.seek(Math.max(0, timeAt(point.x))); positionPlayhead(); return; }
+    event.preventDefault();
     if (active.kind === 'pan') {
-      if (event.shiftKey) view.top -= point.y - active.last.y;
-      else view.leftSeconds -= (point.x - active.last.x) / view.pixelsPerSecond;
-      active.last = point; constrainTop(); paint(); return;
+      view.leftSeconds -= (event.clientX - active.last.x) / view.pixelsPerSecond;
+      view.top -= event.clientY - active.last.y;
+      active.last = { x: event.clientX, y: event.clientY }; constrainTop(); scheduleViewportPaint(); return;
     }
+    const point = localPoint(event);
+    if (active.kind === 'head') { transport.seek(Math.max(0, timeAt(point.x))); positionPlayhead(); return; }
     if (active.kind === 'erase') { sweep(active.previous, point, active); active.previous = point; return; }
     if (active.kind === 'row') {
-      if (!active.moved && Math.abs(point.y - active.from.y) < 3) return;
-      active.moved = true; active.deltaY = clampPlaylist(point.y - active.from.y, -active.sourceIndex * view.rowHeight, (current.body!.tracks.length - 1 - active.sourceIndex) * view.rowHeight);
-      active.targetIndex = clampPlaylist(active.sourceIndex + Math.round(active.deltaY / view.rowHeight), 0, current.body!.tracks.length - 1);
+      updateRowDrag(active, event); if (!active.moved) return;
       viewport.classList.add('is-moving-row'); paintGesture(); return;
     }
     if (Math.hypot(point.x - active.from.x, point.y - active.from.y) < 4 && !active.moved) return;
@@ -676,11 +740,13 @@ export function mountSongWorkspace(root: HTMLElement, options: {
   function wheel(event: WheelEvent): void {
     if (exiting) { event.preventDefault(); return; }
     lastNamePointer = undefined;
-    event.preventDefault(); if (gesture) finishGesture(); const point = localPoint(event);
-    if (event.ctrlKey || event.metaKey) view = zoomPlaylist(view, Math.max(0, point.x), point.y, Math.exp(-event.deltaY * .002), event.shiftKey);
-    else if (event.shiftKey) view.top += event.deltaY || event.deltaX;
+    event.preventDefault(); if (gesture) finishGesture(gesture.kind !== 'row'); const point = localPoint(event);
+    const overControls = !!(event.target as Element | null)?.closest?.('.song-row-controls');
+    const vertical = overControls ? !event.shiftKey : event.shiftKey;
+    if (event.ctrlKey || event.metaKey) view = zoomPlaylist(view, Math.max(0, point.x), point.y, Math.exp(-(event.deltaY || event.deltaX) * .002), vertical);
+    else if (vertical) view.top += event.deltaY || event.deltaX;
     else view.leftSeconds = Math.max(0, view.leftSeconds + (event.deltaX || event.deltaY) / view.pixelsPerSecond);
-    constrainTop(); paint();
+    constrainTop(); scheduleViewportPaint();
   }
   function readDropId(transfer: DataTransfer): string | undefined {
     const entity = readEntityDrag(transfer); return (entity?.kind === 'rootsound.phrase' ? entity.id : transfer.getData('application/x-rootsound-phrase')) || dragPhraseId;
@@ -688,11 +754,11 @@ export function mountSongWorkspace(root: HTMLElement, options: {
   function dragOver(event: DragEvent): void {
     if (exiting) return;
     if (!event.dataTransfer || !event.dataTransfer.types.some(type => type === 'application/x-rootsound-phrase' || type === 'application/x-rootsound-entity')) return;
-    const point = localPoint(event); const index = trackAt(point); if (index === undefined) { dropPreview = undefined; paint(); return; }
+    const point = localPoint(event); const index = trackAt(point); if (index === undefined) { dropPreview = undefined; scheduleViewportPaint(); return; }
     event.preventDefault(); event.dataTransfer.dropEffect = 'copy'; const id = readDropId(event.dataTransfer);
     if (id && phrases().some(phrase => phrase.id === id)) {
       const raw = Math.max(0, timeAt(point.x));
-      dropPreview = { phraseId: id, seconds: raw, trackIndex: index }; paint();
+      dropPreview = { phraseId: id, seconds: raw, trackIndex: index }; scheduleViewportPaint();
     }
   }
   function drop(event: DragEvent): void {
@@ -718,7 +784,7 @@ export function mountSongWorkspace(root: HTMLElement, options: {
     dialog.append(swatches, custom, buttons); dialog.addEventListener('close', () => dialog.remove(), { once: true }); root.append(dialog); dialog.showModal();
   }
   function deleteRow(trackId: string): void {
-    if (exiting) return;
+    if (disposed || exiting || rowDeleteDialog) return;
     window.clearTimeout(deleteTimer);
     if (deleteArmed !== trackId) {
       deleteArmed = trackId; selectRow(trackId); paint();
@@ -726,7 +792,55 @@ export function mountSongWorkspace(root: HTMLElement, options: {
     }
     const track = current.body?.tracks.find(item => item.id === trackId); if (!track) return;
     deleteArmed = undefined;
-    mutate(() => { options.onKeepPhrases?.([...new Set(track.clips.map(clip => clip.phraseId))]); song.removeTrack(trackId); });
+    requestRowDeletion(trackId, structuredClone(track), readRowSelection());
+  }
+  function readRowSelection(): RowSelection {
+    return { draftId: current.draft?.id, clips: [...selected], trackId: selectedTrack, phraseId: selectedPhrase };
+  }
+  function restoreRowSelection(selection: RowSelection): void {
+    if (disposed || current.draft?.id !== selection.draftId) return;
+    const ids = new Set(current.body?.tracks.flatMap(track => track.clips.map(clip => clip.id)));
+    selected = new Set(selection.clips.filter(id => ids.has(id)));
+    selectedTrack = current.body?.tracks.some(track => track.id === selection.trackId) ? selection.trackId : undefined;
+    selectedPhrase = phraseById.has(selection.phraseId ?? '') ? selection.phraseId : undefined;
+  }
+  function requestRowDeletion(trackId: string, snapshot: SongBody['tracks'][number], selection: RowSelection): void {
+    if (disposed || exiting || rowDeleteDialog) return;
+    const activeDraftId = current.draft?.id;
+    const unchanged = () => {
+      const latest = song.read();
+      return latest.draft?.id === activeDraftId && JSON.stringify(latest.body?.tracks.find(track => track.id === trackId)) === JSON.stringify(snapshot);
+    };
+    const remove = () => {
+      if (!unchanged()) throw new Error('这一行已发生变化，请取消后重新操作。');
+      options.onKeepPhrases?.([...new Set(snapshot.clips.map(clip => clip.phraseId))]);
+      if (!unchanged()) throw new Error('这一行已发生变化，请取消后重新操作。');
+      song.removeTrack(trackId);
+    };
+    if (!unchanged()) { sync(); restoreRowSelection(selection); paint(); report('这一行已发生变化，请重新操作。', true); return; }
+    if (!snapshot.clips.length) { mutate(remove); return; }
+    const dialog = node('dialog', 'song-library-delete-dialog song-row-delete-dialog'); rowDeleteDialog = dialog;
+    dialog.setAttribute('aria-label', '删除这一行'); dialog.append(node('h2', '', '删除这一行？'),
+      node('p', '', `将移除“${snapshot.name}”和这一行的 ${snapshot.clips.length} 个乐句片段。乐句库里的原乐句会保留。`));
+    const error = node('p', 'song-library-delete-error'); error.hidden = true; error.setAttribute('role', 'alert');
+    let removed = false;
+    const cancel = action('取消', 'song-row-delete-cancel', () => dialog.close());
+    const confirm = action('删除这一行', 'song-library-delete-confirm song-row-delete-confirm', () => {
+      if (disposed || rowDeleteDialog !== dialog) return;
+      if (!unchanged()) { error.textContent = '这一行已发生变化，请取消后重新操作。'; error.hidden = false; confirm.disabled = true; return; }
+      removed = mutate(remove);
+      if (removed) dialog.close();
+      else { error.textContent = fieldCommitError ?? '暂时无法删除，请稍后再试。'; error.hidden = false; }
+    });
+    const buttons = node('div', 'song-library-delete-actions'); buttons.append(cancel, confirm); dialog.append(error, buttons);
+    dialog.addEventListener('cancel', event => { event.preventDefault(); dialog.close(); });
+    dialog.addEventListener('close', () => {
+      const active = rowDeleteDialog === dialog; if (active) rowDeleteDialog = undefined; dialog.remove();
+      if (!active || disposed) return;
+      if (!removed) { sync(); restoreRowSelection(selection); paint(); }
+      viewport.focus({ preventScroll: true });
+    }, { once: true });
+    paint(); root.append(dialog); dialog.showModal();
   }
   function rowControl(track: NonNullable<typeof current.body>['tracks'][number], trackIndex: number): HTMLElement {
     const control = node('div', 'song-row-control'); control.dataset.trackId = track.id; control.tabIndex = 0;
@@ -759,58 +873,120 @@ export function mountSongWorkspace(root: HTMLElement, options: {
     mute.append(icon('mute')); mute.setAttribute('aria-label', `静默${track.name}`); mute.setAttribute('aria-pressed', String(track.muted)); mute.classList.toggle('is-on', track.muted);
     control.append(color, name, solo, mute, remove); return control;
   }
+  function scheduleViewportPaint(): void {
+    if (disposed || viewFrame) return;
+    viewFrame = requestAnimationFrame(() => { viewFrame = 0; paintViewport(); });
+  }
+  function refreshRowControl(control: HTMLElement, track: NonNullable<typeof current.body>['tracks'][number], index: number): void {
+    control.style.backgroundColor = track.color ? `${track.color}25` : '';
+    control.classList.toggle('is-selected', selectedTrack === track.id); control.setAttribute('aria-selected', String(selectedTrack === track.id));
+    control.setAttribute('aria-label', `${track.name}，行调控`);
+    const name = control.querySelector<HTMLInputElement>('.song-row-name')!;
+    if (document.activeElement !== name) name.value = track.name;
+    name.setAttribute('aria-label', `第${index + 1}行名称`);
+    const color = control.querySelector<HTMLElement>('.song-row-color')!; color.style.background = track.color ?? '#cbd3dc'; color.setAttribute('aria-label', `为${track.name}选择颜色`);
+    const remove = control.querySelector<HTMLElement>('.song-row-delete')!; remove.classList.toggle('is-armed', deleteArmed === track.id);
+    remove.setAttribute('aria-label', `删除${track.name}，连续点击两次`); remove.title = deleteArmed === track.id ? '再次点击删除这一行' : '连续点击两次删除';
+    for (const [kind, enabled] of [['solo', track.solo], ['mute', track.muted]] as const) {
+      const button = control.querySelector<HTMLElement>(`.song-row-${kind}`)!;
+      button.classList.toggle('is-on', enabled); button.setAttribute('aria-pressed', String(enabled)); button.setAttribute('aria-label', `${kind === 'solo' ? '独奏' : '静默'}${track.name}`);
+    }
+  }
+  /** Content/selection refresh. Camera movement uses paintViewport directly. */
   function paint(): void {
     if (disposed || !content) return;
+    cancelAnimationFrame(viewFrame); viewFrame = 0;
     const curtain = viewport.querySelector('.song-empty-curtain');
     if (!phrases().length && !curtain) {
       const empty = node('div', 'song-empty-curtain'); empty.append(node('p', '', '先创建乐句吧'), node('span', 'song-empty-arrow', '←')); viewport.append(empty);
     } else if (phrases().length) curtain?.remove();
-    // Removing a focused input need not dispatch blur in browsers. Commit it while
-    // it is still attached, before reading the body used to rebuild the rows.
-    const active = document.activeElement;
-    if (active instanceof HTMLInputElement && active.classList.contains('song-row-name') && rowControls.contains(active)) active.blur();
-    syncPalette(); const body = current.body; const width = content.clientWidth || viewport.clientWidth || 1000; const height = content.clientHeight || 600;
-    constrainTop(); content.replaceChildren(); ruler.replaceChildren(); rowControls.replaceChildren(); clipNodes.clear(); rowNodes.clear();
-    if (!body) { content.append(action('新建歌曲', 'song-create', () => { if (mutate(() => song.create())) render(); })); return; }
-    const grid = node('div', 'song-grid-lines'); grid.style.height = `${Math.max(0, Math.min(height, body.tracks.length * view.rowHeight - view.top))}px`;
+    syncPalette(); paintViewport(true); updateInspector();
+  }
+  /** Reuse visible nodes and cached display data; never reads a song or a library. */
+  function paintViewport(refreshContent = false): void {
+    if (disposed || !content) return;
+    const body = current.body; const width = content.clientWidth || viewport.clientWidth || 1000; const height = content.clientHeight || 600;
+    constrainTop();
+    if (!body) {
+      gridLayer.hidden = true; addTrackButton.hidden = true; dropPreviewNode.hidden = true;
+      if (!createSongButton) { createSongButton = action('新建歌曲', 'song-create', () => { if (mutate(() => song.create())) render(); }); content.append(createSongButton); }
+      return;
+    }
+    createSongButton?.remove(); createSongButton = undefined;
+    gridLayer.hidden = false; gridLayer.style.maskImage = ''; gridLayer.style.height = `${Math.max(0, Math.min(height, body.tracks.length * view.rowHeight - view.top))}px`;
     const lines = playlistGridLines(view.leftSeconds, width, view.pixelsPerSecond, body.gridTempoBpm ?? body.tempoBpm, body.gridOffsetSeconds ?? 0, body.gridTempoChanges);
-    for (const line of lines) {
-      const mark = node('i', line.strong ? 'is-bar' : 'is-beat'); mark.style.left = `${line.x}px`; grid.append(mark);
-    }
-    content.append(grid);
+    lines.forEach((line, index) => {
+      let mark = gridNodes[index]; if (!mark) { mark = node('i'); gridNodes.push(mark); gridLayer.append(mark); }
+      mark.hidden = false; mark.className = line.strong ? 'is-bar' : 'is-beat'; mark.style.left = `${line.x}px`;
+    });
+    for (let index = lines.length; index < gridNodes.length; index++) gridNodes[index]!.hidden = true;
     const start = Math.max(0, Math.floor(view.top / view.rowHeight)); const end = Math.min(body.tracks.length, Math.ceil((view.top + height) / view.rowHeight));
-    const phraseNames = new Map(phrases().map(phrase => [phrase.id, phrase.name]));
+    const visibleRows = new Set<string>(); rowNodes.clear();
     for (let trackIndex = start; trackIndex < end; trackIndex++) {
-      const track = body.tracks[trackIndex]!; const row = node('div', 'song-track'); row.dataset.trackId = track.id;
-      row.style.top = `${trackIndex * view.rowHeight - view.top}px`; row.style.height = `${view.rowHeight}px`; row.setAttribute('aria-label', track.name); content.append(row);
-      if (track.color) row.style.backgroundColor = `${track.color}16`;
-      const control = rowControl(track, trackIndex); control.style.top = row.style.top; control.style.height = row.style.height; rowControls.append(control); rowNodes.set(track.id, [row, control]);
+      const track = body.tracks[trackIndex]!; visibleRows.add(track.id);
+      let pair = rowCache.get(track.id);
+      if (!pair) { const row = node('div', 'song-track'); row.dataset.trackId = track.id; pair = { row, control: rowControl(track, trackIndex) }; rowCache.set(track.id, pair); }
+      const { row, control } = pair;
+      if (row.parentElement !== content) content.append(row);
+      if (control.parentElement !== rowControls) rowControls.append(control);
+      row.style.top = `${trackIndex * view.rowHeight - view.top}px`; row.style.height = `${view.rowHeight}px`;
+      row.style.transform = ''; control.style.transform = ''; row.classList.remove('is-row-dragging'); control.classList.remove('is-row-dragging');
+      row.setAttribute('aria-label', track.name); row.style.backgroundColor = track.color ? `${track.color}16` : '';
+      control.style.top = row.style.top; control.style.height = row.style.height;
+      const rowSelected = selectedTrack === track.id; const armed = deleteArmed === track.id;
+      // Selection handlers can update attached controls without a repaint. Always
+      // reconcile the real reused node, rather than trusting a second cached flag.
+      control.classList.toggle('is-selected', rowSelected); control.setAttribute('aria-selected', String(rowSelected));
+      if (refreshContent || pair.track !== track || pair.armed !== armed) {
+        refreshRowControl(control, track, trackIndex); pair.track = track; pair.armed = armed;
+      }
+      rowNodes.set(track.id, [row, control]);
     }
+    const trackIds = new Set(body.tracks.map(track => track.id));
+    for (const [id, pair] of rowCache) if (!visibleRows.has(id)) {
+      // Browsers need not dispatch blur when removing an active input. Finish a
+      // name edit explicitly only when its control genuinely leaves the view.
+      const focused = document.activeElement;
+      if (focused instanceof HTMLInputElement && pair.control.contains(focused)) focused.blur();
+      pair.row.remove(); pair.control.remove(); if (!trackIds.has(id)) rowCache.delete(id);
+    }
+    const orderedRows = [...visibleRows].map(id => rowCache.get(id)!);
+    const renderedControls = rowControls.querySelectorAll('.song-row-control');
+    if (orderedRows.some((pair, index) => renderedControls[index] !== pair.control)) for (const pair of orderedRows) rowControls.append(pair.control);
+    const renderedRows = content.querySelectorAll('.song-track');
+    if (orderedRows.some((pair, index) => renderedRows[index] !== pair.row)) for (const pair of orderedRows) content.append(pair.row);
+    const visibleClips = new Set<string>();
     body.tracks.forEach((track, sourceIndex) => track.clips.forEach(clip => {
       if (gesture?.kind === 'erase' && gesture.refs.has(clip.id)) return;
-      const trackIndex = sourceIndex;
-      const seconds = playlistSeconds(clip.startBeat, body.tempoBpm);
-      const rect = playlistClipRect(seconds, duration(clip.phraseId), trackIndex, view);
+      const seconds = playlistSeconds(clip.startBeat, body.tempoBpm); const rect = playlistClipRect(seconds, duration(clip.phraseId), sourceIndex, view);
       if (rect.x + rect.width < 0 || rect.x > width || rect.y + rect.height < 0 || rect.y > height) return;
-      const block = action(phraseNames.get(clip.phraseId) ?? '乐句', 'song-clip', () => {}); block.dataset.clipId = clip.id; block.dataset.trackId = track.id;
+      visibleClips.add(clip.id); let block = clipNodes.get(clip.id);
+      const created = !block;
+      if (!block) { block = action('', 'song-clip', () => {}); block.dataset.clipId = clip.id; clipNodes.set(clip.id, block); content.append(block); }
+      block.dataset.trackId = track.id;
       const isSelected = selected.has(clip.id) || selectedTrack === track.id || selectedPhrase === clip.phraseId;
       block.classList.toggle('is-selected', isSelected); block.setAttribute('aria-pressed', String(isSelected));
-      block.title = `${block.textContent} · ${timeLabel(seconds)} · 音量 ${Math.round((clip.level ?? 1) * 100)}% · 声像 ${Math.round((clip.pan ?? track.pan) * 100)}`;
-      Object.assign(block.style, { left: `${rect.x}px`, top: `${rect.y}px`, width: `${Math.max(1, rect.width)}px`, height: `${rect.height}px` });
-      const color = track.color ?? playlistPhraseColor(clip.phraseId);
-      block.style.backgroundColor = color; block.style.color = playlistColorInk(color); block.style.borderLeftColor = color;
-      content.append(block); clipNodes.set(clip.id, block); rowNodes.set(track.id, [...rowNodes.get(track.id) ?? [], block]);
+      if (created || refreshContent) {
+        block.textContent = phraseById.get(clip.phraseId)?.name ?? '乐句';
+        block.title = `${block.textContent} · ${timeLabel(seconds)} · 音量 ${Math.round((clip.level ?? 1) * 100)}% · 声像 ${Math.round((clip.pan ?? track.pan) * 100)}`;
+        const color = track.color ?? playlistPhraseColor(clip.phraseId);
+        block.style.backgroundColor = color; block.style.color = playlistColorInk(color); block.style.borderLeftColor = color;
+      }
+      Object.assign(block.style, { left: `${rect.x}px`, top: `${rect.y}px`, width: `${Math.max(1, rect.width)}px`, height: `${rect.height}px`, transform: '' });
+      block.classList.remove('is-dragging', 'is-invalid', 'is-row-dragging');
+      rowNodes.get(track.id)?.push(block);
     }));
+    for (const [id, block] of clipNodes) if (!visibleClips.has(id)) { block.remove(); clipNodes.delete(id); }
+    dropPreviewNode.hidden = !dropPreview;
     if (dropPreview) {
+      if (dropPreviewNode.parentElement !== content) content.append(dropPreviewNode);
       const rect = playlistClipRect(dropPreview.seconds, duration(dropPreview.phraseId), dropPreview.trackIndex, view);
-      const preview = node('div', 'song-drop-preview'); Object.assign(preview.style, { left: `${rect.x}px`, top: `${rect.y}px`, width: `${rect.width}px`, height: `${rect.height}px` }); content.append(preview);
-    }
+      Object.assign(dropPreviewNode.style, { left: `${rect.x}px`, top: `${rect.y}px`, width: `${rect.width}px`, height: `${rect.height}px` });
+    } else dropPreviewNode.remove();
     const addY = body.tracks.length * view.rowHeight - view.top;
-    if (addY < height && addY + view.rowHeight > 0) {
-      const add = action('+', 'song-add-track', () => mutate(() => { song.addTrack(); })); add.style.top = `${addY}px`; add.style.height = `${view.rowHeight}px`; add.setAttribute('aria-label', '添加行');
-      add.addEventListener('pointerdown', event => event.stopPropagation()); content.append(add);
-    }
-    content.append(playhead); ruler.append(headHandle); paintGesture(); positionPlayhead(); updateInspector();
+    addTrackButton.hidden = !(addY < height && addY + view.rowHeight > 0);
+    addTrackButton.style.top = `${addY}px`; addTrackButton.style.height = `${view.rowHeight}px`;
+    paintGesture(); positionPlayhead();
   }
   function localSave(mode: 'overwrite' | 'new', confirmation?: SaveConfirmation): void {
     const result = song.save(mode, confirmation);
@@ -871,7 +1047,8 @@ export function mountSongWorkspace(root: HTMLElement, options: {
     contents.classList.add('song-popover-panel'); wrapper.append(button, contents); return wrapper;
   }
   function render(): void {
-    if (disposed) return; phraseLibrary?.close(); inspector.flush(); finishGesture(false); observer?.disconnect(); sync();
+    if (disposed) return; rowDeleteDialog?.close(); phraseLibrary?.close(); inspector.flush(); finishGesture(false); observer?.disconnect(); sync();
+    cancelAnimationFrame(viewFrame); viewFrame = 0; clipNodes.clear(); rowNodes.clear(); rowCache.clear(); gridNodes = []; createSongButton = undefined;
     const page = node('div', 'song-studio'); const top = node('header', 'song-topbar');
     const projectTitle = node('div', 'song-project-name', options.projectName?.() ?? current.draft?.name ?? '新项目');
     projectTitle.title = '双击修改项目名称';
@@ -932,7 +1109,12 @@ export function mountSongWorkspace(root: HTMLElement, options: {
     newPhraseButton = action('+', 'song-new-phrase', openPhraseLibrary); newPhraseButton.setAttribute('aria-label', '打开乐句库'); palette.append(paletteList, newPhraseButton);
     viewport = node('section', 'song-scroll'); viewport.tabIndex = -1; viewport.setAttribute('aria-label', '歌曲编排');
     ruler = node('div', 'song-ruler'); content = node('div', 'song-timeline'); playhead = node('div', 'song-playhead'); headHandle = node('div', 'song-playhead-handle'); headHandle.setAttribute('aria-label', '拖动播放头');
+    gridLayer = node('div', 'song-grid-lines'); dropPreviewNode = node('div', 'song-drop-preview'); dropPreviewNode.hidden = true;
+    addTrackButton = action('+', 'song-add-track', () => mutate(() => { song.addTrack(); })); addTrackButton.setAttribute('aria-label', '添加行');
+    addTrackButton.addEventListener('pointerdown', event => event.stopPropagation());
+    content.append(gridLayer, dropPreviewNode, addTrackButton, playhead); ruler.append(headHandle);
     rowControls = node('div', 'song-row-controls'); rowControls.setAttribute('aria-label', '行调控');
+    rowTrash = node('div', 'song-row-trash'); rowTrash.hidden = true; rowTrash.setAttribute('aria-hidden', 'true'); rowTrash.append(icon('trash')); rowControls.append(rowTrash);
     erasures = node('div', 'song-erasures'); notice = node('div', 'song-notice'); notice.setAttribute('role', 'status'); notice.hidden = true;
     viewport.append(rowControls, ruler, content, erasures, notice);
     if (!phrases().length) { const curtain = node('div', 'song-empty-curtain'); curtain.append(node('p', '', '先创建乐句吧'), node('span', 'song-empty-arrow', '←')); viewport.append(curtain); }
@@ -947,6 +1129,7 @@ export function mountSongWorkspace(root: HTMLElement, options: {
     trash.addEventListener('dragleave', event => { if (!(event.relatedTarget instanceof Node) || !trash.contains(event.relatedTarget)) trash.classList.remove('is-over'); });
     trash.addEventListener('drop', shelfTrashDrop); viewport.append(trash); root.replaceChildren(page);
     viewport.addEventListener('pointerdown', pointerDown); viewport.addEventListener('wheel', wheel, { passive: false });
+    viewport.addEventListener('lostpointercapture', event => { if (gesture?.pointerId === event.pointerId) finishGesture(false); });
     viewport.addEventListener('dblclick', event => {
       if (exiting) return;
       // Pointer capture retargets the browser's double-click to the viewport.
@@ -974,7 +1157,7 @@ export function mountSongWorkspace(root: HTMLElement, options: {
     });
     viewport.addEventListener('contextmenu', event => event.preventDefault()); viewport.addEventListener('dragover', dragOver); viewport.addEventListener('drop', drop);
     viewport.addEventListener('dragleave', event => { if (!(event.relatedTarget instanceof Node) || !viewport.contains(event.relatedTarget)) { dropPreview = undefined; paint(); } });
-    observer = typeof ResizeObserver === 'undefined' ? undefined : new ResizeObserver(() => paint()); observer?.observe(viewport); paint(); updatePlayback();
+    observer = typeof ResizeObserver === 'undefined' ? undefined : new ResizeObserver(scheduleViewportPaint); observer?.observe(viewport); paint(); updatePlayback();
   }
   function removeRefs(refs: SongClipRef[], refreshAudio = true): void {
     mutate(() => {
@@ -1022,6 +1205,7 @@ export function mountSongWorkspace(root: HTMLElement, options: {
     const rangeUndo = event.key === 'Backspace' && target instanceof HTMLInputElement && target.type === 'range';
     if (target instanceof HTMLInputElement && !rangeUndo || target instanceof HTMLSelectElement || target instanceof HTMLTextAreaElement || target?.isContentEditable) return;
     if (event.altKey) return;
+    if (event.key === 'Escape' && gesture?.kind === 'row') { event.preventDefault(); finishGesture(false); return; }
     if (!event.metaKey && !event.shiftKey && ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)) {
       event.preventDefault(); if (gesture) finishGesture();
       const horizontal = event.key === 'ArrowLeft' || event.key === 'ArrowRight';
@@ -1031,7 +1215,7 @@ export function mountSongWorkspace(root: HTMLElement, options: {
         view = zoomPlaylist(view, (content.clientWidth || viewport.clientWidth) / 2, (content.clientHeight || viewport.clientHeight) / 2, factor, !horizontal);
       } else if (horizontal) view.leftSeconds += (forward ? 64 : -64) / view.pixelsPerSecond;
       else view.top += forward ? view.rowHeight : -view.rowHeight;
-      doubleNudge = undefined; constrainTop(); paint(); return;
+      doubleNudge = undefined; constrainTop(); paintViewport(); return;
     }
     if (event.ctrlKey || event.metaKey) {
       const key = event.key.toLowerCase();
@@ -1046,9 +1230,18 @@ export function mountSongWorkspace(root: HTMLElement, options: {
     else if (['q', 'e', 'w', 's', 'a', 'd'].includes(key) && !selectedPhrase && (selected.size || selectedTrack)) { event.preventDefault(); adjust(key, event.repeat); }
     else if (key === 'enter' && !selectedTrack && selected.size === 1 && options.onEditPhrase) { event.preventDefault(); const ref = picked()[0]!; transport.pause(); options.onEditPhrase(ref); }
   }
-  const pointerUp = (event: PointerEvent) => { finishShelfPress(event); if (disposed) return; if (gesture?.pointerId === event.pointerId) finishGesture(true, gesture.kind === 'clip' && gesture.moved && overTrash(event)); inspector.pointerEnd(); updateInspector(); };
+  const pointerUp = (event: PointerEvent) => {
+    finishShelfPress(event); if (disposed) return;
+    if (gesture?.pointerId === event.pointerId) {
+      // Use the release position too: the final move event can be coalesced or
+      // missing when the pointer returns below the threshold just before release.
+      if (gesture.kind === 'row' && gesture.moved) { updateRowDrag(gesture, event); paintGesture(); }
+      finishGesture(true, gesture.kind === 'clip' && gesture.moved && overTrash(event), true);
+    }
+    inspector.pointerEnd(); updateInspector();
+  };
   const pointerCancel = (event: PointerEvent) => { if (shelfPress?.pointerId === event.pointerId) { shelfPress = undefined; previousShelfPointer = undefined; } if (gesture?.pointerId === event.pointerId) finishGesture(false); if (mixPreview) { mixPreview = undefined; inspector.cancel(); transport.refresh(); } updateInspector(); };
-  const resized = () => paint();
+  const resized = () => scheduleViewportPaint();
   const outsideClipPress = (event: PointerEvent) => {
     const target = event.target as Element;
     if (event.button !== 0 || !target || !viewport.contains(target) || !target.closest('.song-clip')) { previousClipPointer = undefined; lastClipPointer = undefined; }
@@ -1058,10 +1251,11 @@ export function mountSongWorkspace(root: HTMLElement, options: {
   document.addEventListener('pointerdown', outsideClipPress);
   document.addEventListener('keydown', keydown); document.addEventListener('dragover', shelfDragMove); window.addEventListener('resize', resized); render();
   return {
+    flush() { if (disposed) throw new Error('当前歌曲页面已关闭。'); prepareFileAction(); },
     notify(message, error = false) { report(message, error); },
     refresh(context, onApplyElsewhere) { if (disposed) return; options.referenceContext = context; options.onApplyElsewhere = onApplyElsewhere; render(); transport.refresh(); },
     dispose() {
-      if (disposed) return; phraseLibrary?.close(); finishGesture(false); resetShelfDrag(); hideTrash(); mixPreview = undefined; inspector.cancel(); audition?.dispose(); disposed = true; transport.dispose(); cancelAnimationFrame(frame); observer?.disconnect(); window.clearTimeout(noticeTimer); window.clearTimeout(deleteTimer);
+      if (disposed) return; rowDeleteDialog?.close(); phraseLibrary?.close(); finishGesture(false); resetShelfDrag(); hideTrash(); mixPreview = undefined; inspector.cancel(); inspector.dispose(); audition?.dispose(); disposed = true; transport.dispose(); cancelAnimationFrame(frame); cancelAnimationFrame(viewFrame); viewFrame = 0; observer?.disconnect(); window.clearTimeout(noticeTimer); window.clearTimeout(deleteTimer);
       document.removeEventListener('pointermove', pointerMove); document.removeEventListener('pointerup', pointerUp); document.removeEventListener('pointercancel', pointerCancel);
       document.removeEventListener('pointerdown', outsideClipPress);
       document.removeEventListener('keydown', keydown); document.removeEventListener('dragover', shelfDragMove); window.removeEventListener('resize', resized);

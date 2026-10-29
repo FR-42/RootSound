@@ -4,22 +4,27 @@ import { test } from 'node:test';
 import type { PlaybackSession, PlayableNotePlan, SoundRuntimeEvent, SoundRuntimePort, SoundSequencePlan } from '../src/workstation/contracts/sound.ts';
 import type { TimbreBody } from '../src/workstation/contracts/timbre.ts';
 import { createWorkspacePreferences } from '../src/workstation/app/platform/preferences.ts';
-import { copyProjectPhrase, createProjectPhrase, readProjectPhraseInfo, readProjectPhrases, retainProjectPhrases } from '../src/workstation/app/project-phrases.ts';
-import { addProjectPhraseTimbre, changeProjectPhraseNoteGroupTimbre, createProjectPhraseNoteGroup, ensureProjectMelodyTimbres, listProjectTimbres, removeProjectPhraseTimbre } from '../src/workstation/app/project-timbres.ts';
+import { copyProjectPhrase, createProjectPhrase, beginProjectPhraseDraft, discardProjectPhraseDraft, assertProjectPhraseSaveReady, readProjectPhraseInfo, readProjectPhrases, retainProjectPhrases } from '../src/workstation/app/project-phrases.ts';
+import { addProjectPhraseTimbre, changeProjectPhraseNoteGroupTimbre, createProjectPhraseNoteGroup, ensureProjectMelodyTimbres, listProjectTimbres, removeProjectPhraseTimbre, reorderProjectTimbres, tryRemoveUnusedProjectTimbre, requiresTimbreDeleteConfirmation } from '../src/workstation/app/project-timbres.ts';
+import { importProjectTimbre } from '../src/workstation/app/project-timbre-import.ts';
 import { createMaterialLibrary, createProjectPackages, createReferenceEditing } from '../src/workstation/modules/materials/public.ts';
 import { createPhraseEditor, createPhrasePlayback, createPhraseReferenceAdapter, readPhraseBody } from '../src/workstation/modules/phrase/public.ts';
 import { createSongEditor, createSongReferenceAdapter, readSongBody } from '../src/workstation/modules/song/public.ts';
-import { createTimbreEditor, createTimbrePlayback, createTimbreReferenceAdapter } from '../src/workstation/modules/timbre/public.ts';
+import { createTimbreEditor, createTimbrePlayback, createTimbreReferenceAdapter, prepareBasicTimbre } from '../src/workstation/modules/timbre/public.ts';
+import { toneColor } from '../src/workstation/modules/ui-rendering/phrase-overview-notes.ts';
 
 const hooks = registerHooks({ load(url, context, next) { return url.endsWith('.css') ? { format: 'module', source: '', shortCircuit: true } : next(url, context); } });
 const { mountStudio } = await import('../src/workstation/modules/ui-rendering/public.ts'); hooks.deregister();
 
 type FakeEvent = Record<string, unknown> & { type: string; target: Element; preventDefault(): void; stopPropagation(): void };
+let navigationHeight: number | undefined;
 /** In-memory event DOM only; no browser, screen, device, or audio is accessed. */
 class Element {
   tagName: string; className = ''; style: Record<string, unknown> & { setProperty(name: string, value: string): void } = { setProperty(name, value) { this[name] = value; } }; dataset: Record<string, string> = {};
   parentElement?: Element; children: Element[] = []; attributes = new Map<string, string>();
-  value = ''; hidden = false; disabled = false; tabIndex = 0; clientWidth = 1000; clientHeight = 700; scrollTop = 0; scrollLeft = 0;
+  value = ''; hidden = false; disabled = false; tabIndex = 0; clientWidth = 1000; private height = 700; scrollTop = 0; scrollLeft = 0;
+  get clientHeight(): number { return navigationHeight !== undefined && (this.classList.contains('melody-scroll') || this.classList.contains('phrase-composition-section')) ? navigationHeight : this.height; }
+  set clientHeight(value: number) { this.height = value; }
   private text = ''; private listeners = new Map<string, Array<(event: FakeEvent) => void>>(); private captured = new Set<number>();
   constructor(tag = 'div') { this.tagName = tag.toUpperCase(); }
   get textContent() { return this.text; }
@@ -49,7 +54,8 @@ class Element {
   removeEventListener(type: string, callback: (event: FakeEvent) => void): void { this.listeners.set(type, (this.listeners.get(type) ?? []).filter(item => item !== callback)); }
   emit(type: string, values: Record<string, unknown> = {}): FakeEvent {
     const event = { type, target: this, pointerId: 1, button: 0, clientX: 0, clientY: 0, key: '', code: '', ctrlKey: false, metaKey: false,
-      shiftKey: false, repeat: false, preventDefault() {}, stopPropagation() {}, ...values } as FakeEvent;
+      shiftKey: false, repeat: false, defaultPrevented: false, propagationStopped: false,
+      preventDefault() { this.defaultPrevented = true; }, stopPropagation() { this.propagationStopped = true; }, ...values } as FakeEvent;
     for (const listener of this.listeners.get(type) ?? []) listener(event); return event;
   }
   getBoundingClientRect() {
@@ -76,15 +82,18 @@ class Document extends Element {
 }
 function installDom() {
   const document = new Document('document'); const window = new Element('window'); const timers: ReturnType<typeof setTimeout>[] = [];
+  const frames = new Map<number, FrameRequestCallback>(); let serial = 0;
   Object.assign(window, { setTimeout(callback: () => void, delay: number) { const timer = setTimeout(callback, delay); timer.unref(); timers.push(timer); return Number(timer); }, clearTimeout });
   const replacements = { document, window, HTMLElement: Element, HTMLInputElement: Input, HTMLSelectElement: Select, HTMLTextAreaElement: TextArea,
-    Node: Element, requestAnimationFrame: () => 1, cancelAnimationFrame() {} };
+    Node: Element, requestAnimationFrame(callback: FrameRequestCallback) { frames.set(++serial, callback); return serial; }, cancelAnimationFrame(id: number) { frames.delete(id); } };
   const previous = new Map<string, PropertyDescriptor | undefined>();
   for (const [key, value] of Object.entries(replacements)) { previous.set(key, Object.getOwnPropertyDescriptor(globalThis, key)); Object.defineProperty(globalThis, key, { configurable: true, writable: true, value }); }
-  return { document, restore() { timers.forEach(clearTimeout); for (const [key, descriptor] of previous) { if (descriptor) Object.defineProperty(globalThis, key, descriptor); else Reflect.deleteProperty(globalThis, key); } } };
+  return { document, window, flushFrames() { const pending = [...frames.values()]; frames.clear(); for (const callback of pending) callback(0); },
+    restore() { timers.forEach(clearTimeout); frames.clear(); for (const [key, descriptor] of previous) { if (descriptor) Object.defineProperty(globalThis, key, descriptor); else Reflect.deleteProperty(globalThis, key); } } };
 }
 const settle = async () => { for (let index = 0; index < 24; index++) await Promise.resolve(); };
-function fixture(config: { empty?: boolean; performance?: boolean } = {}) {
+function fixture(config: { empty?: boolean; performance?: boolean; navigationHeight?: number } = {}) {
+  const previousHeight = navigationHeight; navigationHeight = config.navigationHeight;
   const dom = installDom();
   const adapters = [createTimbreReferenceAdapter(), createPhraseReferenceAdapter(), createSongReferenceAdapter()];
   const library = createMaterialLibrary(undefined, { project: { rootKind: 'rootsound.song', adapters } });
@@ -105,33 +114,36 @@ function fixture(config: { empty?: boolean; performance?: boolean } = {}) {
     stopAll() { emit('stopped'); }, stop() { emit('stopped'); }, position() { return elapsed; },
     async audition(plan: PlayableNotePlan) { auditions.push(plan); }, cancelAudition() {},
     subscribe(listener: (event: SoundRuntimeEvent) => void) { listeners.add(listener); return () => listeners.delete(listener); } } as unknown as SoundRuntimePort;
-  const root = new Element('main'); const saved: string[] = []; const workspaces: string[] = []; let failFamilyChange = false;
+  const root = new Element('main'); const saved: string[] = []; const workspaces: string[] = []; let failFamilyChange = false; let failCopy = false; let failDiscard = false;
   const projects = createProjectPackages(library, adapters, { rootKind: 'rootsound.song' });
   const preferences = createWorkspacePreferences({ getItem: () => null, setItem() {} });
   if (config.performance) preferences.update({ keyboardPerformance: true });
   const studio = mountStudio(root as unknown as HTMLElement, { timbre, phrase, song, references, preferences, sound: runtime, hasPrevious: true, initialEntry: 'phrase',
     onWorkspaceChange: workspace => workspaces.push(workspace), projects,
     projectFiles: { async open() { return { status: 'cancelled' }; }, async save(text, name) { saved.push(text); return { status: 'saved', name }; } },
-    onNewPhrase() { phrase.openDraft(createProjectPhrase(library, songId).draftId); },
-    onCopyPhrase() { phrase.openDraft(copyProjectPhrase(library, songId, phrase.read().draft!.id).draftId); },
+    onNewPhrase(timbreId, tempoBpm) { phrase.openDraft(beginProjectPhraseDraft(library, songId, timbreId, tempoBpm).draftId); },
+    onSavePhraseDraft: (id, mode) => library.saveDraft(id, mode),
+    onDiscardPhraseDraft(id) { if (failDiscard) throw new Error('测试无法释放编辑状态'); discardProjectPhraseDraft(library, songId, id); },
+    onCopyPhrase() { if (failCopy) throw new Error('测试无法另存'); phrase.openDraft(copyProjectPhrase(library, songId, phrase.read().draft!.id).draftId); },
     onPrepareMelody() { prepared++; ensureProjectMelodyTimbres(library, songId); },
-    projectTimbres: () => listProjectTimbres(library, songId).map(({ id, name }) => ({ id, name })),
+    projectTimbres: () => listProjectTimbres(library, songId).map(record => ({ id: record.id, name: record.name, requiresDeleteConfirmation: requiresTimbreDeleteConfirmation(record, library.listDrafts()) })),
     onAddPhraseTimbre: (id, section) => addProjectPhraseTimbre(library, songId, phrase.read().draft!.id, id, section),
     onCreateNoteGroup: id => createProjectPhraseNoteGroup(library, songId, phrase.read().draft!.id, id),
     onChangeNoteGroupTimbre(partId,id) { if (failFamilyChange) throw new Error('测试更换失败'); changeProjectPhraseNoteGroupTimbre(library,songId,phrase.read().draft!.id,partId,id); },
-    onRemovePhraseTimbre: (id, section) => removeProjectPhraseTimbre(library, songId, phrase.read().draft!.id, id, section),
+    onRemovePhraseTimbre(id, section) { if (!tryRemoveUnusedProjectTimbre(library, songId, id)) removeProjectPhraseTimbre(library, songId, phrase.read().draft!.id, id, section); },
+    onReorderTimbres: (id, targetIndex) => reorderProjectTimbres(library, songId, id, targetIndex),
     onKeepPhrases: ids => retainProjectPhrases(library, songId, ids),
     projectPhrases: () => readProjectPhrases(library, songId), phraseInfo: id => readProjectPhraseInfo(library, songId, id) });
   const find = (selector: string) => { const value = root.querySelector(selector); assert(value, `Expected ${selector}`); return value; };
   const save = () => find('.song-save').emit('click'); const exit = () => find('.song-exit').emit('click');
   const tempo = (value: number) => { const field = root.querySelectorAll('input').find(item => item.attributes.get('aria-label') === 'BPM'); assert(field); field.value = String(value); field.emit('change'); };
   const field = (label: string) => { const input = root.querySelectorAll('input').find(item => item.attributes.get('aria-label') === label); assert(input, `Expected ${label} field`); return input; };
-  return { ...dom, library, phrase, song, songId, original, context, session, references, root, saved, workspaces, find, save, exit, tempo, field,
-    plans, auditions, adapters, prepared: () => prepared, failFamilyChange(value: boolean) { failFamilyChange = value; },
-    cleanup() { studio.dispose(); dom.restore(); } };
+  return { ...dom, library, phrase, song, songId, original, context, session, references, root, saved, workspaces, find, save, exit, tempo, field, studio,
+    plans, auditions, adapters, prepared: () => prepared, playback: () => playback, failFamilyChange(value: boolean) { failFamilyChange = value; }, failCopy(value: boolean) { failCopy = value; }, failDiscard(value: boolean) { failDiscard = value; },
+    cleanup() { studio.dispose(); dom.restore(); navigationHeight = previousHeight; } };
 }
 async function enterMelodyWithPiano(f: ReturnType<typeof fixture>): Promise<void> {
-  f.find('.phrase-composition-create').emit('click'); await settle();
+  f.find('.phrase-composition-open-creation').emit('click'); await settle();
   assert(f.root.querySelector('.melody-workspace')); assert.equal(f.find('.phrase-composition-main').hidden, true);
   f.find('.melody-add-tone').emit('click');
   const options = f.root.querySelectorAll('.melody-library-tone');
@@ -140,6 +152,24 @@ async function enterMelodyWithPiano(f: ReturnType<typeof fixture>): Promise<void
   assert.equal(f.root.querySelector('.melody-tone-library'), undefined);
   assert(f.root.querySelectorAll('.melody-tone').some(item => item.textContent === '钢琴'));
 }
+
+test('double-clicking a hidden project phrase in the library opens its editable original through the real studio route', async () => {
+  const f = fixture(); try {
+    f.exit(); await settle();
+    f.find('.song-new-phrase').emit('click');
+    f.find('.song-library-phrase').emit('keydown', { key: 'Enter' });
+    assert(!f.root.querySelectorAll('.song-phrase-card').some(card => card.dataset.phraseId === f.original.id));
+    const before = structuredClone(f.song.read().body); const source = f.library.readContent(f.original.id);
+    const tile = f.root.querySelectorAll('.song-library-phrase').find(item => item.dataset.phraseId === f.original.id); assert(tile);
+    tile.emit('click'); tile.emit('dblclick'); await settle();
+    assert(f.root.querySelector('.phrase-composition-studio')); assert.equal(f.root.querySelector('.song-phrase-library'), undefined);
+    assert.equal(f.phrase.read().draft!.sourceId, f.original.id);
+    assert.equal(f.phrase.read().draft!.name, source!.name);
+    assert.equal(f.find('.song-project-name').textContent, source!.name); assert.equal(f.find('.song-project-kind').textContent, '乐句');
+    assert.deepEqual(f.song.read().body, before); assert.deepEqual(f.library.readContent(f.original.id), source);
+    f.find('.phrase-composition-open-creation').emit('click'); await settle(); assert(f.root.querySelector('.melody-workspace'));
+  } finally { f.cleanup(); }
+});
 async function createMelodyNote(f: ReturnType<typeof fixture>, x = 250): Promise<string> {
   const key = f.root.querySelectorAll('.melody-key').find(item => item.textContent === 'C4'); assert(key);
   const scroll = f.find('.melody-scroll'); const canvas = f.find('.melody-canvas');
@@ -150,23 +180,27 @@ async function createMelodyNote(f: ReturnType<typeof fixture>, x = 250): Promise
   return current.notes[0]!.id;
 }
 async function enterRhythmWithTone(f: ReturnType<typeof fixture>, name = '钢琴'): Promise<string> {
-  f.find('.phrase-composition-rhythm-create').emit('click'); await settle();
-  assert(f.root.querySelector('.rhythm-workspace')); assert.equal(f.find('.phrase-composition-main').hidden, true);
-  assert.equal(f.find('.phrase-composition-section-label').textContent, '节奏部');
-  assert.equal(f.root.querySelectorAll('.melody-key').length, 0);
-  f.find('.melody-add-tone').emit('click');
-  const tone = f.root.querySelectorAll('.melody-library-tone').find(item => item.textContent === name); assert(tone); tone.emit('click'); await settle();
-  assert(f.root.querySelector('.melody-tone-library'));f.find('.melody-library-close').emit('click');await settle();
-  const part = f.phrase.read().body!.parts.find(item => item.section === 'rhythm' && item.name === name); assert(part);
-  return part.id;
+  // Build a legacy rhythm family at the domain boundary, then edit it through
+  // the actual unified creation route. No retired rhythm entry is simulated.
+  ensureProjectMelodyTimbres(f.library, f.songId);
+  const tone = listProjectTimbres(f.library, f.songId).find(item => item.name === name); assert(tone);
+  const partId = addProjectPhraseTimbre(f.library, f.songId, f.phrase.read().draft!.id, tone.id, 'rhythm');
+  f.tempo(120); await settle();
+  f.find('.phrase-composition-open-creation').emit('click'); await settle();
+  assert(f.root.querySelector('.melody-workspace')); assert.equal(f.root.querySelector('.rhythm-workspace'), undefined);
+  assert.equal(f.find('.phrase-composition-main').hidden, true); assert.equal(f.find('.phrase-composition-section-label').textContent, '创作');
+  const card = f.root.querySelectorAll('.melody-note-family').find(item => item.dataset.partId === partId); assert(card); card.emit('click');
+  return partId;
 }
 async function createRhythmNote(f: ReturnType<typeof fixture>, partId: string, x = 250): Promise<string> {
-  const row = f.root.querySelectorAll('.rhythm-tone-row').find(item => item.dataset.partId === partId); assert(row);
+  const card = f.root.querySelectorAll('.melody-note-family').find(item => item.dataset.partId === partId); assert(card); card.emit('click');
+  const key = f.root.querySelectorAll('.melody-key').find(item => item.textContent === 'C4'); assert(key);
   const scroll = f.find('.melody-scroll'); const canvas = f.find('.melody-canvas');
-  scroll.emit('pointerdown', { target: canvas, clientX: x, clientY: Number.parseFloat(String(row.style.top)) - scroll.scrollTop + 12 });
+  scroll.emit('pointerdown', { target: canvas, clientX: x, clientY: Number.parseFloat(String(key.style.top)) - scroll.scrollTop + 4 });
   f.document.emit('pointerup'); await settle();
   const part = f.phrase.read().body!.parts.find(item => item.id === partId)!; assert.equal(part.notes.length, 1);
-  assert.equal(f.root.querySelectorAll('select').filter(item => item.attributes.get('aria-label') === '音高').length, 0);
+  assert.equal(part.section, 'rhythm', 'editing does not rewrite the original family tag');
+  assert.equal(f.root.querySelectorAll('select').filter(item => item.attributes.get('aria-label') === '音高').length, 1);
   return part.notes[0]!.id;
 }
 async function newMelodyFamily(f: ReturnType<typeof fixture>, name: string): Promise<string> {
@@ -204,25 +238,81 @@ test('mountStudio routes occurrence editing through the new shell, saves in plac
   } finally { f.cleanup(); }
 });
 
-test('a dirty exit preserves the occurrence draft and reentering the same clip resumes it', async () => {
+test('a dirty exit asks first, Cancel keeps the scratch work, and Discard restores saved music before returning', async () => {
   const f = fixture(); try {
+    const original = f.library.readContent(f.original.id)!; const beforeSong = f.song.read().body;
     f.tempo(165); const draft = f.phrase.read().draft!; f.exit(); await settle();
-    assert(f.root.querySelector('.song-timeline')); assert.deepEqual(f.library.readDraft(draft.id), draft); assert(f.references.resume(draft.id));
+    assert(f.root.querySelector('.phrase-exit-dialog')); assert.equal(f.root.querySelector('.song-timeline'), undefined);
+    assert.deepEqual(f.library.readDraft(draft.id), draft); assert.deepEqual(f.library.readContent(f.original.id), original); assert.deepEqual(f.song.read().body, beforeSong);
+    f.find('.phrase-exit-cancel').emit('click'); await settle(); assert.equal(f.root.querySelector('.phrase-exit-dialog'), undefined);
+    assert.equal(f.phrase.read().body!.tempoBpm, 165); assert(f.references.resume(draft.id));
+    f.exit(); await settle(); f.find('.phrase-exit-discard').emit('click'); await settle();
+    assert(f.root.querySelector('.song-timeline')); assert.equal(f.references.resume(draft.id), undefined);
     const clip = f.root.querySelectorAll('.song-clip').find(item => item.dataset.clipId === f.context.path[0]); assert(clip);
     f.find('.song-scroll').emit('dblclick', { target: clip }); await settle();
-    assert(f.root.querySelector('.phrase-composition-studio')); assert.equal(f.phrase.read().draft!.id, draft.id); assert.equal(f.phrase.read().body!.tempoBpm, 165);
+    assert(f.root.querySelector('.phrase-composition-studio')); assert.equal(f.phrase.read().body!.tempoBpm, 120);
+    assert.deepEqual(f.library.readContent(f.original.id), original); assert.deepEqual(f.song.read().body, beforeSong);
   } finally { f.cleanup(); }
 });
 
-test('exiting a clean parent keeps an unfinished nested tone draft instead of cancelling its edits', async () => {
+test('exiting a clean parent asks about nested tone scratch work and Discard removes it without applying it', async () => {
   const f = fixture(); try {
     const part = f.phrase.read().body!.parts[0]!;
     const inner = f.references.begin({ root: { type: 'draft', id: f.session.draftId }, path: [part.id] });
     const tone = f.library.readDraft(inner.draftId)!;
     f.library.updateDraft(tone.id, { body: { ...(tone.body as TimbreBody), level: .19 } }, { remember: true, expected: tone });
     const edited = f.library.readDraft(tone.id); assert.equal(f.phrase.read().changed, false);
-    f.exit(); await settle(); assert(f.root.querySelector('.song-timeline'));
-    assert.deepEqual(f.library.readDraft(tone.id), edited); assert(f.references.resume(f.session.draftId));
+    f.exit(); await settle(); assert(f.root.querySelector('.phrase-exit-dialog')); assert.deepEqual(f.library.readDraft(tone.id), edited);
+    f.find('.phrase-exit-discard').emit('click'); await settle(); assert(f.root.querySelector('.song-timeline'));
+    assert.equal(f.library.readDraft(tone.id), undefined); assert.equal(f.references.resume(f.session.draftId), undefined);
+  } finally { f.cleanup(); }
+});
+
+test('new production phrases stay drafts until explicit Save and discarding another draft leaves no library item', async () => {
+  const f = fixture(); try {
+    f.exit(); await settle(); const catalog = readProjectPhrases(f.library, f.songId);
+    f.find('.song-new-phrase').emit('click'); f.find('.song-library-new').emit('click'); await settle();
+    const draftId = f.phrase.read().draft!.id; assert.equal(f.phrase.read().draft!.sourceId, undefined);
+    assert.deepEqual(readProjectPhrases(f.library, f.songId), catalog); assert.equal(f.phrase.read().body!.parts[0]!.notes.length, 0);
+    f.tempo(177); assert.throws(() => assertProjectPhraseSaveReady(f.library, f.songId), /未保存/u);
+    f.exit(); await settle(); assert(f.root.querySelector('.phrase-exit-dialog')); f.find('.phrase-exit-cancel').emit('click'); await settle();
+    assert.equal(f.phrase.read().draft!.id, draftId); assert.deepEqual(readProjectPhrases(f.library, f.songId), catalog);
+    f.document.emit('keydown', { key: 's', code: 'KeyS', ctrlKey: true }); await settle();
+    const savedId = f.phrase.read().draft!.sourceId!; assert(savedId); assert.equal(f.phrase.read().changed, false);
+    assert.equal(readProjectPhrases(f.library, f.songId).length, catalog.length + 1); assert.equal(readPhraseBody(f.library.readContent(savedId)!.body).tempoBpm, 177);
+    f.exit(); await settle(); assert(f.root.querySelector('.song-timeline')); assert.doesNotThrow(() => assertProjectPhraseSaveReady(f.library, f.songId));
+    f.find('.song-new-phrase').emit('click'); f.find('.song-library-new').emit('click'); await settle();
+    const discarded = f.phrase.read().draft!.id; f.exit(); await settle(); f.find('.phrase-exit-discard').emit('click'); await settle();
+    assert(f.root.querySelector('.song-timeline')); assert.equal(f.library.readDraft(discarded), undefined);
+    assert.equal(readProjectPhrases(f.library, f.songId).length, catalog.length + 1); assert.doesNotThrow(() => assertProjectPhraseSaveReady(f.library, f.songId));
+  } finally { f.cleanup(); }
+});
+
+test('saving on phrase exit explicitly applies the edited occurrence and closes its clean continuation', async () => {
+  const f = fixture(); try {
+    const original = f.library.readContent(f.original.id)!; f.tempo(168); f.exit(); await settle();
+    assert.deepEqual(f.library.readContent(f.original.id), original); f.find('.phrase-exit-save').emit('click'); await settle();
+    assert(f.root.querySelector('.song-timeline')); assert.equal(f.references.sessions().length, 0);
+    const clips = f.song.read().body!.tracks[0]!.clips; assert.notEqual(clips[0]!.phraseId, f.original.id); assert.equal(clips[1]!.phraseId, f.original.id);
+    assert.equal(readPhraseBody(f.library.readContent(clips[0]!.phraseId)!.body).tempoBpm, 168); assert.deepEqual(f.library.readContent(f.original.id), original);
+    assert.doesNotThrow(() => assertProjectPhraseSaveReady(f.library, f.songId));
+  } finally { f.cleanup(); }
+});
+
+test('window-close preparation flushes scratch work without saving and permits only actual project-level dialogs when requested', async () => {
+  const f = fixture(); try {
+    const original = f.library.readContent(f.original.id)!; const beforeSong = f.song.read().body;
+    f.find('.song-project-name').emit('dblclick'); const name = f.find('.song-project-name-input'); name.value = '尚未保存的草稿';
+    await f.studio.prepareClose(); assert.equal(f.phrase.read().draft!.name, '尚未保存的草稿');
+    assert.deepEqual(f.library.readContent(f.original.id), original); assert.deepEqual(f.song.read().body, beforeSong);
+    for (const kind of ['project-copy-dialog', 'project-exit-dialog', 'phrase-exit-dialog', 'other-modal']) {
+      const dialog = new Element('dialog'); dialog.className = kind; f.root.append(dialog); dialog.showModal();
+      await assert.rejects(() => f.studio.prepareClose(), /当前窗口/u);
+      if (kind === 'project-copy-dialog' || kind === 'project-exit-dialog') await f.studio.prepareClose({ allowProjectDialog: true });
+      else await assert.rejects(() => f.studio.prepareClose({ allowProjectDialog: true }), /当前窗口/u);
+      dialog.close(); dialog.remove();
+    }
+    assert.deepEqual(f.library.readContent(f.original.id), original);
   } finally { f.cleanup(); }
 });
 
@@ -236,16 +326,66 @@ test('save-as after an occurrence save clears its obsolete clean continuation an
   } finally { f.cleanup(); }
 });
 
-test('a saved copy opens even when its previous clean session cannot close, and reports both outcomes accurately', async () => {
+test('a saved copy remains in the library when cleanup fails, while the original stays reachable for retry', async () => {
   const f = fixture(); try {
     f.tempo(145); f.save(); await settle();
     const previous = f.phrase.read().draft!; const source = f.library.readContent(previous.sourceId!);
-    f.references.cancel = () => ({ status: 'storage-error', message: '测试无法释放编辑状态' });
+    f.failDiscard(true); const before = readProjectPhrases(f.library, f.songId);
     const copyButton = f.root.querySelectorAll('.song-save').find(item => item.textContent === '另存为'); assert(copyButton); copyButton.emit('click'); await settle();
-    assert(f.root.querySelector('.phrase-composition-studio')); assert.notEqual(f.phrase.read().draft!.sourceId, previous.sourceId);
+    assert(f.root.querySelector('.phrase-composition-studio')); assert.equal(f.phrase.read().draft!.id, previous.id);
     assert.equal(f.phrase.read().changed, false); assert(f.references.resume(previous.id));
     assert.deepEqual(f.library.readContent(previous.sourceId!), source);
-    assert.match(f.find('.phrase-composition-notice').textContent, /已另存新乐句，原编辑状态仍保留.*测试无法释放编辑状态/u);
+    assert.match(f.find('.phrase-composition-notice').textContent, /已另存新乐句，原草稿仍待处理.*测试无法释放编辑状态/u);
+    assert.equal(readProjectPhrases(f.library, f.songId).length, before.length + 1);
+    f.failDiscard(false); f.exit(); await settle(); assert(f.root.querySelector('.song-timeline'));
+  } finally { f.cleanup(); }
+});
+
+test('Save As publishes an unpublished phrase and removes the old scratch draft before song Save', async () => {
+  const f = fixture(); try {
+    f.exit(); await settle(); f.find('.song-new-phrase').emit('click'); f.find('.song-library-new').emit('click'); await settle();
+    f.tempo(186); const previous = f.phrase.read().draft!; assert.equal(previous.sourceId, undefined);
+    const copy = f.root.querySelectorAll('.song-save').find(item => item.textContent === '另存为')!; copy.emit('click'); await settle();
+    const next = f.phrase.read().draft!; assert.notEqual(next.id, previous.id); assert(next.sourceId); assert.equal(readPhraseBody(next.body).tempoBpm, 186);
+    assert.equal(f.library.readDraft(previous.id), undefined); assert.equal(f.phrase.read().changed, false);
+    assert.doesNotThrow(() => assertProjectPhraseSaveReady(f.library, f.songId));
+    f.exit(); await settle(); f.save(); await settle(); assert.equal(f.saved.length, 1);
+    assert(JSON.parse(f.saved[0]!).contents.some((record: { id: string }) => record.id === next.sourceId));
+  } finally { f.cleanup(); }
+});
+
+test('Save As of a dirty saved phrase restores the original scratch fields without changing its saved source', async () => {
+  const f = fixture(); try {
+    const original = f.library.readContent(f.original.id)!; f.tempo(169); const previous = f.phrase.read().draft!;
+    f.root.querySelectorAll('.song-save').find(item => item.textContent === '另存为')!.emit('click'); await settle();
+    const next = f.phrase.read().draft!; assert.notEqual(next.id, previous.id); assert(next.sourceId); assert.equal(readPhraseBody(next.body).tempoBpm, 169);
+    assert.equal(readPhraseBody(f.library.readDraft(previous.id)!.body).tempoBpm, 120); assert.equal(f.references.resume(previous.id), undefined);
+    assert.deepEqual(f.library.readContent(f.original.id), original); assert.doesNotThrow(() => assertProjectPhraseSaveReady(f.library, f.songId));
+    f.exit(); await settle(); f.save(); await settle(); assert.equal(f.saved.length, 1);
+  } finally { f.cleanup(); }
+});
+
+test('failed Save As keeps unpublished scratch work active and does not run discard', async () => {
+  const f = fixture(); try {
+    f.exit(); await settle(); f.find('.song-new-phrase').emit('click'); f.find('.song-library-new').emit('click'); await settle();
+    f.tempo(187); const previous = f.phrase.read().draft!; const contents = f.library.listContent(); f.failCopy(true);
+    f.root.querySelectorAll('.song-save').find(item => item.textContent === '另存为')!.emit('click'); await settle();
+    assert.deepEqual(f.phrase.read().draft, previous); assert.deepEqual(f.library.listContent(), contents); assert.match(f.find('.phrase-composition-notice').textContent, /测试无法另存/u);
+    f.failCopy(false); f.exit(); await settle(); f.find('.phrase-exit-discard').emit('click'); await settle();
+    assert.equal(f.library.readDraft(previous.id), undefined); assert.doesNotThrow(() => assertProjectPhraseSaveReady(f.library, f.songId));
+  } finally { f.cleanup(); }
+});
+
+test('failed cleanup after unpublished Save As returns to the original draft so it can be discarded', async () => {
+  const f = fixture(); try {
+    f.exit(); await settle(); f.find('.song-new-phrase').emit('click'); f.find('.song-library-new').emit('click'); await settle();
+    f.tempo(188); const previous = f.phrase.read().draft!; const before = readProjectPhrases(f.library, f.songId); f.failDiscard(true);
+    f.root.querySelectorAll('.song-save').find(item => item.textContent === '另存为')!.emit('click'); await settle();
+    assert.deepEqual(f.phrase.read().draft, previous); assert.equal(readProjectPhrases(f.library, f.songId).length, before.length + 1);
+    assert.throws(() => assertProjectPhraseSaveReady(f.library, f.songId), /未保存/u); assert.match(f.find('.phrase-composition-notice').textContent, /原草稿仍待处理/u);
+    f.failDiscard(false); f.exit(); await settle(); f.find('.phrase-exit-discard').emit('click'); await settle();
+    assert(f.root.querySelector('.song-timeline')); assert.equal(f.library.readDraft(previous.id), undefined);
+    assert.doesNotThrow(() => assertProjectPhraseSaveReady(f.library, f.songId));
   } finally { f.cleanup(); }
 });
 
@@ -315,7 +455,7 @@ test('melody seek shares the header clock and an uncommitted note mix updates li
   } finally { f.cleanup(); }
 });
 
-test('production rhythm creation stays isolated from melody while both save and travel through the same song', async () => {
+test('legacy rhythm families remain separately editable alongside melody in unified creation and travel through the same song', async () => {
   const f = fixture({ empty: true }); try {
     await enterMelodyWithPiano(f); const melodyId = await createMelodyNote(f); f.save(); await settle();
     const melodyPart = structuredClone(f.phrase.read().body!.parts.find(part => part.notes.some(note => note.id === melodyId))!);
@@ -323,20 +463,20 @@ test('production rhythm creation stays isolated from melody while both save and 
     f.find('.phrase-melody-back').emit('click'); await settle(); const rhythmPartId = await enterRhythmWithTone(f);
     const rhythmPart = f.phrase.read().body!.parts.find(part => part.id === rhythmPartId)!;
     assert.notEqual(rhythmPart.id, melodyPart.id); assert.equal(rhythmPart.timbreId, melodyPart.timbreId);
-    assert.equal(f.root.querySelectorAll('.melody-note').some(item => item.dataset.noteId === melodyId), false);
+    assert.equal(f.root.querySelectorAll('.melody-note').some(item => item.dataset.noteId === melodyId), true);
     const rhythmId = await createRhythmNote(f, rhythmPartId);
     f.field('音量').value = '.6'; f.field('音量').emit('input'); f.field('音量').emit('change');
     f.field('声像').value = '.25'; f.field('声像').emit('input'); f.field('声像').emit('change');
     f.field('时长 / 秒').value = '.375'; f.field('时长 / 秒').emit('input'); f.field('时长 / 秒').emit('change');
     assert.deepEqual(f.phrase.read().body!.parts.find(part => part.id === melodyPart.id), melodyPart);
     f.document.emit('keydown', { key: 's', code: 'KeyS', ctrlKey: true }); await settle();
-    assert(f.root.querySelector('.rhythm-workspace')); assert.equal(f.phrase.read().draft!.sourceId, source);
-    assert.equal(f.find('.phrase-composition-section-label').textContent, '节奏部');
+    assert(f.root.querySelector('.melody-workspace')); assert.equal(f.root.querySelector('.rhythm-workspace'), undefined); assert.equal(f.phrase.read().draft!.sourceId, source);
+    assert.equal(f.find('.phrase-composition-section-label').textContent, '创作');
     const note = f.phrase.read().body!.parts.find(part => part.id === rhythmPartId)!.notes[0]!;
     assert.equal(note.id, rhythmId); assert.equal(note.level, .6); assert.equal(note.pan, .25); assert.equal(note.durationSeconds, .375);
-    f.find('.phrase-melody-back').emit('click'); await settle(); f.find('.phrase-composition-create').emit('click'); await settle();
+    f.find('.phrase-melody-back').emit('click'); await settle(); f.find('.phrase-composition-open-creation').emit('click'); await settle();
     assert(f.root.querySelectorAll('.melody-note').some(item => item.dataset.noteId === melodyId));
-    assert.equal(f.root.querySelectorAll('.melody-note').some(item => item.dataset.noteId === rhythmId), false);
+    assert.equal(f.root.querySelectorAll('.melody-note').some(item => item.dataset.noteId === rhythmId), true);
     f.find('.phrase-melody-back').emit('click'); await settle(); f.exit(); await settle();
     const expected = f.song.previewPlan(); assert.equal(expected.events.length, 2); f.save(); await settle(); assert.equal(f.saved.length, 1);
     const target = createMaterialLibrary(undefined, { project: { rootKind: 'rootsound.song', adapters: f.adapters } });
@@ -350,14 +490,14 @@ test('production rhythm creation stays isolated from melody while both save and 
   } finally { f.cleanup(); }
 });
 
-test('production rhythm Save As retains its section and the existing shared header clock', async () => {
+test('legacy rhythm Save As retains its stored tag inside unified creation and the shared header clock', async () => {
   const f = fixture({ empty: true }); try {
     const partId = await enterRhythmWithTone(f, '长笛'); const id = await createRhythmNote(f, partId); f.save(); await settle();
     const previousSource = f.phrase.read().draft!.sourceId;
     f.find('.melody-ruler').emit('pointerdown', { clientX: 375 }); f.document.emit('pointerup'); await settle();
     assert.equal(f.find('.song-clock').textContent, '00:03.000');
     const copy = f.root.querySelectorAll('.song-save').find(item => item.textContent === '另存为'); assert(copy); copy.emit('click'); await settle();
-    assert(f.root.querySelector('.rhythm-workspace')); assert.equal(f.find('.phrase-composition-section-label').textContent, '节奏部');
+    assert(f.root.querySelector('.melody-workspace')); assert.equal(f.root.querySelector('.rhythm-workspace'), undefined); assert.equal(f.find('.phrase-composition-section-label').textContent, '创作');
     assert.notEqual(f.phrase.read().draft!.sourceId, previousSource); assert.equal(f.phrase.read().changed, false);
     assert(f.root.querySelectorAll('.melody-note').some(item => item.dataset.noteId === id));
     const body = f.phrase.read().body!; const held = body.parts.find(part => part.section === 'rhythm')!.notes[0]!.durationSeconds;
@@ -411,7 +551,7 @@ test('production melody typing writes one cell at a time, preserves rests and tr
   } finally { f.cleanup(); }
 });
 
-test('production keyboard entry respects input focus, composition and modifiers while Space plays selected notes and rhythm', async () => {
+test('production keyboard entry guards input and modifiers while legacy families share performance and transport', async () => {
   const f = fixture({ empty: true, performance: true }); try {
     await enterMelodyWithPiano(f); const before = f.phrase.read().draft!;
     for (const extra of [{ repeat: true }, { isComposing: true }, { keyCode: 229 }, { ctrlKey: true }, { metaKey: true }, { altKey: true }]) {
@@ -433,8 +573,11 @@ test('production keyboard entry respects input focus, composition and modifiers 
     f.document.emit('keydown', { key: ' ', code: 'Space' }); await settle();
     assert.equal(f.plans.length, count + 1); assert.equal(f.find('.song-play').attributes.get('aria-label'), '暂停'); assert.deepEqual(f.phrase.read().draft, snapshot);
     f.find('.song-stop').emit('click'); f.find('.phrase-melody-back').emit('click'); await settle();
-    await enterRhythmWithTone(f, '长笛'); const rhythm = f.phrase.read().draft!; const played = f.plans.length;
-    f.document.emit('keydown', { key: 'c' }); await settle(); assert.deepEqual(f.phrase.read().draft, rhythm);
+    const legacyId = await enterRhythmWithTone(f, '长笛'); const countBefore = f.phrase.read().body!.parts.find(part => part.id === legacyId)!.notes.length;
+    f.document.emit('keydown', { key: 'c' }); await settle();
+    assert.equal(f.phrase.read().body!.parts.find(part => part.id === legacyId)!.notes.length, countBefore + 1, 'legacy families use the same performance entry');
+    const rhythm = f.phrase.read().draft!; const played = f.plans.length;
+    f.find('.melody-scroll').emit('pointerdown', { button: 2, target: f.find('.melody-canvas'), clientX: 900, clientY: 5 }); f.document.emit('pointerup'); await settle();
     f.document.emit('keydown', { key: ' ', code: 'Space' }); await settle();
     assert.equal(f.plans.length, played + 1); assert.equal(f.find('.song-play').attributes.get('aria-label'), '暂停'); assert.deepEqual(f.phrase.read().draft, rhythm);
   } finally { f.cleanup(); }
@@ -487,12 +630,12 @@ test('newly typed notes stay selected for right-column controls while Backspace 
   } finally { f.cleanup(); }
 });
 
-test('rhythm note controls live only below the roll and right blank clears row and note selection without deletion', async () => {
+test('legacy rhythm note controls use the unified pitch-aware console and right blank clears selection without deletion', async () => {
   const f = fixture({ empty: true }); try {
     const partId = await enterRhythmWithTone(f, '长笛'); const id = await createRhythmNote(f, partId);
     const console = f.find('.melody-console'); assert.equal(console.parentElement, f.find('.melody-roll'));
     assert.equal(console.hidden, false); assert(f.root.querySelectorAll('.melody-note').some(block => block.dataset.noteId === id && block.classList.contains('is-selected')));
-    assert.equal(f.root.querySelectorAll('select').some(input => input.attributes.get('aria-label') === '音高'), false);
+    assert.equal(f.root.querySelectorAll('select').some(input => input.attributes.get('aria-label') === '音高'), true);
     const level = f.field('音量'); level.value = '.5'; level.emit('input'); level.emit('change');
     f.document.emit('keydown', { key: 'Backspace' }); await settle();
     let note = f.phrase.read().body!.parts.find(part => part.id === partId)!.notes[0]!; assert.equal(note.id, id); assert.equal(note.level, undefined);
@@ -534,67 +677,130 @@ test('production song Backspace undoes mix edits and right blank clears clip, ro
   } finally { f.cleanup(); }
 });
 
-test('section transport isolates melody and rhythm during live entry, mix edits and paused resume without changing stored content', async () => {
+test('unified creation keeps all legacy voices in the live schedule through entry, mix, tempo edits and resume', async () => {
   const f = fixture(); try {
     const melody = f.phrase.read().body!.parts[0]!;
     const rhythmId = f.phrase.addPart(melody.timbreId, 'rhythm');
     f.phrase.addNote(rhythmId, { startBeat: 2, durationBeats: .5, frequencyHz: 110, velocity: .8 });
     const original = structuredClone(f.phrase.read().body!);
     const frequencies = () => f.plans.at(-1)!.events.map(event => event.sound.note.frequencyHz).sort((a, b) => a - b);
-    f.tempo(120);
-    f.find('.phrase-composition-ruler').emit('pointerdown', { clientX: 375 }); f.document.emit('pointerup');
+    f.tempo(120); f.find('.phrase-composition-ruler').emit('pointerdown', { clientX: 375 }); f.document.emit('pointerup');
     assert.equal(f.find('.song-clock').textContent, '00:03.000');
-    f.find('.song-play').emit('click'); await settle();
-    assert.deepEqual(frequencies(), [110, 330]);
-    f.find('.phrase-composition-melody-create').emit('click'); await settle();
-    assert.deepEqual(frequencies(), [330], 'opening Melody changes the playing schedule immediately');
-    assert.equal(f.plans.at(-1)!.transport!.positionSeconds, 3);
-    assert.equal(f.find('.song-clock').textContent, '00:03.000');
-    assert.deepEqual(f.phrase.read().body, original, 'section audition leaves both stored sections intact');
-
+    f.find('.song-play').emit('click'); await settle(); assert.deepEqual(frequencies(), [110, 330]);
+    f.find('.phrase-composition-open-creation').emit('click'); await settle();
+    assert.deepEqual(frequencies(), [110, 330]); assert.equal(f.plans.at(-1)!.transport!.positionSeconds, 3);
+    assert.equal(f.find('.song-clock').textContent, '00:03.000'); assert.deepEqual(f.phrase.read().body, original);
     const beforeLevel = f.plans.at(-1)!.events[0]!.sound.level;
     const master = f.field('总音量'); master.value = '.4'; master.emit('input'); await settle();
-    assert.deepEqual(frequencies(), [330], 'temporary mix previews also remain section-scoped');
-    assert(f.plans.at(-1)!.events[0]!.sound.level < beforeLevel);
-    master.emit('change'); await settle();
-    f.find('.song-play').emit('click'); await settle();
+    assert.deepEqual(frequencies(), [110, 330]); assert(f.plans.at(-1)!.events[0]!.sound.level < beforeLevel);
+    master.emit('change'); await settle(); f.find('.song-play').emit('click'); await settle();
     assert.equal(f.find('.song-play').attributes.get('aria-label'), '播放');
-    f.find('.phrase-melody-back').emit('click'); await settle();
-    f.find('.phrase-composition-rhythm-create').emit('click'); await settle();
-    f.find('.song-play').emit('click'); await settle();
-    assert.deepEqual(frequencies(), [110], 'resuming in Rhythm replaces the paused Melody plan');
-    assert.equal(f.find('.song-clock').textContent, '00:03.000');
-    f.tempo(240); await settle();
-    assert.deepEqual(frequencies(), [110], 'BPM updates cannot reintroduce the other section');
-    assert.equal(f.plans.at(-1)!.events[0]!.atSeconds, .5);
-    f.find('.phrase-melody-back').emit('click'); await settle();
-    assert.deepEqual(frequencies(), [110, 330], 'returning to the phrase overview restores both sections while playing');
+    f.find('.phrase-melody-back').emit('click'); await settle(); f.find('.phrase-composition-open-creation').emit('click'); await settle();
+    f.find('.song-play').emit('click'); await settle(); assert.deepEqual(frequencies(), [110, 330]);
+    f.tempo(240); await settle(); assert.deepEqual(frequencies(), [110, 330]);
+    assert(f.plans.at(-1)!.events.some(event => event.sound.note.frequencyHz === 110 && event.atSeconds === .5));
+    f.find('.phrase-melody-back').emit('click'); await settle(); assert.deepEqual(frequencies(), [110, 330]);
     assert.equal(f.find('.song-play').attributes.get('aria-label'), '暂停');
     assert.deepEqual(f.phrase.read().body!.parts.map(part => part.notes.map(note => note.id)), original.parts.map(part => part.notes.map(note => note.id)));
-    assert.deepEqual(f.phrase.previewPlan().events.map(event => event.sound.note.frequencyHz).sort((a, b) => a - b), [110, 330], 'normal phrase compilation remains complete');
   } finally { f.cleanup(); }
 });
 
-test('an empty section plays a silent four-bar clock and returning to overview restores the other section', async () => {
-  const f = fixture(); try {
-    const original = f.phrase.read().draft!;
-    f.find('.song-play').emit('click'); await settle(); assert.equal(f.plans.at(-1)!.events.length, 1);
-    f.find('.phrase-composition-rhythm-create').emit('click'); await settle();
-    assert.deepEqual(f.plans.at(-1)!.events, []);
-    assert.equal(f.plans.at(-1)!.durationSeconds, 8);
-    assert.equal(f.find('.song-play').attributes.get('aria-label'), '暂停');
-    assert.deepEqual(f.phrase.read().draft, original);
-    f.find('.song-play').emit('click'); await settle();
-    f.find('.song-play').emit('click'); await settle();
-    assert.deepEqual(f.plans.at(-1)!.events, [], 'starting or resuming an empty section never leaks the other section');
-    f.find('.phrase-melody-back').emit('click'); await settle();
-    assert.equal(f.plans.at(-1)!.events.length, 1);
-    assert.equal(f.plans.at(-1)!.events[0]!.sound.note.frequencyHz, 330);
-    assert.deepEqual(f.phrase.read().draft, original);
+test('an empty unified creation keeps the silent phrase clock when returning to overview without content edits', async () => {
+  const f = fixture({ empty: true }); try {
+    ensureProjectMelodyTimbres(f.library, f.songId); const original = f.phrase.read().draft!;
+    f.find('.song-play').emit('click'); await settle(); assert.equal(f.plans.at(-1)!.events.length, 0);
+    f.find('.phrase-composition-open-creation').emit('click'); await settle();
+    assert.deepEqual(f.plans.at(-1)!.events, []); assert.equal(f.plans.at(-1)!.durationSeconds, 8);
+    assert.equal(f.find('.song-play').attributes.get('aria-label'), '暂停'); assert.deepEqual(f.phrase.read().draft, original);
+    f.find('.song-play').emit('click'); await settle(); f.find('.song-play').emit('click'); await settle();
+    assert.deepEqual(f.plans.at(-1)!.events, []); f.find('.phrase-melody-back').emit('click'); await settle();
+    assert.deepEqual(f.plans.at(-1)!.events, []); assert.deepEqual(f.phrase.read().draft, original);
   } finally { f.cleanup(); }
 });
 
-test('bar extension is shared by both editors and survives complete song save and project import', async () => {
+test('the production tone library removes an unused starter for the whole song and keeps it removed after reentry and transfer', async () => {
+  const f = fixture({ empty: true }); try {
+    await enterMelodyWithPiano(f); const noteId = await createMelodyNote(f);
+    f.find('.melody-add-tone').emit('click');
+    const flute = f.root.querySelectorAll('.melody-library-card').find(card => card.querySelector('.melody-library-tone')?.textContent === '长笛')!;
+    const fluteId = flute.dataset.timbreId!; const values = new Map<string, string>();
+    const dataTransfer = { effectAllowed: '', dropEffect: '', setData(type: string, value: string) { values.set(type, value); }, getData(type: string) { return values.get(type) ?? ''; } };
+    flute.emit('dragstart', { dataTransfer }); f.find('.melody-tone-trash').emit('drop', { dataTransfer }); await settle();
+    assert(!f.library.readContent(fluteId)); assert(!f.root.querySelectorAll('.melody-library-tone').some(card => card.textContent === '长笛'));
+    assert(f.phrase.read().body!.parts.some(part => part.notes.some(note => note.id === noteId)));
+    f.find('.melody-library-close').emit('click'); f.find('.phrase-melody-back').emit('click'); await settle();
+    f.find('.phrase-composition-open-creation').emit('click'); await settle(); f.find('.melody-add-tone').emit('click');
+    assert(!f.root.querySelectorAll('.melody-library-tone').some(card => card.textContent === '长笛'));
+    f.find('.melody-library-close').emit('click'); f.save(); await settle(); f.exit(); await settle(); f.save(); await settle();
+    assert.equal(f.saved.length, 1);
+    const target = createMaterialLibrary(undefined, { project: { rootKind: 'rootsound.song', adapters: f.adapters } });
+    const opened = createProjectPackages(target, f.adapters, { rootKind: 'rootsound.song' }).importProject(f.saved[0]!);
+    assert.equal(opened.status, 'imported'); if (opened.status !== 'imported') throw new Error('Expected import');
+    assert(!ensureProjectMelodyTimbres(target, opened.draft.id).some(tone => tone.name === '长笛'));
+  } finally { f.cleanup(); }
+});
+
+test('production tone-card reordering persists across unified-creation reentry without preventing occurrence save', async () => {
+  const f = fixture({ empty: true }); try {
+    await enterMelodyWithPiano(f); const noteId = await createMelodyNote(f); f.find('.melody-add-tone').emit('click');
+    const cards = f.root.querySelectorAll('.melody-library-card'); const source = cards.at(-1)!; const sourceId = source.dataset.timbreId!;
+    cards.forEach((card, index) => { card.getBoundingClientRect = () => ({ left: index % 3 * 110, top: Math.floor(index / 3) * 45, right: index % 3 * 110 + 100, bottom: Math.floor(index / 3) * 45 + 36, width: 100, height: 36 }); });
+    const values = new Map<string, string>();
+    const dataTransfer = { effectAllowed: '', dropEffect: '', setData(type: string, value: string) { values.set(type, value); }, getData(type: string) { return values.get(type) ?? ''; } };
+    source.emit('dragstart', { dataTransfer }); const grid = f.find('.melody-library-grid');
+    grid.emit('dragover', { dataTransfer, clientX: 50, clientY: 18 }); grid.emit('drop', { dataTransfer }); await settle();
+    assert.equal(listProjectTimbres(f.library, f.songId)[0]!.id, sourceId);
+    f.find('.melody-library-close').emit('click'); f.find('.phrase-melody-back').emit('click'); await settle();
+    f.find('.phrase-composition-open-creation').emit('click'); await settle(); f.find('.melody-add-tone').emit('click');
+    assert.equal(f.root.querySelectorAll('.melody-library-card')[0]!.dataset.timbreId, sourceId);
+    f.find('.melody-library-close').emit('click'); f.save(); await settle();
+    assert.notEqual(f.phrase.read().draft!.sourceId, f.original.id);
+    assert(f.phrase.read().body!.parts.some(part => part.notes.some(note => note.id === noteId)));
+  } finally { f.cleanup(); }
+});
+
+test('production imported-tone removal waits for confirmation and Cancel leaves the library and phrase untouched', async () => {
+  const f = fixture({ empty: true }); try {
+    await enterMelodyWithPiano(f); const noteId = await createMelodyNote(f);
+    const imported = importProjectTimbre(f.library, f.songId, prepareBasicTimbre('我导入的声音'));
+    f.find('.melody-add-tone').emit('click');
+    const discard = () => {
+      const card = f.root.querySelectorAll('.melody-library-card').find(card => card.dataset.timbreId === imported.id)!; assert(card);
+      const values = new Map<string, string>();
+      const dataTransfer = { effectAllowed: '', dropEffect: '', setData(type: string, value: string) { values.set(type, value); }, getData(type: string) { return values.get(type) ?? ''; } };
+      card.emit('dragstart', { dataTransfer }); f.find('.melody-tone-trash').emit('drop', { dataTransfer });
+    };
+    const before = structuredClone(f.phrase.read().draft); const token = f.library.currentToken();
+    discard(); assert(f.root.querySelector('.melody-tone-delete-dialog')); assert(f.library.readContent(imported.id)); assert.equal(f.library.currentToken(), token);
+    f.find('.melody-tone-delete-cancel').emit('click'); assert.equal(f.root.querySelector('.melody-tone-delete-dialog'), undefined);
+    assert(f.library.readContent(imported.id)); assert.deepEqual(f.phrase.read().draft, before); assert.equal(f.library.currentToken(), token);
+    discard(); f.find('.melody-tone-delete-confirm').emit('click'); await settle();
+    assert.equal(f.root.querySelector('.melody-tone-delete-dialog'), undefined); assert.equal(f.library.readContent(imported.id), undefined);
+    assert(!f.root.querySelectorAll('.melody-library-card').some(card => card.dataset.timbreId === imported.id));
+    assert(f.phrase.read().body!.parts.some(part => part.notes.some(note => note.id === noteId)));
+    f.find('.melody-library-close').emit('click'); f.save(); await settle(); assert.notEqual(f.phrase.read().draft!.sourceId, f.original.id);
+  } finally { f.cleanup(); }
+});
+
+test('production header cell resolution survives unified-creation reentry, phrase save and full project import', async () => {
+  const f = fixture({ empty: true }); try {
+    await enterMelodyWithPiano(f); const noteId = await createMelodyNote(f); const note = structuredClone(f.phrase.read().body!.parts[0]!.notes[0]!);
+    const field = f.find('.phrase-grid-select'); field.value = '3'; field.emit('change'); await settle();
+    assert.equal(f.phrase.read().body!.stepsPerBeat, 3); assert.equal(f.root.querySelectorAll('.melody-grid-line').length, 49);
+    assert.deepEqual(f.phrase.read().body!.parts[0]!.notes[0], note);
+    f.find('.phrase-melody-back').emit('click'); await settle(); f.find('.phrase-composition-open-creation').emit('click'); await settle();
+    assert.equal(f.find('.phrase-grid-select').value, '3'); assert.equal(f.root.querySelectorAll('.melody-grid-line').length, 49);
+    f.save(); await settle(); f.exit(); await settle(); f.save(); await settle();
+    const target = createMaterialLibrary(undefined, { project: { rootKind: 'rootsound.song', adapters: f.adapters } });
+    const opened = createProjectPackages(target, f.adapters, { rootKind: 'rootsound.song' }).importProject(f.saved[0]!);
+    assert.equal(opened.status, 'imported');
+    const body = target.listContent().filter(record => record.kind === 'rootsound.phrase').map(record => readPhraseBody(record.body))
+      .find(body => body.parts.some(part => part.notes.some(note => note.id === noteId)))!;
+    assert.equal(body.stepsPerBeat, 3); assert.deepEqual(body.parts.find(part => part.notes.some(note => note.id === noteId))!.notes.find(note => note.id === noteId), note);
+  } finally { f.cleanup(); }
+});
+
+test('bar extension remains available while editing a legacy family and survives song save and project import', async () => {
   const f = fixture({ empty: true }); try {
     await enterMelodyWithPiano(f); const initialHead = f.find('.song-clock').textContent;
     f.find('.melody-extend').emit('click'); await settle();
@@ -640,26 +846,27 @@ test('performance is disabled by default and enabling it through the shared sett
   } finally { f.cleanup(); }
 });
 
-test('production Rhythm tone library stays open while assignment toggles preserve notes and mute undefined tone rows',async()=>{
- const f=fixture({empty:true});try{
-  const rhythm=await enterRhythmWithTone(f);const id=await createRhythmNote(f,rhythm);const part=f.phrase.read().body!.parts.find(part=>part.notes.some(note=>note.id===id))!;
-  const original=structuredClone(part), identity=f.phrase.read().draft!.id;f.find('.melody-add-tone').emit('click');
-  const tile=()=>f.root.querySelectorAll('.melody-library-tone').find(tile=>tile.textContent==='钢琴')!;
-  assert.equal(tile().attributes.get('aria-pressed'),'true');tile().emit('click');await settle();
-  assert(f.root.querySelector('.melody-tone-library'));assert.equal(tile().attributes.get('aria-pressed'),'false');
-  const undefinedPart=f.phrase.read().body!.parts.find(value=>value.id===part.id)!;assert.deepEqual(undefinedPart.notes,original.notes);assert.equal(undefinedPart.unassigned,true);
-  assert.equal(f.root.querySelectorAll('.melody-tone').some(card=>card.textContent==='未定义'),true);assert.deepEqual(f.phrase.previewPlan(undefined,{allowSilence:true}).events,[]);
-  tile().emit('click');await settle();assert(f.root.querySelector('.melody-tone-library'));assert.equal(tile().attributes.get('aria-pressed'),'true');
-  assert.deepEqual(f.phrase.read().body!.parts.find(value=>value.id===part.id),original);assert.equal(f.phrase.read().draft!.id,identity);
-  assert.equal(f.phrase.read().body!.parts.filter(value=>value.timbreId===part.timbreId&&(value.section??'melody')==='rhythm').length,1);
-  assert.equal(f.phrase.previewPlan().events.length,1);assert.equal(f.find('.melody-library-close').textContent,'→');f.find('.melody-library-close').emit('click');
-  f.save();await settle();assert(f.root.querySelector('.melody-workspace'));assert(f.phrase.read().body!.parts.some(value=>value.notes.some(note=>note.id===id)));
- }finally{f.cleanup();}
+test('an undefined legacy rhythm family uses the single-choice replacement library without losing notes or identity', async () => {
+  const f = fixture({ empty: true }); try {
+    const partId = await enterRhythmWithTone(f); const noteId = await createRhythmNote(f, partId);
+    const original = structuredClone(f.phrase.read().body!.parts.find(part => part.id === partId)!); const identity = f.phrase.read().draft!.id;
+    f.phrase.setPartVisible(partId, false); f.tempo(120); await settle();
+    const card = f.root.querySelectorAll('.melody-note-family').find(card => card.dataset.partId === partId); assert(card); assert.equal(card.textContent, '未定义'); card.emit('click');
+    f.find('.melody-change-timbre').emit('click');
+    const tones = f.root.querySelectorAll('.melody-library-tone'); assert(tones.every(tone => !tone.attributes.has('aria-pressed')));
+    f.find('.melody-library-close').emit('click'); assert.equal(f.phrase.read().body!.parts.find(part => part.id === partId)!.unassigned, true);
+    await changeMelodyFamily(f, partId, '长笛');
+    const rebound = f.phrase.read().body!.parts.find(part => part.id === partId)!;
+    assert.equal(rebound.section, 'rhythm'); assert.equal(rebound.unassigned, undefined); assert.equal(rebound.name, '长笛');
+    assert.deepEqual(rebound.notes, original.notes); assert.equal(rebound.notes[0]!.id, noteId); assert.equal(f.phrase.read().draft!.id, identity);
+    assert.equal(f.phrase.previewPlan().events.length, 1); f.save(); await settle();
+    assert(f.root.querySelector('.melody-workspace')); assert.equal(f.phrase.read().body!.parts.find(part => part.id === partId)!.section, 'rhythm');
+  } finally { f.cleanup(); }
 });
 
 test('production tone previews do not select library cards, add parts or mutate note assignments',async()=>{
  const f=fixture({empty:true});try{
-  f.find('.phrase-composition-create').emit('click');await settle();f.find('.melody-add-tone').emit('click');
+  f.find('.phrase-composition-open-creation').emit('click');await settle();f.find('.melody-add-tone').emit('click');
   const before=f.phrase.read().draft!;const card=f.root.querySelectorAll('.melody-library-card').find(card=>card.querySelector('.melody-library-tone')?.textContent==='小号');assert(card);
   const play=card.querySelector('.melody-tone-preview');assert(play);play.emit('click');await settle();
   assert.equal(f.auditions.length,1);assert.equal(f.root.querySelector('.melody-tone-library')?.attributes.has('open'),true);assert.deepEqual(f.phrase.read().draft,before);
@@ -670,24 +877,24 @@ test('production tone previews do not select library cards, add parts or mutate 
  }finally{f.cleanup();}
 });
 
-test('production tone library trash removes only current-section uses, keeps its project asset and supports undo and portable save',async()=>{
+test('production tone trash removes all unified phrase uses atomically, keeps the project asset and supports undo and portable save',async()=>{
  const f=fixture({empty:true});try{
   await enterMelodyWithPiano(f);const melodyId=await createMelodyNote(f);const melodyPart=structuredClone(f.phrase.read().body!.parts.find(part=>part.notes.some(note=>note.id===melodyId))!);
   f.find('.phrase-melody-back').emit('click');await settle();const rhythmPartId=await enterRhythmWithTone(f);const rhythmId=await createRhythmNote(f,rhythmPartId);const rhythm=structuredClone(f.phrase.read().body!.parts.find(part=>part.id===rhythmPartId)!);
-  f.find('.phrase-melody-back').emit('click');await settle();f.find('.phrase-composition-create').emit('click');await settle();f.find('.melody-add-tone').emit('click');
+  f.find('.phrase-melody-back').emit('click');await settle();f.find('.phrase-composition-open-creation').emit('click');await settle();f.find('.melody-add-tone').emit('click');
   const card=f.root.querySelectorAll('.melody-library-card').find(card=>card.querySelector('.melody-library-tone')?.textContent==='钢琴');assert(card);
   const data=new Map<string,string>();const dataTransfer={effectAllowed:'',dropEffect:'',setData(type:string,value:string){data.set(type,value);},getData(type:string){return data.get(type)??'';}};
   card.emit('dragstart',{dataTransfer});const trash=f.find('.melody-tone-trash');assert.equal(trash.hidden,false);trash.emit('dragover',{dataTransfer});trash.emit('drop',{dataTransfer});card.emit('dragend',{dataTransfer});await settle();
   assert(f.root.querySelector('.melody-tone-library'));assert.equal(f.phrase.read().body!.parts.some(part=>part.id===melodyPart.id),false);
-  assert.deepEqual(f.phrase.read().body!.parts.find(part=>part.id===rhythmPartId),rhythm);assert(f.library.readContent(melodyPart.timbreId));
+  assert.equal(f.phrase.read().body!.parts.some(part=>part.id===rhythmPartId),false);assert(f.library.readContent(melodyPart.timbreId));
   assert(listProjectTimbres(f.library,f.songId).some(timbre=>timbre.id===melodyPart.timbreId));f.find('.melody-library-close').emit('click');
-  f.document.emit('keydown',{key:'Backspace'});await settle();assert.deepEqual(f.phrase.read().body!.parts.find(part=>part.id===melodyPart.id),melodyPart);
+  f.document.emit('keydown',{key:'Backspace'});await settle();assert.deepEqual(f.phrase.read().body!.parts.find(part=>part.id===melodyPart.id),melodyPart);assert.deepEqual(f.phrase.read().body!.parts.find(part=>part.id===rhythmPartId),rhythm);
   f.document.emit('keydown',{key:'y',ctrlKey:true});await settle();assert.equal(f.phrase.read().body!.parts.some(part=>part.id===melodyPart.id),false);
   f.save();await settle();f.find('.phrase-melody-back').emit('click');await settle();f.exit();await settle();f.save();await settle();
   const target=createMaterialLibrary(undefined,{project:{rootKind:'rootsound.song',adapters:f.adapters}});const imported=createProjectPackages(target,f.adapters,{rootKind:'rootsound.song'}).importProject(f.saved[0]!);
   assert.equal(imported.status,'imported');assert(target.listContent().some(record=>record.kind==='rootsound.timbre'&&record.name==='钢琴'));
   const parts=target.listContent().filter(record=>record.kind==='rootsound.phrase').flatMap(record=>readPhraseBody(record.body).parts);
-  assert(parts.some(part=>part.notes.some(note=>note.id===rhythmId)));assert.equal(parts.some(part=>part.notes.some(note=>note.id===melodyId)),false);
+  assert.equal(parts.some(part=>part.notes.some(note=>note.id===rhythmId)),false);assert.equal(parts.some(part=>part.notes.some(note=>note.id===melodyId)),false);
  }finally{f.cleanup();}
 });
 
@@ -704,7 +911,7 @@ test('double Delete on a selected production tone clears its notes in one undo w
 
 test('Melody plus creates independent total-note families even when choosing an already-used tone',async()=>{
  const f=fixture({empty:true});try{
-  f.find('.phrase-composition-create').emit('click');await settle();
+  f.find('.phrase-composition-open-creation').emit('click');await settle();
   const one=await newMelodyFamily(f,'钢琴');const first=f.phrase.read().body!.parts.find(part=>part.id===one)!;
   const note1=f.phrase.addNote(one,{startBeat:1,durationBeats:.25,durationSeconds:.125,frequencyHz:440,velocity:.7});f.tempo(120);await settle();
   const before=structuredClone(f.phrase.read().body!.parts.find(part=>part.id===one));
@@ -723,7 +930,7 @@ test('Melody plus creates independent total-note families even when choosing an 
 
 test('changing one total-note family tone keeps its notes and sibling families through Undo, save and portable import',async()=>{
  const f=fixture({empty:true});try{
-  f.find('.phrase-composition-create').emit('click');await settle();const one=await newMelodyFamily(f,'钢琴');
+  f.find('.phrase-composition-open-creation').emit('click');await settle();const one=await newMelodyFamily(f,'钢琴');
   f.phrase.addNote(one,{startBeat:1.25,durationBeats:.5,durationSeconds:.28,frequencyHz:440,velocity:.62,level:.44,pan:-.3});
   const two=await newMelodyFamily(f,'钢琴');f.phrase.addNote(two,{startBeat:3,durationBeats:.25,durationSeconds:.125,frequencyHz:660,velocity:.7});
   const rhythm=f.phrase.addPart(f.phrase.read().body!.parts.find(part=>part.id===one)!.timbreId,'rhythm');f.phrase.addNote(rhythm,{startBeat:2,durationBeats:.25,frequencyHz:110,velocity:.8});f.tempo(120);await settle();
@@ -757,8 +964,152 @@ test('changing an existing family retains its formerly implicit tone as a projec
  const f=fixture();try{
   const initial=f.phrase.read().body!.parts[0]!, oldTone=f.library.readContent(initial.timbreId)!;
   assert.equal(f.library.currentProjectView!(f.songId)!.memberIds.includes(oldTone.id),false);
-  f.find('.phrase-composition-create').emit('click');await settle();await changeMelodyFamily(f,initial.id,'长笛');
+  f.find('.phrase-composition-open-creation').emit('click');await settle();await changeMelodyFamily(f,initial.id,'长笛');
   assert(f.library.currentProjectView!(f.songId)!.memberIds.includes(oldTone.id));assert(listProjectTimbres(f.library,f.songId).some(tone=>tone.id===oldTone.id));
   assert.deepEqual(f.library.readContent(oldTone.id),oldTone);assert.deepEqual(f.phrase.read().body!.parts.find(part=>part.id===initial.id)!.notes,initial.notes);
  }finally{f.cleanup();}
+});
+
+test('unified overview previews preserve melody and legacy rhythm identities through editing, replacement and deletion', async () => {
+  const f = fixture({ empty: true }); try {
+    const host = () => f.find('.phrase-composition-melody').querySelector('.phrase-composition-notes')!;
+    const previews = (section: 'melody' | 'rhythm') => {
+      const ids = new Set(f.phrase.read().body!.parts.filter(part => (part.section ?? 'melody') === section).map(part => part.id));
+      return host().querySelectorAll('.phrase-overview-note').filter(note => ids.has(note.dataset.partId!));
+    };
+    const block = (section: 'melody' | 'rhythm', id: string) => { const note = previews(section).find(item => item.dataset.noteId === id); assert(note); return note; };
+    const near = (actual: unknown, expected: number) => assert(Math.abs(Number.parseFloat(String(actual)) - expected) < 1e-8, `${actual} != ${expected}`);
+    const back = async () => { f.find('.phrase-melody-back').emit('click'); await settle(); f.flushFrames(); };
+    const removeSelected = async (id: string) => {
+      const note = f.root.querySelectorAll('.melody-note').find(item => item.dataset.noteId === id); assert(note);
+      const scroll = f.find('.melody-scroll');
+      scroll.emit('pointerdown', { target: note, clientX: Number.parseFloat(String(note.style.left)) + .5,
+        clientY: Number.parseFloat(String(note.style.top)) - scroll.scrollTop + 2 });
+      f.document.emit('pointerup'); f.document.emit('keydown', { target: scroll, key: 'Delete' }); await settle();
+    };
+    assert.deepEqual(previews('melody'), []); assert.deepEqual(previews('rhythm'), []);
+    await enterMelodyWithPiano(f);
+    const shortId = await createMelodyNote(f, 125);
+    const hold = f.field('时长 / 秒'); hold.value = '.015'; hold.emit('input'); hold.emit('change');
+    const key = f.root.querySelectorAll('.melody-key').find(item => item.textContent === 'C4')!;
+    const scroll = f.find('.melody-scroll');
+    scroll.emit('pointerdown', { target: f.find('.melody-canvas'), clientX: 375,
+      clientY: Number.parseFloat(String(key.style.top)) - scroll.scrollTop + 4 });
+    f.document.emit('pointerup'); await settle();
+    const melody = f.phrase.read().body!.parts.find(part => part.name === '钢琴')!;
+    const longId = melody.notes.find(note => note.id !== shortId)!.id;
+    const longHold = f.field('时长 / 秒'); longHold.value = '2.5'; longHold.emit('input'); longHold.emit('change');
+    await back(); const originalPreview = block('melody', shortId);
+    assert.equal(originalPreview.style.backgroundColor, toneColor(melody.timbreId));
+    f.find('.phrase-composition-open-creation').emit('click'); await settle();
+    await changeMelodyFamily(f, melody.id, '长笛');
+    const flute = f.phrase.read().body!.parts.find(part => part.id === melody.id)!;
+    await back();
+    assert.deepEqual(new Set(previews('melody').map(note => note.dataset.noteId)), new Set([shortId, longId]));
+    assert.deepEqual(previews('rhythm'), []);
+    assert.equal(block('melody', shortId), originalPreview, 'a tone change refreshes the already-existing preview identity');
+    assert.equal(block('melody', shortId).style.backgroundColor, toneColor(flute.timbreId));
+
+    const rhythmId = await enterRhythmWithTone(f, '踢'), rhythmNoteId = await createRhythmNote(f, rhythmId, 125);
+    await back();
+    assert.deepEqual(previews('rhythm').map(note => note.dataset.noteId), [rhythmNoteId]);
+    assert(previews('melody').every(note => note.dataset.partId === melody.id));
+    assert(previews('rhythm').every(note => note.dataset.partId === rhythmId));
+    const scale = f.find('.phrase-composition-viewport').clientWidth / 8;
+    near(block('melody', shortId).style.left, scale); near(block('melody', shortId).style.width, .015 * scale);
+    near(block('melody', longId).style.left, 3 * scale); near(block('melody', longId).style.width, 2.5 * scale);
+    const notesBeforeTempo = structuredClone(f.phrase.read().body!.parts.flatMap(part => part.notes));
+    f.tempo(240); await settle(); f.flushFrames();
+    near(block('melody', shortId).style.left, .5 * scale); near(block('melody', shortId).style.width, .015 * scale);
+    near(block('melody', longId).style.left, 1.5 * scale); near(block('melody', longId).style.width, 2.5 * scale);
+    assert.deepEqual(f.phrase.read().body!.parts.flatMap(part => part.notes), notesBeforeTempo);
+    const plan = f.phrase.previewPlan();
+    assert(plan.events.some(event => Math.abs(event.atSeconds - .5) < 1e-8 && event.sound.note.holdSeconds === .015));
+    assert(plan.events.some(event => Math.abs(event.atSeconds - 1.5) < 1e-8 && event.sound.note.holdSeconds === 2.5));
+
+    f.find('.phrase-composition-open-creation').emit('click'); await settle(); await removeSelected(shortId); await back();
+    assert.deepEqual(previews('melody').map(note => note.dataset.noteId), [longId]);
+    assert.deepEqual(previews('rhythm').map(note => note.dataset.noteId), [rhythmNoteId]);
+    f.find('.phrase-composition-open-creation').emit('click'); await settle(); await removeSelected(rhythmNoteId); await back();
+    assert.deepEqual(previews('rhythm'), []); assert.deepEqual(previews('melody').map(note => note.dataset.noteId), [longId]);
+  } finally { f.cleanup(); }
+});
+
+test('overview and unified detailed creation retain time and vertical navigation, with one running head and inert console gestures', async () => {
+  const f = fixture({ navigationHeight: 140 }); try {
+    const back = async () => { f.find('.phrase-melody-back').emit('click'); await settle(); f.flushFrames(); };
+    const host = () => f.find('.phrase-composition-melody').querySelector('.phrase-composition-notes')!;
+    const near = (actual: unknown, expected: number) => assert(Math.abs(Number.parseFloat(String(actual)) - expected) < 1e-8, `${actual} != ${expected}`);
+    const onlyOneHead = () => {
+      const visible = (node: Element) => { let current: Element | undefined = node; while (current) { if (current.hidden) return false; current = current.parentElement; } return true; };
+      assert.equal([...f.root.querySelectorAll('.phrase-composition-playhead'), ...f.root.querySelectorAll('.melody-playhead')].filter(visible).length, 1);
+    };
+    f.find('.phrase-composition-open-creation').emit('click'); await settle(); await back();
+    const melody = f.phrase.read().body!.parts[0]!;
+    const noteId = f.phrase.addNote(melody.id, { startBeat: 6, durationBeats: .4, durationSeconds: .2, frequencyHz: 330, velocity: .7 });
+    f.phrase.setLength(32); const legacyPartId = f.phrase.addPart(melody.timbreId, 'rhythm');
+    const legacyNoteId = f.phrase.addNote(legacyPartId, { startBeat: 6, durationBeats: .4, durationSeconds: .2, frequencyHz: 330, velocity: .7 });
+    f.tempo(120); await settle(); f.flushFrames();
+    const before = structuredClone(f.phrase.read().draft), token = f.library.currentToken();
+    const viewport = f.find('.phrase-composition-viewport');
+    f.find('.phrase-composition-ruler').emit('pointerdown', { clientX: 500 }); f.document.emit('pointerup');
+    assert.equal(f.find('.song-clock').textContent, '00:04.000');
+    f.find('.song-play').emit('click'); await settle(); const playingId = f.playback()!.id; onlyOneHead();
+    viewport.emit('wheel', { target: f.find('.phrase-composition-melody'), ctrlKey: true, deltaY: -Math.log(2) / .002, clientX: 500, clientY: 70 }); f.flushFrames();
+    const initialTop = Number(host().dataset.top), left = Number(viewport.dataset.leftSeconds);
+    viewport.emit('pointerdown', { target: f.find('.phrase-composition-melody'), clientX: 600, clientY: 200 });
+    f.document.emit('pointermove', { clientX: 560, clientY: 170 }); f.flushFrames(); f.document.emit('pointerup');
+    assert(Number(viewport.dataset.leftSeconds) > left); near(host().dataset.top, initialTop + 30);
+    const navigation = { left: viewport.dataset.leftSeconds, top: host().dataset.top, zoom: viewport.dataset.zoom, time: f.find('.song-clock').textContent };
+    const console = f.find('.phrase-composition-console');
+    console.emit('wheel', { deltaY: 60, ctrlKey: true });
+    console.emit('pointerdown', { clientX: 600, clientY: 620 });
+    f.document.emit('pointermove', { clientX: 200, clientY: 100 }); f.document.emit('pointerup'); f.flushFrames();
+    assert.deepEqual({ left: viewport.dataset.leftSeconds, top: host().dataset.top, zoom: viewport.dataset.zoom, time: f.find('.song-clock').textContent }, navigation);
+    f.find('.phrase-composition-open-creation').emit('click'); await settle();
+    const scroll = f.find('.melody-scroll'); near(scroll.scrollTop, initialTop + 30);
+    scroll.emit('wheel', { ctrlKey: true, deltaY: -Math.log(1.25) / .002, clientX: 500, clientY: 70 });
+    scroll.emit('wheel', { deltaY: -80, clientX: 500, clientY: 70 }); f.document.emit('keydown', { target: scroll, key: 'ArrowUp' }); f.flushFrames();
+    const top = scroll.scrollTop; onlyOneHead(); await back(); near(host().dataset.top, top);
+    const sharedLeft = Number(viewport.dataset.leftSeconds), span = Number(viewport.dataset.visibleSeconds);
+    f.find('.phrase-composition-open-creation').emit('click'); await settle(); near(f.find('.melody-scroll').scrollTop, top);
+    for (const id of [noteId, legacyNoteId]) {
+      const note = f.root.querySelectorAll('.melody-note').find(note => note.dataset.noteId === id); assert(note);
+      near(note.style.left, (3 - sharedLeft) * 1000 / span); near(note.style.width, .2 * 1000 / span);
+    }
+    onlyOneHead(); await back(); onlyOneHead();
+    assert.equal(f.playback()!.id, playingId); assert.equal(f.playback()!.status, 'playing');
+    assert.equal(f.find('.song-play').attributes.get('aria-label'), '暂停'); assert.equal(f.find('.song-clock').textContent, '00:04.000');
+    assert.equal(f.library.currentToken(), token); assert.deepEqual(f.phrase.read().draft, before);
+  } finally { f.cleanup(); }
+});
+
+test('a detailed-editor change shares one fresh phrase view with its header instead of rereading and repainting the editor', async () => {
+  const f = fixture({ empty: true });
+  const read = f.phrase.read;
+  try {
+    await enterMelodyWithPiano(f);
+    const id = await createMelodyNote(f);
+    const before = read().body!.parts.flatMap(part => part.notes).find(note => note.id === id)!;
+    let reads = 0;
+    f.phrase.read = () => { reads++; return read(); };
+    f.document.emit('keydown', { key: 's', target: f.find('.melody-scroll') });
+    await settle();
+    assert.equal(reads, 1, 'the editor reads the committed view once; scope synchronization and the parent reuse it');
+    const after = read().body!.parts.flatMap(part => part.notes).find(note => note.id === id)!;
+    assert(after.level! < (before.level ?? 1));
+    assert.equal(after.startBeat, before.startBeat);
+    assert.equal(after.frequencyHz, before.frequencyHz);
+    assert.equal(f.root.querySelectorAll('.melody-note').length, 1);
+
+    reads = 0;
+    f.tempo(180);
+    await settle();
+    assert.equal(reads, 1, 'an outer header refresh also supplies its view to the detailed editor');
+    assert.equal(read().body!.tempoBpm, 180);
+    assert.equal(f.root.querySelectorAll('.melody-note').length, 1);
+  } finally {
+    f.phrase.read = read;
+    f.cleanup();
+  }
 });

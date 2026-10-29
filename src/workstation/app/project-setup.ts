@@ -1,4 +1,4 @@
-import type { ProjectDirectoriesPort, ProjectSetupPort } from '../contracts/project-directory.ts';
+import type { MidiImportNotice, ProjectDirectoriesPort, ProjectSetupPort } from '../contracts/project-directory.ts';
 import { createMaterialLibrary } from '../modules/materials/public.ts';
 import { createTimbrePlayback, createTimbreReferenceAdapter } from '../modules/timbre/public.ts';
 import { createPhrasePlayback, createPhraseReferenceAdapter } from '../modules/phrase/public.ts';
@@ -6,6 +6,7 @@ import { createSongEditor, createSongReferenceAdapter } from '../modules/song/pu
 import { createCoCreationReferenceAdapter } from '../modules/co-creation/public.ts';
 import { createSampleReferenceAdapter } from '../modules/sampling/public.ts';
 import { ensureProjectMelodyTimbres } from './project-timbres.ts';
+import { createMidiProjectLibrary } from './midi-project.ts';
 
 export function projectName(input: string): string {
   const name = input.trim();
@@ -57,8 +58,8 @@ export function renameProjectLibrary(text: string, input: string): string {
   song.rename(name); return snapshot;
 }
 
-export function createProjectSetup(directories: ProjectDirectoriesPort, enter: () => void,
-  source?: { read(): string; songDraftId(): string; name?(): string }): ProjectSetupPort {
+export function createProjectSetup(directories: ProjectDirectoriesPort, enter: (notice?: MidiImportNotice) => void,
+  source?: { read(): string; songDraftId(): string; name?(): string; prepareSave?(): void | Promise<void> }): ProjectSetupPort {
   let busy = false;
   async function exclusive<T>(action: () => Promise<T>): Promise<T> {
     if (busy) throw new Error('正在处理项目，请稍候。');
@@ -81,10 +82,28 @@ export function createProjectSetup(directories: ProjectDirectoriesPort, enter: (
     open: path => exclusive(async () => {
       const result = await directories.open(path);
       if (result.status === 'opened') enter();
+      else if (result.status === 'midi') {
+        // Validate/convert in an isolated library before any active file switch.
+        const base = midiProjectName(result.name);
+        const imported = createMidiProjectLibrary(result.bytes, base);
+        const state = await directories.read();
+        const existing = directories.list ? await directories.list() : [];
+        const names = new Set(existing.flatMap(project => [project.name,
+          project.path.replace(/[\\/]+$/u, '').split(/[\\/]/u).at(-1)!.replace(/\.rootsound$/iu, '')])
+          .map(name => name.normalize('NFC').toLocaleLowerCase('en-US')));
+        let name = base, suffix = 1;
+        while (names.has(name.normalize('NFC').toLocaleLowerCase('en-US'))) {
+          const ending = ` ${suffix++}`;
+          name = base.slice(0, 80 - ending.length).replace(/[\uD800-\uDBFF]$/u, '').trimEnd() + ending;
+        }
+        const text = name === base ? imported.libraryText : renameProjectLibrary(imported.libraryText, name);
+        const created = await directories.create(name, state.defaultLocation, text);
+        enter({ projectId: created.id, name, trackCount: imported.trackCount, noteCount: imported.noteCount, warnings: [...imported.warnings] });
+      }
     }),
     remove: selected => exclusive(async () => {
       if (!directories.remove) throw new Error('当前窗口尚不支持删除歌曲，请重新打开 RootSound。');
-      await directories.remove(selected);
+      return directories.remove(selected);
     }),
     rename: (selected, input) => exclusive(async () => {
       const name = projectName(input);
@@ -94,6 +113,7 @@ export function createProjectSetup(directories: ProjectDirectoriesPort, enter: (
     }),
     save: () => exclusive(async () => {
       if (!directories.save) throw new Error('当前窗口尚不支持保存项目，请重新打开 RootSound。');
+      await source?.prepareSave?.();
       await directories.save(source?.name?.());
     }),
     async hasUnsavedChanges() {
@@ -103,15 +123,28 @@ export function createProjectSetup(directories: ProjectDirectoriesPort, enter: (
     },
     exit: mode => exclusive(async () => {
       if (!directories.exit) throw new Error('当前窗口尚不支持退出项目，请重新打开 RootSound。');
+      if (mode === 'save') await source?.prepareSave?.();
       await directories.exit(mode, source?.name?.());
       enter();
     }),
     ...(source ? { saveAs: (input: string, location: string) => exclusive(async () => {
       const name = projectName(input);
       if (!location.trim()) throw new Error('请选择项目的存储位置。');
+      await source.prepareSave?.();
       const text = createProjectCopyLibrary(source.read(), name, source.songDraftId());
-      await directories.create(name, location.trim(), text);
+      if (directories.createCopy) await directories.createCopy(name, location.trim(), text);
+      else await directories.create(name, location.trim(), text);
       enter();
     }) } : {}),
   };
+}
+
+/** A filesystem-safe suggestion derived from the selected source, never a path. */
+export function midiProjectName(fileName: string): string {
+  let name = fileName.split(/[\\/]/u).at(-1)!.replace(/\.(?:mid|midi)$/iu, '').normalize('NFC')
+    .replace(/[\\/:*?"<>|\u0000-\u001f]/gu, '_').trim().replace(/[. ]+$/u, '');
+  if (!name || name === '.' || name === '..') name = '导入的 MIDI';
+  if (/^(CON|PRN|AUX|NUL|COM[1-9¹²³]|LPT[1-9¹²³])(?:\.|$)/iu.test(name)) name = `导入 ${name}`;
+  name = name.slice(0, 80).replace(/[\uD800-\uDBFF]$/u, '').trimEnd().replace(/[. ]+$/u, '');
+  return projectName(name);
 }

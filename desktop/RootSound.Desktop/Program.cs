@@ -1,4 +1,4 @@
-using System.Text.Json;
+﻿using System.Text.Json;
 
 namespace RootSound.Desktop;
 
@@ -7,6 +7,39 @@ internal static class Program
     [STAThread]
     private static int Main(string[] args)
     {
+        var timbreTestDirectory = Argument(args, "--test-timbre-files");
+        if (timbreTestDirectory is not null)
+        {
+            timbreTestDirectory = Path.GetFullPath(timbreTestDirectory); Directory.CreateDirectory(timbreTestDirectory);
+            try
+            {
+                int passed = TimbreFilesSelfTests.Run(timbreTestDirectory);
+                File.WriteAllText(Path.Combine(timbreTestDirectory, "timbre-files-report.json"), JsonSerializer.Serialize(new { passed, visibleWindowsCreated = false, soundDevicesOpened = false }));
+                return 0;
+            }
+            catch (Exception error)
+            {
+                File.WriteAllText(Path.Combine(timbreTestDirectory, "timbre-files-report.json"), JsonSerializer.Serialize(new { error = error.ToString() }));
+                return 1;
+            }
+        }
+        var midiTestDirectory = Argument(args, "--test-midi-files");
+        if (midiTestDirectory is not null)
+        {
+            midiTestDirectory = Path.GetFullPath(midiTestDirectory);
+            Directory.CreateDirectory(midiTestDirectory);
+            try
+            {
+                int passed = MidiFilesSelfTests.Run(midiTestDirectory);
+                File.WriteAllText(Path.Combine(midiTestDirectory, "midi-files-report.json"), JsonSerializer.Serialize(new { passed, visibleWindowsCreated = false, soundDevicesOpened = false }));
+                return 0;
+            }
+            catch (Exception error)
+            {
+                File.WriteAllText(Path.Combine(midiTestDirectory, "midi-files-report.json"), JsonSerializer.Serialize(new { error = error.ToString() }));
+                return 1;
+            }
+        }
         var projectTestDirectory = Argument(args, "--test-project-directories");
         if (projectTestDirectory is not null)
         {

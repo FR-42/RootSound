@@ -71,8 +71,8 @@ test('a source revision changing during codec work rejects its late PCM and inva
   assert.throws(() => audio.readPrepared('sample'), /尚未准备/);
 });
 
-test('the whole parallel preparation working set is rejected before decoding when declared PCM exceeds 128 MiB', async () => {
-  const contents = ['a', 'b', 'c'].map(id => {
+test('the whole parallel preparation working set is rejected before decoding when declared PCM exceeds 512 MiB', async () => {
+  const contents = Array.from({ length: 11 }, (_, index) => String(index)).map(id => {
     const record = source(id); const body = record.body as { [key: string]: JsonValue };
     body.decoded = { sampleRate: 32000, channels: 4, frames: 3 * 1024 * 1024, durationSeconds: 3 * 1024 * 1024 / 32000 };
     return record;
@@ -80,22 +80,22 @@ test('the whole parallel preparation working set is rejected before decoding whe
   const f = store(contents); let calls = 0;
   const audio = createSampleAudio(f.library, { async decode() { calls++; return pcm(); } });
   const results = await Promise.allSettled(contents.map(record => audio.prepare([record.id])));
-  assert(results.every(result => result.status === 'rejected' && /128 MiB/.test(String(result.reason))));
+  assert(results.every(result => result.status === 'rejected' && /512 MiB/.test(String(result.reason))));
   assert.equal(calls, 0); assert.equal(f.writes(), 0);
 });
 
 test('sample cache evicts only sources outside a requested working set and prepares evicted sources again explicitly', async () => {
   const frames = 3 * 1024 * 1024;
-  const contents = ['a', 'b', 'c'].map(id => {
+  const contents = Array.from({ length: 11 }, (_, index) => String(index)).map(id => {
     const record = source(id); (record.body as { [key: string]: JsonValue }).decoded = { sampleRate: 32000, channels: 4, frames, durationSeconds: frames / 32000 }; return record;
   });
   const f = store(contents); let calls = 0;
   const audio = createSampleAudio(f.library, { async decode() { calls++; return { sampleRate: 32000, channels: Array.from({ length: 4 }, () => new Float32Array(frames)) }; } });
-  await audio.prepare(['a', 'b']); assert.equal(calls, 2);
-  await audio.prepare(['b', 'c']); assert.equal(calls, 3);
-  assert.equal(audio.readPrepared('b').audio.channels.length, 4); assert.equal(audio.readPrepared('c').revision, 1);
-  assert.throws(() => audio.readPrepared('a'), /尚未准备/);
-  await audio.prepare(['a']); assert.equal(calls, 4); assert.equal(audio.readPrepared('a').revision, 1); assert.equal(f.writes(), 0);
+  await audio.prepare(Array.from({ length: 10 }, (_, i) => String(i))); assert.equal(calls, 10);
+  await audio.prepare(['9', '10']); assert.equal(calls, 11);
+  assert.equal(audio.readPrepared('9').audio.channels.length, 4); assert.equal(audio.readPrepared('10').revision, 1);
+  assert.throws(() => audio.readPrepared('0'), /尚未准备/);
+  await audio.prepare(['0']); assert.equal(calls, 12); assert.equal(audio.readPrepared('0').revision, 1); assert.equal(f.writes(), 0);
 });
 
 test('sample handoff retries reuse an unchanged draft but retain edited drafts and never alter the original sample', async () => {

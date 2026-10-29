@@ -1,0 +1,75 @@
+{
+  "release": "20261028-055644-757-e7928b",
+  "engineDirectory": "D:\\RootSound\\experiments\\music-workflow\\spectral-forge\\.builds\\20261028-055644-757-e7928b\\ui",
+  "reference": "D:\\Sound\\temp\\music\\vulcanus.mp3",
+  "referenceSeconds": [
+    0,
+    20
+  ],
+  "sourceAudioIncluded": false,
+  "construction": "Published SpectralSynth, oscillator synthesis only, no additional audio effects",
+  "listeningAccepted": false,
+  "patchSha256": "7afb3eda57f04e2dbc032345c0547ae47aa5ddd16ba1da17786163b93291cd0b",
+  "curveCounts": {
+    "spectrum": 10,
+    "amplitude": 8,
+    "pitch": 3
+  },
+  "effectivePolyphony": 6,
+  "singleNote": {
+    "midi": 60,
+    "hz": 261.6255653005986,
+    "holdSeconds": 4.5
+  },
+  "chordDemo": {
+    "midis": [
+      53,
+      56,
+      60,
+      63
+    ],
+    "holdSeconds": 4.2,
+    "label": "Fm7 voicing for timbre audition, not a verified transcription"
+  },
+  "reports": [
+    {
+      "name": "Vulcanus-铺底-C4.wav",
+      "durationSeconds": 7.581541666666666,
+      "peak": 0.2725362514306786,
+      "rms": 0.030337268308709205,
+      "sideToMidDb": -5.4926596975629085,
+      "dcMean": 7.368903981838463e-13,
+      "last100msPeak": 7.133537138770407e-8,
+      "finite": true,
+      "clipped": false,
+      "tailTruncated": false,
+      "sha256": "56674ffdb8793c94865daccd5029109f9edbcf015f8581bb38bb43931887deca"
+    },
+    {
+      "name": "Vulcanus-铺底-和弦试听.wav",
+      "durationSeconds": 7.281541666666667,
+      "peak": 0.35325151661380416,
+      "rms": 0.0554139211928588,
+      "sideToMidDb": -4.906729234368696,
+      "dcMean": -3.536490390675556e-12,
+      "last100msPeak": 1.051244495897663e-7,
+      "finite": true,
+      "clipped": false,
+      "tailTruncated": false,
+      "sha256": "81250fa4b08ebc0ed94bb035e619ecdf82b9b21a90336ef4f0d556dfbe1c4eee"
+    },
+    {
+      "name": "calibration-Bb7.wav",
+      "durationSeconds": 7.281541666666667,
+      "peak": 0.3831231768514404,
+      "rms": 0.06558119768675345,
+      "sideToMidDb": -5.053402889437254,
+      "dcMean": -6.217278400798147e-13,
+      "last100msPeak": 2.080528531678283e-7,
+      "finite": true,
+      "clipped": false,
+      "tailTruncated": false,
+      "sha256": "8a4e6bef831e805eef3dd859b933930bc8aa941b2564ed6ef4c92e3bdc25dfaa"
+    }
+  ]
+}

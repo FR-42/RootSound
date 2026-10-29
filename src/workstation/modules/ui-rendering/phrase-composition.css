@@ -3,22 +3,45 @@
 .phrase-composition-identity .song-project-name { min-width: 0; }
 .phrase-composition-section-label { flex-shrink: 0; font-size: 12px; color: #65717e; }
 .phrase-melody-back { flex-shrink: 0; font-size: 24px; }
+.phrase-grid-button { width: 40px; padding: 6px 2px; font-size: 11px; white-space: nowrap; }
+.phrase-grid-panel label { display: flex; align-items: center; gap: 8px; white-space: nowrap; font-size: 12px; }
+.phrase-grid-select { min-width: 48px; padding: 3px; border: 1px solid #b9c6d1; border-radius: 3px; background: #fff; color: #30485e; }
 .phrase-melody-back[hidden], .phrase-composition-section-label[hidden], .phrase-composition-main[hidden], .phrase-melody-region[hidden] { display: none; }
 .phrase-melody-region { display: flex; flex: 1; min-height: 0; min-width: 0; }
-.phrase-composition-create { position: absolute; top: 0; right: 0; bottom: 0; width: 56px; border: 0; border-left: 1px solid #cbd2da; border-radius: 0; background: #f0f2f5; color: #405468; font-size: 14px; cursor: pointer; z-index: 4; }
-.phrase-composition-create:hover { background: #e3e9ef; color: #263544; }
-.phrase-composition-main { display: grid; grid-template-columns: var(--phrase-control-width) minmax(0, 1fr); flex: 1; min-height: 0; min-width: 0; }
+.phrase-composition-main { position: relative; display: grid; grid-template-columns: var(--phrase-control-width) minmax(0, 1fr); flex: 1; min-height: 0; min-width: 0; }
 .phrase-composition-controls { display: grid; grid-template-rows: 24px minmax(0, 1fr) minmax(0, 1fr); background: #f0f2f5; border-right: 1px solid #bac5cf; min-height: 0; }
 .phrase-composition-control-spacer { background: #edf0f4; }
 .phrase-composition-control { display: flex; align-items: center; justify-content: center; min-height: 0; font-size: 15px; font-weight: 500; color: #405468; }
-.phrase-composition-control:last-child { border-top: 1px solid #bdc8d2; }
+.phrase-composition-control:last-child { border-top: 0; }
+.phrase-composition-open-creation { border: 0; border-radius: 0; background: transparent; cursor: pointer; font-family: inherit; }
+.phrase-composition-open-creation:hover { background: #e3e9ef; color: #263544; }
+.phrase-composition-open-creation:focus-visible { outline: 2px solid #6485a1; outline-offset: -3px; }
 .phrase-composition-canvas { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
 .phrase-composition-ruler { flex: 0 0 24px; position: relative; background: #edf0f4; overflow: hidden; cursor: pointer; touch-action: none; }
 .phrase-composition-viewport { position: relative; flex: 1; min-width: 0; min-height: 0; overflow: hidden; background: #fbfcfd; cursor: grab; touch-action: none; outline: none; }
 .phrase-composition-viewport.is-panning { cursor: grabbing; }
 .phrase-composition-section { position: absolute; left: 0; right: 0; height: 50%; }
+.phrase-composition-notes { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+.phrase-overview-note { position: absolute; box-sizing: border-box; border: 1px solid #25405b45; border-radius: 2px; opacity: .92; pointer-events: none; }
+.phrase-overview-note.is-unassigned { opacity: .38; }
 .phrase-composition-melody { top: 0; }
-.phrase-composition-rhythm { top: 50%; border-top: 1px solid #bdc8d2; }
+.phrase-composition-console { top: 75%; background: #f1f4f7; overflow: auto; cursor: auto; touch-action: pan-x pan-y; }
+.phrase-console-details { display: flex; align-items: center; gap: 24px; min-height: 100%; width: max-content; min-width: 100%; padding: 14px 20px; box-sizing: border-box; }
+.phrase-console-name { flex: 0 0 auto; max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; font-weight: 500; color: #30485e; }
+.phrase-console-stats { display: flex; flex: 0 0 auto; align-items: center; gap: 20px; }
+.phrase-console-stat { display: flex; flex-direction: column; gap: 5px; white-space: nowrap; }
+.phrase-console-label { font-size: 11px; color: #738494; }
+.phrase-console-value { font-size: 13px; color: #354d61; font-variant-numeric: tabular-nums; }
+.phrase-console-volume-field { display: flex; flex: 0 0 auto; align-items: center; gap: 9px; }
+.phrase-console-volume { width: 120px; accent-color: #6485a1; }
+.phrase-console-volume-value { width: 38px; font-size: 12px; color: #354d61; font-variant-numeric: tabular-nums; }
+.phrase-composition-divider { position: absolute; left: 0; right: 0; height: 14px; transform: translateY(-50%); display: flex; align-items: center; justify-content: center; cursor: row-resize; touch-action: none; user-select: none; z-index: 6; outline: none; }
+.phrase-composition-divider::before { content: ''; position: absolute; left: 0; right: 0; top: calc(50% - .5px); height: 1px; background: #b8c5d1; }
+.phrase-composition-divider-grip { position: relative; width: 28px; height: 12px; border: 1px solid #a7b7c5; border-radius: 5px; background: #f2f5f8; box-shadow: 0 0 0 2px #fbfcfd; pointer-events: none; }
+.phrase-composition-divider-grip::after { content: ''; position: absolute; left: 8px; right: 8px; top: 3px; height: 2px; background: #8195a7; box-shadow: 0 3px #8195a7; }
+.phrase-composition-divider:hover::before, .phrase-composition-divider:focus-visible::before, .is-resizing-split .phrase-composition-divider::before { background: #6a879f; }
+.phrase-composition-divider:hover .phrase-composition-divider-grip, .phrase-composition-divider:focus-visible .phrase-composition-divider-grip, .is-resizing-split .phrase-composition-divider-grip { border-color: #6a879f; background: #e9f0f6; }
+.phrase-composition-main.is-resizing-split, .phrase-composition-main.is-resizing-split * { cursor: row-resize; user-select: none; }
 .phrase-composition-playhead { position: absolute; top: 0; bottom: 0; width: 1px; background: #b94b51; pointer-events: none; z-index: 2; }
 .phrase-composition-head-handle { position: absolute; top: 0; bottom: 0; width: 16px; transform: translateX(-50%); border: 0; background: transparent; color: #b94b51; padding: 0; cursor: ew-resize; }
 .phrase-composition-head-handle svg { display: block; width: 16px; height: 16px; margin: 0; pointer-events: none; }

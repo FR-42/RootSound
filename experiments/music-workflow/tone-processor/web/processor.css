@@ -1,0 +1,8 @@
+body { display:block; min-width:580px; height:100vh; overflow:auto; background:#f2f5f7; }
+.panel { margin:0; border:0; border-radius:0; padding:10px 14px; min-height:100%; }
+header { display:flex; align-items:center; gap:7px; margin-bottom:5px; }
+header strong { font-size:14px; margin-right:18px; }
+header label { display:flex; align-items:center; gap:6px; font-size:12px; }
+header input { width:110px; }
+.spacer { flex:1; } output { width:38px; }
+#eq-status { margin:6px 2px 0; color:var(--muted); font-size:11px; }

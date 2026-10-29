@@ -3,6 +3,10 @@ import type { ReferenceAdapter } from '../../contracts/references.ts';
 import type { BasicWaveform, PlayableNotePlan, SoundPlan } from '../../contracts/sound.ts';
 import type { EditableTimbreBody, SampleTimbreBody, SynthesizerBody, TimbreBody, TimbreEditorPort, TimbrePlaybackPort } from '../../contracts/timbre.ts';
 import { readSynthesizerBody, synthesisPlan, timbrePresets } from './synthesis.ts';
+import { createSpectralAudio, readSpectralTimbreBody, spectralTimbreBody, type SpectralAudio } from './spectral.ts';
+export { createSpectralAudio, readSpectralPatch, spectralTimbreBody, readSpectralTimbreBody } from './spectral.ts';
+export type { SpectralAudio, SpectralWorkerFactory } from './spectral.ts';
+export type { SpectralPatch, SpectralTimbreBody } from '../../contracts/timbre.ts';
 export { readSynthesizerBody, synthesisFromBasic, timbrePresets, previewTimbrePreset } from './synthesis.ts';
 export type { SynthesizerBody, TimbrePreset } from '../../contracts/timbre.ts';
 import type { SampleAudioPort } from '../../contracts/sampling.ts';
@@ -102,7 +106,7 @@ export function createTimbreReferenceAdapter(): ReferenceAdapter {
 /** This portable file contains one basic sound; song/project packaging is separate. */
 interface SoundFile {
   format: 'RootSoundSound';
-  version: 1 | 2;
+  version: 1 | 2 | 3;
   name: string;
   timbre: Exclude<EditableTimbreBody, SampleTimbreBody>;
 }
@@ -118,12 +122,29 @@ function readSoundFile(text: string): SoundFile {
   if (Object.keys(file).some(key => !supported.includes(key))) {
     throw new Error('声音文件包含尚不支持的设置或外部依赖，未改变当前声音。');
   }
-  if (file.format !== 'RootSoundSound' || file.version !== 1 && file.version !== 2
+  if (file.format !== 'RootSoundSound' || file.version !== 1 && file.version !== 2 && file.version !== 3
     || typeof file.name !== 'string' || !file.name.trim()) {
     throw new Error('声音文件格式、版本或名称无效，未改变当前声音。');
   }
   return { format: 'RootSoundSound', version: file.version, name: file.name,
-    timbre: file.version === 1 ? readTimbreBody(file.timbre as JsonValue) : readSynthesizerBody(file.timbre as JsonValue) };
+    timbre: file.version === 1 ? readTimbreBody(file.timbre as JsonValue) : file.version === 2
+      ? readSynthesizerBody(file.timbre as JsonValue) : readSpectralTimbreBody(file.timbre as JsonValue) };
+}
+
+/** One independent, portable tone; parsing never stores data or renders audio. */
+export function prepareImportedTimbre(text: string, name?: string): ContentRecord {
+  if (typeof text !== 'string' || new TextEncoder().encode(text).byteLength > 4 * 1024 * 1024) throw new Error('音色文件为空或超过当前4 MiB导入容量。');
+  const source = text.startsWith('\ufeff') ? text.slice(1) : text;
+  let parsed: unknown;
+  try { parsed = JSON.parse(source); } catch { throw new Error('音色文件损坏，未改变资料。'); }
+  const spectral = parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+    && (parsed as Record<string, unknown>).format === 'RootSoundSpectralPatch';
+  const file = spectral ? undefined : readSoundFile(source);
+  const body = spectral ? spectralTimbreBody(parsed) : file!.timbre;
+  const title = (name ?? (spectral ? body.model === 'spectral-synth' ? body.patch.name : '' : file!.name)).trim();
+  if (!title || title.length > 4096) throw new Error('音色名称无效或过长。');
+  return { id: crypto.randomUUID(), kind: KIND, owner: OWNER, schemaVersion: 1, revision: 1,
+    name: title, dependencies: [], body };
 }
 
 export function readTimbreBody(body: JsonValue): TimbreBody {
@@ -161,6 +182,7 @@ export function readSampleTimbreBody(value: JsonValue): SampleTimbreBody {
     rootFrequencyHz: value.rootFrequencyHz, attackSeconds: value.attackSeconds, releaseSeconds: value.releaseSeconds, level: value.level, ...(loop ? { loop } : {}) };
 }
 export function readEditableTimbreBody(value: JsonValue): EditableTimbreBody {
+  if (value && typeof value === 'object' && !Array.isArray(value) && value.model === 'spectral-synth') return readSpectralTimbreBody(value);
   if (value && typeof value === 'object' && !Array.isArray(value) && value.model === 'synthesizer') return readSynthesizerBody(value);
   return value && typeof value === 'object' && !Array.isArray(value) && value.model === 'sample-instrument' ? readSampleTimbreBody(value) : readTimbreBody(value);
 }
@@ -207,7 +229,12 @@ function soundPlan(body: TimbreBody, note: SoundPlan['note']): SoundPlan {
   };
 }
 
-function playable(body: EditableTimbreBody, note: SoundPlan['note'], sampleAudio?: SampleAudioPort): PlayableNotePlan {
+function playable(body: EditableTimbreBody, note: SoundPlan['note'], sampleAudio?: SampleAudioPort, spectralAudio?: SpectralAudio): PlayableNotePlan {
+  if (body.model === 'spectral-synth') {
+    validateNote(note);
+    if (!spectralAudio) throw new Error('精细音色尚未连接后台声音准备。');
+    return spectralAudio.plan(body, note);
+  }
   if (body.model === 'synthesizer') { validateNote(note); return synthesisPlan(body, note); }
   if (body.model === 'basic-synth') return soundPlan(body, note);
   validateNote(note);
@@ -225,18 +252,33 @@ function savedSounds(library: MaterialLibrary, draftId?: string): ContentRecord[
   const items = draftId && library.listContentInfoForDraft ? library.listContentInfoForDraft(draftId) : library.listContentInfo();
   return items.filter(content => content.kind === KIND).map(content => library.readContent(content.id)!);
 }
-export function createTimbrePlayback(library: MaterialLibrary, sampleAudio?: SampleAudioPort): TimbrePlaybackPort {
+export function createTimbrePlayback(library: MaterialLibrary, sampleAudio?: SampleAudioPort, spectralAudio: SpectralAudio = createSpectralAudio()): TimbrePlaybackPort {
   const reader = createReader(library);
+  const bodies = new Map<string, { revision: number; body: EditableTimbreBody }>();
   function readSaved(id: string) {
     const content = library.readContent(id);
     if (!content) throw new Error('引用的声音不存在，原内容已保留。');
     return { content, body: reader.validate(content) };
   }
+  function planBody(id: string): EditableTimbreBody {
+    const header = library.readContentInfo(id); const old = bodies.get(id);
+    if (!header || header.kind !== KIND || header.owner !== OWNER || header.schemaVersion !== 1) { bodies.delete(id); throw new Error('引用的声音不存在或格式不支持，原内容已保留。'); }
+    if (old?.revision === header.revision) { bodies.delete(id); bodies.set(id, old); return old.body; }
+    const body = readSaved(id).body;
+    if (bodies.size >= 128) bodies.delete(bodies.keys().next().value!);
+    bodies.set(id, { revision: header.revision, body }); return body;
+  }
   return {
     listSaved: () => savedSounds(library),
     readSaved,
-    async prepareForSaved(id) {
+    async prepareForSaved(id, notes) {
       const before = readSaved(id); const body = before.body;
+      if (body.model === 'spectral-synth') {
+        await spectralAudio.prepare(body, notes ?? [{ frequencyHz: 220, holdSeconds: Math.max(1, body.attackSeconds + .1), velocity: .7 }]);
+        const after = readSaved(id);
+        if (after.content.revision !== before.content.revision || JSON.stringify(after.body) !== JSON.stringify(body)) throw new Error('准备期间声音发生变化，请重试。');
+        return;
+      }
       if (body.model !== 'sample-instrument') return;
       if (!sampleAudio) throw new Error('采样声音尚未连接原始音频。');
       await sampleAudio.prepare([body.sampleId]);
@@ -244,13 +286,13 @@ export function createTimbrePlayback(library: MaterialLibrary, sampleAudio?: Sam
       if (after.content.revision !== before.content.revision || JSON.stringify(after.body) !== JSON.stringify(body)) throw new Error('准备期间声音发生变化，请重试。');
     },
     planForSaved(contentId, note) {
-      return playable(readSaved(contentId).body, note, sampleAudio);
+      return playable(planBody(contentId), note, sampleAudio, spectralAudio);
     },
   };
 }
 
 /** Domain operations use the common custody port, never its internal objects. */
-export function createTimbreEditor(library: MaterialLibrary, sampleAudio?: SampleAudioPort): TimbreEditorPort {
+export function createTimbreEditor(library: MaterialLibrary, sampleAudio?: SampleAudioPort, spectralAudio: SpectralAudio = createSpectralAudio()): TimbreEditorPort {
   const reader = createReader(library);
   let generation = 0;
   let lastCreated: { sampleId: string; revision: number; draft: Draft } | undefined;
@@ -322,7 +364,8 @@ export function createTimbreEditor(library: MaterialLibrary, sampleAudio?: Sampl
     setSynthesis(body) {
       const draft = current(); const next = readSynthesizerBody(body);
       // Converting an electronic sound never drops a sample reference silently.
-      if (reader.validate(draft).model === 'sample-instrument') throw new Error('请新建电子音色，原始采样音色仍然保留。');
+      const existing = reader.validate(draft);
+      if (existing.model === 'sample-instrument' || existing.model === 'spectral-synth') throw new Error('请新建普通电子音色，原音色的精细参数和依赖仍然保留。');
       generation++; library.updateDraft(active, { body: next, dependencies: [] }, { remember: true, expected: draft });
     },
     undo() { travel('undo'); },
@@ -368,8 +411,16 @@ export function createTimbreEditor(library: MaterialLibrary, sampleAudio?: Sampl
       const draft = current(); generation++; library.updateDraft(active, { name: value }, { remember: true, expected: draft });
     },
     setCharacter(character) { if (reader.validate(current()).model !== 'basic-synth') throw new Error('当前音色不能切换为固定配方，请调整声音组成或新建电子音色。'); modify({ character }); },
-    setEnvelope(attackSeconds, releaseSeconds) { modify({ attackSeconds, releaseSeconds }); },
-    setLevel(level) { modify({ level }); },
+    setEnvelope(attackSeconds, releaseSeconds) {
+      if (reader.validate(current()).model === 'spectral-synth') throw new Error('精细音色使用多点包络，请在精细音色生成器中调整后重新导入；没有替换原参数。');
+      modify({ attackSeconds, releaseSeconds });
+    },
+    setLevel(level) {
+      const draft = current(); const body = reader.validate(draft);
+      if (body.model !== 'spectral-synth') { modify({ level }); return; }
+      const next = spectralTimbreBody({ ...body.patch, master: { ...body.patch.master, level } });
+      library.updateDraft(active, { body: next }, { remember: true, expected: draft }); generation++;
+    },
     setSampleRange(startSeconds, endSeconds) {
       const body = reader.validate(current()); if (body.model !== 'sample-instrument') throw new Error('先从采样制作一份声音。');
       if (!body.loop) { modify({ startSeconds, endSeconds }); return; }
@@ -384,8 +435,13 @@ export function createTimbreEditor(library: MaterialLibrary, sampleAudio?: Sampl
       const next = readSampleTimbreBody({ ...plain, version: loop ? 2 : 1, ...(loop ? { loop } : {}) });
       library.updateDraft(active, { body: next }, { remember: true, expected: draft }); generation++;
     },
-    async preparePreview() {
+    async preparePreview(notes) {
       const draft = current(); const body = reader.validate(draft);
+      if (body.model === 'spectral-synth') {
+        await spectralAudio.prepare(body, notes ?? [{ frequencyHz: 220, holdSeconds: Math.max(1, body.attackSeconds + .1), velocity: .7 }]);
+        if (JSON.stringify(current()) !== JSON.stringify(draft)) throw new Error('准备期间声音发生变化，请重新试听。');
+        return;
+      }
       if (body.model !== 'sample-instrument') return;
       if (!sampleAudio) throw new Error('原始采样尚未连接音频解码器。');
       await sampleAudio.prepare([body.sampleId]);
@@ -393,7 +449,7 @@ export function createTimbreEditor(library: MaterialLibrary, sampleAudio?: Sampl
     },
     previewPlan(bodyOverride, note): PlayableNotePlan {
       const draft = current(); const body = reader.validate({ ...draft, body: bodyOverride ?? draft.body });
-      return playable(body, note ?? { frequencyHz: 220, holdSeconds: Math.max(1, body.attackSeconds + 0.1), velocity: 0.7 }, sampleAudio);
+      return playable(body, note ?? { frequencyHz: 220, holdSeconds: Math.max(1, body.attackSeconds + 0.1), velocity: 0.7 }, sampleAudio, spectralAudio);
     },
     save(mode, confirmation?: SaveConfirmation) { reader.validate(current()); return library.saveDraft(active, mode, confirmation); },
     exportSound() {
@@ -401,15 +457,15 @@ export function createTimbreEditor(library: MaterialLibrary, sampleAudio?: Sampl
       if (draft.dependencies.length) throw new Error('当前声音含有外部依赖，暂不能导出为独立声音文件。');
       const body = readEditableTimbreBody(draft.body);
       if (body.model === 'sample-instrument') throw new Error('采样音色请使用歌曲工程携带原始采样。');
-      const file: SoundFile = { format: 'RootSoundSound', version: body.model === 'synthesizer' ? 2 : 1, name: draft.name, timbre: body };
+      const file: SoundFile = { format: 'RootSoundSound', version: body.model === 'spectral-synth' ? 3 : body.model === 'synthesizer' ? 2 : 1, name: draft.name, timbre: body };
       return JSON.stringify(file, null, 2);
     },
     importSound(text) {
-      const file = readSoundFile(text);
+      const imported = prepareImportedTimbre(text);
       // createDraft persists before returning, so a failed write cannot change active.
       const draft = library.createDraft({
-        kind: KIND, schemaVersion: 1, owner: OWNER, name: file.name,
-        dependencies: [], body: file.timbre,
+        kind: KIND, schemaVersion: 1, owner: OWNER, name: imported.name,
+        dependencies: [], body: imported.body,
       });
       generation++; active = draft.id;
     },

@@ -1,0 +1,65 @@
+{
+  "destination": "D:\\Sound\\temp\\tone",
+  "delivered": [
+    {
+      "path": "D:\\Sound\\temp\\tone\\Vulcanus-Kick-A-密集短击.rssynth",
+      "bytes": 4491,
+      "sha256": "CF8CE82205D9192F0BFB91421F672796D20D68A223A92387A91F47A1E5F26837"
+    },
+    {
+      "path": "D:\\Sound\\temp\\tone\\Vulcanus-Kick-A-密集短击-单击.wav",
+      "bytes": 155756,
+      "sha256": "8530C021E21528E8FE2A80F5927FD18AB55C43103763A6F83ADF6A2D72C4C4C1"
+    },
+    {
+      "path": "D:\\Sound\\temp\\tone\\Vulcanus-Kick-B-下潜重击.rssynth",
+      "bytes": 4489,
+      "sha256": "2EA580B81717B683DADAE3D28675B4880A27CC73C63AFB8A2AD28152E3652F33"
+    },
+    {
+      "path": "D:\\Sound\\temp\\tone\\Vulcanus-Kick-B-下潜重击-单击.wav",
+      "bytes": 181682,
+      "sha256": "D9CE6CF599739DA16026FB0BBE7C3786A503E6707232FA1AE5B414F6A11E3736"
+    },
+    {
+      "path": "D:\\Sound\\temp\\tone\\Vulcanus-Kick-AB-对比试听.wav",
+      "bytes": 1785644,
+      "sha256": "001E3C96543DF17D47E773A8A02A025DFE80A29A68C9C80460A0F9A74E1C8A6C"
+    },
+    {
+      "path": "D:\\Sound\\temp\\tone\\Vulcanus-Kick-使用说明.txt",
+      "bytes": 1074,
+      "sha256": "3E820A6B16256D9C8FE789D8096BCD001D7D1EDEDD91EAAB564E4D8D9A78EA52"
+    }
+  ],
+  "existingFiles": [
+    {
+      "name": "新的音色.rssynth",
+      "unchanged": true
+    },
+    {
+      "name": "cosmica-采样1.rstimbre",
+      "unchanged": true
+    },
+    {
+      "name": "Vulcanus-铺底-和弦试听.wav",
+      "unchanged": true
+    },
+    {
+      "name": "Vulcanus-铺底-C4.wav",
+      "unchanged": true
+    },
+    {
+      "name": "Vulcanus-铺底音色-说明.txt",
+      "unchanged": true
+    },
+    {
+      "name": "Vulcanus-铺底音色.rssynth",
+      "unchanged": true
+    }
+  ],
+  "referenceUnchanged": true,
+  "applicationRelease": "20261028-055644-757-e7928b",
+  "audioInputSupported": false,
+  "listeningAccepted": false
+}

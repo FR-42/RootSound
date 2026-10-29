@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import type { PhraseEditorViewport } from '../src/workstation/modules/ui-rendering/phrase-editor-viewport.ts';
 import test from 'node:test';
 import { registerHooks } from 'node:module';
 import type { PhraseBody } from '../src/workstation/contracts/phrase.ts';
@@ -59,7 +60,7 @@ function dom() {
 }
 async function settle() { for (let index = 0; index < 10; index++) await Promise.resolve(); }
 
-function fixture(config: { notes?: boolean; extraVoices?: number } = {}) {
+function fixture(config: { notes?: boolean; extraVoices?: number; initialViewport?: PhraseEditorViewport } = {}) {
   const environment=dom(); const library=createMaterialLibrary(); const timbre=createTimbreEditor(library);
   const voices: Array<{id:string;name:string}>=[];
   for(let index=0;index<(config.extraVoices??2);index++){if(index)timbre.create();timbre.rename('节奏音色 '+(index+1));const result=timbre.save('new');if(result.status!=='saved')throw new Error('voice');voices.push(result.content);}
@@ -69,14 +70,42 @@ function fixture(config: { notes?: boolean; extraVoices?: number } = {}) {
   const parts=voices.map(voice=>phrase.addPart(voice.id,'rhythm'));
   const ids:string[]=[];
   if(config.notes)for(let index=0;index<Math.min(2,parts.length);index++)ids.push(phrase.addNote(parts[index]!,{startBeat:2+index*2,durationBeats:1,durationSeconds:.5,frequencyHz:index?220:330,velocity:.7,level:.6,pan:.2}));
-  const root=new Element('main');const previews:Array<PhraseBody|undefined>=[];let changes=0;const auditions:PlayableNotePlan[]=[];
+  const root=new Element('main');const previews:Array<PhraseBody|undefined>=[];let changes=0;const viewports:PhraseEditorViewport[]=[];const auditions:PlayableNotePlan[]=[];
   const sound={async audition(plan:PlayableNotePlan){auditions.push(plan);},cancelAudition(){}} as unknown as SoundRuntimePort;
-  const workspace=mountRhythmWorkspace(root as unknown as HTMLElement,{phrase,sound,gridBpm:()=>phrase.read().body!.tempoBpm,onPreview(value){previews.push(value);},onChange(){changes++;},onSeek(){},listTimbres:()=>voices,onAddTimbre(id){return phrase.read().body!.parts.find(part=>part.timbreId===id&&part.section==='rhythm')?.id??phrase.addPart(id,'rhythm');}});
+  const workspace=mountRhythmWorkspace(root as unknown as HTMLElement,{phrase,sound,initialViewport:config.initialViewport,onViewportChange(value){viewports.push(value);},gridBpm:()=>phrase.read().body!.tempoBpm,onPreview(value){previews.push(value);},onChange(){changes++;},onSeek(){},listTimbres:()=>voices,onAddTimbre(id){return phrase.read().body!.parts.find(part=>part.timbreId===id&&part.section==='rhythm')?.id??phrase.addPart(id,'rhythm');}});
   const scroll=root.querySelector('.melody-scroll')!,canvas=root.querySelector('.melody-canvas')!;
   const pointAt=(beat:number,row:number)=>({clientX:212+beat*50,clientY:100+row*72+36-scroll.scrollTop});
   const block=(id:string)=>root.querySelectorAll('.melody-note').find(value=>value.dataset.noteId===id)!;
-  return{...environment,library,phrase,root,workspace,scroll,canvas,voices,parts,ids,melodyPart,melodyNote,previews,auditions,pointAt,block,changes:()=>changes,cleanup(){workspace.dispose();environment.restore();}};
+  return{...environment,library,phrase,root,workspace,scroll,canvas,voices,parts,ids,melodyPart,melodyNote,previews,auditions,pointAt,block,viewports,changes:()=>changes,cleanup(){workspace.dispose();environment.restore();}};
 }
+
+test('selecting a rhythm tone draws an anchored continuous step with no audio or write until release', async () => {
+ const f=fixture();try{
+  f.root.querySelectorAll('.melody-tone')[0]!.emit('click');f.phrase.setStepsPerBeat(3);f.workspace.refresh();
+  const before=f.phrase.read().draft,token=f.library.currentToken(),melody=f.phrase.read().body!.parts.find(part=>part.id===f.melodyPart)!;
+  const start=f.pointAt(3.05,1);f.scroll.emit('pointerdown',{target:f.canvas,...start});
+  const ghost=f.root.querySelector('.is-drawing')!;assert(ghost);assert.equal(ghost.dataset.partId,f.parts[1]);
+  f.document.emit('pointermove',{clientX:212+(3+2.2/3)*50,clientY:start.clientY-72});
+  assert(Math.abs(Number.parseFloat(f.root.querySelector('.is-drawing')!.style.width!)-2.2/3*50)<1e-8);
+  assert.equal(f.root.querySelector('.is-drawing')!.style.top,ghost.style.top);assert.equal(f.library.currentToken(),token);assert.deepEqual(f.phrase.read().draft,before);
+  assert.equal(f.previews.length,0);assert.equal(f.auditions.length,0);assert.equal(f.changes(),0);
+  f.document.emit('pointerup');await settle();
+  const note=f.phrase.read().body!.parts.find(part=>part.id===f.parts[1])!.notes[0]!;
+  assert.equal(note.startBeat,3);assert(Math.abs(note.durationSeconds!-1/3)<1e-10);assert(Math.abs(note.durationBeats-2/3)<1e-10);
+  assert(Math.abs(note.frequencyHz-261.6255653005986)<1e-8);assert(f.block(note.id).classList.contains('is-selected'));
+  assert.equal(f.changes(),1);assert.equal(f.auditions.length,1);assert.deepEqual(f.phrase.read().body!.parts.find(part=>part.id===f.melodyPart),melody);
+ }finally{f.cleanup();}
+});
+
+test('cancelled rhythm drawing preserves family selection and leaves all existing melody and rhythm notes intact', () => {
+ const f=fixture({notes:true});try{
+  f.root.querySelectorAll('.melody-tone')[0]!.emit('click');const before=f.phrase.read().draft,token=f.library.currentToken();
+  const start=f.pointAt(7,0);f.scroll.emit('pointerdown',{target:f.canvas,...start});f.document.emit('pointermove',{clientX:start.clientX+70,clientY:start.clientY});
+  assert(f.root.querySelector('.is-drawing'));f.document.emit('pointercancel');f.document.emit('pointerup');
+  assert.equal(f.root.querySelector('.is-drawing'),undefined);assert.deepEqual(f.phrase.read().draft,before);assert.equal(f.library.currentToken(),token);
+  assert(f.root.querySelectorAll('.melody-tone')[0]!.classList.contains('is-selected'));assert.equal(f.changes(),0);assert.equal(f.previews.length,0);assert.equal(f.auditions.length,0);
+ }finally{f.cleanup();}
+});
 
 test('rhythm has broad one-to-one tone rows and no pitch keyboard or pitch console',()=>{
  const f=fixture({notes:true});try{
@@ -103,15 +132,48 @@ test('tone row controls follow shared vertical scroll and horizontal zoom retain
  }finally{f.cleanup();}
 });
 
-test('creating a step uses its clicked tone row, leaves melody intact and previews the whole phrase',async()=>{
+test('rhythm restores its own vertical viewport and diagonal blank panning changes no notes or audio',()=>{
+ const initial={leftSeconds:2,zoom:4,top:100,rowHeight:84};
+ const f=fixture({extraVoices:7,initialViewport:initial});try{
+  assert.deepEqual(f.workspace.readViewport(),initial); const original=f.phrase.read().body; const previewCount=f.previews.length;
+  f.scroll.emit('pointerdown',{target:f.canvas,clientX:412,clientY:300});
+  f.document.emit('pointermove',{clientX:372,clientY:280});
+  f.document.emit('pointermove',{clientX:332,clientY:260});
+  assert(Math.abs(f.workspace.readViewport().leftSeconds-2.2)<1e-10);assert.equal(f.scroll.scrollTop,140);
+  f.document.emit('pointerup');assert.deepEqual(f.viewports.at(-1),f.workspace.readViewport());
+  assert.deepEqual(f.phrase.read().body,original);assert.equal(f.changes(),0);assert.equal(f.previews.length,previewCount);
+  f.scroll.emit('pointerdown',{button:1,target:f.canvas,clientX:400,clientY:300});
+  f.document.emit('pointermove',{clientX:-10000,clientY:-10000});
+  assert.equal(f.workspace.readViewport().leftSeconds,6);assert.equal(f.scroll.scrollTop,7*84+52-f.scroll.clientHeight);
+  f.document.emit('pointermove',{clientX:10000,clientY:10000});assert.equal(f.scroll.scrollTop,0);assert.equal(f.workspace.readViewport().leftSeconds,0);
+  f.document.emit('pointercancel');assert.equal(f.previews.length,previewCount);
+  f.scroll.emit('wheel',{ctrlKey:true,deltaY:-100,clientX:412,clientY:200});assert.equal(f.workspace.readViewport().rowHeight,84);
+  f.scroll.emit('wheel',{ctrlKey:true,shiftKey:true,deltaY:-100,clientX:412,clientY:200});assert(f.workspace.readViewport().rowHeight>84);
+  assert.deepEqual(f.viewports.at(-1),f.workspace.readViewport());assert.equal(f.changes(),0);
+ }finally{f.cleanup();}
+});
+
+test('clicking a step commits its clicked tone row on release and leaves melody intact',async()=>{
  const f=fixture();try{
   f.root.querySelectorAll('.melody-tone')[0]!.emit('click');
   f.scroll.emit('pointerdown',{target:f.canvas,...f.pointAt(2.13,1)});
-  const preview=f.previews.at(-1)!;assert.equal(preview.parts.find(part=>part.id===f.melodyPart)!.notes[0]!.id,f.melodyNote);
-  assert.equal(preview.parts.find(part=>part.id===f.parts[1])!.notes[0]!.startBeat,2);assert.equal(f.phrase.read().body!.parts.find(part=>part.id===f.parts[1])!.notes.length,0);
+  assert.equal(f.previews.length,0);assert.equal(f.auditions.length,0);assert.equal(f.phrase.read().body!.parts.find(part=>part.id===f.melodyPart)!.notes[0]!.id,f.melodyNote);
+  assert.equal(f.phrase.read().body!.parts.find(part=>part.id===f.parts[1])!.notes.length,0);
   f.document.emit('pointerup');await settle();const note=f.phrase.read().body!.parts.find(part=>part.id===f.parts[1])!.notes[0]!;
   assert.equal(note.frequencyHz,261.6255653005986);assert.equal(note.durationSeconds,.125);assert.equal(f.auditions.length,1);assert.equal(f.changes(),1);
   assert.equal(f.root.querySelectorAll('select').length,0);f.phrase.undo();assert.equal(f.phrase.read().body!.parts.find(part=>part.id===f.parts[1])!.notes.length,0);
+ }finally{f.cleanup();}
+});
+
+test('middle-button selected-tone rhythm blank drag pans without a provisional step or sound, while a click still writes once',async()=>{
+ const f=fixture({extraVoices:7,initialViewport:{leftSeconds:1,zoom:4,top:100,rowHeight:84}});try{
+  f.root.querySelectorAll('.melody-tone')[0]!.emit('click');const before=f.phrase.read().body;
+  f.scroll.emit('pointerdown',{target:f.canvas,clientX:412,clientY:300,button:1});
+  f.document.emit('pointermove',{clientX:392,clientY:280});f.document.emit('pointermove',{clientX:372,clientY:260});f.document.emit('pointerup');await settle();
+  assert.deepEqual(f.workspace.readViewport(),{leftSeconds:1.1,zoom:4,top:140,rowHeight:84});assert.deepEqual(f.phrase.read().body,before);
+  assert.equal(f.changes(),0);assert.equal(f.previews.length,0);assert.equal(f.auditions.length,0);assert.equal(f.root.querySelectorAll('.melody-note').length,0);
+  f.scroll.emit('pointerdown',{target:f.canvas,clientX:412,clientY:300});f.document.emit('pointerup');await settle();
+  assert.equal(f.phrase.read().body!.parts.filter(part=>part.section==='rhythm').flatMap(part=>part.notes).length,1);assert.equal(f.changes(),1);assert.equal(f.auditions.length,1);
  }finally{f.cleanup();}
 });
 
@@ -175,5 +237,23 @@ test('shortcuts and Delete flush a cross-row drag before reading its new note an
   f.document.emit('keydown',{key:'Delete',target:f.scroll});
   assert.equal(f.phrase.read().body!.parts.flatMap(part=>part.notes).some(note=>note.id===id),false);
   f.document.emit('pointerup');assert.equal(f.previews.at(-1),undefined);
+ }finally{f.cleanup();}
+});
+
+test('rhythm tone controls use label-wheel axes while the step canvas retains the original mapping',()=>{
+ const f=fixture({notes:true,extraVoices:7,initialViewport:{leftSeconds:1,zoom:2,top:40,rowHeight:72}});try{
+  const token=f.library.currentToken(),draft=f.phrase.read().draft;
+  const shelf=f.root.querySelector('.melody-shelf')!;
+  const wheel=(values:Record<string,unknown>)=>shelf.emit('wheel',{target:f.root.querySelector('.melody-tone')!,clientX:150,clientY:200,...values});
+  wheel({deltaY:30});assert.equal(f.workspace.readViewport().top,70);assert.equal(f.workspace.readViewport().leftSeconds,1);
+  const rowAnchor=(70+100)/72;wheel({deltaY:-60,ctrlKey:true});const vertical=f.workspace.readViewport();
+  assert(vertical.rowHeight>72);assert.equal(vertical.zoom,2);assert(Math.abs((vertical.top+100)/vertical.rowHeight-rowAnchor)<1e-8);
+  wheel({deltaY:80,shiftKey:true});const horizontal=f.workspace.readViewport();
+  assert.equal(horizontal.leftSeconds,1.4);assert.equal(horizontal.top,vertical.top);
+  wheel({deltaY:-100,ctrlKey:true,shiftKey:true});const zoomed=f.workspace.readViewport();
+  assert(zoomed.zoom>horizontal.zoom);assert.equal(zoomed.rowHeight,horizontal.rowHeight);assert.equal(zoomed.leftSeconds,horizontal.leftSeconds);
+  f.scroll.emit('wheel',{target:f.canvas,deltaY:20,shiftKey:true,clientX:400,clientY:200});
+  assert.equal(f.workspace.readViewport().top,zoomed.top+20);
+  assert.deepEqual(f.phrase.read().draft,draft);assert.equal(f.library.currentToken(),token);assert.equal(f.auditions.length,0);
  }finally{f.cleanup();}
 });

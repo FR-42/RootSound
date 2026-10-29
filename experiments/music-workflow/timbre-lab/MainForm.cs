@@ -18,6 +18,9 @@ public sealed class MainForm : Form
     private readonly ToolStrip _toolbar = new() { GripStyle = ToolStripGripStyle.Hidden, Padding = new Padding(8, 6, 8, 6) };
     private readonly ToolStripButton _import = new("导入采样…"), _open = new("打开音色…"), _save = new("保存音色…"), _export = new("导出 WAV…"), _cancel = new("取消");
     private readonly Button _primary = new() { Text = "设为主采样", AutoSize = true }, _remove = new() { Text = "移除", AutoSize = true };
+    private readonly Button _capture = new() { Text = "+", Dock = DockStyle.Fill, AccessibleName = "从歌曲截取采样", Font = new Font("Segoe UI", 17), Margin = new Padding(3, 3, 3, 5) };
+    private readonly bool _integrated;
+    internal event EventHandler? CaptureRequested;
     private readonly Button _play = new() { Text = "试听采样", AutoSize = true }, _stop = new() { Text = "停止", AutoSize = true };
     private readonly Button _zoomIn = new() { Text = "+", AutoSize = true }, _zoomOut = new() { Text = "−", AutoSize = true }, _fit = new() { Text = "全图", AutoSize = true };
     private readonly NumericUpDown _zoom = Number(1, 10000, 1, 2, .25m);
@@ -57,12 +60,15 @@ public sealed class MainForm : Form
     private bool _seeking, _resumeAfterSeek;
     private long _seekRevision;
     private IAuditionVoice? _seekVoice;
+    private Task? _shutdownTask;
 
     public MainForm() : this(new AuditionSession()) { }
 
-    internal MainForm(AuditionSession audition)
+    internal MainForm(AuditionSession audition, bool integrated = false)
     {
         _audition = audition;
+        _integrated = integrated;
+        _graph.Timeline.AllowSelectionCrossing = integrated;
         Text = "音色打磨 · RootSound 实验";
         AutoScaleMode = AutoScaleMode.Dpi;
         Font = new Font("Microsoft YaHei UI", 9);
@@ -85,15 +91,20 @@ public sealed class MainForm : Form
         var body = new TableLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(12), ColumnCount = 2, RowCount = 1 };
         body.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 215));
         body.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        var left = new TableLayoutPanel { Dock = DockStyle.Fill, RowCount = 4, Padding = new Padding(0, 0, 12, 0) };
+        var left = new TableLayoutPanel { Dock = DockStyle.Fill, RowCount = 5, Padding = new Padding(0, 0, 12, 0) };
         left.RowStyles.Add(new RowStyle(SizeType.Absolute, 30));
         left.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        left.RowStyles.Add(new RowStyle(SizeType.Absolute, _integrated ? 44 : 0));
         left.RowStyles.Add(new RowStyle(SizeType.Absolute, 42));
         left.RowStyles.Add(new RowStyle(SizeType.Absolute, 70));
         left.Controls.Add(new Label { Text = "采样 · 最多 8 段", AutoSize = true }, 0, 0);
         left.Controls.Add(_samples, 0, 1);
-        left.Controls.Add(Row(_primary, _remove), 0, 2);
-        left.Controls.Add(new Label { Text = "主采样决定声音。\n参考请选同一音色、不同伴奏的片段。", Dock = DockStyle.Fill, ForeColor = _notes.ForeColor }, 0, 3);
+        _capture.Visible = _integrated;
+        _capture.Click += (_, _) => { if (!_busy && !_closing) CaptureRequested?.Invoke(this, EventArgs.Empty); };
+        _tips.SetToolTip(_capture, "打开歌曲截取界面；歌曲和编辑状态会在界面切换时保留");
+        left.Controls.Add(_capture, 0, 2);
+        left.Controls.Add(Row(_primary, _remove), 0, 3);
+        left.Controls.Add(new Label { Text = "主采样决定声音。\n参考请选同一音色、不同伴奏的片段。", Dock = DockStyle.Fill, ForeColor = _notes.ForeColor }, 0, 4);
         body.Controls.Add(left, 0, 0);
 
         var right = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 6 };
@@ -292,6 +303,38 @@ public sealed class MainForm : Form
         UpdateEnabled();
     }
 
+    internal void ValidateCapturedSample(int sampleRate, int channels, long frames)
+    {
+        if (_closing || _busy) throw new InvalidOperationException("采样栏暂时不可用，请稍后再试。");
+        if (frames > (long)sampleRate * ImportBridge.MaximumSeconds)
+            throw new InvalidOperationException("每段采样最多 30 秒，请先缩短两条蓝线之间的范围；歌曲会继续保留。");
+        ImportBridge.ValidateFormat(sampleRate, channels, frames);
+        if (_workspace.Entries.Count >= ImportBridge.MaximumClipCount)
+            throw new InvalidOperationException("采样栏已有 8 段，请先返回并移除不需要的采样。");
+        if (_workspace.Entries.Sum(x => x.Clip.Samples.LongLength) + checked(frames * channels) > ImportBridge.MaximumCollectionSamples)
+            throw new InvalidOperationException("采样栏容量不足，请先移除不需要的片段。");
+    }
+
+    internal void AddCapturedSample(PcmClip clip, string sourcePath, FileIdentity? sourceIdentity)
+    {
+        ValidateCapturedSample(clip.SampleRate, clip.Channels, clip.FrameCount);
+        ImportBridge.ValidateCollectionCanAdd(_workspace.Entries.Select(x => x.Clip), clip);
+        _protection.RememberSnapshot(sourcePath, sourceIdentity);
+        bool first = _workspace.Primary is null;
+        _workspace.Add(new SampleEntry(clip, sourcePath));
+        if (first) ResetTrim();
+        RefreshSamples(); _samples.SelectedIndex = _workspace.Entries.Count - 1;
+        _status.Text = "已加入截取采样，正在准备处理。";
+        QueueProcess(immediate: true);
+    }
+
+    internal async Task SuspendForNavigationAsync()
+    {
+        _playTimer.Stop();
+        await StopPlaybackAsync();
+    }
+    internal void ResumeForNavigation() { if (!_closing) _playTimer.Start(); }
+
     private void ResetTrim()
     {
         _ = StopPlaybackAsync();
@@ -333,6 +376,7 @@ public sealed class MainForm : Form
     private void ChangeSelection(TimelineMarker marker, decimal seconds)
     {
         if (_suppress || !_graph.Timeline.HasAudio) return;
+        marker = _graph.Timeline.BoundaryMarker(marker == TimelineMarker.SelectionStart);
         _graph.Timeline.Move(marker, Math.Round((double)seconds * _graph.Timeline.SampleRate));
         SyncSelection(); _graph.Invalidate();
     }
@@ -604,6 +648,7 @@ public sealed class MainForm : Form
     {
         if (_closing) return;
         _import.Enabled = _open.Enabled = !_busy;
+        _capture.Enabled = !_busy;
         _save.Enabled = _export.Enabled = !_busy && _workspace.IsCurrent && _graph.Timeline.HasSelection;
         _cancel.Enabled = _busy || _processing;
         _primary.Enabled = _remove.Enabled = !_busy && _samples.SelectedIndex >= 0;
@@ -635,6 +680,13 @@ public sealed class MainForm : Form
         if (_closed) return;
         e.Cancel = true;
         if (_closing) return;
+        await ShutdownAsync();
+        Close();
+    }
+
+    internal Task ShutdownAsync() => _shutdownTask ??= ShutdownCoreAsync();
+    private async Task ShutdownCoreAsync()
+    {
         _closing = true;
         Enabled = false; _debounce.Stop(); _playTimer.Stop();
         _operationCts?.Cancel(); _processCts?.Cancel(); _auditionCts?.Cancel();
@@ -643,7 +695,6 @@ public sealed class MainForm : Form
         await _audition.DisposeAsync();
         _debounce.Dispose(); _playTimer.Dispose(); _tips.Dispose();
         _closed = true;
-        Close();
     }
 
     internal static string NoteName(int midi) => new[] { "C", "C♯", "D", "D♯", "E", "F", "F♯", "G", "G♯", "A", "A♯", "B" }[Math.Clamp(midi, 0, 127) % 12] + (midi / 12 - 1);

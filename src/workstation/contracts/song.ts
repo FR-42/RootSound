@@ -34,6 +34,10 @@ export type SongBody = {
   hiddenPhraseIds?: string[];
   /** Arrangement shelf ordering only; includes hidden sources and adds no musical reference. */
   phraseShelfOrder?: string[];
+  /** Song-wide timbre picker order; visual metadata, not musical references. */
+  timbreLibraryOrder?: string[];
+  /** Starter palette has been prepared once; removed starters must not respawn. */
+  melodyTimbresSeeded?: boolean;
   /** Minimum musical extent. Referenced phrase changes can extend the effective extent. */
   lengthBeats: number; tracks: SongTrack[];
   /** Omitted in earlier songs; equivalent to unprocessed output. */

@@ -5,6 +5,8 @@ import { projectFileName, projectText } from './project-text.ts';
 import { createDesktopSampleFiles, type NativeSampleBridge } from './sample-files.ts';
 import type { ProjectDirectoriesPort } from '../../contracts/project-directory.ts';
 import { createDesktopProjectDirectories, type NativeProjectDirectoriesBridge } from './project-directories.ts';
+import type { TimbreFilesPort } from '../../contracts/timbre-files.ts';
+import { createDesktopTimbreFiles, type NativeTimbreFilesBridge } from './timbre-files.ts';
 
 export const DESKTOP_ORIGIN = 'https://rootsound.local';
 
@@ -24,6 +26,7 @@ export interface DesktopBridge {
   projectFiles?: { Open(): Promise<unknown>; Save(text: string, suggestedName: string): Promise<unknown> };
   sampleFiles?: NativeSampleBridge;
   projectDirectories?: NativeProjectDirectoriesBridge;
+  timbreFiles?: NativeTimbreFilesBridge;
 }
 
 export function isDesktopOrigin(origin = typeof location === 'undefined' ? '' : location.origin): boolean {
@@ -48,7 +51,7 @@ function responseError(value: Record<string, unknown>, key: 'error' | 'message')
 function hostBridge(): DesktopBridge {
   if (!isDesktopOrigin()) fail('当前页面不是受信任的桌面界面。');
   const host = (globalThis as typeof globalThis & {
-    chrome?: { webview?: { hostObjects?: { sync?: { storage?: DesktopBridge['storage'] }; files?: DesktopBridge['files']; audioFiles?: DesktopBridge['audioFiles']; projectFiles?: DesktopBridge['projectFiles']; sampleFiles?: DesktopBridge['sampleFiles']; projectDirectories?: NativeProjectDirectoriesBridge } } };
+    chrome?: { webview?: { hostObjects?: { sync?: { storage?: DesktopBridge['storage'] }; files?: DesktopBridge['files']; audioFiles?: DesktopBridge['audioFiles']; projectFiles?: DesktopBridge['projectFiles']; sampleFiles?: DesktopBridge['sampleFiles']; projectDirectories?: NativeProjectDirectoriesBridge; timbreFiles?: NativeTimbreFilesBridge } } };
   }).chrome?.webview?.hostObjects;
   const storage = host?.sync?.storage;
   const files = host?.files;
@@ -60,7 +63,9 @@ function hostBridge(): DesktopBridge {
   try { sampleFiles = host?.sampleFiles; } catch { /* Optional on older hosts; unrelated music remains usable. */ }
   let projectDirectories: DesktopBridge['projectDirectories'];
   try { projectDirectories = host?.projectDirectories; } catch { /* Older hosts cannot create managed project folders. */ }
-  return { storage, files, audioFiles, projectFiles, sampleFiles, projectDirectories };
+  let timbreFiles: DesktopBridge['timbreFiles'];
+  try { timbreFiles = host?.timbreFiles; } catch { /* An older host keeps existing work usable. */ }
+  return { storage, files, audioFiles, projectFiles, sampleFiles, projectDirectories, timbreFiles };
 }
 
 function checkSize(text: string): void {
@@ -78,12 +83,14 @@ export function createDesktopPlatform(bridge: DesktopBridge = hostBridge()): {
   audioFiles: AudioFilesPort;
   projectFiles: ProjectFilesPort;
   sampleFiles: SampleFilesPort;
+  timbreFiles: TimbreFilesPort;
   projectDirectories?: ProjectDirectoriesPort;
 } {
   let storageScope: string | undefined;
   return {
     ...(bridge.projectDirectories ? { projectDirectories: createDesktopProjectDirectories(bridge.projectDirectories) } : {}),
     sampleFiles: createDesktopSampleFiles(bridge.sampleFiles),
+    timbreFiles: createDesktopTimbreFiles(bridge.timbreFiles),
     projectFiles: {
       async open() {
         if (!bridge.projectFiles) fail('当前桌面窗口尚不支持工程文件，请关闭旧窗口后重新打开 RootSound。');

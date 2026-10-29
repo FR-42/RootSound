@@ -288,7 +288,7 @@ test('every sequence event validates before replacing the active preview or allo
   await assert.rejects(runtime.preview(phrase([], 1)), /空乐句/);
   await assert.rejects(runtime.preview(phrase([{ atSeconds: 0, sound: plan() }], 601)), /600/);
   await assert.rejects(runtime.preview(phrase([{ atSeconds: 2, sound: plan() }], 2)), /结束前/);
-  await assert.rejects(runtime.preview(phrase(Array.from({ length: 2049 }, () => ({ atSeconds: 0, sound: plan() })))), /2048/);
+  await assert.rejects(runtime.preview(phrase(Array.from({ length: 50_001 }, () => ({ atSeconds: 0, sound: plan() })))), /50000/);
   await assert.rejects(runtime.preview({ ...phrase([{ atSeconds: 0, sound: plan() }]), version: 2 } as unknown as SoundSequencePlan), /第 1 版/);
   await assert.rejects(runtime.preview(phrase(new Array(1))), /必须是有效对象/);
   assert.equal(audio().oscillators.length, 1);

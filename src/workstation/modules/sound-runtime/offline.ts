@@ -2,6 +2,7 @@ import type { AudioRenderOptions, RenderedAudio, PlayableNotePlan, SoundSequence
 import { MAX_AUDIO_FILE_BYTES } from '../../contracts/files.ts';
 import { allocateGraph, releaseGraph, scheduleGraph, startGraphSource, type GraphResources } from './graph.ts';
 import { readPreview, validateFrequency } from './plan.ts';
+import { WindowedGraph, WINDOWED_EVENT_THRESHOLD } from './windowed.ts';
 
 function cancelled(): DOMException { return new DOMException('音频导出已取消，尚未保存文件。', 'AbortError'); }
 function abortIfNeeded(signal?: AbortSignal): void { if (signal?.aborted) throw cancelled(); }
@@ -59,9 +60,11 @@ export async function renderOffline(plan: PlayableNotePlan | SoundSequencePlan, 
   if (typeof globalThis.OfflineAudioContext !== 'function') throw new Error('当前环境没有可用的离线音频接口。');
   const audio = new OfflineAudioContext(2, frames, sampleRate);
   const resources: GraphResources = { oscillators: [], samples: [], bufferReleases: [], gains: [], panners: [] };
+  let windowed: WindowedGraph | undefined;
   let rejectAborted: ((error: DOMException) => void) | undefined;
   const aborted = new Promise<never>((_resolve, reject) => { rejectAborted = reject; });
   const abort = (): void => {
+    windowed?.dispose();
     releaseGraph(resources);
     // Offline close is optional in current hosts; older implementations stop at
     // the next scheduled suspension and never resume a cancelled graph.
@@ -71,8 +74,10 @@ export async function renderOffline(plan: PlayableNotePlan | SoundSequencePlan, 
   };
   options.signal?.addEventListener('abort', abort, { once: true });
   try {
-    const graph = allocateGraph(audio, preview, resources);
+    if (preview.sequence && preview.events.length > WINDOWED_EVENT_THRESHOLD) windowed = new WindowedGraph(audio, preview, resources, audio.destination);
+    const graph = windowed?.graph ?? allocateGraph(audio, preview, resources);
     scheduleGraph(graph, preview.normalization, 0);
+    windowed?.prepare(0, 0);
     for (const scheduled of graph.starts) {
       startGraphSource(scheduled, 0);
     }
@@ -87,7 +92,9 @@ export async function renderOffline(plan: PlayableNotePlan | SoundSequencePlan, 
       if (Math.ceil(next * sampleRate / 128) * 128 >= frames) return;
       void audio.suspend(next).then(async () => {
         if (options.signal?.aborted) return;
+        windowed?.advance(audio.currentTime);
         report(options, 0.85 * audio.currentTime / (frames / sampleRate));
+        if (options.signal?.aborted) return;
         step();
         await audio.resume();
       }).catch(error => { rejectAborted?.(error instanceof DOMException ? error : new DOMException(String(error), 'OperationError')); });
@@ -100,6 +107,7 @@ export async function renderOffline(plan: PlayableNotePlan | SoundSequencePlan, 
     return Object.freeze({ bytes, mimeType: 'audio/wav', extension: '.wav', sampleRate, channels: 2, bitsPerSample: 24, durationSeconds: frames / sampleRate });
   } finally {
     options.signal?.removeEventListener('abort', abort);
+    windowed?.dispose();
     releaseGraph(resources);
   }
 }

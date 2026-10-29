@@ -1,0 +1,42 @@
+[
+  {
+    "name": "intel-cmplr-lib-rt",
+    "version": "2025.0.5"
+  },
+  {
+    "name": "intel-cmplr-lib-ur",
+    "version": "2025.0.5"
+  },
+  {
+    "name": "intel-cmplr-lic-rt",
+    "version": "2025.0.5"
+  },
+  {
+    "name": "intel-pti",
+    "version": "0.10.1"
+  },
+  {
+    "name": "intel-sycl-rt",
+    "version": "2025.0.5"
+  },
+  {
+    "name": "pytorch-triton-xpu",
+    "version": "3.3.1"
+  },
+  {
+    "name": "tcmlib",
+    "version": "1.2.0"
+  },
+  {
+    "name": "torch",
+    "version": "2.7.1+xpu"
+  },
+  {
+    "name": "torchaudio",
+    "version": "2.7.1+xpu"
+  },
+  {
+    "name": "umf",
+    "version": "0.9.1"
+  }
+]

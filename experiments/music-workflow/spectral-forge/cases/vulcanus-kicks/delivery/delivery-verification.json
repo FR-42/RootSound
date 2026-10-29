@@ -1,0 +1,73 @@
+{
+  "release": "20261028-055644-757-e7928b",
+  "referenceSha256": "FD358C65504E24FB95173F825FFE50AD5B4F5458AE3067513A8E1A72F3729926",
+  "referenceUnchanged": true,
+  "sourceAudioIncluded": false,
+  "audioInputSupported": false,
+  "listeningAccepted": false,
+  "realAudioDeviceOpened": false,
+  "applicationEngineUsed": true,
+  "toolChanged": false,
+  "engineHashes": [
+    {
+      "filename": "model.mjs",
+      "sha256": "136da7a5d7ece430fe73f72179f4075f77de04a021b795f82aa7556e6a194d91"
+    },
+    {
+      "filename": "dsp.mjs",
+      "sha256": "9bd27769fb26a101cd65f44a0530225e62586473b0bb87ae0cf6c563bc4afe5b"
+    },
+    {
+      "filename": "curve-density.mjs",
+      "sha256": "b09e20890aeb65306a3729982579eab3aa2b01a8876bd4738c62088dfc4ced56"
+    }
+  ],
+  "checks": [
+    {
+      "name": "Vulcanus-Kick-A-密集短击",
+      "coldReopenWavExact": true,
+      "heldKeySelfDecays": true,
+      "continuedPeak": 5.881312797884064e-11,
+      "sha256": "603b06894ec29034c9472dd192cca5eadaf02797ef569693f87d15ce91d1057f"
+    },
+    {
+      "name": "Vulcanus-Kick-B-下潜重击",
+      "coldReopenWavExact": true,
+      "heldKeySelfDecays": true,
+      "continuedPeak": 8.34685653927636e-9,
+      "sha256": "710bd82ab42e322c7a8dfeb75eae4a33aee001e0a8acb6688aa299fac3d08ff1"
+    }
+  ],
+  "files": [
+    {
+      "name": "Vulcanus-Kick-A-密集短击.rssynth",
+      "bytes": 4490,
+      "sha256": "603b06894ec29034c9472dd192cca5eadaf02797ef569693f87d15ce91d1057f"
+    },
+    {
+      "name": "Vulcanus-Kick-A-密集短击-单击.wav",
+      "bytes": 155756,
+      "sha256": "dc7069e7aad4cbf7f68af9a52864f26f6a7f6b7d68c5a939b66091f1fa7ef759"
+    },
+    {
+      "name": "Vulcanus-Kick-B-下潜重击.rssynth",
+      "bytes": 4491,
+      "sha256": "710bd82ab42e322c7a8dfeb75eae4a33aee001e0a8acb6688aa299fac3d08ff1"
+    },
+    {
+      "name": "Vulcanus-Kick-B-下潜重击-单击.wav",
+      "bytes": 181682,
+      "sha256": "f3a7bb07c44c6b7dbdbc73c3a991ee914129681a1ff62a46618cda641fe72568"
+    },
+    {
+      "name": "Vulcanus-Kick-AB-对比试听.wav",
+      "bytes": 1785644,
+      "sha256": "258e868af156dd320f0414eb97ce1a8e8af4041eb9e0cb340d44b02f06e42942"
+    },
+    {
+      "name": "Vulcanus-Kick-使用说明.txt",
+      "bytes": 1074,
+      "sha256": "3e820a6b16256d9c8fe789d8096bcd001d7d1ededd91eaab564e4d8d9a78ea52"
+    }
+  ]
+}

@@ -1,0 +1,36 @@
+{
+  "source": "D:\\Sound\\temp\\music\\vulcanus.mp3",
+  "sourceSha256": "FD358C65504E24FB95173F825FFE50AD5B4F5458AE3067513A8E1A72F3729926",
+  "files": [
+    {
+      "Name": "新的音色.rssynth",
+      "Bytes": 4144,
+      "Sha256": "39015069DA7858156D72A032EB7F6003E29FE8E89037871897A4BFBED8B5FF95"
+    },
+    {
+      "Name": "cosmica-采样1.rstimbre",
+      "Bytes": 192136,
+      "Sha256": "8B7BCA321731BCF10BD8DA1E6241134E257561515D14890C54C899EEB534E910"
+    },
+    {
+      "Name": "Vulcanus-铺底-和弦试听.wav",
+      "Bytes": 2097128,
+      "Sha256": "4ECD293C5FF03C98D1E1DD117B57A3DA5F1FD2B1A43A2459C40C999C895D651F"
+    },
+    {
+      "Name": "Vulcanus-铺底-C4.wav",
+      "Bytes": 2183528,
+      "Sha256": "7F3C80A3793031184CF9DAFBA07D3AA2B81F77A5BE1EA83395D2E64040A16C55"
+    },
+    {
+      "Name": "Vulcanus-铺底音色-说明.txt",
+      "Bytes": 679,
+      "Sha256": "C70ADB444962CA7791B3E2BD073BE70093D64CCAFDAC05141265B607FDCF9794"
+    },
+    {
+      "Name": "Vulcanus-铺底音色.rssynth",
+      "Bytes": 3700,
+      "Sha256": "23F39BC04D9418B8EE958E716357A560A534C2E33D5D979F706784E802ABACB2"
+    }
+  ]
+}

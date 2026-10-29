@@ -1,0 +1,18 @@
+{
+  "4": {
+    "wall_seconds": 15.36780489992816,
+    "actual_device": "xpu",
+    "device_name": "Intel(R) Arc(TM) Graphics / XPU\uff08FFT \u5728 CPU\uff09",
+    "reconstruction_max_error": 2.3283064365386963e-10
+  },
+  "6": {
+    "wall_seconds": 14.677164699998684,
+    "actual_device": "xpu",
+    "device_name": "Intel(R) Arc(TM) Graphics / XPU\uff08FFT \u5728 CPU\uff09",
+    "reconstruction_max_error": 1.4901161193847656e-08
+  },
+  "source_unchanged": true,
+  "default_gpu": true,
+  "basic_pitch_default_off": true,
+  "hidden_ui_load": true
+}

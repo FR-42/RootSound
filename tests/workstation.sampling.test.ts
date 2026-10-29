@@ -6,7 +6,7 @@ import type { SampleCapturePort, SampleRecording } from '../src/workstation/cont
 import type { PcmAudio } from '../src/workstation/contracts/sound.ts';
 import { createMaterialLibrary } from '../src/workstation/modules/materials/public.ts';
 import { createSampling, createSampleReferenceAdapter, readSampleBody } from '../src/workstation/modules/sampling/public.ts';
-import { copyPcm, decodeBase64, decodePcmWav, encodeBase64, encodeFloatWav, validatePcm, waveform } from '../src/workstation/modules/sampling/audio.ts';
+import { copyPcm, decodeBase64, decodePcmWav, encodeBase64, encodeFloatWav, validateBase64, validatePcm, waveform } from '../src/workstation/modules/sampling/audio.ts';
 
 function deferred<T>() {
   let resolve!: (value: T) => void; let reject!: (error: Error) => void;
@@ -206,4 +206,131 @@ test('uncompressed 24-bit PCM audition keeps its native rate without converting 
   view.setUint16(20, 1, true); view.setUint16(22, 1, true); view.setUint32(24, 88200, true); view.setUint32(28, 88200 * 3, true); view.setUint16(32, 3, true); view.setUint16(34, 24, true);
   write(36, 'data'); view.setUint32(40, 6, true); bytes.set([0, 0, 128, 255, 255, 127], 44);
   const audio = decodePcmWav(bytes)!; assert.equal(audio.sampleRate, 88200); assert.deepEqual(audio.channels[0], new Float32Array([-1, 8388607 / 8388608]));
+});
+
+test('base64 validation preserves canonical padding, zero unused bits, byte bounds and chunk boundaries', () => {
+  for (const length of [1, 2, 3, 4, 5, 6, 255, 256, 257, 32765, 32766, 32767]) {
+    const bytes = Uint8Array.from({ length }, (_, index) => (index * 73 + 29) & 255);
+    const encoded = encodeBase64(bytes); validateBase64(encoded, length);
+    assert.deepEqual(decodeBase64(encoded, length), bytes);
+  }
+  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+  for (let index = 0; index < alphabet.length; index++) {
+    const oneByte = `A${alphabet[index]}==`, twoBytes = `AA${alphabet[index]}=`;
+    if ((index & 15) === 0) assert.doesNotThrow(() => validateBase64(oneByte, 1));
+    else assert.throws(() => validateBase64(oneByte, 1));
+    if ((index & 3) === 0) assert.doesNotThrow(() => validateBase64(twoBytes, 2));
+    else assert.throws(() => validateBase64(twoBytes, 2));
+  }
+  for (const [value, bytes] of [['AAAA', 1], ['AAAA', 2], ['AA==', 2], ['AAA=', 3], ['AA=A', 2],
+    ['A===', 1], ['====', 1], ['=AAA', 3], ['AA-_', 3], ['AA\nA', 3], ['AA\rA', 3],
+    ['AA\tA', 3], ['AA\fA', 3], ['AA A', 3], ['AA\0A', 3], ['AA\u00a0A', 3], ['AA\u0100A', 3]] as const)
+    assert.throws(() => validateBase64(value, bytes), `reject ${JSON.stringify(value)} for ${bytes} bytes`);
+  for (const bytes of [0, -1, NaN, Infinity, 1.5, MAX_SAMPLE_FILE_BYTES + 1])
+    assert.throws(() => validateBase64('AA==', bytes));
+  assert.throws(() => validateBase64(null as never, 1));
+  assert.throws(() => validateBase64(new String('AA==') as never, 1));
+  // Largest supported payload also checks the long-string regexp is stack safe.
+  const maximum = Buffer.alloc(MAX_SAMPLE_FILE_BYTES).toString('base64');
+  assert.doesNotThrow(() => validateBase64(maximum, MAX_SAMPLE_FILE_BYTES));
+  assert.throws(() => validateBase64(`${maximum.slice(0, -3)}B==`, MAX_SAMPLE_FILE_BYTES));
+});
+
+test('base64 acceptance matches the prior atob and canonical re-encoding check across seeded mutations', () => {
+  let seed = 0x83410ac5;
+  const random = (limit: number) => { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed % limit; };
+  const priorAccepts = (value: string, expectedLength: number) => {
+    if (!Number.isSafeInteger(expectedLength) || expectedLength < 1 || expectedLength > MAX_SAMPLE_FILE_BYTES
+      || value.length !== Math.ceil(expectedLength / 3) * 4) return false;
+    try { const binary = atob(value); return binary.length === expectedLength && btoa(binary) === value; } catch { return false; }
+  };
+  const currentAccepts = (value: string, expectedLength: number) => { try { validateBase64(value, expectedLength); return true; } catch { return false; } };
+  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+  const invalid = ['=', '\n', '\r', '\t', '\f', ' ', '-', '_', '\0', '\u00a0', '\u0100'];
+  let accepted = 0, rejected = 0;
+  for (let iteration = 0; iteration < 1600; iteration++) {
+    const bytes = Uint8Array.from({ length: 1 + random(513) }, () => random(256));
+    let value = Buffer.from(bytes).toString('base64'); let expectedLength = bytes.length;
+    switch (iteration % 8) {
+      case 1: { const at = random(value.length); value = value.slice(0, at) + alphabet[random(64)] + value.slice(at + 1); break; }
+      case 2: { const at = random(value.length); value = value.slice(0, at) + invalid[random(invalid.length)] + value.slice(at + 1); break; }
+      case 3: expectedLength += random(5) - 2; break;
+      case 4: value = value.slice(0, -1); break;
+      case 5: value += '='; break;
+      case 6: value = `${value.slice(0, -3)}${alphabet[random(64)]}==`; break;
+      case 7: value = Array.from({ length: value.length }, () => alphabet[random(64)]).join(''); break;
+    }
+    const previous = priorAccepts(value, expectedLength), current = currentAccepts(value, expectedLength);
+    assert.equal(current, previous, `case ${iteration}, ${expectedLength} bytes: ${JSON.stringify(value)}`);
+    if (current) { accepted++; assert.equal(decodeBase64(value, expectedLength).length, expectedLength); }
+    else rejected++;
+  }
+  assert(accepted > 300); assert(rejected > 300);
+});
+
+test('repeated one-MiB sample metadata validation never decodes while explicit decodes remain independent', t => {
+  const frames = 131072, sampleRate = 44100;
+  const wav = encodeFloatWav({ sampleRate, channels: [new Float32Array(frames), new Float32Array(frames)] });
+  const encoded = encodeBase64(wav);
+  const body = { model: 'audio-sample', version: 1, source: { kind: 'file', name: '大型立体声.wav', mimeType: 'audio/wav' },
+    audio: { encoding: 'base64', byteLength: wav.length, data: encoded },
+    decoded: { sampleRate, channels: 2, frames, durationSeconds: frames / sampleRate } };
+  const originalAtob = globalThis.atob, originalBtoa = globalThis.btoa;
+  let decodes = 0, encodes = 0;
+  t.mock.method(globalThis, 'atob', (value: string) => { decodes++; return originalAtob(value); });
+  t.mock.method(globalThis, 'btoa', (value: string) => { encodes++; return originalBtoa(value); });
+  const adapter = createSampleReferenceAdapter();
+  const record = { id: 'large-sample', kind: 'rootsound.sample', schemaVersion: 1, owner: 'sampling',
+    name: '大型采样', revision: 1, dependencies: [], body };
+  for (let count = 0; count < 32; count++) {
+    assert.equal(readSampleBody(body).audio.data, encoded);
+    assert.deepEqual(adapter.slots(record as never), []);
+  }
+  assert.equal(decodes, 0); assert.equal(encodes, 0);
+  assert.throws(() => readSampleBody({ ...body, audio: { ...body.audio, data: `!${encoded.slice(1)}` } }));
+  assert.equal(decodes, 0); assert.equal(encodes, 0);
+  const first = decodeBase64(encoded, wav.length), second = decodeBase64(encoded, wav.length);
+  assert.equal(decodes, 2); assert.equal(encodes, 0);
+  assert.notEqual(first.buffer, second.buffer); assert.deepEqual(first, wav); assert.deepEqual(second, wav);
+  first[0] = 0; assert.equal(second[0], wav[0]);
+});
+
+test('canonical verification reuses only the exact immutable payload and declared length, with bounded entry retention', t => {
+  const nativeTest = RegExp.prototype.test;
+  let scans = 0;
+  t.mock.method(RegExp.prototype, 'test', function (this: RegExp, value: string) {
+    if (this.source === '[^A-Za-z0-9+/]') scans++;
+    return Reflect.apply(nativeTest, this, [value]);
+  });
+  const bytes = Buffer.alloc(65537, 83); const encoded = bytes.toString('base64');
+  for (let count = 0; count < 64; count++) validateBase64(encoded, bytes.length);
+  assert.equal(scans, 1, 'unchanged payloads do not rescan every sample byte during note edits');
+  assert.throws(() => validateBase64(encoded, bytes.length + 1), /编码/);
+  assert.throws(() => validateBase64(`!${encoded.slice(1)}`, bytes.length), /编码/);
+  assert.throws(() => validateBase64(`${encoded.slice(0, -2)}B=`, bytes.length), /编码/);
+  const beforeEviction = scans;
+  for (let count = 0; count < 130; count++) {
+    const value = Buffer.from(`bounded-canonical-evidence-${count}`).toString('base64');
+    validateBase64(value, Buffer.byteLength(`bounded-canonical-evidence-${count}`));
+  }
+  validateBase64(encoded, bytes.length);
+  assert.equal(scans, beforeEviction + 131, 'an evicted payload is checked again, rather than retained without bound');
+});
+
+test('canonical verification also bounds retained payload bytes before its entry count is reached', t => {
+  const nativeTest = RegExp.prototype.test;
+  let scans = 0;
+  t.mock.method(RegExp.prototype, 'test', function (this: RegExp, value: string) {
+    if (this.source === '[^A-Za-z0-9+/]') scans++;
+    return Reflect.apply(nativeTest, this, [value]);
+  });
+  const bytes = 262144; const length = Math.ceil(bytes / 3) * 4;
+  const payload = (index: number) => Buffer.from([211, 192, 71, index, 81, 17]).toString('base64')
+    + 'A'.repeat(length - 12) + 'AA==';
+  const first = payload(0);
+  validateBase64(first, bytes);
+  for (let index = 1; index < 100; index++) validateBase64(payload(index), bytes);
+  assert.equal(scans, 100);
+  validateBase64(first, bytes);
+  assert.equal(scans, 101, 'large payload evidence is evicted by its byte budget while fewer than 128 entries exist');
 });

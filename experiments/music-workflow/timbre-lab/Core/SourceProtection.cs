@@ -13,6 +13,15 @@ public sealed class SourceProtection
         _sources.Add((full, FileIdentity.Read(handle)));
     }
 
+    // A capture comes from an already decoded, read-only snapshot. Keep the identity
+    // acquired at import even if the original was moved while the song stayed open.
+    internal void RememberSnapshot(string path, FileIdentity? identity)
+    {
+        string full = Path.GetFullPath(path);
+        if (!_sources.Any(x => string.Equals(x.Path, full, StringComparison.OrdinalIgnoreCase) && x.Identity == identity))
+            _sources.Add((full, identity));
+    }
+
     public void CheckDestination(string path)
     {
         string full = Path.GetFullPath(path);
