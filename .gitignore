@@ -13,7 +13,7 @@ dist/
 /data/
 /project/
 /timbres/
-/RootSound.exe
+/experiments
 /RootSound.*.tmp
 bin/
 obj/
