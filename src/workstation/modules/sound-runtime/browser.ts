@@ -283,7 +283,7 @@ export function createBrowserSoundRuntime(): SoundRuntimePort {
       voice.originSeconds = start;
       scheduleGraph(graph, preview.normalization, start);
       voice.windowed?.prepare(start, 0);
-      if (audio.currentTime >= start) throw new Error('当前乐句的声音调度未能及时完成，请减少同时使用的声音后重试。');
+      if (audio.currentTime >= start) throw new Error('当前音乐的声音调度未能及时完成，请减少同时使用的声音后重试。');
       voice.remaining = voice.oscillators.length + voice.samples.length;
       if (active !== null) finish(active, 'stopped');
       if (disposed || request !== requestSequence) throw new Error('这次试听已取消。');
@@ -386,7 +386,7 @@ export function createBrowserSoundRuntime(): SoundRuntimePort {
     const voice = active;
     const audio = context;
     if (disposed || voice === null || audio === null || voice.session.id !== sessionId || voice.session.status !== 'playing') return undefined;
-    if (voice.audioSource) throw new Error('采样试听暂不支持乐句计划更新，请重新试听。');
+    if (voice.audioSource) throw new Error('采样试听暂不支持音乐计划更新，请重新试听。');
     // An ended event can still be queued while the UI handles a pointer event.
     // Editing that stale session must not extend it into another playback.
     if (audio.currentTime >= voice.originSeconds + voice.session.durationSeconds! + 0.001) {

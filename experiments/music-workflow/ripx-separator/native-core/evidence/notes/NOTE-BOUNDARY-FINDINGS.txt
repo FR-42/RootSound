@@ -129,3 +129,135 @@ end=trunc(float32(layer.int4*275310(note)+.5))+offset.
 Invalid layer returns both zero. This consumes existing boundaries and
 does not establish how those layer start/end indices were produced.
 
+5. Actual initial-note producer identified; executable minimal components.
+
+0x14036faf0 (direct-36faf0.asm) gathers runs from 0x9e0 frame groups.
+Implemented native_group_runs.find_group_run: scan from caller's cursor for
+the first group without processed mask0x1 and groupID !=0xffffffff. Match
+subsequent frames by exact groupID and type sign mask0x8000, marking each
+selected entry. Stop on first absent match, caller run capacity, or end.
+The returned cursor is the starting frame, allowing other unprocessed groups
+at that frame on the next call. The optional host/edit cursor adjustment via
+40b310 must be resolved by the caller; it has not been guessed.
+
+In 370a00, 370d98 and370da2 set a new 0x2c0 harmonic object's start/end to
+context.start + selected run start, and context.start + run start + run length.
+370dad sets +0x27c to float32(1/DAT_14098a1ac).
+At372225 the fresh-note branch reserves table capacity via3556c0, increments
+DAT_14098a5d8, derives a new 0x90 note address from DAT_14098a5d0, and calls
+25f3a0 to initialize it. 37239c/3723bc multiply the absolute start/end frame
+indices by that time step into note+8/+c. 3723c9 associates its harmonic
+object at note+0x30. Finally3724e1..372503 copies start to +0/+10/+18 and
+end to +4/+14/+1c. These writes directly join the previously identified MIDI
+consumer's +10/+14 fields to this native analysis producer.
+
+native_initial_times.initial_time_fields implements that exact time mapping
+for a retained run in the fresh, non-editing branch. It explicitly rejects
+editing-offset and existing-note merge flags, which require other branches.
+It preserves float32 reciprocal then float32 multiply, not double seconds/rate.
+This still requires upstream native harmonic retention; it is not permission
+to emit every candidate run as a final note. 370a00's harmonic processing and
+existing-note merge conditions remain incompletely reconstructed.
+
+Correction to an earlier hypothesis: 25fc80 does NOT normalize note times.
+direct-25fc80.asm shows frequency/perceived-pitch/amplitude cache writes at
++20/+24/+28 and flags mask0x2 clearing. Actual time copies are in370a00 itself.
+
+Current test total:17 passed. The native frame packing -> expanded groups ->
+run-selection -> initial-time mapping components are executable. No target
+dynamic comparison or claim of complete final-note production is made.
+
+6. Supported no-merge initial-time projection (20 focused tests now pass).
+
+370a00's second argument DL is saved at entry [original RSP+0x10], equal
+to [RBP+0xd8] after its prologue. At371bfb..371c02 a zero argument branches
+directly to37222c, bypassing existing-note matching. A positive run start
+also branches to fresh creation at371c08..371c0d. This is a concrete native
+path, rather than an invented merge heuristic. native_initial_notes.py
+implements the no-edit, argument2=0 initial TIME PROJECTION from frame
+groups, resetting consumed bits exactly as370b60 before run selection.
+The returned stage remains initial-note-time-projection and deliberately
+has no inferred pitch, velocity or instrument. Harmonic amplitude/phase
+arrays, pitch-cache computation, native allocation-failure handling and
+postprocessing are not included; it is not a final-note or MIDI pipeline.
+
+Caller coverage matters: REA final-output-commit.c shows argument2=0 only
+when param2[2]>=0 and param2[0]==param2[1]; entering the body in that case
+also requires param2[0]==0. The usual param2[2]<0 branch passes1. Therefore
+this supported no-merge branch must NOT silently replace normal full-rip
+analysis. The full370a00 merge branch remains unresolved and retained.
+
+Within the successfully allocated group object, the48-harmonic loop at
+370f90..371714 increments object+0x60 once per harmonic (370fa9).
+Its zero-count rejection at371895 is not a generic energy threshold.
+The initial start/end assigned370d98/370da2 remain unchanged through this
+packing/sum loop; later edit/merge branches and373670 remain separate.
+
+7. Warm REA evidence and default first-block implementation.
+
+Full370a00 REA Evidence:
+ev_a26e63c0c7cde829d11860ef6db2a70c902527b4b799054814d66ea2db9dd38c
+retained at work/ripx-analysis/next-ok-370a00.json/.c. Source digest matches
+the direct disassembly above. next-36faf0.c, next-25fc80.c, next-25f6c0.c,
+next-377c10.c, next-370070.c, next-36cc70.c and next-36a390.c are reused.
+
+native_harmonic_object.py implements the actual48-harmonic packing for
+complete3449c0-expanded groups: component arrays, uint16 amplitude rounding
+and saturation, optional zero-padded channels, constant negative-type arrays,
+group identity and amplitude-weighted+218 metadata. Reduced-harmonic and
+missing-group branches are explicitly outside this wrapper's input domain.
+No energy-based note pruning is invented. Components1..3 remain caller inputs.
+
+native_initial_payload.py implements NORMAL argument2=1 first-block creation
+with an initially empty table and no editing. It packs a real harmonic object
+before producing note fields, then makes attached indices relative as3723f9.
+Run capacity is float32(30/native configured timestep), from370a00. Output
+is explicitly native-initial-note-before-cache-and-cleanup. This is meaningful
+native content, but not a claim of complete final RipX output or cache values.
+
+Default cross-block candidate matching is recovered in native_merge_candidate.py:
+only runstart0 searches old notes, with matchinggroupID/type and newStart-oldEnd
+in{0,1}, then native logarithmic pitch distance within explicitDAT9399e0.
+The caller scans backwards toDAT941c78. The normal earlier-start trimming
+condition is retained in evidence but unreachable after the default no-edit
+newStart>=oldEnd gate; editing can change that and is not covered here.
+25f6c0 getter subtracts note+10/current-rip timestep then clamps into attached
+object; negative-type uses its first frequency. 377c10 returns+27c unless a
+variable timestep array exists. Actual370070 array merging is NOT implemented
+by the eligibility predicate. 36b460/3747f0 representative-frequency/amplitude
+caches and373670 postprocessing remain required for a full result.
+
+27 focused synthetic tests pass; no original-RipX runtime comparison occurred.
+
+
+8. Build-only continuation/cache/export wiring (2026-10-30).
+
+User requested construction only; Python AST parsing only. No audio/numerical
+test and no original program execution were performed in this pass.
+
+native_object_merge.py ports the370070 branch admitted by normal370a00:
+nonoverlapping zero/one-frame continuation. It retains old metadata, takes
+max component counts, zeros gap harmonic samples, propagates last nonzero
+primary frequency into a one-frame gap, while zeroing secondary frequency.
+Editing overlaps/variable-step paths reject. secondary_frequencies is now a
+distinct field because actual native gap handling differs between the arrays.
+
+3747f0 is a direct tail-call wrapper to36b4e0. Its full-range all-harmonic
+request used by25fc80 selects an initial scan length
+trunc(float32(float32(.5/step)+.5)), capped to max(1,2*len/3) when needed,
+then keeps maximum float32 sum of uint16 component amplitudes. Implemented
+in native_note_cache.py as amplitude_28, expressly NOT MIDI velocity.
+
+36b460 delegates to36ad30 and converts continuous pitch to Hz.36ad30 also
+calls36b850,373790,373df0. Their whole transformation remains unrecovered,
+so frequency/pitch caches stay null unless an actual native provider supplies
+them. No mean-frequency stand-in is used.
+
+native_note_export.build_initial_notes_document composes true refined0x4c
+harmonic frames (including empty frames) into initial payloads and a portable
+document with raw arrays/time fields/cache readiness. It marks full_transcription
+false. continue_default_payload connects candidate eligibility to real ordinary
+array continuation and updates the four end-time fields actually written by370a00.
+
+Machine coverage:stage-coverage.json. Independent objdump/file digests:
+cache-merge-provenance.json. No new REA Evidence ID is invented.

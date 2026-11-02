@@ -1,0 +1,11 @@
+{
+  "parsed_source_modules": 102,
+  "noise_source_modules": 13,
+  "checks": [
+    "AST syntax",
+    "Native import symbol ownership",
+    "Static named call arity"
+  ],
+  "errors": [],
+  "execution": "No reconstruction module was imported or executed; no media/signal/numerical test."
+}

@@ -43,7 +43,7 @@ export function mountSampleTimbreWorkspace(root: HTMLElement, options: {
   const tabs = node('nav', 'workspace-tabs'); tabs.setAttribute('aria-label', '切换创作工作区');
   if (options.onSampling) tabs.append(button('采样获取', 'workspace-tab', () => leave(options.onSampling!)));
   tabs.append(button('音色制作', 'workspace-tab is-active', () => {}));
-  if (options.onPhrase) tabs.append(button('乐句谱写', 'workspace-tab', () => leave(options.onPhrase!)));
+  if (options.onPhrase) tabs.append(button('音乐谱写', 'workspace-tab', () => leave(options.onPhrase!)));
   if (options.onSong) tabs.append(button('歌曲编排', 'workspace-tab', () => leave(options.onSong!)));
   toolbar.append(tabs);
   const tools = node('nav', 'toolbar-tools');

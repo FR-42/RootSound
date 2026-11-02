@@ -1,0 +1,14 @@
+李斯特《钟》La Campanella，S.141 No.3
+
+完整演奏MIDI：Alex’s Piano Service / Kuhmann – Disklavier World
+https://www.alexanderpeppe.com/midi/242-liszt-la-campanella-from-paganinis-2nd-conc-a7ab7bc9/
+公开下载：https://www.alexanderpeppe.com/midi-download/9441/
+来源SHA256：a1c7b2451c8dc157a183114b167f43a4b38c945f1534cea1e7233e19e96f1f30
+
+保留4077音符的音高、起点、力度和实际按键时长，去除踏板延长；钢琴仅加60毫秒释放。使用60附点四分大拍BPM／每小节2大拍、每拍3格的6/8编辑背景，不量化演奏时间，不声称原MIDI时钟是乐谱速度。录入为一个完整可编辑钢琴音符族。
+
+配合核对的公开乐谱：
+https://noctavepiano.com/en/sheet-music/liszt-la-campanella/
+本地reference.mxl内含该乐谱的CC0标注；它不代表上述演奏MIDI也拥有同样许可，未作此宣称。
+
+音源为RootSound内置GeneralUser GS 2.0.3，工程内嵌所用钢琴录音与许可。本次未作声卡试听，不声称真人录音或演奏家级诠释。

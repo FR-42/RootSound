@@ -1,0 +1,7 @@
+GeneralUser GS 2.0.3 by S. Christian Collins
+https://www.schristiancollins.com/generaluser.php
+Source: https://github.com/mrbumpy409/GeneralUser-GS
+Pinned commit: 684543d5e5efaef08d02be50dcda8d552478fa60
+RootSound repackaging: selected, uncompressed original PCM regions and pitch/key/velocity/loop metadata.
+Not a complete SoundFont renderer; filters, modulators and layered articulations are not reproduced in full.
+See LICENSE.txt for the author's complete terms and source-provenance statement.

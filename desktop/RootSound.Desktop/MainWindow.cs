@@ -1,4 +1,4 @@
-﻿using Microsoft.Web.WebView2.Core;
+using Microsoft.Web.WebView2.Core;
 using Microsoft.Web.WebView2.WinForms;
 using System.Text.Json;
 
@@ -6,7 +6,7 @@ namespace RootSound.Desktop;
 
 internal sealed class MainWindow : Form
 {
-    private const string Origin = "https://rootsound.local";
+    private const string Origin = DesktopResourceRouter.Origin;
     private readonly WebView2 view = new() { Dock = DockStyle.Fill, DefaultBackgroundColor = Color.FromArgb(20, 23, 21) };
     private readonly ProjectDirectoryManager projects;
     private readonly string dataDirectory;
@@ -45,7 +45,7 @@ internal sealed class MainWindow : Form
             if (choice == DialogResult.Cancel) return;
             if (choice == DialogResult.Yes)
             {
-                if (!preparation.CanSave) throw new IOException(preparation.SaveMessage ?? "请先完成或放弃正在编辑的乐句，再保存歌曲。");
+                if (!preparation.CanSave) throw new IOException(preparation.SaveMessage ?? "请先完成或放弃正在编辑的音乐，再保存歌曲。");
                 projects.Save(preparation.Name);
             }
             projects.Exit("discard");
@@ -95,29 +95,29 @@ internal sealed class MainWindow : Form
         {
             var uiDirectory = Path.Combine(AppContext.BaseDirectory, "ui");
             if (!File.Exists(Path.Combine(uiDirectory, "index.html")))
-                throw new IOException("缺少界面文件。请从项目根目录重新运行 RootSound.bat。");
+                throw new IOException("缺少界面文件，请重新安装或构建 RootSound。");
             var environment = await CoreWebView2Environment.CreateAsync(null, Path.Combine(dataDirectory, "webview"));
             await view.EnsureCoreWebView2Async(environment);
             var core = view.CoreWebView2;
             core.Settings.IsStatusBarEnabled = false;
             core.Settings.AreDefaultContextMenusEnabled = false;
-            core.SetVirtualHostNameToFolderMapping("rootsound.local", uiDirectory, CoreWebView2HostResourceAccessKind.DenyCors);
+            var resources = new DesktopResourceRouter(uiDirectory, projects.OpenPayloadStream);
             core.AddHostObjectToScript("storage", new NativeStorage(projects));
             core.AddHostObjectToScript("projectDirectories", new NativeProjectDirectories(this, projects));
-            core.AddHostObjectToScript("files", new NativeSoundFiles(this));
+            core.AddHostObjectToScript("files", new NativeSoundFiles(this, projects));
             core.AddHostObjectToScript("audioFiles", new NativeAudioFiles(this));
-            core.AddHostObjectToScript("projectFiles", new NativeProjectFiles(this));
+            core.AddHostObjectToScript("projectFiles", new NativeProjectFiles(this, projects));
             core.AddHostObjectToScript("sampleFiles", new NativeSampleFiles(this));
             core.AddHostObjectToScript("timbreFiles", new NativeTimbreFiles(this, projects, dataDirectory));
             core.NavigationStarting += (_, e) => e.Cancel = !Trusted(e.Uri);
             core.FrameNavigationStarting += (_, e) => e.Cancel = !Trusted(e.Uri);
             core.NewWindowRequested += (_, e) => e.Handled = true;
             core.PermissionRequested += (_, e) => e.State = PermissionStateFor(e.Uri, e.PermissionKind);
-            core.AddWebResourceRequestedFilter("*", CoreWebView2WebResourceContext.All);
+            core.AddWebResourceRequestedFilter("*", CoreWebView2WebResourceContext.All, CoreWebView2WebResourceRequestSourceKinds.All);
             core.WebResourceRequested += (_, e) =>
             {
-                if (!Trusted(e.Request.Uri))
-                    e.Response = environment.CreateWebResourceResponse(Stream.Null, 403, "Local content only", "Content-Type: text/plain");
+                var resource = resources.Open(e.Request.Uri, e.Request.Method);
+                e.Response = environment.CreateWebResourceResponse(resource.Content, resource.StatusCode, resource.Reason, resource.Headers);
             };
             core.Navigate(Origin + "/index.html");
         }
@@ -128,8 +128,12 @@ internal sealed class MainWindow : Form
         }
     }
 
-    private static bool Trusted(string value) => Uri.TryCreate(value, UriKind.Absolute, out var uri)
-        && uri.Scheme == Uri.UriSchemeHttps && uri.Host == "rootsound.local" && uri.IsDefaultPort;
+    private static bool Trusted(string value) => DesktopResourceRouter.TrustedOrigin(value);
+
+    internal static string? PayloadTokenFor(string value)
+    {
+        return DesktopResourceRouter.PayloadTokenFor(value);
+    }
 
     // Default delegates the trusted microphone request to WebView2's ordinary
     // user prompt. This never grants access without the user's decision.

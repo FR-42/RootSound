@@ -1,0 +1,82 @@
+RipX native PCM component kernel reconstructed, 2026-10-29
+
+Artifact identity:
+D:/#Software/ripx/RipX.exe
+SHA256 5f088fa4fbbe1759ef75d8034c79f33c846e3bf5f13d5048dd95a6614d2ad441
+
+Evidence kind: independent static PE bytes + objdump. These are NOT invented REA IDs.
+The parent REA session's cold analysis was still pending when this was implemented.
+No original executable bytes are loaded as callable code, and RipX is not executed.
+
+Recovered executable implementation:
+native_pcm_component.py::add_component_inplace
+Arguments map directly to 3190b0: buffer, start, length (derived from buffer), hop,
+integer sample rate, float amplitude, float frequency, float phase at start.
+The ninth visible caller argument is never read in this function's instructions.
+
+Instruction provenance:
+- 3190bc..319105: left=min(hop/2,start), right=min(hop/2,length-start-hop).
+- 319109..31916e: frequency -> normalized omega, float32 shift by left*omega,
+  fmod through CRT IAT 140689bb0 (api-ms-win-crt-math-l1-1-0.dll!fmod).
+- 31916e..319211: double scale 5215.189175235227 * 2^32, +0.5 then integer.
+- 319280..3193ef: left linear ramp.
+- 319440..319536: constant-amplitude middle.
+- 3195a0..3196ef: right linear ramp.
+- Every sample first increments uint64 phase, then selects table[(phase>>32)&0x7fff].
+- Arithmetic order is float32(amplitude*table), optional float32(*weight),
+  float32(+existing PCM), not fused multiply-add.
+- The first write is start-left+1, not start-left. The right zero endpoint is excluded.
+
+Table discovery, not a generic sine substitution:
+The table pointer 154f06340 was located by a bounded scan of RIP-relative code
+references and verified with objdump. Writer 36e5a0 allocates 0x20000 bytes,
+fills 32768 float32 entries from two-wide double evaluations of
+  (index+0.5)/5215.189175235227
+and calls 61c2f0 -> 61dd30. The fast SSE2 polynomial branch and its raw constants
+were recovered in direct-sine-fast-61dd30.asm and sine-table-static-constants.json.
+The implementation preserves this polynomial's operation ordering. math.sin is
+used only as an independent mathematical TEST oracle, never in the runtime kernel.
+
+Saved evidence:
+direct-3190b0.asm
+direct-table-init-14036e5a0.asm
+direct-sine-fast-61dd30.asm
+direct-fmod-thunk.asm
+3190b0-static-evidence.json
+sine-table-static-constants.json
+extract_3190b0_static.py
+
+Verification executed:
+python -m unittest discover -s work/ripx-native-next/resynthesis -p test_*.py
+11 tests passed (6 output/trajectory/statistic tests + 5 PCM tests).
+All 32768 generated table entries match independently evaluated sine rounded to
+float32 bit-for-bit on this host. Full triangle weights and clipped-buffer first
+sample behavior match hand-derived instruction expectations. A generated 48000-
+sample PCM buffer receives a 440 Hz component; negative-amplitude subtraction
+returns every sample to zero. No original media was opened or played.
+
+Limits:
+This is a genuine reconstructed native component subtraction kernel, not the
+complete polyphonic note recognizer/resynthesizer. It needs supplied component
+frequency, amplitude, phase and native window coordinates. It does not estimate
+these parameters from arbitrary music. Same-implementation cancellation is an
+invariant test, not proof of original-program equivalence. No dynamic original
+comparison has been run.
+
+31b830 further trace:
+Actual function ends at 31bdd3. Its phase estimation calls 32a1b0 to obtain four
+statistics, then calls CRT atan2 at620e04 (symbol still to resolve from IAT).
+It calls3297a0 for an amplitude quadratic objective; its coefficients and energy
+set amplitude and residual improvement. Both functions call3293f0 before data
+loops. These producers must be decoded before claiming PCM->parameter estimation.
+Independent disassemblies direct-31b830.asm/direct-3297a0.asm/direct-32a1b0.asm retained.
+
+Additional implemented consumers:
+native_harmonic_fields.py::phase_from_four_statistics follows 31bb41..31bc1e,
+including the observed double subtraction order, atan2 and (3*pi/2 - angle).
+amplitude_from_native_objective follows31bc6f..31bd43. A notable detail: evaluate
+the quadratic at the unbounded optimum BEFORE clipping output amplitude to
+[0,32767]; reject the amplitude if total-energy minus objective is nonpositive.
+These helpers require the actual producer statistics. Supplying a generic
+correlator/least-squares estimator would not constitute recovered RipX analysis.
+Constants and exact atan2 IAT identity retained in31b830-statistic-constants.json.

@@ -72,6 +72,11 @@ user's actual instructions.
   redundant checks and unrelated work within the authorized task.
 - Rule: a question about time spent is a request to understand the reasons,
   not evidence that the user wants lower quality or less verification.
+- Update 2026-11-02: prioritize progress and reduce defensive checking. Use
+  proportionate verification rather than repeated exhaustive safeguards. Offer
+  independent judgments and proactively improve proposed approaches within the
+  authorized objective; explain consequential deviations. This does not authorize
+  unrelated destruction or silently changing the user's product goal.
 - Origin: user's clarification after asking about the approximately
   40-minute reference-editing implementation, 2026-10-23.
 

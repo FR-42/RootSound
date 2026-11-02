@@ -31,7 +31,7 @@ export function readCoCreationBody(value: unknown): CoCreationBody {
     || !Number.isSafeInteger(body.round) || Number(body.round) < 0
     || body.lastDirection !== undefined && !validDirection(body.lastDirection)) return fail('这份创作旅途包含暂不支持的设置，原内容已保留。');
   for (const key of ['sourcePhraseId', 'currentPhraseId']) {
-    if (body[key] !== undefined && (typeof body[key] !== 'string' || !(body[key] as string).trim())) return fail('创作旅途引用的乐句标识无效。');
+    if (body[key] !== undefined && (typeof body[key] !== 'string' || !(body[key] as string).trim())) return fail('创作旅途引用的音乐标识无效。');
   }
   if ((body.hasArrangement || Number(body.round) > 0) && body.currentPhraseId === undefined) return fail('创作旅途缺少当前成果，原内容已保留。');
   return clone(body) as CoCreationBody;
@@ -42,7 +42,7 @@ export function createCoCreationReferenceAdapter(): ReferenceAdapter {
   function validate(record: ContentRecord | Draft): CoCreationBody {
     if (record.kind !== KIND || record.owner !== OWNER || record.schemaVersion !== 1) return fail('这份内容不是当前支持的创作旅途。');
     const body = readCoCreationBody(record.body); const actual = references(body);
-    if (record.dependencies.length !== actual.length || actual.some(id => !record.dependencies.includes(id))) return fail('创作旅途的乐句与引用记录不一致。');
+    if (record.dependencies.length !== actual.length || actual.some(id => !record.dependencies.includes(id))) return fail('创作旅途的音乐与引用记录不一致。');
     return body;
   }
   return { kind: KIND,
@@ -56,7 +56,7 @@ export function createCoCreationReferenceAdapter(): ReferenceAdapter {
     validateTarget(record, slotId, target) {
       const body = validate(record);
       const exists = slotId === 'source' ? !!body.sourcePhraseId : slotId === 'current' && !!body.currentPhraseId;
-      if (!exists || target.kind !== 'rootsound.phrase' || target.owner !== 'phrase' || target.schemaVersion !== 1) fail('创作旅途的位置需要当前支持的乐句。');
+      if (!exists || target.kind !== 'rootsound.phrase' || target.owner !== 'phrase' || target.schemaVersion !== 1) fail('创作旅途的位置需要当前支持的音乐。');
     },
     replace(record, replacements) {
       const body = validate(record); const seen = new Set<string>();
@@ -86,7 +86,7 @@ export function createCoCreation(library: MaterialLibrary, sampleAudio?: SampleA
   function readMusic(phraseId: string) {
     const phrase = playback.readSaved(phraseId).content;
     const sounds = phrase.dependencies.map(id => {
-      const sound = library.readContent(id) ?? fail('这段乐句引用的声音已不存在。');
+      const sound = library.readContent(id) ?? fail('这段音乐引用的声音已不存在。');
       soundAdapter.slots(sound); return sound;
     });
     const assets = [...new Set(sounds.flatMap(sound => soundAdapter.slots(sound).map(slot => slot.targetId)))].map(id => {

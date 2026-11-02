@@ -1,0 +1,78 @@
+{
+  "source_sha256": "5f088fa4fbbe1759ef75d8034c79f33c846e3bf5f13d5048dd95a6614d2ad441",
+  "kind": "independent-pe-constant-read",
+  "constants": [
+    {
+      "va": "0x140850030",
+      "file_offset": 8712752,
+      "bytes": "0000803f",
+      "value": 1.0
+    },
+    {
+      "va": "0x14084ffac",
+      "file_offset": 8712620,
+      "bytes": "cdcccc3d",
+      "value": 0.10000000149011612
+    },
+    {
+      "va": "0x1406971dc",
+      "file_offset": 6906844,
+      "bytes": "0000dc43",
+      "value": 440.0
+    },
+    {
+      "va": "0x14068e150",
+      "file_offset": 6869840,
+      "bytes": "0000000000004040",
+      "value": 32.0
+    },
+    {
+      "va": "0x14068e170",
+      "file_offset": 6869872,
+      "bytes": "0000000000807b40",
+      "value": 440.0
+    },
+    {
+      "va": "0x14068e140",
+      "file_offset": 6869824,
+      "bytes": "0000000000002840",
+      "value": 12.0
+    },
+    {
+      "va": "0x14068e118",
+      "file_offset": 6869784,
+      "bytes": "ff799f501344d33f",
+      "value": 0.3010299956639812
+    },
+    {
+      "va": "0x14068e138",
+      "file_offset": 6869816,
+      "bytes": "0000000000002240",
+      "value": 9.0
+    },
+    {
+      "va": "0x140850178",
+      "file_offset": 8713080,
+      "bytes": "000000000000f03f",
+      "value": 1.0
+    },
+    {
+      "va": "0x1408502f0",
+      "file_offset": 8713456,
+      "bytes": "000080bf",
+      "value": -1.0
+    },
+    {
+      "va": "0x1408501a8",
+      "file_offset": 8713128,
+      "bytes": "0000000000000040",
+      "value": 2.0
+    },
+    {
+      "va": "0x1406ae7a8",
+      "file_offset": 7002536,
+      "bytes": "0000000000802b40",
+      "value": 13.75
+    }
+  ]
+}

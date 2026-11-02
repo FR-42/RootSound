@@ -21,7 +21,7 @@ function text(value: unknown, label: string, maximum: number): string {
   if (typeof value !== 'string' || !value.trim() || value.length > maximum) fail(`${label}无效或过长。`);
   return value;
 }
-function validateJson(value: unknown): asserts value is JsonValue {
+function validateJson(value: unknown, allowSessionPayloads: boolean): asserts value is JsonValue {
   const pending = [{ value, depth: 0 }]; let count = 0;
   while (pending.length) {
     const item = pending.pop()!;
@@ -30,10 +30,12 @@ function validateJson(value: unknown): asserts value is JsonValue {
     if (current === null || typeof current === 'boolean' || typeof current === 'string') continue;
     if (typeof current === 'number' && Number.isFinite(current)) continue;
     if (!object(current) && !Array.isArray(current)) fail('内容包含无效或非有限的数据。');
+    if (!allowSessionPayloads && object(current) && current.encoding === 'host-asset')
+      fail('外来工程必须内嵌采样原文件，不能使用其他会话的本机采样引用。');
     for (const child of Object.values(current)) pending.push({ value: child, depth: item.depth + 1 });
   }
 }
-function readRecord(value: unknown): ContentRecord {
+function readRecord(value: unknown, allowSessionPayloads: boolean): ContentRecord {
   if (!object(value)) fail('素材记录不是有效对象。');
   exactFields(value, RECORD_FIELDS, '素材记录');
   text(value.id, '素材标识', 1024); text(value.kind, '素材类型', 256); text(value.owner, '素材所有者', 256); text(value.name, '素材名称', 4096);
@@ -42,7 +44,7 @@ function readRecord(value: unknown): ContentRecord {
   if (!Array.isArray(value.dependencies) || value.dependencies.length > MAX_CONTENTS) fail('素材引用列表无效。');
   for (const dependency of value.dependencies) text(dependency, '素材引用', 1024);
   if (new Set(value.dependencies).size !== value.dependencies.length) fail('素材引用不能重复。');
-  validateJson(value.body);
+  validateJson(value.body, allowSessionPayloads);
   return value as unknown as ContentRecord;
 }
 
@@ -56,13 +58,13 @@ export function createProjectPackages(
   function owner(record: ContentRecord): ReferenceAdapter {
     return owners.get(record.kind) ?? fail(`尚不支持工程中的素材类型 ${record.kind}。原内容未改变。`);
   }
-  function validate(value: unknown): ValidatedProject {
+  function validate(value: unknown, allowSessionPayloads = true): ValidatedProject {
     if (!object(value)) fail('不是支持的歌曲工程文件。');
     if (value.format !== 'RootSoundProject' || value.version !== 1 && value.version !== 2) fail('暂不支持这个工程格式或版本。');
     exactFields(value, value.version === 2 ? ['format', 'version', 'rootId', 'contents', 'memberIds'] : ['format', 'version', 'rootId', 'contents'], '工程文件');
     const rootId = text(value.rootId, '工程根标识', 1024);
     if (!Array.isArray(value.contents) || !value.contents.length || value.contents.length > MAX_CONTENTS) fail(`工程需要 1 至 ${MAX_CONTENTS} 份素材。`);
-    const contents = value.contents.map(readRecord);
+    const contents = value.contents.map(record => readRecord(record, allowSessionPayloads));
     const records = new Map(contents.map(record => [record.id, record]));
     if (records.size !== contents.length) fail('工程中有重复的素材标识。');
     const root = records.get(rootId);
@@ -120,7 +122,7 @@ export function createProjectPackages(
       if (!draft || draft.kind !== options.rootKind) fail('先打开一首歌曲，再导出完整工程。');
       if (draft.editingContext !== undefined) fail('请先完成或取消正在调整的独立编辑，再导出工程。');
       const current = library.currentProjectView?.(draftId);
-      if (current?.drafts.some(item => item.id !== draft.id)) fail('请先完成或取消当前音色、乐句等素材的调整，再保存歌曲工程。');
+      if (current?.drafts.some(item => item.id !== draft.id)) fail('请先完成或取消当前音色、音乐等素材的调整，再保存歌曲工程。');
       const used = new Set([...library.listContentInfo().map(record => record.id), ...library.listDrafts().map(item => item.id)]);
       const root: ContentRecord = { id: freshId(used), kind: draft.kind, schemaVersion: draft.schemaVersion, owner: draft.owner,
         name: draft.name, revision: 1, dependencies: [...draft.dependencies], body: clone(draft.body) };
@@ -145,7 +147,9 @@ export function createProjectPackages(
         if (typeof source !== 'string' || new TextEncoder().encode(source).byteLength > MAX_PROJECT_FILE_BYTES) fail('工程文件超过当前大小上限。');
         let value: unknown;
         try { value = JSON.parse(source); } catch { return { status: 'conflict', reason: '歌曲工程文件损坏，未改动任何素材。' }; }
-        const project = validate(value);
+        // Session references are legal in the working graph, but a file coming
+        // from another device must carry its complete source audio.
+        const project = validate(value, false);
         const used = new Set([...project.records.keys(), ...library.listContentInfo().map(record => record.id), ...library.listDrafts().map(item => item.id)]);
         const remap = new Map(project.file.contents.map(record => [record.id, freshId(used)]));
         const contents = project.file.contents.map(record => {
@@ -159,7 +163,7 @@ export function createProjectPackages(
         const rootId = remap.get(project.file.rootId)!;
         const memberIds = project.file.memberIds?.map(id => remap.get(id)!) ?? [];
         const rewritten = validate({ format: 'RootSoundProject', version: project.file.version, rootId, contents,
-          ...(project.file.version === 2 ? { memberIds } : {}) });
+          ...(project.file.version === 2 ? { memberIds } : {}) }, false);
         const content = rewritten.records.get(rootId)!;
         const { revision, id, ...fields } = content;
         const draft: Draft = { ...clone(fields), id: freshId(used), sourceId: id, baseRevision: revision };

@@ -1,0 +1,18 @@
+{
+  "format": "RipXNativeComponentTask",
+  "version": 1,
+  "subtract": false,
+  "candidates": [
+    {
+      "candidate_id": "manual-440hz-example",
+      "channel": 0,
+      "frame_index": 16,
+      "fit_begin": 4096,
+      "fit_end": 12288,
+      "energy_begin": 4096,
+      "energy_end": 12288,
+      "frequency": 440.0,
+      "branch": "raw-pcm-constant-frequency-unweighted-energy"
+    }
+  ]
+}

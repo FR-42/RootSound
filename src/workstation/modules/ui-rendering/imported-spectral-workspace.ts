@@ -26,7 +26,7 @@ export function mountImportedSpectralWorkspace(root: HTMLElement, options: {
     options.onSave();
   });
   toolbar.append(button('RootSound', options.onWelcome), title);
-  if (options.onPhrase) toolbar.append(button('乐句谱写', options.onPhrase));
+  if (options.onPhrase) toolbar.append(button('音乐谱写', options.onPhrase));
   if (options.onSong) toolbar.append(button('歌曲编排', options.onSong));
   if (options.onSettings) toolbar.append(button('设置', options.onSettings));
   toolbar.append(button('保存', save));

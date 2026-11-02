@@ -21,7 +21,7 @@ namespace RootSound.Launcher
             catch (Exception error)
             {
                 MessageBox.Show(
-                    error.Message + "\n\n请将 RootSound.exe 保留在项目根目录。需要构建或修复时，运行同目录的 RootSound.bat。",
+                    error.Message + "\n\n请将 RootSound.exe 保留在项目根目录。程序文件缺失时，请重新安装或构建 RootSound。",
                     "RootSound 暂时无法打开", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 return 1;
             }

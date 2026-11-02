@@ -1,0 +1,162 @@
+{
+  "target": "D:/#Software/ripx/RipX.exe",
+  "sha256": "5f088fa4fbbe1759ef75d8034c79f33c846e3bf5f13d5048dd95a6614d2ad441",
+  "kind": "static-source-derived-reconstruction",
+  "procedures": {
+    "347170": {
+      "evidence_id": "ev_c2e1466ea441b0ee4316cdbe85dae25a0d7b97ad292b9f4d6912993d1eed08f9",
+      "path": "work/ripx-analysis/remaining-347170.json",
+      "source": "work/ripx-analysis/remaining-347170.c"
+    },
+    "346ed0": {
+      "evidence_id": "ev_a8ab44fd8e932751c1f1e2f0d3c31d325ac59fbbb42abf0bb2c6b8d73de6449d",
+      "path": "work/ripx-analysis/remaining-346ed0.json",
+      "source": "work/ripx-analysis/remaining-346ed0.c"
+    },
+    "31c500": {
+      "evidence_id": "ev_b596f1cb77ab1981c44c443da289fd908387cfcef0f1044869065c3808eedaed",
+      "path": "work/ripx-analysis/remaining-31c500.json",
+      "source": "work/ripx-analysis/remaining-31c500.c"
+    },
+    "32e650": {
+      "evidence_id": "ev_7dbc3efff5ad8ca3c88db83a3204c33a63e231e529a56f7f5c9c0ebcaaaf86b2",
+      "path": "work/ripx-analysis/remaining-32e650.json",
+      "source": "work/ripx-analysis/remaining-32e650.c"
+    },
+    "32e4b0": {
+      "evidence_id": "ev_034213df14720d63915a357bbc7dc1239be51c9d1a36e458ec6a775b4e2648ee",
+      "path": "work/ripx-analysis/remaining-32e4b0.json",
+      "source": "work/ripx-analysis/remaining-32e4b0.c"
+    },
+    "31d960": {
+      "evidence_id": "ev_522ea0c32fc3759a1c25e52c88f9c82169d0c3a1e28225701aa5d38e90303f38",
+      "path": "work/ripx-analysis/remaining-31d960.json",
+      "source": "work/ripx-analysis/remaining-31d960.c"
+    },
+    "31cf80": {
+      "evidence_id": "ev_6561e647a9246d46204812e307bbf3c8b9ee18b40f10100662b83fa0b52cacbd",
+      "path": "work/ripx-analysis/remaining-31cf80.json",
+      "source": "work/ripx-analysis/remaining-31cf80.c"
+    },
+    "334d50": {
+      "evidence_id": "ev_b734040c3683f9b796d88cacbd3aadf29e7d56ae40f0502445165b64e0b8a681",
+      "path": "work/ripx-analysis/remaining-334d50.json",
+      "source": "work/ripx-analysis/remaining-334d50.c"
+    },
+    "350e40": {
+      "evidence_id": "ev_ac8e91f0d9281182ed1c5151d4388dc5e8fe404b1429d26aa6dd9a8589a09ed7",
+      "path": "work/ripx-analysis/remaining-350e40.json",
+      "source": "work/ripx-analysis/remaining-350e40.c"
+    },
+    "349600": {
+      "evidence_id": "ev_a8baa3b1958be32a687de1d1d2c2729d6c953329cb5b943a47b068dda3be7b59",
+      "path": "work/ripx-analysis/remaining-349600.json",
+      "source": "work/ripx-analysis/remaining-349600.c"
+    },
+    "34b460": {
+      "evidence_id": "ev_ffc91a58b13e2089e60faffbba9594c2cbcd6ee046110195ed3f762060149463",
+      "path": "work/ripx-analysis/remaining-34b460.json",
+      "source": "work/ripx-analysis/remaining-34b460.c"
+    },
+    "3492f0": {
+      "evidence_id": "ev_29c524185b9eac39be602020212c5b6099772f99832cc76a8b68ded28dddb22d",
+      "path": "work/ripx-analysis/remaining-3492f0.json",
+      "source": "work/ripx-analysis/remaining-3492f0.c"
+    },
+    "34c020": {
+      "evidence_id": "ev_ac6eacfcf6dcb36403c34abd44d7cca6741e41b2aff7230db6e48af220ef66d6",
+      "path": "work/ripx-analysis/remaining-34c020.json",
+      "source": "work/ripx-analysis/remaining-34c020.c"
+    },
+    "34c2b0": {
+      "evidence_id": "ev_1028528e4be0abd6aad0d641ffb40b2d277b48cd047bb99b53dbc2cfbd706e15",
+      "path": "work/ripx-analysis/remaining-34c2b0.json",
+      "source": "work/ripx-analysis/remaining-34c2b0.c"
+    },
+    "34bb60": {
+      "evidence_id": "ev_6d0f7476810e5bfc3a00c6e04dc3b54a2744000a4eac57f712d7c38fc1fa75bf",
+      "path": "work/ripx-analysis/remaining-34bb60.json",
+      "source": "work/ripx-analysis/remaining-34bb60.c"
+    },
+    "34c5a0": {
+      "evidence_id": "ev_27130f7250025100b2d186bf14b8392f8c384a8666c9fd6773dbafd86c8dce28",
+      "path": "work/ripx-analysis/remaining-34c5a0.json",
+      "source": "work/ripx-analysis/remaining-34c5a0.c"
+    },
+    "34ba00": {
+      "evidence_id": "ev_30f78e8e869358005f73963015cd0a657c6dd3bc9d71115be3561a5ce42cc392",
+      "path": "work/ripx-analysis/remaining-34ba00.json",
+      "source": "work/ripx-analysis/remaining-34ba00.c"
+    },
+    "34d770": {
+      "evidence_id": "ev_76a87cc10b1dcc8bccef2c7fc40475ea9bd00d6b10fbe8098c6b51153fb6cba9",
+      "path": "work/ripx-analysis/remaining-34d770.json",
+      "source": "work/ripx-analysis/remaining-34d770.c"
+    },
+    "34df10": {
+      "evidence_id": "ev_cf8579cfa2d54969aaa976d21d580c2fd0482341482f6a698ccc8f10517fdb05",
+      "path": "work/ripx-analysis/remaining-34df10.json",
+      "source": "work/ripx-analysis/remaining-34df10.c"
+    },
+    "34dd10": {
+      "evidence_id": "ev_5273b89e071a015a9f61bc3b7c980963bb16f4a98e5c9564d8d29f3783b06a47",
+      "path": "work/ripx-analysis/remaining-34dd10.json",
+      "source": "work/ripx-analysis/remaining-34dd10.c"
+    },
+    "350430": {
+      "evidence_id": "ev_785a6bdbc6f9b91e5636279c42adede482df06bb3f9def332f598edb77819952",
+      "path": "work/ripx-analysis/remaining-350430.json",
+      "source": "work/ripx-analysis/remaining-350430.c"
+    },
+    "350100": {
+      "evidence_id": "ev_a2e86d83d7edd52a6c96f2097f0687e9252af7cd157f0e302dc66faf8d1f73ab",
+      "path": "work/ripx-analysis/remaining-350100.json",
+      "source": "work/ripx-analysis/remaining-350100.c"
+    },
+    "351580": {
+      "evidence_id": "ev_583c00131f3da6046a04e22a4420332c28967530ebc9a328b3943350e98ed0ab",
+      "path": "work/ripx-analysis/remaining-351580.json",
+      "source": "work/ripx-analysis/remaining-351580.c"
+    },
+    "3514f0": {
+      "evidence_id": "ev_954e450896e455bcbef16797731adcc2ade75512564e1fe16a8a9c7b6163ff2e",
+      "path": "work/ripx-analysis/remaining-3514f0.json",
+      "source": "work/ripx-analysis/remaining-3514f0.c"
+    },
+    "351660": {
+      "evidence_id": "ev_60c88d4524ac290c737a15be7e12665b6e4d5b79b455af9791af2efed5e323c0",
+      "path": "work/ripx-analysis/remaining-351660.json",
+      "source": "work/ripx-analysis/remaining-351660.c"
+    },
+    "3516c0": {
+      "evidence_id": "ev_75a1e6fc5c7048c3e036649211809e93f1714c7fa0dde3c76af2411f00c4a178",
+      "path": "work/ripx-analysis/remaining-3516c0.json",
+      "source": "work/ripx-analysis/remaining-3516c0.c"
+    },
+    "2a0d40": {
+      "evidence_id": "ev_77886b028272600eb9be2d75c8557df129aa83cb7e8b8d467142dada67261d76",
+      "path": "work/ripx-analysis/remaining-2a0d40.json",
+      "source": "work/ripx-analysis/remaining-2a0d40.c"
+    }
+  },
+  "entrypoint": "noise/native_noise_pipeline.py::run_native_noise_task",
+  "source_validation": [
+    "All13noise modules AST parsed without importing/executing DSP",
+    "Static intermodule function call arity validated"
+  ],
+  "not_performed": [
+    "Target execution or GUI control",
+    "Audio/image/media reads",
+    "Signal or numerical tests",
+    "Runtime equivalence or performance measurements"
+  ],
+  "unknowns": [
+    "Original inactive malloc record padding values; explicit reconstruction-owned inactive zero policy is distinct",
+    "Original combined preset orchestration; caller-selected mode8 harmonic/mode0 residual composition is reconstruction scheduling",
+    "Original-runtime numerical equivalence remains unverified"
+  ],
+  "known_modes": {
+    "nonzero_mode14_flag92_false": "Actual residual0xf8 fixed fits and0x7e nonharmonic trajectories;350e40 is not called",
+    "mode14_zero_or_flag92_true": "Actual939680enabled350e40 history/classification graph"
+  }
+}

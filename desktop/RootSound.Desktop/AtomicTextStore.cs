@@ -58,6 +58,43 @@ public sealed class AtomicTextStore : IDisposable
 
     public string? Read() => ReadValidated(null);
 
+    internal T ReadStreamValidated<T>(Func<Stream, T> validate)
+    {
+        lock (gate)
+        {
+            ThrowIfDisposed();
+            using var stream = new FileStream(FilePath, FileMode.Open, FileAccess.Read, FileShare.Read);
+            if (stream.Length > MaximumBytes) throw new InvalidDataException("歌曲文件超过当前大小范围，原文件已保留。");
+            T result = validate(stream);
+            stream.Position = 0; observedHash = SHA256.HashData(stream);
+            return result;
+        }
+    }
+
+    internal void WriteStream(Action<Stream> write)
+    {
+        lock (gate)
+        {
+            ThrowIfDisposed(); RequireUnchanged();
+            string temporary = Path.Combine(directory, $".rootsound-write-{Guid.NewGuid():N}.tmp");
+            try
+            {
+                byte[] hash;
+                using (var stream = new FileStream(temporary, FileMode.CreateNew, FileAccess.ReadWrite, FileShare.None))
+                {
+                    write(stream);
+                    if (stream.Length > MaximumBytes) throw new InvalidDataException("歌曲文件超过当前大小范围，原文件没有被覆盖。");
+                    stream.Flush(true); stream.Position = 0; hash = SHA256.HashData(stream);
+                }
+                RequireUnchanged();
+                if (observedHash is null) File.Move(temporary, FilePath);
+                else File.Replace(temporary, FilePath, FilePath + ".bak");
+                observedHash = hash;
+            }
+            finally { try { File.Delete(temporary); } catch (IOException) { } catch (UnauthorizedAccessException) { } }
+        }
+    }
+
     internal string? ReadValidated(Action<string?>? validate)
     {
         lock (gate)

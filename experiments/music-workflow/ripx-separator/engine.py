@@ -231,6 +231,22 @@ def main():
     action=request.get('action','separate')
     if action=='separate': separate(request)
     elif action=='mix': mix(request)
+    elif action=='native_song':
+        sys.path.insert(0,str(ROOT/'native-core'))
+        from native_song_job import run_native_song
+        run_native_song(request,report,CONFIG)
+    elif action=='midi_rootsound':
+        from midi_document import export_rootsound_notes
+        export_rootsound_notes(request,report,CONFIG,ROOT)
+    elif action=='native_rootsound':
+        sys.path.insert(0,str(ROOT/'native-core'))
+        from native_rootsound_export import export_native_rootsound
+        export_native_rootsound(request,report,CONFIG,ROOT)
+    elif action in ('native_component_sequence','native_initial_notes'):
+        sys.path.insert(0,str(ROOT/'native-core'))
+        from native_pipeline_jobs import run_component_sequence, run_initial_notes
+        if action=='native_component_sequence': run_component_sequence(request, report, CONFIG)
+        else: run_initial_notes(request, report)
     elif action in ('native_analysis','native_components'):
         sys.path.insert(0,str(ROOT/'native-core'))
         from native_analysis_job import analyze_audio, apply_identified_components

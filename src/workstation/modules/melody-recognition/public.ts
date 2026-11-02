@@ -126,11 +126,11 @@ export function createMelodyRecognition(library: MaterialLibrary, options: { ana
       const candidate = ready();
       if (adopted) {
         const content = library.readContent(adopted.contentId); const draft = library.readDraft(adopted.draftId);
-        if (!content || !draft) return fail('已采用的乐句已被移动，请从素材库打开或重新识别。');
+        if (!content || !draft) return fail('已采用的音乐已被移动，请从素材库打开或重新识别。');
         return { content, draft };
       }
       const title = name === undefined ? candidate.phrase.name : name.trim();
-      if (!title || title.length > 4096) return fail('请给要采用的乐句起一个有效名称。');
+      if (!title || title.length > 4096) return fail('请给要采用的音乐起一个有效名称。');
       const content: ContentRecord = { ...clone(candidate.phrase), name: title };
       const { id, revision, ...fields } = content;
       const draft: Draft = { ...clone(fields), id: crypto.randomUUID(), sourceId: id, baseRevision: revision };

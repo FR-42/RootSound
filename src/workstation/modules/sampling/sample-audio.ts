@@ -1,13 +1,14 @@
 import type { MaterialLibrary } from '../../contracts/content.ts';
-import type { SampleAudioPort, SampleBody, SampleDecoderPort } from '../../contracts/sampling.ts';
+import type { SampleAudioPort, SampleBody, SampleDecoderPort, SamplePayloadPort } from '../../contracts/sampling.ts';
 import { readSampleBody } from './public.ts';
-import { copyPcm, decodeBase64, waveform } from './audio.ts';
+import { copyPcm, waveform } from './audio.ts';
+import { resolveSampleBytes } from './sample-payload.ts';
 
 import { MAX_SEQUENCE_PCM_BYTES } from '../../contracts/playback-limits.ts';
 const MAX_PREPARED_BYTES = MAX_SEQUENCE_PCM_BYTES;
 
 /** Original files decode once per identity/revision; callers borrow prepared, read-only audio. */
-export function createSampleAudio(library: MaterialLibrary, decoder: SampleDecoderPort): SampleAudioPort {
+export function createSampleAudio(library: MaterialLibrary, decoder: SampleDecoderPort, payloads?: SamplePayloadPort): SampleAudioPort {
   type Prepared = ReturnType<SampleAudioPort['readPrepared']>;
   type Header = { id: string; revision: number; decoded: SampleBody['decoded']; bytes: number };
   const cache = new Map<string, { token: string; bytes: number; value: Prepared }>();
@@ -54,7 +55,7 @@ export function createSampleAudio(library: MaterialLibrary, decoder: SampleDecod
       const record = library.readContent(item.id);
       if (!record || record.revision !== item.revision) throw new Error('原始采样已发生变化，请重新准备声音。');
       const body = readSampleBody(record.body);
-      const audio = copyPcm(await decoder.decode(decodeBase64(body.audio.data, body.audio.byteLength)));
+      const audio = copyPcm(await decoder.decode(await resolveSampleBytes(body.audio, payloads)));
       if (info(item.id).revision !== item.revision) throw new Error('解码期间原始采样发生变化，请重试。');
       if (audio.sampleRate !== item.decoded.sampleRate || audio.channels.length !== item.decoded.channels || audio.channels[0]!.length !== item.decoded.frames) throw new Error('解码结果与原始采样记录不一致，未采用这份声音。');
       const value: Prepared = Object.freeze({ id: item.id, revision: item.revision,

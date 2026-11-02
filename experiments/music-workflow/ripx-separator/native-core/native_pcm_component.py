@@ -88,6 +88,9 @@ def add_component_inplace(pcm, start, hop, sample_rate, amplitude, frequency, ph
     right = min(hop // 2, len(pcm) - end)
     first = start - left + 1
     position, increment = phase_state(frequency, sample_rate, phase_at_start, left)
+    from native_loop_kernels import add_component
+    if add_component(pcm,start,hop,amplitude,position,increment):
+        return first,max(first,end+right)
     table = native_sine_table()
     index = first
 

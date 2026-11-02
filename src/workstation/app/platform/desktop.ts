@@ -7,6 +7,8 @@ import type { ProjectDirectoriesPort } from '../../contracts/project-directory.t
 import { createDesktopProjectDirectories, type NativeProjectDirectoriesBridge } from './project-directories.ts';
 import type { TimbreFilesPort } from '../../contracts/timbre-files.ts';
 import { createDesktopTimbreFiles, type NativeTimbreFilesBridge } from './timbre-files.ts';
+import { createDesktopSamplePayloads } from './sample-payloads.ts';
+import type { SamplePayloadPort } from '../../contracts/sampling.ts';
 
 export const DESKTOP_ORIGIN = 'https://rootsound.local';
 
@@ -83,6 +85,7 @@ export function createDesktopPlatform(bridge: DesktopBridge = hostBridge()): {
   audioFiles: AudioFilesPort;
   projectFiles: ProjectFilesPort;
   sampleFiles: SampleFilesPort;
+  samplePayloads: SamplePayloadPort;
   timbreFiles: TimbreFilesPort;
   projectDirectories?: ProjectDirectoriesPort;
 } {
@@ -90,6 +93,7 @@ export function createDesktopPlatform(bridge: DesktopBridge = hostBridge()): {
   return {
     ...(bridge.projectDirectories ? { projectDirectories: createDesktopProjectDirectories(bridge.projectDirectories) } : {}),
     sampleFiles: createDesktopSampleFiles(bridge.sampleFiles),
+    samplePayloads: createDesktopSamplePayloads(),
     timbreFiles: createDesktopTimbreFiles(bridge.timbreFiles),
     projectFiles: {
       async open() {

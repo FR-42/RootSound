@@ -28,7 +28,7 @@ export function createSongPhraseAudition(options: {
     if (disposed) return;
     if (event.type === 'device') {
       if (event.status === 'failed' && (state.playing || state.preparing)) {
-        stop(); options.onError(new Error(event.error ?? '暂时无法演奏这个乐句。'));
+        stop(); options.onError(new Error(event.error ?? '暂时无法演奏这个音乐。'));
       }
       return;
     }
@@ -37,13 +37,13 @@ export function createSongPhraseAudition(options: {
       state = { ...state, playing: event.session.status === 'playing', preparing: false }; changed(); return;
     }
     sessionId = undefined; state = { playing: false, preparing: false }; changed();
-    if (event.session.status === 'failed') options.onError(new Error(event.session.error ?? '暂时无法演奏这个乐句。'));
+    if (event.session.status === 'failed') options.onError(new Error(event.session.error ?? '暂时无法演奏这个音乐。'));
   });
   return {
     read: () => ({ ...state }),
     async toggle(id) {
       if (disposed) return;
-      if (!id.trim()) { options.onError(new Error('找不到要演奏的乐句。')); return; }
+      if (!id.trim()) { options.onError(new Error('找不到要演奏的音乐。')); return; }
       if (state.phraseId === id && (state.playing || state.preparing)) { stop(); return; }
       stop(); const expected = ++generation; const controller = new AbortController(); request = controller;
       state = { phraseId: id, playing: false, preparing: true }; changed();
@@ -53,7 +53,7 @@ export function createSongPhraseAudition(options: {
         request = undefined;
         if (session.status === 'ended' || session.status === 'stopped' || session.status === 'failed') {
           state = { playing: false, preparing: false }; changed();
-          if (session.status === 'failed') options.onError(new Error(session.error ?? '暂时无法演奏这个乐句。'));
+          if (session.status === 'failed') options.onError(new Error(session.error ?? '暂时无法演奏这个音乐。'));
           return;
         }
         sessionId = session.id; state = { phraseId: id, playing: session.status === 'playing', preparing: false }; changed();

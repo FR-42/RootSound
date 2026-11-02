@@ -8,7 +8,7 @@ import { createSampleReferenceAdapter } from '../modules/sampling/public.ts';
 
 function currentSong(library: MaterialLibrary, draftId: string) {
   const draft = library.readDraft(draftId);
-  if (!draft) throw new Error('先打开一首歌曲，再新建或保留乐句。');
+  if (!draft) throw new Error('先打开一首歌曲，再新建或保留音乐。');
   createSongReferenceAdapter().slots(draft);
   const view = library.currentProjectView?.(draftId);
   if (!view || view.project.id !== draft.id) throw new Error('找不到当前歌曲的素材列表，请重新打开项目。');
@@ -17,7 +17,7 @@ function currentSong(library: MaterialLibrary, draftId: string) {
 function requireSaved(result: SaveResult): { content: ContentRecord; draft: Extract<SaveResult, { status: 'saved' }>['draft'] } {
   if (result.status === 'saved') return result;
   throw new Error(result.status === 'storage-error' ? result.message
-    : result.status === 'conflict' ? result.reason : '未能准备新乐句，原工程已保留。');
+    : result.status === 'conflict' ? result.reason : '未能准备新音乐，原工程已保留。');
 }
 function committed(result: ReturnType<MaterialLibrary['commitTransaction']>): void {
   if (result.status === 'committed') return;
@@ -44,7 +44,7 @@ function privateSoundGraph(library: MaterialLibrary, scope: string, names: Map<s
   const owners = new Map([createTimbreReferenceAdapter(), createSampleReferenceAdapter()].map(adapter => [adapter.kind, adapter]));
   const copied = new Map<string, ContentRecord>(); const visiting = new Set<string>(); const created: ContentRecord[] = [];
   function adopt(id: string): ContentRecord {
-    const record = library.readContent(id); if (!record) throw new Error('乐句所需的音色或采样不存在。');
+    const record = library.readContent(id); if (!record) throw new Error('音乐所需的音色或采样不存在。');
     const owner = library.projectScopeOf?.({ type: 'content', id });
     if (owner && owner !== scope) throw new Error('不能使用另一首歌曲的音色或采样。');
     if (owner === scope) return record;
@@ -64,15 +64,15 @@ function prepareProjectPhrase(library: MaterialLibrary, songDraftId: string, tim
   const expectedToken = library.currentToken();
   const { draft: song, view, scope } = currentSong(library, songDraftId);
   const initialTempo = tempoBpm ?? songGridTempoAt(readSongBody(song.body), 0);
-  if (!Number.isFinite(initialTempo) || initialTempo < 40 || initialTempo > 240) throw new Error('新乐句速度必须在 40 至 240 之间。');
+  if (!Number.isFinite(initialTempo) || initialTempo < 40 || initialTempo > 240) throw new Error('新音乐速度必须在 40 至 240 之间。');
   const local = [...library.listContentInfo().filter(item => library.projectScopeOf?.({ type: 'content', id: item.id }) === scope),
     ...library.listDrafts().filter(item => library.projectScopeOf?.({ type: 'draft', id: item.id }) === scope),
     ...view.contents, ...view.drafts];
   const phraseNames = new Set(local.filter(item => item.kind === 'rootsound.phrase').map(item => nameKey(item.name)));
   const voiceNames = new Set(local.filter(item => item.kind === 'rootsound.timbre').map(item => nameKey(item.name)));
   let number = 1;
-  while (phraseNames.has(nameKey(`乐句 ${number}`)) || voiceNames.has(nameKey(`乐句 ${number} 音色`))) number++;
-  const name = `乐句 ${number}`;
+  while (phraseNames.has(nameKey(`音乐 ${number}`)) || voiceNames.has(nameKey(`音乐 ${number} 音色`))) number++;
+  const name = `音乐 ${number}`;
   const staging = createMaterialLibrary();
   let voice: ContentRecord; let created: ContentRecord[];
   if (timbreId !== undefined) {
@@ -129,20 +129,20 @@ export function copyProjectPhrase(library: MaterialLibrary, songDraftId: string,
   const expectedToken = library.currentToken();
   const { draft: song, view, scope } = currentSong(library, songDraftId);
   const source = library.readDraft(phraseDraftId);
-  if (!source) throw new Error('先打开要另存的乐句。');
+  if (!source) throw new Error('先打开要另存的音乐。');
   const adapter = createPhraseReferenceAdapter(); adapter.slots(source);
   const owner = library.projectScopeOf?.({ type: 'draft', id: source.id });
-  if (owner && owner !== scope) throw new Error('不能另存另一首歌曲的乐句。');
+  if (owner && owner !== scope) throw new Error('不能另存另一首歌曲的音乐。');
   const references = createReferenceEditing(library, [createTimbreReferenceAdapter(), adapter,
     createSongReferenceAdapter(), createSampleReferenceAdapter()]);
   if (references.sessions().some(session => session.context?.root.type === 'draft' && session.context.root.id === source.id)) {
-    throw new Error('先完成或取消正在调整的音色，再另存乐句。');
+    throw new Error('先完成或取消正在调整的音色，再另存音乐。');
   }
   const names = projectNames(library, scope);
   let number = 1;
-  while (names.get('rootsound.phrase')?.has(nameKey(`乐句 ${number}`))
-    || names.get('rootsound.timbre')?.has(nameKey(`乐句 ${number} 音色`))) number++;
-  const name = `乐句 ${number}`;
+  while (names.get('rootsound.phrase')?.has(nameKey(`音乐 ${number}`))
+    || names.get('rootsound.timbre')?.has(nameKey(`音乐 ${number} 音色`))) number++;
+  const name = `音乐 ${number}`;
   const graph = privateSoundGraph(library, scope, names);
   const fields = adapter.replace(source, adapter.slots(source).map(slot => ({ slotId: slot.id, targetId: graph.adopt(slot.targetId).id })));
   const record: ContentRecord = { id: crypto.randomUUID(), kind: source.kind, owner: source.owner,
@@ -164,12 +164,12 @@ export function copyProjectPhrase(library: MaterialLibrary, songDraftId: string,
 export function retainProjectPhrases(library: MaterialLibrary, songDraftId: string, ids: string[]): void {
   const expectedToken = library.currentToken();
   const { draft: song, view, scope } = currentSong(library, songDraftId);
-  if (!Array.isArray(ids) || ids.some(id => typeof id !== 'string' || !id)) throw new Error('要保留的乐句标识无效。');
+  if (!Array.isArray(ids) || ids.some(id => typeof id !== 'string' || !id)) throw new Error('要保留的音乐标识无效。');
   const accessible = new Set((library.listContentInfoForDraft?.(songDraftId) ?? view.contents).map(item => item.id));
   const phrases = createPhrasePlayback(library, createTimbrePlayback(library));
   const unique = [...new Set(ids)];
   for (const id of unique) {
-    if (!accessible.has(id)) throw new Error('这份乐句不属于当前歌曲可使用的素材。');
+    if (!accessible.has(id)) throw new Error('这份音乐不属于当前歌曲可使用的素材。');
     phrases.readSaved(id);
   }
   const members = [...new Set([...view.memberIds, ...unique])];
@@ -182,7 +182,7 @@ export function retainProjectPhrases(library: MaterialLibrary, songDraftId: stri
     const source = library.readContent(id)!;
     const working = library.listDrafts().filter(draft => draft.sourceId === id);
     if (working.some(draft => draft.editingContext || draft.name !== source.name || !same(draft.body, source.body) || !same(draft.dependencies, source.dependencies))) {
-      throw new Error('先完成或取消正在编辑的乐句，再加入乐句库。');
+      throw new Error('先完成或取消正在编辑的音乐，再加入音乐库。');
     }
     const adapter = createPhraseReferenceAdapter();
     const replacement = { ...source, ...adapter.replace(source, adapter.slots(source).map(slot => ({ slotId: slot.id, targetId: graph.adopt(slot.targetId).id }))),
@@ -192,7 +192,7 @@ export function retainProjectPhrases(library: MaterialLibrary, songDraftId: stri
     for (const draft of working) drafts.push({ expected: draft, replacement: { ...draft, name: replacement.name,
       body: structuredClone(replacement.body), dependencies: [...replacement.dependencies], baseRevision: replacement.revision } });
   }
-  committed(library.commitTransaction({ expectedToken, label: '在本曲乐句库保留乐句',
+  committed(library.commitTransaction({ expectedToken, label: '在本曲音乐库保留音乐',
     ...(graph.created.length ? { createContents: graph.created } : {}),
     ...(replacements.length ? { replaceContents: replacements, replaceDrafts: drafts,
       exactNameIds: [...graph.created.map(record => record.id), ...replacements.map(item => item.replacement.id), ...drafts.map(item => item.replacement.id)] } : {}),
@@ -208,7 +208,7 @@ const phraseCatalogs = new WeakMap<MaterialLibrary, { token: string; songId: str
 
 function savedPhraseInfo(library: MaterialLibrary, phraseId: string): ProjectPhraseInfo {
   const phrase = library.readContent(phraseId);
-  if (!phrase || phrase.kind !== 'rootsound.phrase' || phrase.owner !== 'phrase' || phrase.schemaVersion !== 1) throw new Error('找不到当前支持的乐句。');
+  if (!phrase || phrase.kind !== 'rootsound.phrase' || phrase.owner !== 'phrase' || phrase.schemaVersion !== 1) throw new Error('找不到当前支持的音乐。');
   createPhraseReferenceAdapter().slots(phrase);
   const body = readPhraseBody(phrase.body);
   return { id: phrase.id, name: phrase.name, tempoBpm: body.tempoBpm, durationSeconds: body.lengthBeats * 60 / body.tempoBpm };
@@ -233,7 +233,7 @@ export function readProjectPhraseInfo(library: MaterialLibrary, songDraftId: str
   const { view, scope } = currentSong(library, songDraftId);
   const eligible = library.listContentInfoForDraft?.(songDraftId) ?? view.contents;
   const owner = library.projectScopeOf?.({ type: 'content', id: phraseId });
-  if (!eligible.some(item => item.id === phraseId) || owner && owner !== scope) throw new Error('这份乐句不属于当前歌曲。');
+  if (!eligible.some(item => item.id === phraseId) || owner && owner !== scope) throw new Error('这份音乐不属于当前歌曲。');
   return savedPhraseInfo(library, phraseId);
 }
 
@@ -255,7 +255,7 @@ export function discardProjectPhraseDraft(library: MaterialLibrary, songDraftId:
   const expectedToken = library.currentToken(); const { scope } = currentSong(library, songDraftId);
   const draft = library.readDraft(phraseDraftId);
   if (!draft || draft.kind !== 'rootsound.phrase' || library.projectScopeOf?.({ type: 'draft', id: draft.id }) !== scope)
-    throw new Error('这份乐句草稿不属于当前歌曲。');
+    throw new Error('这份音乐草稿不属于当前歌曲。');
   const closing = new Set([draft.id]); const all = library.listDrafts(); let added = true;
   while (added) {
     added = false;
@@ -265,13 +265,13 @@ export function discardProjectPhraseDraft(library: MaterialLibrary, songDraftId:
   const replaceDrafts: { expected: Draft; replacement: Draft }[] = [];
   if (draft.sourceId) {
     const source = library.readContent(draft.sourceId);
-    if (!source || source.kind !== draft.kind) throw new Error('原乐句已变化，草稿暂时保留，请重新打开。');
+    if (!source || source.kind !== draft.kind) throw new Error('原音乐已变化，草稿暂时保留，请重新打开。');
     createPhraseReferenceAdapter().slots(source);
     replaceDrafts.push({ expected: draft, replacement: { id: draft.id, sourceId: source.id, baseRevision: source.revision,
       ...(draft.projectRootId ? { projectRootId: draft.projectRootId } : {}), kind: source.kind, owner: source.owner,
       schemaVersion: source.schemaVersion, name: source.name, dependencies: [...source.dependencies], body: structuredClone(source.body) } });
   }
-  committed(library.commitTransaction({ expectedToken, label: '放弃乐句草稿', deleteDrafts, replaceDrafts }));
+  committed(library.commitTransaction({ expectedToken, label: '放弃音乐草稿', deleteDrafts, replaceDrafts }));
 }
 
 /** Project save is never permission to publish another editor's pending phrase work. */
@@ -298,7 +298,7 @@ export function deleteProjectPhrase(library: MaterialLibrary, songDraftId: strin
   const expectedToken = library.currentToken();
   const { scope } = currentSong(library, songDraftId);
   if (!readProjectPhrases(library, songDraftId).some(item => item.id === phraseId)
-    || library.projectScopeOf?.({ type: 'content', id: phraseId }) !== scope) throw new Error('这份乐句不属于当前歌曲的乐句库。');
+    || library.projectScopeOf?.({ type: 'content', id: phraseId }) !== scope) throw new Error('这份音乐不属于当前歌曲的音乐库。');
   const source = library.readContent(phraseId)!;
   const contents = library.listContent(); const drafts = library.listDrafts();
   const object = (value: unknown): value is Record<string, unknown> => !!value && typeof value === 'object' && !Array.isArray(value);
@@ -349,7 +349,7 @@ export function deleteProjectPhrase(library: MaterialLibrary, songDraftId: strin
       || songBody?.hiddenPhraseIds?.includes(phraseId) || songBody?.phraseShelfOrder?.includes(phraseId);
     if (!contains) continue;
     if (record.kind !== 'rootsound.song' || library.projectScopeOf?.({ type: 'content', id: record.id }) !== scope)
-      throw new Error('另一个作品仍在使用这份乐句，请先处理对应使用位置。');
+      throw new Error('另一个作品仍在使用这份音乐，请先处理对应使用位置。');
     const replacement = { ...record, ...withoutPhrase(record), revision: record.revision + 1 };
     savedChanges.set(record.id, replacement); contentUpdates.push({ expected: record, replacement });
   }
@@ -375,19 +375,19 @@ export function deleteProjectPhrase(library: MaterialLibrary, songDraftId: strin
     if (draft.dependencies.includes(phraseId)
       || songBody?.hiddenPhraseIds?.includes(phraseId) || songBody?.phraseShelfOrder?.includes(phraseId)) {
       if (draft.kind !== 'rootsound.song' || library.projectScopeOf?.({ type: 'draft', id: draft.id }) !== scope)
-        throw new Error('另一份编辑稿仍在使用这份乐句，请先处理对应使用位置。');
+        throw new Error('另一份编辑稿仍在使用这份音乐，请先处理对应使用位置。');
       replacement = { ...replacement, ...withoutPhrase(draft) };
     }
     const sourceChange = draft.sourceId ? savedChanges.get(draft.sourceId) : undefined;
     if (sourceChange && draft.baseRevision === sourceChange.revision - 1) replacement.baseRevision = sourceChange.revision;
     if (draft.editingContext && mentions(draft.editingContext)) {
-      if (library.projectScopeOf?.({ type: 'draft', id: draft.id }) !== scope) throw new Error('其他歌曲的编辑仍在使用这份乐句，当前未删除。');
+      if (library.projectScopeOf?.({ type: 'draft', id: draft.id }) !== scope) throw new Error('其他歌曲的编辑仍在使用这份音乐，当前未删除。');
       replacement.editingContext = repairContext(draft.editingContext) as Draft['editingContext'];
-      if (mentions(replacement.editingContext)) throw new Error('还有未完成的联合编辑使用这份乐句，请先完成或取消后再删除。');
+      if (mentions(replacement.editingContext)) throw new Error('还有未完成的联合编辑使用这份音乐，请先完成或取消后再删除。');
     }
     if (!same(draft, replacement)) draftUpdates.push({ expected: draft, replacement });
   }
-  committed(library.commitTransaction({ expectedToken, label: '永久删除本曲乐句', permanentDelete: true,
+  committed(library.commitTransaction({ expectedToken, label: '永久删除本曲音乐', permanentDelete: true,
     deleteContents: [source], deleteDrafts: drafts.filter(draft => deletedDrafts.has(draft.id)),
     replaceContents: contentUpdates, replaceDrafts: draftUpdates,
   }));
@@ -400,15 +400,15 @@ export function renameProjectPhrase(library: MaterialLibrary, songDraftId: strin
   readProjectPhraseInfo(library, songDraftId, phraseId);
   const source = library.readContent(phraseId)!;
   const name = input.trim();
-  if (!name) throw new Error('乐句名称不能为空。');
-  if ([...name].length > 80) throw new Error('乐句名称请控制在 80 个字以内。');
+  if (!name) throw new Error('音乐名称不能为空。');
+  if ([...name].length > 80) throw new Error('音乐名称请控制在 80 个字以内。');
   const body = readSongBody(song.body);
   const clip = ref ? body.tracks.find(track => track.id === ref.trackId)?.clips.find(item => item.id === ref.clipId) : undefined;
-  if (ref && (!clip || clip.phraseId !== phraseId)) throw new Error('这个乐句使用位置已改变，请重新选择。');
+  if (ref && (!clip || clip.phraseId !== phraseId)) throw new Error('这个音乐使用位置已改变，请重新选择。');
   if (name === source.name) return { id: source.id };
   const working = library.listDrafts().filter(draft => draft.sourceId === source.id);
   if (working.some(draft => draft.editingContext || draft.name !== source.name || !same(draft.body, source.body) || !same(draft.dependencies, source.dependencies))) {
-    throw new Error('先完成或取消正在编辑的乐句，再改名。');
+    throw new Error('先完成或取消正在编辑的音乐，再改名。');
   }
   const adapters = [createSongReferenceAdapter(), createPhraseReferenceAdapter(), createTimbreReferenceAdapter()];
   const usage = countUsagePositions(library.listContent(), library.listDrafts(), adapters).get(source.id) ?? 0;
@@ -429,12 +429,12 @@ export function renameProjectPhrase(library: MaterialLibrary, songDraftId: strin
     }
     const copied = new Map<string, ContentRecord>(); const visiting = new Set<string>();
     function adopt(id: string): ContentRecord {
-      const content = library.readContent(id); if (!content) throw new Error('乐句缺少音色或采样，原内容已保留。');
+      const content = library.readContent(id); if (!content) throw new Error('音乐缺少音色或采样，原内容已保留。');
       if (library.projectScopeOf?.({ type: 'content', id }) === scope) return content;
       const previous = copied.get(id); if (previous) return previous;
-      if (visiting.has(id)) throw new Error('乐句素材出现循环引用，原内容已保留。');
+      if (visiting.has(id)) throw new Error('音乐素材出现循环引用，原内容已保留。');
       visiting.add(id);
-      const owner = owners.get(content.kind); if (!owner) throw new Error('暂不支持采用这份乐句所需的素材类型。');
+      const owner = owners.get(content.kind); if (!owner) throw new Error('暂不支持采用这份音乐所需的素材类型。');
       const changes = owner.replace(content, owner.slots(content).map(slot => ({ slotId: slot.id, targetId: adopt(slot.targetId).id })));
       const taken = names.get(content.kind) ?? new Set<string>();
       let nextName = content.name; let number = 1;
@@ -453,7 +453,7 @@ export function renameProjectPhrase(library: MaterialLibrary, songDraftId: strin
       dependencies: [...new Set(body.tracks.flatMap(track => track.clips.map(item => item.phraseId)))] } });
   } else for (const draft of working) updates.push({ expected: draft,
     replacement: { ...draft, name, baseRevision: replacement.revision } });
-  committed(library.commitTransaction({ expectedToken, anchorDraftId: song.id, label: ref ? '修改此处乐句名称' : '修改本曲乐句名称',
+  committed(library.commitTransaction({ expectedToken, anchorDraftId: song.id, label: ref ? '修改此处音乐名称' : '修改本曲音乐名称',
     ...(fork ? { createContents: [...created, replacement] } : { replaceContents: [{ expected: source, replacement }] }),
     replaceDrafts: updates,
     exactNameIds: [replacement.id, ...updates.filter(update => update.expected.id !== song.id).map(update => update.replacement.id)],

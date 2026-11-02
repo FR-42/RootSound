@@ -1,5 +1,356 @@
 # RootSound TODO
 
+## RB100 La Campanella compound-beat grid — IMPLEMENTED 2026-11-02
+
+- User asks to apply the discussed grid correction. Revised only the existing
+  saved La Campanella project:60 dotted-quarter pulses/minute,2 pulses/bar,
+  3 eighth-note cells/pulse. Rebased starts, beat durations, extent and pickup by
+  60/90 rather than merely changing BPM; every original onset/hold second and
+  other note property remains unchanged. Does not quantize expressive MIDI or
+  claim a listening/rhythm reconstruction; source bar alignment remains approximate.
+- Original saved file backed up in experiments/liszt-la-campanella/grid-revision;
+  guarded native project lock and before-hash comparison precede atomic replacement.
+  Actual detailed-grid calculation verifies six cells/bar, beat at cells0/3,
+  bar lines every2s. Fresh domain reopen with external assets forbidden verifies
+  all4077 pitches/onsets/held seconds/velocities and sample events.
+- Experiment writer now accepts stepsPerBeat, default4 unchanged. Generator,
+  delivery/source records and verification updated for the corrected preset;
+  no application code/default grid change, no EXE build needed. Evidence
+  `.test-output/rb100-grid-*` and grid-revision/report.json. No desktop control,
+  heavy-file validation or actual audition. Prior RB99 grid coordinates superseded.
+
+## RB99 Editable Liszt La Campanella — DELIVERED 2026-11-02
+
+- User requests Liszt's La Campanella piano piece. Delivered the distinct default
+  library file project/李斯特 · 钟 La Campanella S.141 No.3.rootsound,5.16MB,
+  4077 editable notes in one piano family, source extent293.32s. Existing projects
+  untouched; no application source change or new EXE build required.
+- Public complete performance MIDI from Alex's Piano Service / Kuhmann–Disklavier
+  World Classical5; original4077 pitches/onsets/velocities retained. Zeroed466
+  CC64 events only in a private MIDI copy, shortening2414 pedal-expanded holds to
+  key-down durations; median61ms,p95 146ms,max3.08s, modest60ms voice release.
+  This is a sourced rendition of Liszt, not a newly composed work or live recording.
+- Downloaded the public Noctave score as reference; its embedded CC0 notice does
+  not establish the separate performance MIDI's license. Kept provenance separate.
+  MIDI fixed120 clock encodes expressive seconds rather than a reliable score
+  grid. Use90 quarter BPM/3 quarter beats per bar as provisional6/8 edit coordinates,
+  preserving exact onset/hold seconds without claiming bar-perfect alignment.
+- Extended only experiment writer's optional beatsPerBar (old default4 unchanged).
+  Embedded piano recordings and bank license; fresh domain reopen with external
+  sources forbidden verifies all4077 sample events and all source pitch/onset/
+  key-hold/velocity values. Sources/result/verification in experiments/liszt-la-campanella;
+  logs `.test-output/rb99-campanella-*`. No heavy-file checks, user-project reads,
+  desktop automation or actual audio-device audition; listening acceptance pending.
+
+## RB98 Selected-family playback and shorter delivered piano holds — IMPLEMENTED 2026-11-02
+
+- Detailed editor reports family-only selection to composition transport; its
+  temporary body filters by exact part ID for preparation/playback/live previews.
+  Clear or individual-note selection restores the complete body. Running updates
+  retain the head, empty family is silent, deletion cannot leave a stale scope.
+  Selection changes during asynchronous preparation reprepare the latest family.
+  Musical drafts, mute flags and disk saves are unaffected by listening selection.
+-95 small music checks pass, including same-sound different families, selection
+  during delayed preparation, live switching, empty family, clear/note selection,
+  deletion and unchanged musical storage. Build0 warnings/errors, release
+  20261102-151641-863-6fa077; root EXE updated. Evidence `.test-output/rb98-*`.
+- Read the two explicitly requested current saved projects, not generator output:
+  user's V3 had4 retained families/3147 notes; Mitsuha had2/712. Replaced2153/679
+  original pedal-expanded holds with raw key-down time from private MIDI copies
+  whose CC64 values are zeroed. Original MIDI and general importer unchanged.
+  User-adjusted duration fields would be excluded; none differed in these files.
+  Other note properties, sounds, removed parts and project identities preserved.
+- Fresh domain reopen and embedded-only preparation verify all3147/712 sample
+  events and exact expected bodies. Before snapshots, staged revisions, per-note
+  changes and verification in experiments/two-music-projects/duration-revision.
+  Wrote back only after same native per-project locks and before-hash checks;
+  `.bak` files and other projects untouched. No heavy-file tests, desktop control
+  or actual audition; shorter holds' listening quality awaits user assessment.
+
+## RB97 C-only labels and two editable arrangements — IMPLEMENTED 2026-11-02
+
+- Vertical keyboard prints only Cn; below22px columns use stacked letter/octave.
+  All pitch buttons, full accessible names/hover labels and equal widths remain.
+  Narrow/wide zoom tests cover this without music edits;94 small music checks pass.
+- Delivered two distinct self-contained files under project, preserving existing
+  projects: V3 · 悲怆第三乐章 · 节奏编配 (6.30MB,172.5s,4632notes,7parts), and
+  三葉のテーマ · 钢琴与弦乐编配 (7.81MB,234.49s,850notes,4parts).
+- V3 retains aqtq314's complete2713-note public piano transcription from the
+  author's video/shared MIDI, adds newly arranged electric bass/kick/snare/hats/
+  crash. Mitsuha retains712 piano notes from callmeyyzx/midi and adds94 viola plus
+  44 cello notes; these strings are newly arranged, not original OST transcription.
+  Source pitches/onsets/held seconds preserved. Mitsuha uses fixed62BPM editing
+  coordinates to retain source rubato timing; source meter changes are not mapped.
+- GeneralUser GS recordings/license embedded. Fresh domain reopen with external
+  assets forbidden verifies all4632/850 sample events and retained source timing.
+  Sources/arrangement distinctions/results/verification in experiments/two-music-projects.
+  Source MIDI publication does not establish commercial rights; no such claim made.
+- Build0 warnings/errors, release20261102-144457-045-29e47f, EXE updated. Evidence
+  `.test-output/rb97-*`. No user-project reads/overwrites, heavy-file validation,
+  desktop control or actual audio-device audition; listening acceptance pending.
+
+## RB96 Vertical workspace and Chopin nocturne — IMPLEMENTED 2026-11-02
+
+- Active music editor is time-downward, keyboard low-to-high above equal-width
+  pitch columns, ruler at left and extension below. Removed active bottom console;
+  family double-click replaces sound. Transposed painting, hit tests, head seeking,
+  resize, two-axis pan, drag/create/erase, wheel/arrow zoom and entry centering.
+- Local context marks orientation; older pitch offsets recenter instead of applying
+  reversed horizontal coordinates. New-score pitch fit12–32px; rendering culls notes
+  outside the time window, retaining selection/active gestures. Shared legacy route
+  remains internal for compatibility, with equal black/white sizes too.
+- Added optional beatsPerBar/pickupBeats domain fields and correct grid/downbeats
+  plus measure extension, retaining old4/0 defaults. No new meter UI.
+- Delivered project/肖邦 · 降B小调夜曲 Op.9 No.1.rootsound, about3.9MB,1714 notes
+  (697 right/1017 left), source duration264.31s,116 BPM,6/4 with3-beat pickup; two
+  independent piano families, all used-zone recordings and bank license embedded.
+  Exact source pitches/onsets/pedal-expanded durations retained, velocity balance
+  adjusted. Mutopia transcription by Benjamin D. Esham, CC BY-SA2.5, attribution in
+  project metadata and experiments/chopin-nocturne-op9-no1/SOURCE.txt.
+-93 small checks pass, including vertical physical axes/drag/resize/seek/context,
+  equal lanes and visible-note culling; musical delivery reopened through the domain
+  and all1714 sample events planned. Build0 warnings/errors, release
+  20261102-141226-151-1e0df6, EXE updated. Evidence `.test-output/rb96-*` and experiment
+  result.json. No existing user project was read/overwritten, no heavy stress test,
+  desktop automation or physical audition. Actual listening acceptance remains user-owned.
+
+## RB95 Project workspace memory and family duration defaults — IMPLEMENTED 2026-11-02
+
+- Added project-ID-scoped local context adapter and passed it from desktop bootstrap
+  through studio/composition into the roll. Restores viewport/spacing, valid selected
+  family/note, paused transport position and entry state without changing music.
+  Missing note falls back to its surviving family, without reviving a musical draft.
+- Coalesced200ms small context writes, immediate explicit flush/dispose, no music
+  serialization in context; internal interaction flushes do not force local writes.
+- Per-family last adjusted seconds persist locally. Commit duration input/resize/
+  wheel or a changed drawing length to set it; mouse click and keyboard generation
+  reuse exact held seconds while keyboard cursor steps remain unchanged.
+-90 small checks pass: context roundtrip/project isolation/stale storage, full shell
+  playhead restore, roll reopen/selection/missing-note fallback, no music writes,
+  independent non-grid family lengths and mouse/keyboard/resize/wheel paths. Build
+  zero warnings/errors, release20261102-110026-200-e883c7; EXE updated. Evidence
+  `.test-output/rb95-*`; no user projects, heavy-file checks or desktop automation.
+
+## RB94 Short notes, adaptive grid and narrower black rows — IMPLEMENTED 2026-11-02
+
+- Replaced UI10ms resize/input floor with shared0.1ms audio minimum; beat storage
+  permits corresponding short durations. Duration wheel scales down its increment
+  below100ms. Beat-only playback also respects the sound runtime's minimum hold.
+- Initial grid draws only beat/bar lines. At48px per configured cell, show cells;
+  deeper zoom adds binary subdivisions and matching draw/move resolution without
+  changing configured keyboard entry. Zoom cap256, subdivision cap4096 (retaining
+  base-grid multiples); grid generation is viewport-bounded, not whole-score.
+- Cached weighted pitch layout makes black rows80% height. Drawing, dragging,
+  notes, labels, scroll/zoom anchors and octave-entry reveal share that geometry.
+-85 small music checks and7 selected duration/navigation regressions pass. Includes
+  0.1ms input/resize, fine wheel, finer-grid drawing, black-row drag/hit geometry,
+  n2/3/4/9 grid levels and bounded deep-zoom generation; no user/heavy files or
+  desktop automation. Build0 warnings/errors, release20261102-103057-396-7c3986;
+  RootSound.exe updated, evidence `.test-output/rb94-*`.
+
+## RB93 EXE-only launch and lighter project loading — IMPLEMENTED 2026-11-02
+
+- Removed RootSound.bat, updated launcher/native recovery text and the README's
+  single entry reference. RootSound.exe continues directly selecting the built
+  application; developer scripts remain separate.
+- Canonical library listing reads a metadata prefix (normally4KiB, bounded64KiB)
+  rather than decoding every embedded library/audio string. Reordered headers fall
+  back compatibly. Full opening still validates; list discovery is not body validation.
+- Draft reads/updates no longer hash the disk file on each host call; explicit Save
+  retains full source fingerprint conflict protection. Opening defers derived sound
+  mirror generation and roll entry no longer repeats synchronization.
+-78 music checks,19 native checks with fixtures at most64KiB, and44 launcher checks
+  passed (2 optional junction checks skipped). New native cases prove bounded header
+  discovery, reordered compatibility, draft access with the source exclusively locked,
+  no eager mirror, and preserved same-size/same-time conflict protection. Build zero
+  warnings/errors; release20261102-101900-592-e80a1b. Evidence `.test-output/rb93-*`.
+  No user projects, heavy-file validation, visible UI automation or physical audio.
+  Real project/cold-start wall time has not been measured; no speedup ratio claimed.
+
+## RB92 Hover-scoped note duration wheel — IMPLEMENTED 2026-11-02
+
+- Unmodified wheel adjusts duration only over the selected note or its resize
+  handle, matched by both family and note IDs. Blank canvas and unselected notes
+  scroll vertically; selection and existing modifier navigation remain intact.
+-14 small checks passed:7 current workspace integrations (including hover/blank/
+  other-family/same-family/resize-child and modifier cases) and7 selected legacy
+  duration/navigation regressions. Desktop package rebuilt; no user projects,
+  heavy files, physical audio or desktop automation used. Evidence `.test-output/rb92-*`.
+
+## RB91 Piano-roll spacing and wheel axes — IMPLEMENTED 2026-11-02
+
+- Default detail view uses32px cells/rows instead of fitting the whole score. First
+  entry through the music shell uses the new view, while later visits retain the
+  user's viewport. Subdivision edits and undo preserve cell width by proportional
+  horizontal zoom without changing written note coordinates or held seconds.
+- Wheel axes now match on pitch labels/canvas: vertical normally, horizontal with
+  Shift; Ctrl zooms that same axis. Selected-note plain-wheel duration editing stays.
+-77 small music checks and7 selected navigation/duration regressions passed; new
+  tests include1024-beat geometry,2/4/9 subdivisions and four navigation combinations.
+  Desktop build0 warnings/errors; release20261102-093725-459-40202d updates EXE/BAT.
+  Evidence `.test-output/rb91-*`; no user projects, heavy files or desktop control.
+
+## RB90 Tap tempo — IMPLEMENTED 2026-11-02
+
+- Top tempo popover now offers 敲击定速: a compact modal accepts Space or mouse
+  taps, estimates after4 taps and refines the last8 intervals. Median-based filtering
+  resists a missed beat, sub120ms doubles are ignored, and a2.5s pause restarts.
+- Explicit Apply changes the current score BPM with held seconds preserved. Cancel,
+  Escape and reset never alter the project. Auto-repeat is ignored and modal key
+  handling does not trigger playback or keyboard note entry; listeners dispose cleanly.
+  Existing40–240 range remains, with honest out-of-range display and disabled Apply.
+-75 targeted small checks pass, including4 model cases and modal/studio integration
+  covering mouse/keyboard, jitter, repeat, pause, reset/cancel, application, held
+  seconds and manual-save isolation. Build0 warnings/errors, release
+  20261102-092816-052-c02b2c. Evidence `.test-output/rb90-*`. EXE/BAT updated;
+  no user projects, heavy-file validation, desktop automation or physical audio used.
+
+## RB89 Sound removal and inactive note interaction — IMPLEMENTED 2026-11-02
+
+- Shelf families gain a remove button; console removal works on a single click.
+  Empty families remove immediately, populated families confirm before removing
+  the group plus notes. Two Delete presses remove the family as one undoable edit.
+- Library removal now deletes the actual sound identity, rather than silently
+  falling back to removing current uses. All scoped saved/working note references
+  become silent undefined-tone uses; preserve note identities, times and pitches.
+  A hidden zero-level placeholder keeps the graph valid and supports reassignment.
+  Removed default voices do not respawn; deliberate project Save still controls disk.
+- Dim note pointer events are rejected before focus/selection; dim blocks sit behind
+  active notes and are removed from tab order. Eraser sweeps skip inactive families.
+-70 targeted small checks pass, including2 new domain and2 new in-memory UI cases:
+  used/unused sound removal, reassign/undo, cancel/confirm, double Delete and dim-note
+  picking/dragging/right-click/erase sweep. No user projects, heavy-file validation,
+  desktop input/observation or physical audio tested. Evidence `.test-output/rb89-*`.
+- Release20261102-091328-581-2dd3d3 builds with0 warnings/errors; EXE/BAT updated.
+  Audio bank remains unchanged; user README and creative files preserved.
+
+## RB88 Recorded multi-sample palette — IMPLEMENTED 2026-11-02
+
+- Remove the53 RB87 oscillator/FM imitations from the actual current project and
+  its54 managed mirror files; install53 sampled definitions, preserving project
+  identity and its0 notes. Explicit reset evidence `.test-output/rb88-reset-report.json`.
+- Pinned GeneralUser GS2.0.3 commit684543d5e5efaef08d02be50dcda8d552478fa60;
+  original SF2 SHA9575028c7a1f589f5770fccc8cff2734566af40cd26ed836944e9a5152688cfe.
+  Build selected PCM/key/velocity/loop/envelope assets:958 WAVs,37,043,494 bytes,
+  53 visible plus128 GM programs/47 drums (228 manifest entries,6111 regions).
+  Acoustic, bass and drum playback no longer imitates recordings with oscillators.
+  Human labels corrected to actual Voice Oohs / Japanese koto recordings.
+- New sample-bank model and ownership adapter; lazy local fetch/decode and per-note
+  key/velocity principal-region selection. Quiet noise overlays cannot displace the
+  main pitched source. Preserve source tuning, loops, natural drum tails and envelope.
+  MIDI uses exact available GM bank entries; imported drum pitches don't slow hits.
+- Empty projects contain only compact definitions. Explicit Save/Save As and dirty
+  native-close preparation capture all zones of used instruments as ordinary scoped
+  sample contents, with standard lazy native-cache support on reopening. Tests reopen
+  embedded voices with all bank/network access disabled. Clean close avoids repacking.
+-66 targeted small checks pass;6 bank cases include tiny fixture portability/failure
+  retry, async close handling and selected actual piano/string/wind/brass/drum sources
+  (each<300KB, combined<1MiB), no audio device. No heavy user-file verification,
+  full old UI suite, screen/input automation or physical listening. Existing sampler
+  remains single principal-region playback, not complete SF2 modulation/layering.
+- Release20261102-085149-046-03954b,0 build warnings/errors. Published inventory
+  contains958 WAVs and manifest/license/credits. Evidence `.test-output/rb88-*`;
+  root EXE/BAT updated, user README and experiments/original music preserved.
+- Source license explicitly permits packaging but acknowledges historical-origin
+  uncertainty; full original terms and attribution are included under public/instruments/.
+
+## RB87 Organized default instrument palette — IMPLEMENTED 2026-11-02
+
+- Replace7 bundled starts with53 distinct self-contained synthesis recipes in9
+  families: keyboards7, plucked6, strings5, woodwinds6, brass4, bass3, percussion14,
+  electronic6 and voices2. Seven electric-piano/mallet/bell recipes use the existing
+  FM/spectral engine; the other46 use the efficient real-time synthesizer.
+- Instrument library adds category navigation, name/alias search and Custom;
+  filtered reorder maps back to the global order, imports enter Custom, audition
+  uses an appropriate register and longer gates for pads/strings/voices. Independent
+  per-song defaults retain import/delete/reorder, do not respawn after deletion.
+- Explicitly replace the current empty dddd project palette7→53 and remove8 old
+  managed mirror files; no notes were present, project identity unchanged. New
+  mirrors regenerate through the normal application sync. No original audio,
+  experiment tools or unrelated projects removed. Evidence rb87-reset-report.json.
+-60 targeted small checks pass (`npm run test:music`), including53-recipe schema/
+  plan checks, actual short FM renders with finite non-silent output, new-project
+  isolation and no-respawn, in-memory category/search/audition/selection UI, manual
+  saving and core music workflow. No heavy file validation, desktop automation,
+  physical listening or full superseded UI suite. Acoustic realism remains limited.
+- Release20261102-075605-629-bb96ca built with0 warnings/errors and existing EXE/BAT
+  entries updated. Evidence `.test-output/rb87-final-tests.log`,
+  `rb87-catalog-tests.log`, `rb87-desktop-build.log`. User README preserved.
+
+## RB86 Unified music creation — IMPLEMENTED 2026-11-02
+
+- Project creation/opening now mounts the piano roll directly. Removed the
+  arrangement renderer and intermediate library from the active application shell;
+  no overview/back-to-arrangement step. Active Chinese messages use music naming.
+- One authoritative score per project; Save/Ctrl+S, Save As, title rename and
+  save-on-exit use the whole project. Normal edits remain working drafts. Preparing
+  a clean document is a no-op rather than inventing unsaved changes.
+- Older positioned notes and imported MIDI lanes are merged at the compatibility
+  boundary, preserving onset/held seconds, gain/pan and silent undefined-tone notes.
+  Group matching sound uses and raise the former8-family limit to128 for whole music.
+  The formal .rootsound format remains portable; no user project files were opened
+  for testing or generated in the real project directory.
+- `npm run test:music`:57 targeted lightweight checks pass, including new document
+  and in-memory DOM integration (direct entry, playback, Ctrl+S), copy/rename,
+  ten-track tiny MIDI, manual saving and host audio payloads. No full historical
+  arrangement-interface suite, heavy-file validation, desktop automation or real
+  audio-device listening. Evidence `.test-output/rb86-final-tests.log`.
+- Desktop release `20261102-071135-116-749866`, build0 warnings/errors; published
+  via the existing RootSound.exe/RootSound.bat entries. Build evidence
+  `.test-output/rb86-desktop-build-final.log`. User README preserved.
+
+## RB85 Repair native sample transport — IMPLEMENTED 2026-10-30
+
+- User reports audition and Arrangement playback unavailable after RB84. The
+  mapped rootsound.local host bypasses WebResourceRequested, so /__payload/
+  never reached the native cache handler. Official mechanism reference:
+  https://learn.microsoft.com/en-us/microsoft-edge/webview2/how-to/webresourcerequested
+- Replace whole-host folder mapping with one same-origin DesktopResourceRouter
+  serving streamed UI assets and authorized samples. All request-source filters
+  include Worker. Preserve origin/path/token/method restrictions, MIME, exact
+  Content-Length, no-store and nosniff; do not expose arbitrary cache paths.
+- Release `20261030-022134-949-d08fff`: final EXE6 resource-route checks and17
+  existing dedicated cache checks pass, with4KiB/64KiB fixture bounds. Build
+  succeeds, .NET0 warnings/errors and one Vite size notice. No heavy cases run.
+- Actual hidden WebView156 with the final native DLL reproduces legacy mapping
+  failure:0 payload handler events and TypeError Failed to fetch (not HTTP404).
+  Clearing that mapping and using the production router succeeds:204-byte WAV
+  SHA/80 frames, module Worker fetch, missing/stale404, retry/cache, sampled tone,
+  note/phrase/song transport and runtime plans, saved-source audition.8 payload
+  and4 static events, no router exceptions; only OfflineAudioContext decoding.
+  No visible window, desktop observation/input, physical output or user projects.
+- Evidence `.test-output/rb85/`, particularly
+  `transport-harness/result-final/transport-report.json`, final build and native
+  reports. Main UI assets unchanged from RB84; no full/heavy application suite
+  rerun. Actual large-project use and physical listening remain untested.
+
+## RB84 Disk-backed native project working state — IMPLEMENTED 2026-10-30; large-file use untested
+
+- User reports long stalls and memory-related failure after RB83 accepts the file,
+  and explicitly forbids heavy-file verification. Do not treat RB83's large-data
+  checks as acceptance of this fix. No real project/audio or old heavy CLI tested.
+- Native v2 .rootsound Open/List/Inspect/Delete parse streams; embedded sample
+  payloads above64KiB become owned per-session binary cache references. Working
+  JSON, undo and COM transfer carry metadata; audition fetches one source through
+  a trusted same-origin stream with exact byte bounds. No arbitrary file paths.
+- Save/Copy/Rename stream original bytes back into self-contained base64. Keep
+  manual saving, full-content conflict checks, atomic backup and failure retention.
+  Independent inspection cache, strict Unicode/token ownership, corrupt-cache
+  refusal, bounded writes and per-tone32MiB mirror expansion preserve portability.
+  Native cache lives under .cache/project-payloads/ and normal disposal releases
+  owned files. New inline imports can remain inline in the working draft until
+  reopening; legacy folder projects retain their earlier text-based path.
+- Startup reads once and retains only a presence flag; transaction candidates
+  validate objects directly without serializing/parsing a second library. External
+  portable imports reject session-only references; native exports re-embed them.
+- Release `20261030-020821-289-c83200`:152 selected small application checks pass
+  (111 domain/bootstrap,36 library,5 filtered platform) and17 dedicated native
+  checks pass on the final EXE. Native fixtures enforce64KiB per file. No full
+  application suite or previous4 native groups, user files, heavy data, visible UI,
+  physical audio or real WebView transport tested. Build succeeds with .NET0
+  warnings/errors and one Vite size notice. Evidence `.test-output/rb84/`.
+  Actual large-project peak memory, load time and interaction remain unmeasured.
+
 ## RB83 Large native project opening — IMPLEMENTED 2026-10-29
 
 - Fix the reported128MiB rejection for the463,559,570-byte native project.

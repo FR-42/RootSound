@@ -59,7 +59,7 @@ export function mountSamplingWorkspace(root: HTMLElement, options: {
   toolbar.append(button('RootSound', 'wordmark brand-button', () => leave(options.onWelcome)));
   const tabs = node('nav', 'workspace-tabs'); tabs.setAttribute('aria-label', '切换创作工作区');
   tabs.append(button('采样获取', 'workspace-tab is-active', () => {}), button('音色制作', 'workspace-tab', () => leave(options.onSound)));
-  if (options.onPhrase) tabs.append(button('乐句谱写', 'workspace-tab', () => leave(options.onPhrase!)));
+  if (options.onPhrase) tabs.append(button('音乐谱写', 'workspace-tab', () => leave(options.onPhrase!)));
   if (options.onSong) tabs.append(button('歌曲编排', 'workspace-tab', () => leave(options.onSong!)));
   toolbar.append(tabs);
   const tools = node('nav', 'toolbar-tools');
@@ -316,7 +316,7 @@ export function mountSamplingWorkspace(root: HTMLElement, options: {
       const signature = JSON.stringify(warnings);
       if (signature !== warningSignature) { warningSignature = signature; melodyWarnings.replaceChildren(...warnings.map(warning => node('li', '', warning))); }
       melodyWarnings.hidden = !warnings.length;
-      melodySaveHint.textContent = recognitionView?.adopted ? '这份旋律已保留，可继续细调或共创。原采样不变。' : '选择“去细调”或“继续共创”才保留为可编辑乐句，原采样不变。';
+      melodySaveHint.textContent = recognitionView?.adopted ? '这份旋律已保留，可继续细调或共创。原采样不变。' : '选择“去细调”或“继续共创”才保留为可编辑音乐，原采样不变。';
       if (previewTarget === 'melody' && !result) stopPreview();
       syncControls();
     } catch (error) { report(message(error), true); }

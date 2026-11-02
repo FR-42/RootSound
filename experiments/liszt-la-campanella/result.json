@@ -1,0 +1,36 @@
+{
+  "name": "李斯特 · 钟 La Campanella S.141 No.3",
+  "destination": "D:\\RootSound\\project\\李斯特 · 钟 La Campanella S.141 No.3.rootsound",
+  "bytes": 5198964,
+  "durationSeconds": 293.3208333333333,
+  "notes": 4077,
+  "parts": [
+    {
+      "name": "钢琴 · 演奏",
+      "notes": 4077,
+      "origin": "Kuhmann / Disklavier World public performance MIDI"
+    }
+  ],
+  "embeddedRecordingBytes": 2172136,
+  "fullSamplePlanVerified": true,
+  "physicalAudioUsed": false,
+  "shortenedPedalNotes": 2414,
+  "removedPedalEvents": 466,
+  "sourceSha256": "a1c7b2451c8dc157a183114b167f43a4b38c945f1534cea1e7233e19e96f1f30",
+  "holdSeconds": {
+    "median": 0.06145833333334849,
+    "p95": 0.1458333333333286,
+    "max": 3.0770833333332916
+  },
+  "meter": "6/8",
+  "initialGrid": {
+    "quarterBpm": 90,
+    "quarterBeatsPerBar": 3,
+    "stepsPerBeat": 4
+  },
+  "gridBpm": 60,
+  "gridBeatUnit": "dotted-quarter",
+  "beatsPerBar": 2,
+  "stepsPerBeat": 3,
+  "gridRevision": "grid-revision/report.json"
+}

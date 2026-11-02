@@ -1,0 +1,60 @@
+{
+  "source_sha256": "5f088fa4fbbe1759ef75d8034c79f33c846e3bf5f13d5048dd95a6614d2ad441",
+  "evidence_type": "direct PE constant bytes; not REA record",
+  "constants": [
+    {
+      "va": "0x1406971b8",
+      "offset": "0x6963b8",
+      "hex": "00004842",
+      "float32": 50.0
+    },
+    {
+      "va": "0x14084ffac",
+      "offset": "0x84f1ac",
+      "hex": "cdcccc3d",
+      "float32": 0.10000000149011612
+    },
+    {
+      "va": "0x140698b34",
+      "offset": "0x697d34",
+      "hex": "295c8f3d",
+      "float32": 0.07000000029802322
+    },
+    {
+      "va": "0x14084ffdc",
+      "offset": "0x84f1dc",
+      "hex": "0000003f",
+      "float32": 0.5
+    },
+    {
+      "va": "0x1408502c8",
+      "offset": "0x84f4c8",
+      "hex": "00007a44",
+      "float32": 1000.0
+    },
+    {
+      "va": "0x14084ffa8",
+      "offset": "0x84f1a8",
+      "hex": "cdcc4c3d",
+      "float32": 0.05000000074505806
+    },
+    {
+      "va": "0x140850030",
+      "offset": "0x84f230",
+      "hex": "0000803f",
+      "float32": 1.0
+    },
+    {
+      "va": "0x1406971a8",
+      "offset": "0x6963a8",
+      "hex": "0000a041",
+      "float32": 20.0
+    },
+    {
+      "va": "0x140697100",
+      "offset": "0x696300",
+      "hex": "8fc2753d",
+      "float32": 0.05999999865889549
+    }
+  ]
+}

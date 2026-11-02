@@ -11,8 +11,9 @@ public sealed class NativeProjectFiles
     internal const int MaximumBytes = 32 * 1024 * 1024;
     private static readonly UTF8Encoding Utf8 = new(false, true);
     private readonly Form owner;
+    private readonly ProjectDirectoryManager? projects;
     private int operating;
-    public NativeProjectFiles(Form owner) => this.owner = owner;
+    public NativeProjectFiles(Form owner, ProjectDirectoryManager? projects = null) { this.owner = owner; this.projects = projects; }
 
     public string Open() => OnUi(() =>
     {
@@ -27,6 +28,7 @@ public sealed class NativeProjectFiles
 
     public string Save(string text, string suggestedName) => OnUi(() =>
     {
+        text = projects?.ExpandPayloadText(text, MaximumBytes) ?? text;
         var checkedText = ValidateText(text);
         var name = new string(suggestedName.Where(c => !Path.GetInvalidFileNameChars().Contains(c)).ToArray()).Trim();
         using var dialog = new SaveFileDialog

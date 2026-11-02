@@ -4,11 +4,14 @@ import type { PcmAudio } from './sound.ts';
 export interface SampleBody {
   model: 'audio-sample'; version: 1;
   source: { kind: 'file' | 'microphone'; name: string; mimeType: string };
-  audio: { encoding: 'base64'; byteLength: number; data: string };
+  /** host-asset is a native-session reference; saved portable files embed base64. */
+  audio: { encoding: 'base64' | 'host-asset'; byteLength: number; data: string };
   /** Information about the decoded audition, not a claim about source encoding. */
   decoded: { sampleRate: number; channels: number; frames: number; durationSeconds: number };
 }
 export interface SampleDecoderPort { decode(bytes: Uint8Array): Promise<PcmAudio> }
+/** Loads only opaque assets owned by the current native project session. */
+export interface SamplePayloadPort { load(token: string, expectedBytes: number): Promise<Uint8Array> }
 /** Decode belongs to sampling; other modules prepare and read by shared material identity. */
 export interface SampleAudioPort {
   prepare(ids: readonly string[]): Promise<void>;

@@ -1,0 +1,46 @@
+{
+  "format": "RipXNativeBuildCoverage",
+  "version": 2,
+  "date": "2026-10-30",
+  "reference_binary_sha256": "5f088fa4fbbe1759ef75d8034c79f33c846e3bf5f13d5048dd95a6614d2ad441",
+  "full_transcription_complete": false,
+  "public_model_fallback_allowed": false,
+  "validation_this_pass": "AST/source wiring only; no audio or numerical tests executed",
+  "entries": {
+    "native_analysis": "source audio -> native two-window spectral records",
+    "native_component_sequence": "explicit native candidates -> phase/amplitude statistics -> optional PCM residual",
+    "native_initial_notes": "refined native 0x4c records -> initial note objects and partial caches"
+  },
+  "not_connected": [
+    "full automatic peak/candidate/chirp scheduling",
+    "complete harmonic tracking and refinement",
+    "representative note frequency producer",
+    "final note cleanup",
+    "complete native MIDI output from input audio"
+  ],
+  "installed_sources": {
+    "native-core\\native_fft.py": "7260dd36c70912fbe4a5077346b9b0507c73b07fc49243f16f6de178db154d43",
+    "native-core\\native_fft_numba.py": "5f10ffd3219669eea2b1862149a79d5b2bf31b11dd99d98fded9553aa8deb1ab",
+    "native-core\\native_peak_windows.py": "32e314bf769349492adfc9bef8ca2762794ab8bacb8b81326156ee0c1d244baf",
+    "native-core\\native_spectral.py": "c7e5e2d133e09e931fe9f5c1b0dd3f4bdcaf8f798ad3bb2e4709f3a917bf1d95",
+    "native-core\\native_component_sequence.py": "0645e97e07fce81363a5c8f2a63f79eec2cf43a2647996408230ee3b75b996dd",
+    "native-core\\native_harmonic_fields.py": "26eb77bac70b5b1089608b0c9679014275da17367ebebb79c167b50e23066ce3",
+    "native-core\\native_pcm_component.py": "78832fe5484caa7ae61947137ea4c78a1c9a1bd9ae7e13d2dd23633786807b20",
+    "native-core\\native_pcm_estimate.py": "2405c2dc9ba2d865a51ecb2139499ba27558c30d56e41a8fc8b2579980cdfc04",
+    "native-core\\native_frame_groups.py": "9bcb912f78f0a4c14ec998949d45c2413ae98b7de26843bf27d31e5e170886a3",
+    "native-core\\native_group_runs.py": "4ac72bf355236b2dc62e3f872981d14939e9780ebcab0786ac22ccec9e35c18e",
+    "native-core\\native_harmonic_object.py": "6457b25359e1e101e43a4f1fc51fb10ced4abb6450a94d318b893553c4e093ad",
+    "native-core\\native_initial_notes.py": "501658a8a482d4bbab0c81b7d55a6ea7c19fec968d7a8ded598e9c0134a12468",
+    "native-core\\native_initial_payload.py": "cec40f8088182c4b333937570a5bc8a98ad14cc359790fbc968f3b41391e3f96",
+    "native-core\\native_initial_times.py": "308c8049a7f411ca7f3e050c229f82d1169c571d05aaad3927f31c752948a8da",
+    "native-core\\native_merge_candidate.py": "b058d8a35cebf2f65195c854ac58b42bf4d423dbe8f9ca150fc2a4d78cc5b732",
+    "native-core\\native_minimum_frames.py": "167e08a3bf1f628a45bb64e7cc13729550b3d766678a325436b94dad9fece09a",
+    "native-core\\native_note_boundary.py": "991840d2417a3599afb9a7e48a0a719c1f6054e9df544933ef8dfa3efe80756e",
+    "native-core\\native_note_cache.py": "5a70585da32647440bd510d7b9fa5cdb1ee832c7ab25960e41bb622e31328c45",
+    "native-core\\native_note_export.py": "a31577c251eff641a39f4dd1ff58359e10140d08601d547b1a1d9d7125acd2a3",
+    "native-core\\native_object_merge.py": "ec29b9ca36c25cb6e8c92b608dc15e8a02224dd45706aebc063251d8a7ff961e",
+    "native-core\\native_analysis_job.py": "f3eeaf5cf31c82cf189d40e5c3057cd003c5e811125b269a34462034baa2b033",
+    "native-core\\native_pipeline_jobs.py": "3b231c5975bb1e65637c4f1ff87f33601348370a785183297e7b798bce185683",
+    "native_panel.py": "578c2f83ad24d5dac6cc86b8bd4e114b2df3b8537beadcb5c9143bebc698e48e"
+  }
+}

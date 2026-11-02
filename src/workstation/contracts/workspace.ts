@@ -12,3 +12,18 @@ export interface WorkspacePreferencesPort {
   read(): WorkspacePreferences;
   update(changes: Partial<WorkspacePreferences>): WorkspacePreferences;
 }
+
+/** Local editing context, deliberately separate from saved musical content. */
+export interface MusicWorkspaceState {
+  orientation?: 'vertical';
+  viewport: { leftSeconds: number; zoom: number; top: number; rowHeight: number };
+  selection?: { partId: string; noteId?: string };
+  playheadSeconds: number;
+  entryOctave: number;
+  entryToneId?: string;
+  noteLengths: Record<string, number>;
+}
+export interface MusicWorkspaceStatePort {
+  read(): MusicWorkspaceState | undefined;
+  write(state: MusicWorkspaceState): void;
+}

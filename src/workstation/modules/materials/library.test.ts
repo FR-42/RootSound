@@ -96,7 +96,7 @@ test('names are independent from identity; save as new preserves all old referen
 test('overwrite reports direct and indirect dependencies, including projects never opened', () => {
   const library = createMaterialLibrary();
   const timbre = add(library);
-  const phrase = add(library, '乐句', [timbre.id]);
+  const phrase = add(library, '音乐', [timbre.id]);
   const song = add(library, '歌曲', [phrase.id]);
   const otherSong = add(library, '另一首歌曲', [timbre.id]);
   const draft = library.createDraft({ sourceId: timbre.id });
@@ -127,7 +127,7 @@ test('a dependency change invalidates the previous impact confirmation', () => {
 test('an unfinished phrase reference requires confirmation before its timbre is overwritten', () => {
   const library = createMaterialLibrary();
   const timbre = add(library);
-  const phrase = library.createDraft(input('未保存的乐句', [timbre.id]));
+  const phrase = library.createDraft(input('未保存的音乐', [timbre.id]));
   const edit = library.createDraft({ sourceId: timbre.id });
   library.updateDraft(edit.id, { body: { gain: 0.7 } });
   const check = library.saveDraft(edit.id, 'overwrite');
@@ -137,7 +137,7 @@ test('an unfinished phrase reference requires confirmation before its timbre is 
   assert.deepEqual(check.affectedDrafts, [phrase]);
   assert(!check.affectedDrafts.some(draft => draft.id === edit.id));
   check.affectedDrafts[0]!.name = '不能修改保管内容';
-  assert.equal(library.readDraft(phrase.id)?.name, '未保存的乐句');
+  assert.equal(library.readDraft(phrase.id)?.name, '未保存的音乐');
   assert.equal(library.readContent(timbre.id)?.revision, 1);
   assert.equal(saved(library.saveDraft(edit.id, 'overwrite', check.confirmation)).revision, 2);
 });
@@ -145,7 +145,7 @@ test('an unfinished phrase reference requires confirmation before its timbre is 
 test('unfinished drafts using an indirectly affected saved phrase also require confirmation', () => {
   const library = createMaterialLibrary();
   const timbre = add(library);
-  const phrase = add(library, '保存的乐句', [timbre.id]);
+  const phrase = add(library, '保存的音乐', [timbre.id]);
   const song = library.createDraft(input('未完成歌曲', [phrase.id]));
   const edit = library.createDraft({ sourceId: timbre.id });
   const check = library.saveDraft(edit.id, 'overwrite');
@@ -160,7 +160,7 @@ test('unfinished drafts using an indirectly affected saved phrase also require c
 test('draft content, reference and replacement edits invalidate an earlier impact confirmation', () => {
   const library = createMaterialLibrary();
   const timbre = add(library);
-  const phrase = add(library, '引用音色的乐句', [timbre.id]);
+  const phrase = add(library, '引用音色的音乐', [timbre.id]);
   const song = library.createDraft(input('正在创作', [timbre.id]));
   const edit = library.createDraft({ sourceId: timbre.id });
   let check = library.saveDraft(edit.id, 'overwrite');
@@ -190,7 +190,7 @@ test('a confirmed overwrite with unfinished dependents remains atomic when stora
     raw = value;
   } });
   const timbre = add(library);
-  const phrase = library.createDraft(input('未保存乐句', [timbre.id]));
+  const phrase = library.createDraft(input('未保存音乐', [timbre.id]));
   const edit = library.createDraft({ sourceId: timbre.id });
   library.updateDraft(edit.id, { body: { gain: 0.95 } });
   const check = library.saveDraft(edit.id, 'overwrite');
@@ -391,7 +391,7 @@ function transactionFixture() {
   const storage = { read: () => raw, write(value: string) { if (failing) throw new Error('磁盘空间不足'); raw = value; writes++; } };
   const library = createMaterialLibrary(storage);
   const sound = add(library, '原声音');
-  const phrase = add(library, '共享乐句', [sound.id]);
+  const phrase = add(library, '共享音乐', [sound.id]);
   const song = add(library, '歌曲甲', [phrase.id]);
   const secondSong = add(library, '歌曲乙', [phrase.id]);
   const anchor = library.createDraft({ sourceId: song.id });

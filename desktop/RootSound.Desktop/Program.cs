@@ -7,6 +7,51 @@ internal static class Program
     [STAThread]
     private static int Main(string[] args)
     {
+        var resourceTestDirectory = Argument(args, "--test-local-resources");
+        if (resourceTestDirectory is not null)
+        {
+            resourceTestDirectory = Path.GetFullPath(resourceTestDirectory); Directory.CreateDirectory(resourceTestDirectory);
+            try
+            {
+                int passed = DesktopResourceSelfTests.Run(resourceTestDirectory);
+                File.WriteAllText(Path.Combine(resourceTestDirectory, "local-resources-report.json"), JsonSerializer.Serialize(new
+                {
+                    passed, lightweightFixturesOnly = true, maximumFixtureBytes = DesktopResourceSelfTests.MaximumFixtureBytes,
+                    symbolicLinkChecked = DesktopResourceSelfTests.SymbolicLinkChecked, visibleWindowsCreated = false, soundDevicesOpened = false,
+                }));
+                return 0;
+            }
+            catch (Exception error)
+            {
+                File.WriteAllText(Path.Combine(resourceTestDirectory, "local-resources-report.json"), JsonSerializer.Serialize(new { error = error.ToString(), lightweightFixturesOnly = true }));
+                return 1;
+            }
+        }
+        var payloadTestDirectory = Argument(args, "--test-payload-cache");
+        if (payloadTestDirectory is not null)
+        {
+            payloadTestDirectory = Path.GetFullPath(payloadTestDirectory);
+            Directory.CreateDirectory(payloadTestDirectory);
+            try
+            {
+                int passed = PayloadCacheSelfTests.Run(payloadTestDirectory);
+                File.WriteAllText(Path.Combine(payloadTestDirectory, "payload-cache-report.json"), JsonSerializer.Serialize(new
+                {
+                    passed, lightweightFixturesOnly = true, maximumFixtureBytes = PayloadCacheSelfTests.MaximumFixtureBytes,
+                    visibleWindowsCreated = false, soundDevicesOpened = false,
+                }));
+                return 0;
+            }
+            catch (Exception error)
+            {
+                File.WriteAllText(Path.Combine(payloadTestDirectory, "payload-cache-report.json"), JsonSerializer.Serialize(new
+                {
+                    error = error.ToString(), lightweightFixturesOnly = true,
+                    visibleWindowsCreated = false, soundDevicesOpened = false,
+                }));
+                return 1;
+            }
+        }
         var timbreTestDirectory = Argument(args, "--test-timbre-files");
         if (timbreTestDirectory is not null)
         {

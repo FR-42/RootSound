@@ -44,6 +44,6 @@ RootSound (已经趋势)
 
 遗产：一些有关daw和逆向工程的文件。具体如下：
 
-"\RootSound.bat" 项目本体，打开即玩
+"\RootSound.exe" 项目本体，打开即玩
 
 "\experiments\music-workflow" 含有大量的exe文件，用于项目可行性验证

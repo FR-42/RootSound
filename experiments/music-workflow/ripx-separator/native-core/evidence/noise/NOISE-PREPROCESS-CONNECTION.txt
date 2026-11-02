@@ -1,0 +1,46 @@
+349600 ordinary mode14=0 preprocessing
+
+Target D:/#Software/ripx/RipX.exe
+SHA2565f088fa4fbbe1759ef75d8034c79f33c846e3bf5f13d5048dd95a6614d2ad441
+Source:work/ripx-analysis/remaining-349600.c/json
+REA Evidence ev_a8baa3b1958be32a687de1d1d2c2729d6c953329cb5b943a47b068dda3be7b59
+Caller source:remaining-350e40.c line54.
+
+preprocess_native_noise_frames(records_by_frame,*,context,task_start_frame,
+ task_end_frame,first_frame=None,last_frame=None) updates/returns the same dict.
+task_end_frame is exclusive; native349600 first/last are inclusive. Default
+span is task_start-bias989fe4 through task_end+context_bc-1. Caller may pass
+already-resolved/clipped first_frame,last_frame explicitly. Reference grid
+frequency/count ownership is records_by_frame[task_start_frame], corresponding
+to the native task+5a0/+598 slot at bias989fe4. Existing variable shorter frame
+counts are preserved; an absent required frame or unknown grid identity fails.
+Bytes remain bytes and bytearrays retain their object identities.
+
+The implementation ports all six ordered source passes:
+1.34974e..349e8b detects low-band rises and native forward peak/backward core
+  spans. Thresholds are pow(0.07500000298023224,1.6609640475208238)*32767 and
+  pow(0.20000000298023224,1.6609640475208238)*32767, with originalfloat32 casts.
+  Maximum spans use native float32 round(rate*0.2) / round(rate*0.15).
+2.349e8b..34a432 rejects weak segments against up to two neighboring frames
+  on each side and immediately adjacent frequency-bin group1 peaks.
+3.34a432..34a4f0 extends marked0x10 coverage down to lower-frequency ordinals.
+4.34a4f0..34a924 preserves the source's one-frame backward extension and
+  decreasing>=16 forward tails, guarded against neighboring low-band events.
+5.34a924..34b105 accumulates consecutive marked frequency-weighted strengths;
+  a run centroid>=115Hz changes0x10 to0x11. This pass starts at native taskstart.
+6.34b105..34b460 completes higher-frequency coverage below500Hz, then moves
+  actual side amplitudes+14/+18 to group1+2c/+30 and zeroes the consumed source.
+  Type bytes+0xd1 and group1 identity+0xdc follow the source writes. Original
+  distinctions between<500 and<=500, missing-bin behavior and mode2 repeated
+  side0 moves are kept; mode1 and3 do not manufacture absent side estimates.
+
+Noise helper gains were read from actual PE constant bytes and switch tables,
+not inferred from conventional dB formulas. noise-preprocess-static-constants.json
+retains the exact table/case addresses and values; entry timing/threshold SSE
+is retained in noise-preprocess-entry-direct.asm. Constant extraction reads
+only the static executable; it does not execute it.
+
+This helper precedes34b460 histogram cells and34d770/34df10 classification;
+it does not replace those owners or claim to complete classification alone.
+No original execution, GUI, image/audio inspection, numerical or audio tests
+were performed. Validation is AST parsing/compilation and source inspection.

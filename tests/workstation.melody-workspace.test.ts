@@ -318,11 +318,11 @@ test('restored melody viewport survives initialization and diagonal panning uses
 test('wheel, zoom, arrows and native scrolling report independent view snapshots without musical side effects', () => {
   const f = fixture({ initialViewport: { leftSeconds: 1, zoom: 2, top: 100, rowHeight: 24 } }); try {
     const original = f.phrase.read().body; const previewCount = f.previews.length;
-    f.scroll.emit('wheel', { deltaY: 100, clientX: 412, clientY: 200 });
+    f.scroll.emit('wheel', { shiftKey: true, deltaY: 100, clientX: 412, clientY: 200 });
     assert.equal(f.workspace.readViewport().leftSeconds, 1.5);
-    f.scroll.emit('wheel', { shiftKey: true, deltaY: 50, clientX: 412, clientY: 200 }); assert.equal(f.scroll.scrollTop, 150);
-    f.scroll.emit('wheel', { ctrlKey: true, deltaY: -100, clientX: 412, clientY: 200 }); assert(f.workspace.readViewport().zoom > 2);
-    f.scroll.emit('wheel', { ctrlKey: true, shiftKey: true, deltaY: -100, clientX: 412, clientY: 200 }); assert(f.workspace.readViewport().rowHeight > 24);
+    f.scroll.emit('wheel', { deltaY: 50, clientX: 412, clientY: 200 }); assert.equal(f.scroll.scrollTop, 150);
+    f.scroll.emit('wheel', { ctrlKey: true, shiftKey: true, deltaY: -100, clientX: 412, clientY: 200 }); assert(f.workspace.readViewport().zoom > 2);
+    f.scroll.emit('wheel', { ctrlKey: true, deltaY: -100, clientX: 412, clientY: 200 }); assert(f.workspace.readViewport().rowHeight > 24);
     const top = f.scroll.scrollTop; const rowHeight = f.workspace.readViewport().rowHeight;
     f.document.emit('keydown', { target: f.scroll, key: 'ArrowDown' }); assert.equal(f.scroll.scrollTop, top + rowHeight);
     f.document.emit('keydown', { target: f.scroll, key: 'ArrowRight', ctrlKey: true });
@@ -420,11 +420,11 @@ test('ordinary wheel fine-tunes only the selected note duration without moving t
     const original = f.phrase.read().body!.parts[0]!.notes[0]!; const at = f.pointAt(2.02);
     f.scroll.emit('pointerdown', { target: f.block(original.id), ...at }); f.document.emit('pointerup', at);
     const viewport = f.workspace.readViewport(); const changes = f.changes(); const seeks = [...f.seeks];
-    f.scroll.emit('wheel', { target: f.canvas, deltaY: -100 });
+    f.scroll.emit('wheel', { target: f.block(original.id), deltaY: -100 });
     const next = f.phrase.read().body!.parts[0]!.notes[0]!;
     assert.deepEqual(next, { ...original, durationSeconds: .51, durationBeats: 1.02 });
     assert.deepEqual(f.workspace.readViewport(), viewport); assert.deepEqual(f.seeks, seeks); assert.equal(f.changes(), changes + 1);
-    assert(f.block(original.id).classList.contains('is-selected')); assert.equal(Number.parseFloat(f.block(original.id).style.width!), 51);
+    assert(f.block(original.id).classList.contains('is-selected')); assert.equal(Number.parseFloat(f.block(original.id).style.width!), .51 * f.canvas.clientWidth * viewport.zoom / 8);
     assert.equal(f.root.querySelectorAll('input').find(input => input.attributes.get('aria-label') === '时长 / 秒')!.value, '0.51');
     assert.equal(f.lastChange()!.body!.parts[0]!.notes[0]!.durationSeconds, .51, 'the shared playback callback receives the changed duration');
     f.scroll.emit('wheel', { target: f.block(original.id), deltaY: 25 });
@@ -440,15 +440,15 @@ test('duration wheel normalizes device units and preserves short notes and natur
     const id = f.phrase.read().body!.parts[0]!.notes[0]!.id; const at = f.pointAt(2.02);
     f.scroll.emit('pointerdown', { target: f.block(id), ...at }); f.document.emit('pointerup', at);
     const held = () => f.phrase.read().body!.parts[0]!.notes[0]!.durationSeconds!;
-    f.scroll.emit('wheel', { target: f.canvas, deltaY: -3, deltaMode: 1 }); assert.equal(held(), .51);
-    f.scroll.emit('wheel', { target: f.canvas, deltaY: 1, deltaMode: 2 }); assert.equal(held(), .5);
-    f.scroll.emit('wheel', { target: f.canvas, deltaY: -100000 }); assert.equal(held(), .54, 'large wheel deltas stay a fine adjustment');
-    f.phrase.updateNote(f.partId, id, { durationSeconds: .0002 }); f.workspace.refresh();
-    f.scroll.emit('wheel', { target: f.canvas, deltaY: 100 }); assert.equal(held(), .0001);
-    let token = f.library.currentToken(); f.scroll.emit('wheel', { target: f.canvas, deltaY: 100 }); assert.equal(f.library.currentToken(), token);
+    f.scroll.emit('wheel', { target: f.block(id), deltaY: -3, deltaMode: 1 }); assert.equal(held(), .51);
+    f.scroll.emit('wheel', { target: f.block(id), deltaY: 1, deltaMode: 2 }); assert.equal(held(), .5);
+    f.scroll.emit('wheel', { target: f.block(id), deltaY: -100000 }); assert.equal(held(), .54, 'large wheel deltas stay a fine adjustment');
+    f.phrase.updateNote(f.partId, id, { durationSeconds: .00011 }); f.workspace.refresh();
+    f.scroll.emit('wheel', { target: f.block(id), deltaY: 100 }); assert.equal(held(), .0001);
+    let token = f.library.currentToken(); f.scroll.emit('wheel', { target: f.block(id), deltaY: 100 }); assert.equal(f.library.currentToken(), token);
     f.phrase.updateNote(f.partId, id, { startBeat: 15.75, durationBeats: .25, durationSeconds: 96 }); f.workspace.refresh();
-    token = f.library.currentToken(); f.scroll.emit('wheel', { target: f.canvas, deltaY: -100 }); assert.equal(f.library.currentToken(), token);
-    f.scroll.emit('wheel', { target: f.canvas, deltaY: 100 });
+    token = f.library.currentToken(); f.scroll.emit('wheel', { target: f.block(id), deltaY: -100 }); assert.equal(f.library.currentToken(), token);
+    f.scroll.emit('wheel', { target: f.block(id), deltaY: 100 });
     const tail = f.phrase.read().body!.parts[0]!.notes[0]!;
     assert.equal(tail.durationSeconds, 95.99); assert.equal(tail.durationBeats, .25); assert.equal(tail.startBeat, 15.75);
   } finally { f.cleanup(); }
@@ -464,8 +464,8 @@ test('note duration wheel leaves modifiers, labels, ruler, horizontal input and 
     f.root.querySelector('.melody-ruler')!.emit('wheel', { deltaY: 20 });
     f.scroll.emit('wheel', { target: f.canvas, deltaY: 0, deltaX: 20 });
     assert.deepEqual(f.phrase.read().body, before); assert.equal(f.library.currentToken(), token);
-    f.selectTone(); const left = f.workspace.readViewport().leftSeconds;
-    f.scroll.emit('wheel', { target: f.canvas, deltaY: 20 }); assert(f.workspace.readViewport().leftSeconds > left);
+    f.selectTone(); const top = f.workspace.readViewport().top;
+    f.scroll.emit('wheel', { target: f.canvas, deltaY: 20 }); assert(f.workspace.readViewport().top > top);
     assert.equal(f.library.currentToken(), token);
   } finally { f.cleanup(); }
 });
@@ -475,15 +475,15 @@ test('legacy beat durations remain fine-adjustable and failed duration edits lea
     const id = f.phrase.read().body!.parts[0]!.notes[0]!.id;
     f.phrase.setLength(512); f.phrase.updateNote(f.partId, id, { durationBeats: 240, durationSeconds: undefined }); f.workspace.refresh();
     const at = f.pointAt(2.02); f.scroll.emit('pointerdown', { target: f.block(id), ...at }); f.document.emit('pointerup', at);
-    f.scroll.emit('wheel', { target: f.canvas, deltaY: 100 });
+    f.scroll.emit('wheel', { target: f.block(id), deltaY: 100 });
     let note = f.phrase.read().body!.parts[0]!.notes[0]!;
     assert.equal(note.durationSeconds, undefined); assert(Math.abs(note.durationBeats - 239.98) < 1e-10);
     f.phrase.updateNote(f.partId, id, { durationBeats: 1 }); f.workspace.refresh();
-    f.scroll.emit('wheel', { target: f.canvas, deltaY: -100 }); note = f.phrase.read().body!.parts[0]!.notes[0]!;
+    f.scroll.emit('wheel', { target: f.block(id), deltaY: -100 }); note = f.phrase.read().body!.parts[0]!.notes[0]!;
     assert.equal(note.durationSeconds, .51); assert.equal(note.durationBeats, 1.02);
     const before = structuredClone(f.phrase.read().body); const token = f.library.currentToken(); const changes = f.changes();
     const update = f.phrase.updateNote; f.phrase.updateNote = () => { throw new Error('测试拒绝时长修改'); };
-    f.scroll.emit('wheel', { target: f.canvas, deltaY: 100 }); f.phrase.updateNote = update;
+    f.scroll.emit('wheel', { target: f.block(id), deltaY: 100 }); f.phrase.updateNote = update;
     assert.deepEqual(f.phrase.read().body, before); assert.equal(f.library.currentToken(), token); assert.equal(f.changes(), changes);
     assert(f.block(id).classList.contains('is-selected')); assert.match(f.root.querySelector('.melody-notice')!.textContent, /测试拒绝/u);
   } finally { f.cleanup(); }
@@ -496,16 +496,16 @@ test('duration wheel reads the freshly flushed note and supports legacy rhythm f
     const at = f.pointAt(4.02, 220); f.scroll.emit('pointerdown', { target: f.block(note.id), ...at }); f.document.emit('pointerup', at);
     const duration = f.root.querySelectorAll('input').find(input => input.attributes.get('aria-label') === '时长 / 秒')!;
     duration.value = '.3'; duration.emit('input'); assert.equal(f.phrase.read().body!.parts[1]!.notes[0]!.durationSeconds, .17);
-    f.scroll.emit('wheel', { target: f.canvas, deltaY: -100 });
+    f.scroll.emit('wheel', { target: f.block(note.id), deltaY: -100 });
     const result = f.phrase.read().body!.parts.find(part => part.id === legacy.id)!;
     assert.equal(result.section, 'rhythm'); assert.equal(result.notes[0]!.id, note.id);
     assert.equal(result.notes[0]!.durationSeconds, .31); assert.equal(result.notes[0]!.durationBeats, .62);
     assert.deepEqual(f.phrase.read().body!.parts[0], melody);
     const before = structuredClone(f.phrase.read().body); const token = f.library.currentToken(); const view = f.workspace.readViewport();
-    for (const deltaY of [NaN, Infinity, -Infinity, 0]) f.scroll.emit('wheel', { target: f.canvas, deltaY });
+    for (const deltaY of [NaN, Infinity, -Infinity, 0]) f.scroll.emit('wheel', { target: f.block(note.id), deltaY });
     assert.deepEqual(f.phrase.read().body, before); assert.equal(f.library.currentToken(), token); assert.deepEqual(f.workspace.readViewport(), view);
     f.root.querySelector('.melody-add-tone')!.emit('click');
-    f.scroll.emit('wheel', { target: f.canvas, deltaY: -100 });
+    f.scroll.emit('wheel', { target: f.block(note.id), deltaY: -100 });
     assert.equal(f.library.currentToken(), token, 'an open dialog cannot edit a selected background note');
   } finally { f.cleanup(); }
 });
@@ -720,7 +720,7 @@ test('failed tone reorder reports inside the open library and leaves its previou
   } finally { f.cleanup(); }
 });
 
-test('SPN label wheels invert only the four navigation modes and retain pitch/time anchors without editing', () => {
+test('SPN label and canvas wheels share navigation modes and retain pitch/time anchors without editing', () => {
   const f = fixture({ notes: true, initialViewport: { leftSeconds: 1, zoom: 2, top: 200, rowHeight: 24 } }); try {
     const token = f.library.currentToken(); const before = f.phrase.read().draft;
     const wheel = (values: Record<string, unknown>) => f.scroll.emit('wheel', { target: f.root.querySelector('.melody-key')!, clientX: 180, clientY: 200, ...values });
@@ -734,7 +734,8 @@ test('SPN label wheels invert only the four navigation modes and retain pitch/ti
     wheel({ deltaY: -100, ctrlKey: true, shiftKey: true }); const zoomed = f.workspace.readViewport();
     assert(zoomed.zoom > horizontal.zoom); assert.equal(zoomed.rowHeight, horizontal.rowHeight); assert.equal(zoomed.leftSeconds, horizontal.leftSeconds);
     f.scroll.emit('wheel', { target: f.canvas, shiftKey: true, deltaY: 20, clientX: 400, clientY: 200 });
-    assert.equal(f.workspace.readViewport().top, zoomed.top + 20, 'main grid retains its original Shift vertical mode');
+    assert.equal(f.workspace.readViewport().top, zoomed.top, 'Shift scrolls horizontally on both labels and grid');
+    assert(f.workspace.readViewport().leftSeconds > zoomed.leftSeconds);
     assert.equal(f.library.currentToken(), token); assert.deepEqual(f.phrase.read().draft, before);
     assert.equal(f.auditions.length, 0); assert.equal(f.seeks.length, 0);
   } finally { f.cleanup(); }

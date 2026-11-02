@@ -158,7 +158,7 @@ export function mountCoCreationWorkspace(root: HTMLElement, options: {
     const tabs = node('nav', 'workspace-tabs'); tabs.setAttribute('aria-label', '切换创作工作区');
     tabs.append(button('灵感共创', 'workspace-tab is-active', () => {}), button('音色制作', 'workspace-tab', () => leave(options.onSound)));
     if (options.onSampling) tabs.insertBefore(button('采样获取', 'workspace-tab', () => leave(options.onSampling!)), tabs.lastChild);
-    if (options.onPhrase) tabs.append(button('乐句谱写', 'workspace-tab', () => leave(options.onPhrase!)));
+    if (options.onPhrase) tabs.append(button('音乐谱写', 'workspace-tab', () => leave(options.onPhrase!)));
     if (options.onSong) tabs.append(button('歌曲编排', 'workspace-tab', () => leave(options.onSong!)));
     toolbar.append(tabs);
     const tools = node('nav', 'toolbar-tools');
@@ -171,7 +171,7 @@ export function mountCoCreationWorkspace(root: HTMLElement, options: {
     main.append(heading);
 
     const source = node('section', 'co-source'); source.setAttribute('aria-label', '选择探索起点');
-    const field = node('label', 'co-source-field'); field.append(node('span', '', '从我的乐句继续'));
+    const field = node('label', 'co-source-field'); field.append(node('span', '', '从我的音乐继续'));
     const picker = node('select', 'co-source-picker'); picker.setAttribute('aria-label', '探索的起点');
     const fresh = node('option', '', '给我一个新的起点'); fresh.value = ''; picker.append(fresh);
     for (const phrase of view?.availablePhrases ?? []) { const option = node('option', '', phrase.name); option.value = phrase.id; picker.append(option); }

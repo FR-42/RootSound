@@ -23,7 +23,7 @@ export function requiresTimbreDeleteConfirmation(record: ContentRecord, workingD
     || draft.name !== record.name || JSON.stringify(draft.body) !== JSON.stringify(record.body)
     || JSON.stringify(draft.dependencies) !== JSON.stringify(record.dependencies)))) return true;
   starterSignatures ??= prepareMelodyTimbres().map(preset => ({
-    prefix: `rootsound.melody.${presetKey(preset)}.v1:`, name: preset.name, body: JSON.stringify(readEditableTimbreBody(preset.body)),
+    prefix: `${preset.id}:`, name: preset.name, body: JSON.stringify(readEditableTimbreBody(preset.body)),
   }));
   const body = JSON.stringify(readEditableTimbreBody(record.body));
   return !starterSignatures.some(preset => record.id.startsWith(preset.prefix) && record.name === preset.name && body === preset.body);
@@ -60,13 +60,6 @@ function songLibraryMetadataChanges(library: MaterialLibrary, song: Draft, body:
   }
   return result;
 }
-function presetKey(record: ContentRecord): string | undefined {
-  const body = readEditableTimbreBody(record.body);
-  if (body.model !== 'synthesizer') return undefined;
-  return ['piano', 'flute', 'bass-drum', 'kick', 'strings', 'trumpet', 'guitar']
-    .find(key => body.sources.some(source => source.id.startsWith(`rootsound.melody.${key}.v1:`)));
-}
-
 /** Current song identities only: no global starters, other songs or historical custody. */
 export function listProjectTimbres(library: MaterialLibrary, songDraftId: string): ContentRecord[] {
   const { song, view, scope } = currentSong(library, songDraftId);
@@ -76,7 +69,7 @@ export function listProjectTimbres(library: MaterialLibrary, songDraftId: string
     .map(record => library.readContent(record.id)!), ...view.drafts.filter(record => record.kind === 'rootsound.phrase')]
     .flatMap(record => readPhraseBody(record.body).parts);
   const playback = createTimbrePlayback(library);
-  const records = [...ids].filter(id => library.projectScopeOf?.({ type: 'content', id }) === scope).map(id => {
+  const records = [...ids].filter(id => !id.startsWith('rootsound.undefined-voice:') && library.projectScopeOf?.({ type: 'content', id }) === scope).map(id => {
     const record = playback.readSaved(id).content;
     const draft = view.drafts.find(item => item.kind === 'rootsound.timbre' && item.sourceId === id);
     return draft ? { ...record, name: draft.name } : record;
@@ -104,8 +97,8 @@ export function ensureProjectMelodyTimbres(library: MaterialLibrary, songDraftId
     .map(item => nameKey(item.name)));
   const created: ContentRecord[] = [];
   for (const preset of prepareMelodyTimbres()) {
-    const key = presetKey(preset)!; const id = `rootsound.melody.${key}.v1:${scope}`;
-    if (current.some(record => record.id === id || presetKey(record) === key)) continue;
+    const id = `${preset.id}:${scope}`;
+    if (current.some(record => record.id === id)) continue;
     // A renamed/edited preset is still the same saved identity after reopening.
     const previous = library.readContent(id);
     if (previous && library.projectScopeOf?.({ type: 'content', id }) === scope) continue;
@@ -114,6 +107,7 @@ export function ensureProjectMelodyTimbres(library: MaterialLibrary, songDraftId
     names.add(nameKey(name)); created.push({ ...preset, id, name });
   }
   songBody.melodyTimbresSeeded = true;
+  songBody.timbreLibraryOrder = [...new Set([...(songBody.timbreLibraryOrder ?? []), ...current.map(record => record.id), ...created.map(record => record.id)])];
   committed(library.commitTransaction({ expectedToken, label: '准备本曲音色', createContents: created,
     replaceDrafts: songLibraryMetadataChanges(library, song, songBody),
     exactNameIds: created.map(record => record.id), projectMembers: [{ rootId: song.id,
@@ -175,8 +169,41 @@ export function tryRemoveUnusedProjectTimbre(library: MaterialLibrary, songDraft
   return true;
 }
 
+/** Removing a library sound retains written notes as silent, reassignable families. */
+export function removeProjectTimbre(library: MaterialLibrary, songDraftId: string, timbreId: string): void {
+  const {song,view,scope}=currentSong(library,songDraftId);
+  const tone=library.readContent(timbreId);
+  if(!tone || tone.kind!=='rootsound.timbre' || library.projectScopeOf?.({type:'content',id:timbreId})!==scope)throw new Error('请选择本曲的音色。');
+  const placeholderId=`rootsound.undefined-voice:${scope}`;
+  let used=false;
+  function rewrite<T extends ContentRecord | Draft>(record:T):T {
+    if(record.kind!=='rootsound.phrase')return record;
+    const body=readPhraseBody(record.body);
+    if(!body.parts.some(part=>part.timbreId===timbreId))return record;
+    used=true;
+    body.parts=body.parts.map(part=>part.timbreId===timbreId?{...part,timbreId:placeholderId,unassigned:true}:part);
+    return {...record,body,dependencies:[...new Set(body.parts.map(part=>part.timbreId))]};
+  }
+  const contents=library.listContentInfo().filter(item=>item.kind==='rootsound.phrase'&&library.projectScopeOf?.({type:'content',id:item.id})===scope)
+    .map(item=>library.readContent(item.id)!).map(expected=>({expected,replacement:rewrite(expected)})).filter(change=>change.expected!==change.replacement)
+    .map(change=>({...change,replacement:{...change.replacement,revision:change.expected.revision+1}}));
+  const changed=new Map(contents.map(change=>[change.expected.id,change]));
+  const drafts=library.listDrafts().filter(item=>item.kind==='rootsound.phrase'&&library.projectScopeOf?.({type:'draft',id:item.id})===scope)
+    .map(expected=>{let replacement=rewrite(expected);const source=expected.sourceId?changed.get(expected.sourceId):undefined;
+      if(source && expected.baseRevision===source.expected.revision)replacement={...replacement,baseRevision:source.replacement.revision};
+      return {expected,replacement};}).filter(change=>change.expected!==change.replacement);
+  const placeholder:ContentRecord={id:placeholderId,kind:'rootsound.timbre',owner:'timbre',schemaVersion:1,revision:1,name:'未定义音色',dependencies:[],
+    body:{model:'basic-synth',version:1,character:'warm',attackSeconds:.01,releaseSeconds:.05,level:0}};
+  const body=readSongBody(song.body);body.timbreLibraryOrder=body.timbreLibraryOrder?.filter(id=>id!==timbreId);body.melodyTimbresSeeded=true;
+  committed(library.commitTransaction({expectedToken:library.currentToken(),label:`移除音色${tone.name}`,
+    createContents:used&&!library.readContentInfo(placeholderId)?[placeholder]:[],deleteContents:[tone],
+    deleteDrafts:library.listDrafts().filter(draft=>draft.kind==='rootsound.timbre'&&draft.sourceId===timbreId),
+    replaceContents:contents,replaceDrafts:[...drafts,...songLibraryMetadataChanges(library,song,body)],
+    projectMembers:[{rootId:song.id,contentIds:view.memberIds.filter(id=>id!==timbreId)}],permanentDelete:true}));
+}
+
 function generatedEmptyPlaceholder(library: MaterialLibrary, part: ReturnType<typeof readPhraseBody>['parts'][number]): boolean {
-  if (part.notes.length || !/^乐句 [1-9]\d* 音色$/.test(part.name)) return false;
+  if (part.notes.length || !/^音乐 [1-9]\d* 音色$/.test(part.name)) return false;
   const record = library.readContent(part.timbreId);
   if (!record || record.name !== part.name || record.dependencies.length) return false;
   if (library.listDrafts().some(draft => draft.sourceId === record.id && (draft.name !== record.name
@@ -215,7 +242,7 @@ function addProjectPhrasePart(library: MaterialLibrary, songDraftId: string, phr
   if (section !== 'melody' && section !== 'rhythm') throw new Error('请选择旋律部或节奏部。');
   const expectedToken = library.currentToken(); const { scope } = currentSong(library, songDraftId);
   const source = library.readDraft(phraseDraftId);
-  if (!source || library.projectScopeOf?.({ type: 'draft', id: source.id }) !== scope) throw new Error('这份乐句不属于当前歌曲。');
+  if (!source || library.projectScopeOf?.({ type: 'draft', id: source.id }) !== scope) throw new Error('这份音乐不属于当前歌曲。');
   const phraseAdapter = createPhraseReferenceAdapter(); phraseAdapter.slots(source);
   const body = readPhraseBody(source.body);
   const voice = listProjectTimbres(library, songDraftId).find(record => record.id === timbreId);
@@ -236,7 +263,7 @@ function addProjectPhrasePart(library: MaterialLibrary, songDraftId: string, phr
 export function changeProjectPhraseNoteGroupTimbre(library: MaterialLibrary, songDraftId: string, phraseDraftId: string, partId: string, timbreId: string): void {
   const expectedToken = library.currentToken(); const { song, view, scope } = currentSong(library, songDraftId);
   const source = library.readDraft(phraseDraftId);
-  if (!source || library.projectScopeOf?.({ type: 'draft', id: source.id }) !== scope) throw new Error('这份乐句不属于当前歌曲。');
+  if (!source || library.projectScopeOf?.({ type: 'draft', id: source.id }) !== scope) throw new Error('这份音乐不属于当前歌曲。');
   const adapter = createPhraseReferenceAdapter(); adapter.slots(source); const body = readPhraseBody(source.body);
   const target = body.parts.find(part => part.id === partId);
   if (!target) throw new Error('请选择一个总音符。');
@@ -258,7 +285,7 @@ export function removeProjectPhraseTimbre(library: MaterialLibrary, songDraftId:
   if (section !== 'melody' && section !== 'rhythm' && section !== 'all') throw new Error('请选择有效的音符范围。');
   const expectedToken = library.currentToken(); const { song, view, scope } = currentSong(library, songDraftId);
   const source = library.readDraft(phraseDraftId);
-  if (!source || library.projectScopeOf?.({ type: 'draft', id: source.id }) !== scope) throw new Error('这份乐句不属于当前歌曲。');
+  if (!source || library.projectScopeOf?.({ type: 'draft', id: source.id }) !== scope) throw new Error('这份音乐不属于当前歌曲。');
   const adapter = createPhraseReferenceAdapter(); adapter.slots(source); const body = readPhraseBody(source.body);
   const targets = body.parts.filter(part => part.timbreId === timbreId && (section === 'all' || (part.section ?? 'melody') === section));
   if (!targets.length) return;
@@ -267,7 +294,7 @@ export function removeProjectPhraseTimbre(library: MaterialLibrary, songDraftId:
   const removed = new Set(targets.map(part => part.id));
   const next = readPhraseBody({ ...body, parts: body.parts.filter(part => !removed.has(part.id)) });
   const replacement = { ...source, body: next, dependencies: [...new Set(next.parts.map(part => part.timbreId))] }; adapter.slots(replacement);
-  committed(library.commitTransaction({ expectedToken, label: `从乐句移除${tone.name}`, anchorDraftId: source.id,
+  committed(library.commitTransaction({ expectedToken, label: `从音乐移除${tone.name}`, anchorDraftId: source.id,
     replaceDrafts: [{ expected: source, replacement }], projectMembers: [{ rootId: song.id,
       contentIds: [...new Set([...view.memberIds, tone.id])] }] }));
 }

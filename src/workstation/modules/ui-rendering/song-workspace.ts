@@ -216,14 +216,14 @@ export function mountSongWorkspace(root: HTMLElement, options: {
   }
   function phraseInfo(id: string) {
     const item = phraseById.get(id);
-    return { id, name: item?.name ?? '乐句', tempoBpm: item?.tempoBpm, durationSeconds: item?.durationSeconds ?? duration(id) };
+    return { id, name: item?.name ?? '音乐', tempoBpm: item?.tempoBpm, durationSeconds: item?.durationSeconds ?? duration(id) };
   }
   function editPhrase(ref: SongClipRef): void {
     inspector.flush(); finishGesture(false); audition?.stop(); transport.pause();
     try { options.onEditPhrase?.(ref); } catch (error) { report(error instanceof Error ? error.message : String(error), true); }
   }
   function renamePhrase(id: string, name: string, ref?: SongClipRef): void {
-    if (!options.onRenamePhrase) throw new Error('当前窗口暂不支持修改乐句名称。');
+    if (!options.onRenamePhrase) throw new Error('当前窗口暂不支持修改音乐名称。');
     const apply = (result: void | { id: string }) => { if (result && selectedPhrase === id) selectedPhrase = result.id; if (!disposed) { sync(); paint(); } };
     const result = options.onRenamePhrase(id, name, ref);
     if (result instanceof Promise) {
@@ -362,10 +362,10 @@ export function mountSongWorkspace(root: HTMLElement, options: {
     if (exiting || phraseLibrary) return;
     inspector.flush(); finishGesture(false); audition?.stop(); transport.pause();
     const dialog = node('dialog', 'song-phrase-library'); phraseLibrary = dialog;
-    dialog.setAttribute('aria-label', '乐句库'); const heading = node('header', 'song-library-heading');
+    dialog.setAttribute('aria-label', '音乐库'); const heading = node('header', 'song-library-heading');
     let opening = false; const addTimers = new Map<string, { timer: number }>();
     const cancelAdd = (id?: string) => { for (const [key, pending] of addTimers) if (!id || key === id) { window.clearTimeout(pending.timer); addTimers.delete(key); } };
-    heading.append(node('h2', '', '乐句库'), action('→', 'song-library-close', () => { if (!opening) dialog.close(); }));
+    heading.append(node('h2', '', '音乐库'), action('→', 'song-library-close', () => { if (!opening) dialog.close(); }));
     heading.querySelector('button')!.setAttribute('aria-label', '返回歌曲编排');
     const grid = node('div', 'song-library-grid'); let suppressClickUntil = 0;
     const openError = node('p', 'song-library-open-error'); openError.setAttribute('role', 'alert'); openError.hidden = true;
@@ -396,7 +396,7 @@ export function mountSongWorkspace(root: HTMLElement, options: {
           if (!active() || opening || phraseDeleteDialog || libraryDragId || Date.now() < suppressClickUntil || !phrases().some(item => item.id === phrase.id)) return;
           opening = true; openError.hidden = true;
           try {
-            if (!options.onOpenPhrase) throw new Error('当前窗口暂不支持打开乐句，请重新打开 RootSound。');
+            if (!options.onOpenPhrase) throw new Error('当前窗口暂不支持打开音乐，请重新打开 RootSound。');
             prepareFileAction(); options.onOpenPhrase(phrase.id);
             if (active()) dialog.close();
           } catch (reason) {
@@ -425,13 +425,13 @@ export function mountSongWorkspace(root: HTMLElement, options: {
         }
         catch (error) { report(error instanceof Error ? error.message : String(error), true); }
       });
-      create.setAttribute('aria-label', '新建乐句'); grid.append(create);
+      create.setAttribute('aria-label', '新建音乐'); grid.append(create);
     };
     const requestDelete = (id: string) => {
       if (!active() || phraseDeleteDialog) return;
       const phrase = phrases().find(item => item.id === id); if (!phrase) return;
       const warning = node('dialog', 'song-library-delete-dialog'); phraseDeleteDialog = warning;
-      warning.setAttribute('aria-label', '彻底删除乐句'); warning.append(node('h2', '', '彻底删除乐句？'),
+      warning.setAttribute('aria-label', '彻底删除音乐'); warning.append(node('h2', '', '彻底删除音乐？'),
         node('p', '', `“${phrase.name}”及其使用位置将从当前工程移除，相关撤销记录会清除。保存工程后生效；保存前仍可退出并放弃本次修改。`));
       const error = node('p', 'song-library-delete-error'); error.hidden = true; error.setAttribute('role', 'alert');
       let busy = false;
@@ -441,7 +441,7 @@ export function mountSongWorkspace(root: HTMLElement, options: {
         if (busy || !active() || phraseDeleteDialog !== warning) return;
         busy = true; cancel.disabled = true; confirm.disabled = true; error.hidden = true;
         try {
-          if (!options.onDeletePhrase) throw new Error('当前窗口暂不支持删除乐句，请重新打开 RootSound。');
+          if (!options.onDeletePhrase) throw new Error('当前窗口暂不支持删除音乐，请重新打开 RootSound。');
           await options.onDeletePhrase(id);
           if (!active() || phraseDeleteDialog !== warning) return;
           warning.close(); sync(); paint(); refreshLibrary(); transport.refresh();
@@ -475,7 +475,7 @@ export function mountSongWorkspace(root: HTMLElement, options: {
   function showTrash(source: 'shelf' | 'playlist' | 'library', over = false): void {
     if (!trash) return;
     trash.hidden = false; trash.classList.toggle('is-over', over); trash.dataset.source = source;
-    const label = source === 'library' ? '彻底删除乐句' : source === 'shelf' ? '从乐句栏移除' : '从播放列表移除'; trash.setAttribute('aria-label', label);
+    const label = source === 'library' ? '彻底删除音乐' : source === 'shelf' ? '从音乐栏移除' : '从播放列表移除'; trash.setAttribute('aria-label', label);
   }
   function hideTrash(): void { if (trash) { trash.hidden = true; trash.classList.remove('is-over'); } }
   function overTrash(event: Pick<PointerEvent, 'clientX' | 'clientY'>): boolean {
@@ -821,7 +821,7 @@ export function mountSongWorkspace(root: HTMLElement, options: {
     if (!snapshot.clips.length) { mutate(remove); return; }
     const dialog = node('dialog', 'song-library-delete-dialog song-row-delete-dialog'); rowDeleteDialog = dialog;
     dialog.setAttribute('aria-label', '删除这一行'); dialog.append(node('h2', '', '删除这一行？'),
-      node('p', '', `将移除“${snapshot.name}”和这一行的 ${snapshot.clips.length} 个乐句片段。乐句库里的原乐句会保留。`));
+      node('p', '', `将移除“${snapshot.name}”和这一行的 ${snapshot.clips.length} 个音乐片段。音乐库里的原音乐会保留。`));
     const error = node('p', 'song-library-delete-error'); error.hidden = true; error.setAttribute('role', 'alert');
     let removed = false;
     const cancel = action('取消', 'song-row-delete-cancel', () => dialog.close());
@@ -898,7 +898,7 @@ export function mountSongWorkspace(root: HTMLElement, options: {
     cancelAnimationFrame(viewFrame); viewFrame = 0;
     const curtain = viewport.querySelector('.song-empty-curtain');
     if (!phrases().length && !curtain) {
-      const empty = node('div', 'song-empty-curtain'); empty.append(node('p', '', '先创建乐句吧'), node('span', 'song-empty-arrow', '←')); viewport.append(empty);
+      const empty = node('div', 'song-empty-curtain'); empty.append(node('p', '', '先创建音乐吧'), node('span', 'song-empty-arrow', '←')); viewport.append(empty);
     } else if (phrases().length) curtain?.remove();
     syncPalette(); paintViewport(true); updateInspector();
   }
@@ -967,7 +967,7 @@ export function mountSongWorkspace(root: HTMLElement, options: {
       const isSelected = selected.has(clip.id) || selectedTrack === track.id || selectedPhrase === clip.phraseId;
       block.classList.toggle('is-selected', isSelected); block.setAttribute('aria-pressed', String(isSelected));
       if (created || refreshContent) {
-        block.textContent = phraseById.get(clip.phraseId)?.name ?? '乐句';
+        block.textContent = phraseById.get(clip.phraseId)?.name ?? '音乐';
         block.title = `${block.textContent} · ${timeLabel(seconds)} · 音量 ${Math.round((clip.level ?? 1) * 100)}% · 声像 ${Math.round((clip.pan ?? track.pan) * 100)}`;
         const color = track.color ?? playlistPhraseColor(clip.phraseId);
         block.style.backgroundColor = color; block.style.color = playlistColorInk(color); block.style.borderLeftColor = color;
@@ -1103,10 +1103,10 @@ export function mountSongWorkspace(root: HTMLElement, options: {
     }));
     files.append(action('保存', 'song-save', () => saveCurrent()), action('另存为', 'song-save', () => saveCurrent(true)), action('退出', 'song-exit', () => { void exitCurrent(); }));
     top.append(controls, files); page.append(top);
-    const main = node('main', 'song-workspace'); const palette = node('aside', 'song-palette'); palette.setAttribute('aria-label', '当前歌曲乐句');
+    const main = node('main', 'song-workspace'); const palette = node('aside', 'song-palette'); palette.setAttribute('aria-label', '当前歌曲音乐');
     paletteList = node('div', 'song-phrase-list'); phraseCards.clear();
     paletteList.addEventListener('dragover', reorderShelfPreview); paletteList.addEventListener('drop', dropShelfOrder);
-    newPhraseButton = action('+', 'song-new-phrase', openPhraseLibrary); newPhraseButton.setAttribute('aria-label', '打开乐句库'); palette.append(paletteList, newPhraseButton);
+    newPhraseButton = action('+', 'song-new-phrase', openPhraseLibrary); newPhraseButton.setAttribute('aria-label', '打开音乐库'); palette.append(paletteList, newPhraseButton);
     viewport = node('section', 'song-scroll'); viewport.tabIndex = -1; viewport.setAttribute('aria-label', '歌曲编排');
     ruler = node('div', 'song-ruler'); content = node('div', 'song-timeline'); playhead = node('div', 'song-playhead'); headHandle = node('div', 'song-playhead-handle'); headHandle.setAttribute('aria-label', '拖动播放头');
     gridLayer = node('div', 'song-grid-lines'); dropPreviewNode = node('div', 'song-drop-preview'); dropPreviewNode.hidden = true;
@@ -1117,7 +1117,7 @@ export function mountSongWorkspace(root: HTMLElement, options: {
     rowTrash = node('div', 'song-row-trash'); rowTrash.hidden = true; rowTrash.setAttribute('aria-hidden', 'true'); rowTrash.append(icon('trash')); rowControls.append(rowTrash);
     erasures = node('div', 'song-erasures'); notice = node('div', 'song-notice'); notice.setAttribute('role', 'status'); notice.hidden = true;
     viewport.append(rowControls, ruler, content, erasures, notice);
-    if (!phrases().length) { const curtain = node('div', 'song-empty-curtain'); curtain.append(node('p', '', '先创建乐句吧'), node('span', 'song-empty-arrow', '←')); viewport.append(curtain); }
+    if (!phrases().length) { const curtain = node('div', 'song-empty-curtain'); curtain.append(node('p', '', '先创建音乐吧'), node('span', 'song-empty-arrow', '←')); viewport.append(curtain); }
     const arrangement = node('div', 'song-arrangement'); arrangement.append(viewport, inspector.element);
     main.append(palette, arrangement); page.append(main);
     trash = node('div', 'song-phrase-trash'); trash.hidden = true; trash.setAttribute('role', 'region');

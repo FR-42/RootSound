@@ -1,0 +1,9 @@
+肖邦《降B小调夜曲》Op.9 No.1
+来源：https://www.mutopiaproject.org/cgibin/piece-info.cgi?id=582
+录谱：Benjamin D. Esham，Mutopia-2005/08/08-582
+底本：Schirmer 1915，R. Joseffy 编订
+录谱许可：Creative Commons Attribution-ShareAlike 2.5
+https://creativecommons.org/licenses/by-sa/2.5/
+本次转换：保留1714个音符的音高、起点及踏板延长时值；拆为左右手；调整力度平衡；嵌入 RootSound 自带钢琴录音。
+采用6/4小节、3拍弱起，小节线与谱面同步。
+音色来源与许可见项目 public/instruments/generaluser-gs-2.0.3/CREDITS.txt 和 LICENSE.txt。

@@ -40,7 +40,7 @@ function color(value: unknown): string {
   return value;
 }
 function mode(value: unknown): SongTempoMode {
-  if (value !== 'song' && value !== 'source') throw new Error('请明确选择乐句跟随歌曲速度，还是保留原速。');
+  if (value !== 'song' && value !== 'source') throw new Error('请明确选择音乐跟随歌曲速度，还是保留原速。');
   return value;
 }
 function same(a: unknown, b: unknown): boolean { return JSON.stringify(a) === JSON.stringify(b); }
@@ -56,7 +56,7 @@ export function createSongReferenceAdapter(): ReferenceAdapter {
   function validate(record: ContentRecord | Draft): SongBody {
     if (record.kind !== KIND || record.owner !== OWNER || record.schemaVersion !== 1) throw new Error('这份内容不是当前支持的歌曲。');
     const body = readSongBody(record.body); const actual = references(body);
-    if (record.dependencies.length !== actual.length || actual.some(id => !record.dependencies.includes(id))) throw new Error('歌曲乐句引用与依赖记录不一致。');
+    if (record.dependencies.length !== actual.length || actual.some(id => !record.dependencies.includes(id))) throw new Error('歌曲音乐引用与依赖记录不一致。');
     return body;
   }
   return { kind: KIND,
@@ -64,7 +64,7 @@ export function createSongReferenceAdapter(): ReferenceAdapter {
       label: `${track.name} · 第 ${Number((clip.startBeat + 1).toFixed(4))} 拍` }))); },
     validateTarget(record, slotId, target) {
       if (!validate(record).tracks.some(track => track.clips.some(clip => clip.id === slotId)) || target.kind !== 'rootsound.phrase'
-        || target.owner !== 'phrase' || target.schemaVersion !== 1) throw new Error('歌曲片段需要当前支持的乐句内容。');
+        || target.owner !== 'phrase' || target.schemaVersion !== 1) throw new Error('歌曲片段需要当前支持的音乐内容。');
     },
     replace(record, replacements) {
       const body = validate(record); const used = new Set<string>();
@@ -94,15 +94,15 @@ export function readSongBody(value: unknown): SongBody {
   const tempoMode = mode(body.tempoMode);
   const lengthBeats = finite(body.lengthBeats, '歌曲长度', 16, MAX_LENGTH);
   const hiddenPhraseIds = body.hiddenPhraseIds === undefined ? undefined : (() => {
-    if (!Array.isArray(body.hiddenPhraseIds)) throw new Error('乐句栏显示设置需要是标识列表。');
-    const ids = body.hiddenPhraseIds.map(id => text(id, '乐句栏来源标识'));
-    if (new Set(ids).size !== ids.length) throw new Error('乐句栏显示设置包含重复标识。');
+    if (!Array.isArray(body.hiddenPhraseIds)) throw new Error('音乐栏显示设置需要是标识列表。');
+    const ids = body.hiddenPhraseIds.map(id => text(id, '音乐栏来源标识'));
+    if (new Set(ids).size !== ids.length) throw new Error('音乐栏显示设置包含重复标识。');
     return ids;
   })();
   const phraseShelfOrder = body.phraseShelfOrder === undefined ? undefined : (() => {
-    if (!Array.isArray(body.phraseShelfOrder)) throw new Error('乐句栏顺序需要是标识列表。');
-    const order = body.phraseShelfOrder.map(id => text(id, '乐句栏顺序标识'));
-    if (new Set(order).size !== order.length) throw new Error('乐句栏顺序包含重复标识。');
+    if (!Array.isArray(body.phraseShelfOrder)) throw new Error('音乐栏顺序需要是标识列表。');
+    const order = body.phraseShelfOrder.map(id => text(id, '音乐栏顺序标识'));
+    if (new Set(order).size !== order.length) throw new Error('音乐栏顺序包含重复标识。');
     return order;
   })();
   const timbreLibraryOrder = body.timbreLibraryOrder === undefined ? undefined : (() => {
@@ -133,10 +133,10 @@ export function readSongBody(value: unknown): SongBody {
   const tracks = body.tracks.map(raw => {
     const track = object(raw, '轨道'); fields(track, ['id', 'name', 'level', 'pan', 'muted', 'solo', 'clips', 'color', 'panOffset'], '轨道');
     const id = unique(track.id);
-    if (!Array.isArray(track.clips) || (count += track.clips.length) > MAX_CLIPS) throw new Error(`当前歌曲最多放置 ${MAX_CLIPS} 个乐句片段。`);
+    if (!Array.isArray(track.clips) || (count += track.clips.length) > MAX_CLIPS) throw new Error(`当前歌曲最多放置 ${MAX_CLIPS} 个音乐片段。`);
     const clips = track.clips.map(rawClip => {
-      const clip = object(rawClip, '乐句片段'); fields(clip, ['id', 'phraseId', 'startBeat', 'level', 'pan'], '乐句片段');
-      return { id: unique(clip.id), phraseId: text(clip.phraseId, '引用乐句'), startBeat: finite(clip.startBeat, '片段开始位置', 0, MAX_LENGTH),
+      const clip = object(rawClip, '音乐片段'); fields(clip, ['id', 'phraseId', 'startBeat', 'level', 'pan'], '音乐片段');
+      return { id: unique(clip.id), phraseId: text(clip.phraseId, '引用音乐'), startBeat: finite(clip.startBeat, '片段开始位置', 0, MAX_LENGTH),
         ...(clip.level === undefined ? {} : { level: finite(clip.level, '片段音量', 0, 1) }),
         ...(clip.pan === undefined ? {} : { pan: finite(clip.pan, '片段左右位置', -1, 1) }) };
     });
@@ -185,7 +185,7 @@ function extent(body: SongBody, phrases: PhrasePlaybackPort): number {
 function validateSong(record: Draft | ContentRecord, phrases: PhrasePlaybackPort): SongBody {
   if (record.kind !== KIND || record.schemaVersion !== 1 || record.owner !== OWNER) throw new Error('这份内容目前不能作为歌曲打开。原内容已保留。');
   const body = readSongBody(record.body); const actual = references(body);
-  if (record.dependencies.length !== actual.length || actual.some(id => !record.dependencies.includes(id))) throw new Error('歌曲的乐句引用与依赖记录不一致。原内容已保留。');
+  if (record.dependencies.length !== actual.length || actual.some(id => !record.dependencies.includes(id))) throw new Error('歌曲的音乐引用与依赖记录不一致。原内容已保留。');
   for (const id of actual) phrases.readSaved(id);
   return body;
 }
@@ -222,7 +222,7 @@ function compileSong(body: SongBody, phrases: PhrasePlaybackPort, allowSilence =
       if (events.length > MAX_SEQUENCE_EVENTS) throw new Error(`这首歌曲超过当前 ${MAX_SEQUENCE_EVENTS} 个发声音符的试听范围，请缩短编排。`);
     }
   }
-  if (!events.length && !allowSilence) throw new Error('先放入有音符的乐句，并开启至少一条轨道，再听整首歌吧。');
+  if (!events.length && !allowSilence) throw new Error('先放入有音符的音乐，并开启至少一条轨道，再听整首歌吧。');
   if (durationSeconds > MAX_SEQUENCE_SECONDS) throw new Error('当前歌曲试听与导出支持最长 10 分钟，请缩短编排。');
   events.sort((a, b) => a.atSeconds - b.atSeconds);
   const plan: SoundSequencePlan = { kind: 'sequence', version: 1, durationSeconds, events };
@@ -258,7 +258,7 @@ export function createSongEditor(library: MaterialLibrary, phrases: PhrasePlayba
   const validate = (record: Draft | ContentRecord) => validateSong(record, phrases);
   function current(): { draft: Draft; body: SongBody } {
     const draft = active ? library.readDraft(active) : undefined;
-    if (!draft) throw new Error('先新建一首歌曲，再把乐句放进来。');
+    if (!draft) throw new Error('先新建一首歌曲，再把音乐放进来。');
     return { draft, body: validate(draft) };
   }
   function changed(draft: Draft): boolean {
@@ -281,7 +281,7 @@ export function createSongEditor(library: MaterialLibrary, phrases: PhrasePlayba
     const result = body.tracks.find(item => item.id === id); if (!result) throw new Error('找不到这条轨道。'); return result;
   }
   function clip(body: SongBody, trackId: string, clipId: string): SongClip {
-    const result = track(body, trackId).clips.find(item => item.id === clipId); if (!result) throw new Error('找不到这个乐句片段。'); return result;
+    const result = track(body, trackId).clips.find(item => item.id === clipId); if (!result) throw new Error('找不到这个音乐片段。'); return result;
   }
   function travel(direction: 'undo' | 'redo'): void {
     const { draft } = current(); const history = library.readDraftHistory(draft.id);
@@ -348,7 +348,7 @@ export function createSongEditor(library: MaterialLibrary, phrases: PhrasePlayba
     setGridOffset(seconds) { finite(seconds, '背景网格偏移', -1e6, 1e6); modify(body => { body.gridOffsetSeconds = seconds; }); },
     setMasterLevel(level) { finite(level, '总音量', 0, 1); modify(body => { body.masterLevel = level; }); },
     setPhraseShelfVisible(phraseId, visible) {
-      text(phraseId, '乐句栏来源标识'); boolean(visible, '乐句栏显示');
+      text(phraseId, '音乐栏来源标识'); boolean(visible, '音乐栏显示');
       const { draft, body } = current();
       phrases.readSaved(phraseId);
       const view = library.currentProjectView?.(draft.id);
@@ -356,7 +356,7 @@ export function createSongEditor(library: MaterialLibrary, phrases: PhrasePlayba
         ...view.drafts.flatMap(item => item.sourceId ? [item.sourceId] : [])]) : undefined;
       const scope = library.projectScopeOf?.({ type: 'draft', id: draft.id });
       const owner = library.projectScopeOf?.({ type: 'content', id: phraseId });
-      if (currentIds && !currentIds.has(phraseId) || owner && owner !== scope) throw new Error('这份乐句不属于当前歌曲的乐句库。');
+      if (currentIds && !currentIds.has(phraseId) || owner && owner !== scope) throw new Error('这份音乐不属于当前歌曲的音乐库。');
       const hidden = new Set(body.hiddenPhraseIds ?? []);
       if (visible === !hidden.has(phraseId)) return;
       if (visible) hidden.delete(phraseId); else hidden.add(phraseId);
@@ -364,7 +364,7 @@ export function createSongEditor(library: MaterialLibrary, phrases: PhrasePlayba
       write({ name: draft.name, dependencies: draft.dependencies, body });
     },
     reorderPhraseShelf(phraseId, targetIndex) {
-      text(phraseId, '乐句栏来源标识');
+      text(phraseId, '音乐栏来源标识');
       const { draft, body } = current(); const project = library.currentProjectView?.(draft.id);
       const scope = library.projectScopeOf?.({ type: 'draft', id: draft.id });
       const currentIds = project ? new Set([...project.memberIds, ...project.contents.map(item => item.id),
@@ -376,8 +376,8 @@ export function createSongEditor(library: MaterialLibrary, phrases: PhrasePlayba
       const ordered = orderSongPhraseShelf(available, body);
       const hidden = new Set(body.hiddenPhraseIds); const visible = ordered.filter(item => !hidden.has(item.id));
       const from = visible.findIndex(item => item.id === phraseId);
-      if (from < 0) throw new Error('这份乐句不属于当前可见的乐句栏。');
-      if (!Number.isInteger(targetIndex) || targetIndex < 0 || targetIndex >= visible.length) throw new Error('乐句栏位置无效。');
+      if (from < 0) throw new Error('这份音乐不属于当前可见的音乐栏。');
+      if (!Number.isInteger(targetIndex) || targetIndex < 0 || targetIndex >= visible.length) throw new Error('音乐栏位置无效。');
       if (from === targetIndex) return;
       const [moved] = visible.splice(from, 1); visible.splice(targetIndex, 0, moved!);
       let index = 0;
@@ -391,7 +391,7 @@ export function createSongEditor(library: MaterialLibrary, phrases: PhrasePlayba
     },
     setLength(lengthBeats) {
       finite(lengthBeats, '歌曲长度', 16, MAX_LENGTH);
-      modify(body => { if (body.tracks.some(item => item.clips.some(clip => clip.startBeat + clipLength(body, clip.phraseId) > lengthBeats + 1e-8))) throw new Error('乐句仍在这个位置之后，请先移动或移除这些片段。'); body.lengthBeats = lengthBeats; });
+      modify(body => { if (body.tracks.some(item => item.clips.some(clip => clip.startBeat + clipLength(body, clip.phraseId) > lengthBeats + 1e-8))) throw new Error('音乐仍在这个位置之后，请先移动或移除这些片段。'); body.lengthBeats = lengthBeats; });
     },
     addTrack(name) {
       const id = crypto.randomUUID(); modify(body => { body.tracks.push({ id, name: text(name ?? `行${body.tracks.length + 1}`, '轨道名称'), level: 0.8, pan: 0, muted: false, solo: false, clips: [] }); }); return id;
@@ -494,7 +494,7 @@ export function createSongEditor(library: MaterialLibrary, phrases: PhrasePlayba
       const temporary = readSongBody(bodyOverride);
       return compileSong(validate({ ...draft, body: temporary, dependencies: references(temporary) }), phrases, options.allowSilence, apiPostProduction);
     },
-    save(saveMode, confirmation) { const { draft, body } = current(); if (!body.tracks.some(track => track.clips.length)) throw new Error('先放入一段乐句，再保存歌曲吧。'); return library.saveDraft(draft.id, saveMode, confirmation); },
+    save(saveMode, confirmation) { const { draft, body } = current(); if (!body.tracks.some(track => track.clips.length)) throw new Error('先放入一段音乐，再保存歌曲吧。'); return library.saveDraft(draft.id, saveMode, confirmation); },
   };
   return api;
 }

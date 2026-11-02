@@ -1,0 +1,27 @@
+{
+  "source": "D:\\#Software\\ripx\\RipX.exe",
+  "source_sha256": "5f088fa4fbbe1759ef75d8034c79f33c846e3bf5f13d5048dd95a6614d2ad441",
+  "values": [
+    {
+      "address": "0x140939a00",
+      "section": ".data",
+      "file_offset": "0x938c00",
+      "bytes": "01000000",
+      "unsigned": 1
+    },
+    {
+      "address": "0x1409399fc",
+      "section": ".data",
+      "file_offset": "0x938bfc",
+      "bytes": "02000000",
+      "unsigned": 2
+    },
+    {
+      "address": "0x14093965c",
+      "section": ".data",
+      "file_offset": "0x93885c",
+      "bytes": "01000000",
+      "unsigned": 1
+    }
+  ]
+}

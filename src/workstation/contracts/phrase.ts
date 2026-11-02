@@ -42,6 +42,10 @@ export type PhraseBody = {
   lengthBeats: number;
   /** Editing cells per beat only; changing this never quantizes existing notes. Omitted values are four. */
   stepsPerBeat?: number;
+  /** Quarter-note beats per bar; omitted legacy scores use four. */
+  beatsPerBar?: number;
+  /** Initial incomplete bar, in quarter-note beats. */
+  pickupBeats?: number;
   /** Phrase output gain; omitted older content uses unity gain. */
   masterLevel?: number;
   parts: PhrasePart[];

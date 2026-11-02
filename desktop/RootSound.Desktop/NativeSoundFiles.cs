@@ -10,7 +10,8 @@ public sealed class NativeSoundFiles
 {
     private const int MaximumBytes = 1024 * 1024;
     private readonly Form owner;
-    public NativeSoundFiles(Form owner) => this.owner = owner;
+    private readonly ProjectDirectoryManager? projects;
+    public NativeSoundFiles(Form owner, ProjectDirectoryManager? projects = null) { this.owner = owner; this.projects = projects; }
 
     // Called through the asynchronous host proxy; dialogs never block a sync JS storage call.
     public string Open() => OnUi(() =>
@@ -27,6 +28,7 @@ public sealed class NativeSoundFiles
 
     public string Save(string text, string suggestedName) => OnUi(() =>
     {
+        text = projects?.ExpandPayloadText(text, MaximumBytes) ?? text;
         if (Encoding.UTF8.GetByteCount(text) > MaximumBytes) throw new IOException("声音文件过大，尚未保存。");
         var name = new string(suggestedName.Where(c => !Path.GetInvalidFileNameChars().Contains(c)).ToArray()).Trim();
         using var dialog = new SaveFileDialog

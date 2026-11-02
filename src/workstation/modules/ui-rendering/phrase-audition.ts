@@ -1,5 +1,6 @@
 import type { PhraseEditorPort, PhraseView } from '../../contracts/phrase.ts';
 import type { SoundRuntimePort } from '../../contracts/sound.ts';
+import { defaultInstrumentInfo } from '../timbre/instrument-catalog.ts';
 
 /** A short-note lane has its own request lifetime, separate from the transport. */
 export function createPhraseAudition(
@@ -38,7 +39,9 @@ export function createPhraseAudition(
       cancel(); const initial = phrase.read(); scope = currentScope(initial); const expected = scope; const draftId = initial.draft?.id;
       if (!draftId) return; const request = generation;
       try {
-        const plan = await phrase.previewTimbrePlan(id, { frequencyHz: 261.6255653005986, holdSeconds: .35, velocity: .75 });
+        const info = defaultInstrumentInfo(id);
+        const holdSeconds = info?.key.includes('pad') ? 1.7 : info?.category === '弦乐' || info?.category === '人声' ? 1 : .55;
+        const plan = await phrase.previewTimbrePlan(id, { frequencyHz: 440 * 2 ** (((info?.midi ?? 60) - 69) / 12), holdSeconds, velocity: .75 });
         if (request !== generation) return;
         const current = phrase.read();
         if (current.draft?.id !== draftId || currentScope(current) !== expected) return;

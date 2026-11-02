@@ -255,7 +255,7 @@ export function createReferenceEditing(library: MaterialLibrary, adapters: Refer
           if (item.id === draft.id) return false;
           const child = readContext(item);
           return child?.context?.root.type === 'draft' && child.context.root.id === draft.id;
-        })) return { status: 'conflict', reason: '请先完成或取消正在调整的声音，再保存这段乐句；所有修改均已保留。' };
+        })) return { status: 'conflict', reason: '请先完成或取消正在调整的声音，再保存这段音乐；所有修改均已保留。' };
         const { public: available, candidates } = collect(draft, meta);
         if (options.expectedToken !== undefined && options.expectedToken !== available.token) return { status: 'conflict', reason: '使用位置已发生变化，请重新选择；你的修改已保留。' };
         const selectedIds = options.locationIds ?? available.locations.filter(item => item.current).map(item => item.id);

@@ -115,6 +115,9 @@ function validateDependencies(contents: ContentRecord[], candidate: ContentRecor
 function restore(raw: string, projectRootKind = 'rootsound.song'): State {
   let value: unknown;
   try { value = JSON.parse(raw); } catch { return fail('已保存的数据损坏，未清空或覆盖原数据。'); }
+  return validateState(value, projectRootKind);
+}
+function validateState(value: unknown, projectRootKind = 'rootsound.song'): State {
   if (!isObject(value) || value.format !== 'RootSoundMaterialLibrary' || value.version !== 1
     || !Array.isArray(value.contents) || !Array.isArray(value.drafts)) fail('不支持或损坏的素材库格式。');
   for (const records of [value.contents, value.drafts]) {
@@ -274,7 +277,7 @@ export function createMaterialLibrary(storage?: MaterialStorage, options?: { pro
         if (!newIds.has(dependency) && (oldIds.has(dependency) || changedDrafts.has(draft.id))) fail('仍有编辑稿引用将被移除或不存在的素材。');
       }
     }
-    restore(JSON.stringify(next), options?.project?.rootKind);
+    validateState(next, options?.project?.rootKind);
   }
   function commitTransaction(transaction: MaterialTransaction): MaterialTransactionResult {
     if (transaction.expectedToken !== token) return { status: 'conflict', reason: '素材或使用位置已变化，请重新查看后再应用。' };

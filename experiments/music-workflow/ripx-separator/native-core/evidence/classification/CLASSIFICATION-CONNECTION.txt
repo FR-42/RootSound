@@ -1,0 +1,65 @@
+RipX native automatic instrument classification — static reconstruction
+Target D:/#Software/ripx/RipX.exe
+SHA256 5f088fa4fbbe1759ef75d8034c79f33c846e3bf5f13d5048dd95a6614d2ad441
+
+Implemented API
+  native_acoustic_classifier.classify_native_notes(payloads)
+  returns one NativeAcousticAssignment per input payload in the same order.
+  Fields: note_index, instrument_id, name, program_0based, percussion,
+  candidates(id/score/quality), complete, source, limitation,
+  signature_source_sha256.
+
+This calls the actual source-derived automatic per-note classifier382c80,
+including380d90 harmonic amplitude/phase windows,37be30 shipped-signature
+matching,37c3e0 phase/amplitude similarity,382540 attack ratio,381980
+repeated-frequency extrema,3827e0 pitch spread, per-instrument modifiers,
+source guitar/bass consolidation, piano multiplier and381ef0 top8 candidates.
+The source lookup table365a30 uses floor/clamp0..32767 and
+float32(20*log10(index/32768)), with table[0]=-90; it is not divided by32767.
+
+Original owned data
+  Resources/idat SHA256
+    9c30650d33152928155f70ddc352e4f57fdf37417680c2d639307188386ad262
+  Version7,943 example records,6818 harmonic signatures. The format-aware
+  loader consumed803964/803964 bytes. No media/harmonic objects were read:
+  older versions<6 that embed harmonic objects are refused.
+  native-signature-library.json is extracted metadata + numerical signatures.
+  native-builtin-instruments.json is literal initializer data from378220.
+  It has52 defined IDs in0..52; ID35 is absent, not invented.
+  GeneralMIDI.txt is the installed resource, SHA256
+    25be100e5e4cfccdf478f83cfd6f95141c8a71b83803606a0923797bdd71aec3.
+  6132a0's longest alias matching maps names to source1-based programs;
+  304bb0 subtracts1. Its Bass->Bass guitar rewrite is preserved.
+
+Distinct source boundaries
+  3449c0 expanded group+9cd is an analysis/transient kind, NOT a GM program.
+  370a00 initially maps negative-type kinds via382b40, then new-note commit
+  overwrites object+20 with384830 context choice and optional939660 override.
+  384830 reads context only. It does not inspect harmonic/audio features.
+  3848b0 can explicitly assign every note a context/stem preset (94=>Piano).
+  This adapter therefore directly schedules382c80 on harmonic objects for
+  real automatic classification. It does not claim to reproduce3848b0's
+  editor preset dispatch, concurrent worker schedule or whole-song contextual
+  regrouping. No default Piano label is substituted for an unknown label.
+  ID0 means source Other. Its MIDI program0 is a lookup fallback, not evidence
+  that the acoustic class is Piano.
+  MIDI percussion choice is read from source21c&8080; it is not guessed from
+  pitch or harmonic count. Negative-type objects use preserved native_kind
+  through382b40. Types126/127/128 require the original context14; omission
+  remains unknown. Every assignment includes midi_eligible/midi_limitation.
+  304bb0's channel10 branch excludes signed-negative21c objects. Positive
+  harmonic percussion requires original30a110 key mapping and is not given
+  an invented drum key.
+
+Expected incomplete boundaries remain explicit
+  Source feature windows with no positive interior frequency coverage,
+  or unsupported zero harmonic frequency return
+  complete=false with a reason. No public model or frequency-label rules.
+  Fresh constant timestep native payloads are covered. Runtime equivalence,
+  mixed-song accuracy and original provider/application sequencing are unverified.
+
+Verification performed in this pass
+  Parsed original PE literal constants/definitions and owned idat format.
+  Parsed Python AST only. Did not run numerical/classifier/audio tests,
+  invoke RipX, use its GUI, read audio/image contents, or open another REA
+  native session. No performance/quality measurements were made.

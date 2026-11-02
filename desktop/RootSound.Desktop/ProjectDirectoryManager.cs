@@ -43,6 +43,11 @@ public sealed class ProjectDirectoryManager : IDisposable
     private string? memory;
     private string scope = Guid.NewGuid().ToString("N");
     private bool disposed;
+    private readonly string payloadRoot;
+    private readonly int payloadThreshold;
+    private SessionPayloadStore? payloads;
+    private readonly Dictionary<string, (SessionPayloadStore Store, string Token)> inspections = new(StringComparer.OrdinalIgnoreCase);
+    internal string? ActivePayloadDirectory => payloads?.DirectoryPath;
 
     public string DefaultLocation { get; }
 
@@ -56,15 +61,33 @@ public sealed class ProjectDirectoryManager : IDisposable
     internal ProjectDirectoryManager(string installationRoot, Action<string>? beforeCommit, Action<string>? beforeSaveCommit, Action<string>? beforeDeleteFile)
         : this(installationRoot, beforeCommit, beforeSaveCommit, beforeDeleteFile, null) { }
 
+    internal ProjectDirectoryManager(string installationRoot, int payloadThreshold)
+        : this(installationRoot, null, null, null, null, payloadThreshold) { }
+
     internal ProjectDirectoryManager(string installationRoot, Action<string>? beforeCommit, Action<string>? beforeSaveCommit, Action<string>? beforeDeleteFile, Action<string>? beforeRenameCapture)
+        : this(installationRoot, beforeCommit, beforeSaveCommit, beforeDeleteFile, beforeRenameCapture, SessionPayloadStore.DefaultThreshold) { }
+
+    private ProjectDirectoryManager(string installationRoot, Action<string>? beforeCommit, Action<string>? beforeSaveCommit, Action<string>? beforeDeleteFile, Action<string>? beforeRenameCapture, int payloadThreshold)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(installationRoot);
         DefaultLocation = Path.Combine(Path.GetFullPath(installationRoot), "project");
         timbreMirror = new ProjectTimbreMirror(installationRoot);
+        payloadRoot = Path.Combine(Path.GetFullPath(installationRoot), ".cache", "project-payloads");
+        this.payloadThreshold = payloadThreshold;
         this.beforeCommit = beforeCommit;
         this.beforeSaveCommit = beforeSaveCommit;
         this.beforeDeleteFile = beforeDeleteFile;
         this.beforeRenameCapture = beforeRenameCapture;
+    }
+
+    public Stream OpenPayloadStream(string token)
+    {
+        lock (gate) { ThrowIfDisposed(); return (payloads ?? throw new IOException("当前没有打开音频缓存工程。")).Open(token); }
+    }
+
+    public string ExpandPayloadText(string text, int maxBytes)
+    {
+        lock (gate) { ThrowIfDisposed(); return StreamingWorkspaceCodec.Expand(text, payloads, maxBytes); }
     }
 
     public ProjectDirectoryInfo? Current
@@ -100,7 +123,8 @@ public sealed class ProjectDirectoryManager : IDisposable
         try
         {
             string? previousWarning = timbreFilesState.status == "warning" ? timbreFilesState.message : null;
-            timbreMirror.Sync(current.Id, library, timbreSongDraftId, verifyPhysicalFiles);
+            timbreMirror.Sync(current.Id, library, timbreSongDraftId, verifyPhysicalFiles,
+                text => StreamingWorkspaceCodec.Expand(text, payloads, NativeTimbreFiles.MaximumSoundBytes));
             timbreFilesState = !verifyPhysicalFiles && previousWarning is not null ? new("warning", directory, previousWarning) : new("mirrored", directory);
         }
         catch (Exception error) { timbreFilesState = new("warning", directory, "音色已保存在工程，目录副本暂未写入：" + error.Message); }
@@ -118,10 +142,8 @@ public sealed class ProjectDirectoryManager : IDisposable
         {
             ThrowIfDisposed();
             if (activeStore is null) return (memory, scope);
-            // The library is this session's working copy. A status/read call must
-            // neither replace it with disk nor accept external changes as a baseline.
-            activeStore.VerifyUnchanged();
-            if (fileEnvelope is null) RequireManifestUnchanged();
+            // Draft reads never touch the source file. Explicit Save still compares
+            // its full fingerprint before committing, without adopting external edits.
             return (currentSnapshot, scope);
         }
     }
@@ -134,13 +156,12 @@ public sealed class ProjectDirectoryManager : IDisposable
             if (expectedScope is not null && !string.Equals(expectedScope, scope, StringComparison.Ordinal))
                 throw new IOException("当前歌曲项目已切换，这次旧页面的保存没有写入。请重新打开当前歌曲后再编辑。");
             ValidateLibrary(value);
+            StreamingWorkspaceCodec.ValidateTokens(value, payloads);
             if (checkpoint && activeStore is null) throw new IOException("请先创建或打开歌曲项目，再执行永久删除。");
             if (activeStore is null) memory = value;
             else
             {
                 if (!File.Exists(activeStore.FilePath)) throw new IOException("当前歌曲项目文件已被移走，本次没有重建或覆盖它。");
-                activeStore.VerifyUnchanged();
-                if (fileEnvelope is null) RequireManifestUnchanged();
                 currentSnapshot = value;
             }
         }
@@ -159,6 +180,7 @@ public sealed class ProjectDirectoryManager : IDisposable
             if (!copy) RequireCleanForSwitch();
             name = ValidateName(name);
             string text = ValidateLibrary(libraryText);
+            StreamingWorkspaceCodec.ValidateTokens(text, payloads);
             string parent = FullDirectory(parentPath);
             if (!Directory.Exists(parent))
             {
@@ -177,17 +199,18 @@ public sealed class ProjectDirectoryManager : IDisposable
                 using var stagingOwner = new FileStream(staging, FileMode.CreateNew, FileAccess.Write, FileShare.None);
                 ownsStaging = true;
                 string id = Guid.NewGuid().ToString("N");
-                var manifest = LargeJsonText.Serialize(new
+                var manifest = JsonSerializer.SerializeToNode(new
                 {
                     format = "RootSoundWorkspace", version = 2, id, name,
                     createdAtUtc = DateTimeOffset.UtcNow.ToString("O", CultureInfo.InvariantCulture),
-                }, "libraryText", text);
-                ValidateEncodingAndSize(manifest);
-                stagingOwner.Write(Utf8.GetBytes(manifest)); stagingOwner.Flush(true); stagingOwner.Dispose();
+                })!.AsObject();
+                StreamingWorkspaceCodec.Write(stagingOwner, manifest, text, payloads);
+                if (stagingOwner.Length > AtomicTextStore.MaximumBytes) throw new InvalidDataException("歌曲文件超过当前大小范围，尚未创建。");
+                stagingOwner.Flush(true); stagingOwner.Dispose();
                 beforeCommit?.Invoke(target);
                 File.Move(staging, target); // A racing destination is never overwritten.
                 ownsStaging = false;
-                try { return ActivateFile(target); }
+                try { return ActivateFile(target, synchronizeTimbres: true); }
                 catch (Exception error)
                 {
                     throw new IOException("歌曲文件已创建，但暂时无法打开。现有歌曲仍保持原状；可稍后从乐曲库打开：" + target + "。原因：" + error.Message, error);
@@ -274,6 +297,7 @@ public sealed class ProjectDirectoryManager : IDisposable
                 activeStore.Dispose();
             }
             activeStore = null;
+            payloads?.Dispose(); payloads = null;
             current = null; timbreFilesState = new("idle", null); timbreSongDraftId = null;
             currentSnapshot = null;
             savedSnapshot = null;
@@ -368,10 +392,17 @@ public sealed class ProjectDirectoryManager : IDisposable
             if (File.Exists(path))
             {
                 using var ownership = AtomicTextStore.ForProjectFile(path);
-                var parsed = ParseEnvelope(path, ownership.Read() ?? throw new IOException("歌曲文件已被移走。"));
-                RequireSelectedIdentity(parsed.Project, expectedId);
-                string token = RenameToken(path); ownership.VerifyUnchanged();
-                return new(parsed.Project, parsed.Library, token);
+                SessionPayloadStore? inspection = new(payloadRoot, payloadThreshold);
+                try
+                {
+                    var parsed = ownership.ReadStreamValidated(stream => ReadWorkspace(path, stream, inspection));
+                    RequireSelectedIdentity(parsed.Project, expectedId);
+                    string token = RenameToken(path); ownership.VerifyUnchanged();
+                    if (inspections.Remove(path, out var previous)) previous.Store.Dispose();
+                    inspections.Add(path, (inspection, token)); inspection = null;
+                    return new(parsed.Project, parsed.Library, token);
+                }
+                finally { inspection?.Dispose(); }
             }
             using var legacy = new AtomicTextStore(path);
             byte[] manifest = ReadManifestBytes(path); var selected = ParseManifest(path, manifest);
@@ -394,16 +425,18 @@ public sealed class ProjectDirectoryManager : IDisposable
             if (string.IsNullOrWhiteSpace(expectedToken)) throw new IOException("歌曲快照已过期，请重新打开乐曲库。");
             if (File.Exists(path))
             {
+                SessionPayloadStore? inspected = inspections.TryGetValue(path, out var snapshot) && snapshot.Token == expectedToken ? snapshot.Store : null;
+                StreamingWorkspaceCodec.ValidateTokens(libraryText, inspected);
                 using var ownership = AtomicTextStore.ForProjectFile(path);
-                var parsed = ParseEnvelope(path, ownership.Read() ?? throw new IOException("歌曲文件已被移走。"));
+                var parsed = ownership.ReadStreamValidated(stream => ReadWorkspace(path, stream, null, metadataOnly: true));
                 RequireSelectedIdentity(parsed.Project, expectedId);
                 if (RenameToken(path) != expectedToken) throw new IOException("这首歌刚刚发生变化，请重新选择后改名。");
                 var envelope = (JsonObject)parsed.Envelope.DeepClone(); envelope["name"] = name;
-                string replacement = LargeJsonText.Serialize(envelope, "libraryText", libraryText); ValidateEncodingAndSize(replacement);
                 beforeSaveCommit?.Invoke(path);
                 RequireEditableSelection(path, expectedId); ownership.VerifyUnchanged();
                 if (RenameToken(path) != expectedToken) throw new IOException("这首歌刚刚发生变化，本次未修改名称。");
-                ownership.Write(replacement);
+                ownership.WriteStream(stream => StreamingWorkspaceCodec.Write(stream, envelope, libraryText, inspected));
+                if (inspections.Remove(path, out var used)) used.Store.Dispose();
                 return parsed.Project with { Name = name };
             }
             using var legacy = new AtomicTextStore(path);
@@ -534,7 +567,7 @@ public sealed class ProjectDirectoryManager : IDisposable
     private void DeleteProjectFile(string path, string expectedId)
     {
         using var ownership = AtomicTextStore.ForProjectFile(path);
-        var selected = ParseEnvelope(path, ownership.Read() ?? throw new IOException("歌曲文件已被移走。"));
+        var selected = ownership.ReadStreamValidated(stream => ReadWorkspace(path, stream, null, metadataOnly: true));
         RequireSelectedIdentity(selected.Project, expectedId);
         string backup = path + ".bak";
         string[] files = Path.Exists(backup) ? [path, backup] : [path];
@@ -749,79 +782,81 @@ public sealed class ProjectDirectoryManager : IDisposable
         if (fileEnvelope is null) { activeStore!.Write(library); MirrorTimbres(library, verifyTimbres); return; }
         var envelope = (JsonObject)fileEnvelope.DeepClone();
         if (name is not null) envelope["name"] = name;
-        string text = LargeJsonText.Serialize(envelope, "libraryText", library);
-        ValidateEncodingAndSize(text);
-        activeStore!.Write(text);
+        activeStore!.WriteStream(stream => StreamingWorkspaceCodec.Write(stream, envelope, library, payloads));
         // Working/committed snapshots already own the library. Keep only the
         // small envelope metadata so subsequent saves do not clone audio again.
         fileEnvelope = envelope; MirrorTimbres(library, verifyTimbres);
     }
 
-    private ProjectDirectoryInfo ActivateFile(string path)
+    private ProjectDirectoryInfo ActivateFile(string path, bool synchronizeTimbres = false)
     {
         if (IsLink(path)) throw new IOException("请选择实际的歌曲项目文件，不能使用链接文件。");
-        if (current is not null && SamePath(current.Path, path))
-        {
-            (ProjectDirectoryInfo Project, JsonObject Envelope, string Library)? parsed = null;
-            activeStore!.ReadValidated(text => parsed = ParseEnvelope(path, text ?? throw new IOException("歌曲文件已被移走。")));
-            var result = parsed!.Value;
-            timbreSongDraftId = null; current = result.Project; fileEnvelope = result.Envelope; currentSnapshot = committedSnapshot = savedSnapshot = result.Library; loadingCompleted = false;
-            scope = Guid.NewGuid().ToString("N");
-            MirrorTimbres(currentSnapshot!, verifyPhysicalFiles: true);
-            return current;
-        }
         AtomicTextStore? candidate = null;
+        SessionPayloadStore? nextPayloads = new(payloadRoot, payloadThreshold);
+        bool reuse = current is not null && SamePath(current.Path, path);
         try
         {
-            candidate = AtomicTextStore.ForProjectFile(path);
-            var parsed = ParseEnvelope(path, candidate.Read() ?? throw new IOException("歌曲文件已被移走。"));
+            candidate = reuse ? activeStore! : AtomicTextStore.ForProjectFile(path);
+            var parsed = candidate.ReadStreamValidated(stream => ReadWorkspace(path, stream, nextPayloads));
             var previous = activeStore;
+            var previousPayloads = payloads;
             activeStore = candidate; candidate = null;
+            payloads = nextPayloads; nextPayloads = null;
             timbreSongDraftId = null; current = parsed.Project; fileEnvelope = parsed.Envelope;
             currentSnapshot = committedSnapshot = savedSnapshot = parsed.Library; loadingCompleted = false;
             observedManifestHash = null; memory = null; scope = Guid.NewGuid().ToString("N");
-            previous?.Dispose();
-            MirrorTimbres(currentSnapshot!, verifyPhysicalFiles: true);
+            if (!reuse) previous?.Dispose();
+            previousPayloads?.Dispose();
+            timbreFilesState = new("idle", timbreMirror.DirectoryFor(current.Id));
+            if (synchronizeTimbres) MirrorTimbres(currentSnapshot!, verifyPhysicalFiles: true);
             return current;
         }
-        finally { candidate?.Dispose(); }
+        finally { if (!reuse) candidate?.Dispose(); nextPayloads?.Dispose(); }
     }
 
     private static (ProjectDirectoryInfo Project, JsonObject Envelope, string Library) ReadEnvelope(string path)
     {
         using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
         if (stream.Length > AtomicTextStore.MaximumBytes) throw new InvalidDataException("歌曲文件超过当前 512 MiB 上限。");
-        byte[] bytes = new byte[checked((int)stream.Length)]; stream.ReadExactly(bytes);
-        int offset = bytes.AsSpan().StartsWith(new byte[] { 0xef, 0xbb, 0xbf }) ? 3 : 0;
-        try { return ParseEnvelope(path, Utf8.GetString(bytes, offset, bytes.Length - offset)); }
+        try {
+            // Our writer puts the small header before libraryText. Listing is a
+            // discovery operation; validate the complete music only when opened.
+            var header = StreamingWorkspaceCodec.ReadHeader(stream);
+            if (header is not null) return (ProjectFromMetadata(path, header), header, "");
+            stream.Position = 0; // Compatibility with reordered/extended old envelopes.
+            return ReadWorkspace(path, stream, null, metadataOnly: true);
+        }
         catch (DecoderFallbackException error) { throw new InvalidDataException("歌曲文件不是有效的 UTF-8 文本。", error); }
+        catch (Exception error) when (error is JsonException or ArgumentException or InvalidOperationException or FormatException or KeyNotFoundException or OverflowException)
+        { throw new InvalidDataException("歌曲项目简介无效。", error); }
     }
 
-    private static (ProjectDirectoryInfo Project, JsonObject Envelope, string Library) ParseEnvelope(string path, string text)
+    private static (ProjectDirectoryInfo Project, JsonObject Envelope, string Library) ReadWorkspace(string path, Stream stream, SessionPayloadStore? cache, bool metadataOnly = false)
     {
-        try
+        try { return ReadWorkspaceCore(path, stream, cache, metadataOnly); }
+        catch (Exception error) when (error is JsonException or ArgumentException or InvalidOperationException or FormatException or KeyNotFoundException or OverflowException)
         {
-            ValidateEncodingAndSize(text);
-            var root = JsonNode.Parse(text, documentOptions: new JsonDocumentOptions { MaxDepth = 256 }) as JsonObject;
-            if (root is null || root["format"]?.GetValueKind() != JsonValueKind.String || root["format"]!.GetValue<string>() != "RootSoundWorkspace"
-                || root["version"]?.GetValueKind() != JsonValueKind.Number || !root["version"]!.AsValue().TryGetValue<int>(out int version) || version != 2
-                || root["id"]?.GetValueKind() != JsonValueKind.String || !Guid.TryParse(root["id"]!.GetValue<string>(), out _)
-                || root["name"]?.GetValueKind() != JsonValueKind.String || string.IsNullOrWhiteSpace(root["name"]!.GetValue<string>())
-                || root["createdAtUtc"]?.GetValueKind() != JsonValueKind.String
-                || !DateTimeOffset.TryParse(root["createdAtUtc"]!.GetValue<string>(), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var timestamp) || timestamp.Offset != TimeSpan.Zero
-                || root["libraryText"]?.GetValueKind() != JsonValueKind.String)
-                throw new InvalidDataException("所选文件不是受支持的 RootSound 歌曲项目。");
-            string library = ValidateLibrary(root["libraryText"]!.GetValue<string>());
-            // Detach each small field from the parsed document: simply removing
-            // libraryText would leave its giant backing JSON buffer retained by
-            // the remaining JsonElement values.
-            var metadata = new JsonObject();
-            foreach (var field in root)
-                if (field.Key != "libraryText") metadata.Add(field.Key, field.Value?.DeepClone());
-            return (new ProjectDirectoryInfo(root["id"]!.GetValue<string>(), root["name"]!.GetValue<string>(), Path.GetFullPath(path)), metadata, library);
+            throw new InvalidDataException("歌曲项目包含无效的 JSON 或字段数据，原文件已保留。", error);
         }
-        catch (JsonException error) { throw new InvalidDataException("歌曲项目文件不是完整的 JSON 文本。", error); }
-        catch (ArgumentException error) { throw new InvalidDataException("歌曲项目文件包含重复字段或无效的数据结构。", error); }
+    }
+
+    private static (ProjectDirectoryInfo Project, JsonObject Envelope, string Library) ReadWorkspaceCore(string path, Stream stream, SessionPayloadStore? cache, bool metadataOnly)
+    {
+        var result = StreamingWorkspaceCodec.Read(stream, cache, metadataOnly);
+        var root = result.Metadata;
+        return (ProjectFromMetadata(path, root), root, result.Library);
+    }
+
+    private static ProjectDirectoryInfo ProjectFromMetadata(string path, JsonObject root)
+    {
+        if (root["format"]?.GetValueKind() != JsonValueKind.String || root["format"]!.GetValue<string>() != "RootSoundWorkspace"
+            || root["version"]?.GetValueKind() != JsonValueKind.Number || !root["version"]!.AsValue().TryGetValue<int>(out int version) || version != 2
+            || root["id"]?.GetValueKind() != JsonValueKind.String || !Guid.TryParse(root["id"]!.GetValue<string>(), out _)
+            || root["name"]?.GetValueKind() != JsonValueKind.String || string.IsNullOrWhiteSpace(root["name"]!.GetValue<string>())
+            || root["createdAtUtc"]?.GetValueKind() != JsonValueKind.String
+            || !DateTimeOffset.TryParse(root["createdAtUtc"]!.GetValue<string>(), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var timestamp) || timestamp.Offset != TimeSpan.Zero)
+            throw new InvalidDataException("所选文件不是受支持的 RootSound 歌曲项目。");
+        return new(root["id"]!.GetValue<string>(), root["name"]!.GetValue<string>(), Path.GetFullPath(path));
     }
 
     private ProjectDirectoryInfo Activate(string path)
@@ -848,6 +883,7 @@ public sealed class ProjectDirectoryManager : IDisposable
             memory = null;
             scope = Guid.NewGuid().ToString("N");
             previous?.Dispose();
+            payloads?.Dispose(); payloads = null;
             MirrorTimbres(currentSnapshot!, verifyPhysicalFiles: true);
             return project;
         }
@@ -957,6 +993,9 @@ public sealed class ProjectDirectoryManager : IDisposable
             disposed = true;
             activeStore?.Dispose();
             activeStore = null;
+            payloads?.Dispose(); payloads = null;
+            foreach (var inspection in inspections.Values) inspection.Store.Dispose();
+            inspections.Clear();
         }
     }
 

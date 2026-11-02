@@ -6,7 +6,7 @@ import { createDesktopPlatform, type DesktopBridge } from '../src/workstation/ap
 import { createInitialProjectLibrary, createProjectCopyLibrary, createProjectSetup, renameProjectLibrary } from '../src/workstation/app/project-setup.ts';
 import { createProjectClosePreparation } from '../src/workstation/app/project-close.ts';
 import { createMaterialLibrary } from '../src/workstation/modules/materials/public.ts';
-import { createTimbrePlayback } from '../src/workstation/modules/timbre/public.ts';
+import { createTimbrePlayback, listDefaultInstruments } from '../src/workstation/modules/timbre/public.ts';
 import { createPhrasePlayback } from '../src/workstation/modules/phrase/public.ts';
 import { createSongEditor } from '../src/workstation/modules/song/public.ts';
 
@@ -63,7 +63,10 @@ test('library rename edits the real selected song through its domain and keeps m
   const beforeSong = before.drafts.find((draft: {kind:string}) => draft.kind === 'rootsound.song');
   const afterSong = after.drafts.find((draft: {kind:string}) => draft.kind === 'rootsound.song');
   assert.equal(afterSong.id, beforeSong.id); assert.deepEqual(afterSong.body, beforeSong.body);
-  assert.deepEqual(after.contents, before.contents); assert.equal(afterSong.name, '新歌曲 🌤');
+  assert.deepEqual(after.contents.map((item: { id:string; body:unknown; dependencies:string[] }) => [item.id, item.body, item.dependencies]),
+    before.contents.map((item: { id:string; body:unknown; dependencies:string[] }) => [item.id, item.body, item.dependencies]));
+  assert.equal(after.contents.find((item: {kind:string}) => item.kind === 'rootsound.phrase').name, '新歌曲 🌤');
+  assert.equal(afterSong.name, '新歌曲 🌤');
   assert.equal(JSON.parse(original).drafts[0].name, '原歌曲');
   const calls: unknown[][] = []; let entered = 0;
   const setup = createProjectSetup({
@@ -169,11 +172,11 @@ test('a named project reopens through real song services and has fresh identitie
   const song = createSongEditor(first, createPhrasePlayback(first, createTimbrePlayback(first)), { defaultTempoMode: 'source' });
   assert.equal(song.read().draft?.name, '清晨 🌤');
   assert.equal(song.read().body?.tempoMode, 'source');
-  assert.equal(song.read().body?.tracks.length, 7);
-  assert.equal(song.read().body?.tracks[0]?.clips.length, 0);
-  assert.deepEqual(new Set(first.listContent().map(item => item.name)), new Set(['钢琴', '长笛', '底鼓', '踢', '弦乐', '小号', '吉他']));
+  assert.equal(song.read().body?.tracks.length, 1);
+  assert.equal(song.read().body?.tracks[0]?.clips.length, 1);
+  assert.deepEqual(new Set(first.listContent().map(item => item.name)), new Set(['清晨 🌤', ...listDefaultInstruments().map(item => item.name)]));
   assert(first.listContent().every(item => !second.listContent().some(other => other.id === item.id)));
-  assert.equal(first.listDrafts().length, 1);
+  assert.equal(first.listDrafts().length, 2);
   assert.notEqual(first.listDrafts()[0]?.id, second.listDrafts()[0]?.id);
 });
 

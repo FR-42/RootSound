@@ -200,22 +200,22 @@ export function readPreview(value: unknown, options: { allowEmptySequence?: bool
       samples: sampleReader.sources,
     };
   }
-  if (input.version !== 1) throw new Error('当前声音运行仅支持第 1 版乐句试听计划。');
-  fields(input, ['kind', 'version', 'durationSeconds', 'events', 'output', 'transport'], '乐句试听计划');
+  if (input.version !== 1) throw new Error('当前声音运行仅支持第 1 版音乐试听计划。');
+  fields(input, ['kind', 'version', 'durationSeconds', 'events', 'output', 'transport'], '音乐试听计划');
   let output: OutputProcessingPlan | undefined;
   if (input.output !== undefined) {
     const settings = object(input.output, '输出处理'); fields(settings, ['level', 'fadeInSeconds', 'fadeOutSeconds'], '输出处理');
     output = { level: number(settings.level, '总输出音量', 0, 1), fadeInSeconds: number(settings.fadeInSeconds, '淡入秒数', 0, 30),
       fadeOutSeconds: number(settings.fadeOutSeconds, '淡出秒数', 0, 30) };
   }
-  const duration = number(input.durationSeconds, '乐句时长（秒）', 0.0001, MAX_SEQUENCE_SECONDS);
+  const duration = number(input.durationSeconds, '音乐时长（秒）', 0.0001, MAX_SEQUENCE_SECONDS);
   let transport: ScheduledPreview['transport'];
   if (input.transport !== undefined) {
     const settings = object(input.transport, '播放头设置'); fields(settings, ['positionSeconds', 'rate'], '播放头设置');
     transport = { positionSeconds: number(settings.positionSeconds, '播放头位置', 0, duration), rate: number(settings.rate, '播放头速度', .25, 4) };
   }
   if (!Array.isArray(input.events) || (input.events.length < 1 && !options.allowEmptySequence) || input.events.length > MAX_SEQUENCE_EVENTS) {
-    throw new Error(`乐句试听需要 1 至 ${MAX_SEQUENCE_EVENTS} 个音符，空乐句暂时无法试听。`);
+    throw new Error(`音乐试听需要 1 至 ${MAX_SEQUENCE_EVENTS} 个音符，空音乐暂时无法试听。`);
   }
   const elapsed = options.transportElapsed ?? 0;
   let durationSeconds = transport ? elapsed + (duration - transport.positionSeconds) / transport.rate : duration;
@@ -228,10 +228,10 @@ export function readPreview(value: unknown, options: { allowEmptySequence?: bool
   }
   const boundaries: { time: number; amplitude: number; sources: number }[] = [];
   const scheduled = Array.from(input.events, (raw: unknown) => {
-    const event = object(raw, '乐句音符');
-    fields(event, ['atSeconds', 'sound', 'pan'], '乐句音符');
+    const event = object(raw, '音乐音符');
+    fields(event, ['atSeconds', 'sound', 'pan'], '音乐音符');
     const songAtSeconds = number(event.atSeconds, '音符开始时间（秒）', 0, duration);
-    if (songAtSeconds >= duration) throw new Error('音符必须在乐句结束前开始。');
+    if (songAtSeconds >= duration) throw new Error('音符必须在音乐结束前开始。');
     let atSeconds = songAtSeconds;
     if (transport) {
       // Already-triggered notes retain their physical onset across speed changes,

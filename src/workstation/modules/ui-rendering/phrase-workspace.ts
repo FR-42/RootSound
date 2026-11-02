@@ -97,7 +97,7 @@ export function mountPhraseWorkspace(root: HTMLElement, options: {
     if (!noteClipboard.length) return;
     const span = Math.max(...noteClipboard.map(note => note.startBeat + note.durationBeats));
     const target = duplicate ? Math.max(...state.notes.map(note => note.startBeat + note.durationBeats)) : pasteBeat;
-    if (target < 0 || target + span > body.lengthBeats + 1e-10) { report('当前位置放不下这些音符，请先延长乐句或换一个粘贴位置。', true); return; }
+    if (target < 0 || target + span > body.lengthBeats + 1e-10) { report('当前位置放不下这些音符，请先延长音乐或换一个粘贴位置。', true); return; }
     edit(() => { selectedNotes = new Set(phrase.addNotes(state.part.id, noteClipboard.map(note => ({ ...note, startBeat: note.startBeat + target })))); pasteBeat = target + span; }, `已${duplicate ? '重复' : '粘贴'} ${noteClipboard.length} 个音符。`);
   }
   function deleteNotes(): void {
@@ -154,9 +154,9 @@ export function mountPhraseWorkspace(root: HTMLElement, options: {
     preparing = true; updatePlayback();
     const snapshot = JSON.stringify(phrase.read().draft);
     try {
-      report('正在准备乐句使用的声音…'); await phrase.preparePreview();
+      report('正在准备音乐使用的声音…'); await phrase.preparePreview();
       if (disposed || generation !== playbackGeneration) return;
-      if (JSON.stringify(phrase.read().draft) !== snapshot) throw new Error('乐句已改变，请重新试听当前内容。');
+      if (JSON.stringify(phrase.read().draft) !== snapshot) throw new Error('音乐已改变，请重新试听当前内容。');
       playbackTempo = phrase.read().body?.tempoBpm ?? 120;
       const session = await sound.preview(phrase.previewPlan(liveBody));
       if (disposed || generation !== playbackGeneration) { sound.stop(session.id); return; }
@@ -192,21 +192,21 @@ export function mountPhraseWorkspace(root: HTMLElement, options: {
   }
   function confirmSave(result: Extract<SaveResult, { status: 'needs-confirmation' }>): void {
     const dialog = node('dialog', 'save-dialog');
-    dialog.append(node('h2', '', '这段乐句正在被使用'), node('p', '', '覆盖后，以下内容会采用修改后的乐句：'));
+    dialog.append(node('h2', '', '这段音乐正在被使用'), node('p', '', '覆盖后，以下内容会采用修改后的音乐：'));
     const list = node('ul');
     result.affectedContent.forEach(item => list.append(node('li', '', item.name)));
     result.affectedDrafts.forEach(item => list.append(node('li', '', `${item.name} · 编辑稿`)));
     dialog.append(list);
     const buttons = node('div', 'dialog-actions');
     const close = () => { dialog.close(); dialog.remove(); };
-    buttons.append(action('返回编辑', 'secondary', close), action('另存为新乐句', 'secondary', () => { close(); save('new'); }),
+    buttons.append(action('返回编辑', 'secondary', close), action('另存为新音乐', 'secondary', () => { close(); save('new'); }),
       action('确认覆盖', 'primary', () => { close(); save('overwrite', result.confirmation); }));
     dialog.append(buttons); dialog.addEventListener('cancel', () => dialog.remove()); root.append(dialog); dialog.showModal();
   }
   function openLibrary(): void {
     const view = phrase.read();
     const dialog = node('dialog', 'library-dialog');
-    const header = node('div', 'library-heading'); header.append(node('h2', '', '我的乐句'), action('关闭', 'quiet', () => dialog.close())); dialog.append(header);
+    const header = node('div', 'library-heading'); header.append(node('h2', '', '我的音乐'), action('关闭', 'quiet', () => dialog.close())); dialog.append(header);
     if (!view.savedPhrases.length && !view.unfinishedDrafts.length) dialog.append(node('p', '', '写下第一段旋律，它会留在这里。'));
     for (const draft of view.unfinishedDrafts) dialog.append(action(`${draft.name} · 编辑稿 ↗`, 'library-sound', () => {
       dialog.close(); edit(() => { phrase.openDraft(draft.id); selectedPart = undefined; selectedNotes.clear(); });
@@ -218,7 +218,7 @@ export function mountPhraseWorkspace(root: HTMLElement, options: {
   }
   function startPhrase(): void {
     if (options.onNewPhrase) {
-      edit(() => { options.onNewPhrase!(); selectedPart = undefined; selectedNotes.clear(); scrollLeft = 0; pasteBeat = 0; }, '已新建乐句。');
+      edit(() => { options.onNewPhrase!(); selectedPart = undefined; selectedNotes.clear(); scrollLeft = 0; pasteBeat = 0; }, '已新建音乐。');
       return;
     }
     const sounds = phrase.read().availableSounds;
@@ -226,7 +226,7 @@ export function mountPhraseWorkspace(root: HTMLElement, options: {
     const dialog = node('dialog', 'library-dialog');
     dialog.append(node('h2', '', '选择音色'));
     for (const content of sounds) dialog.append(action(content.name + ' ↗', 'library-sound', () => {
-      dialog.close(); edit(() => { phrase.create(content.id); selectedPart = undefined; selectedNotes.clear(); scrollLeft = 0; pasteBeat = 0; }, '已新建乐句。');
+      dialog.close(); edit(() => { phrase.create(content.id); selectedPart = undefined; selectedNotes.clear(); scrollLeft = 0; pasteBeat = 0; }, '已新建音乐。');
     }));
     dialog.append(action('返回', 'quiet', () => dialog.close())); dialog.addEventListener('close', () => dialog.remove(), { once: true }); root.append(dialog); dialog.showModal();
   }
@@ -271,11 +271,11 @@ export function mountPhraseWorkspace(root: HTMLElement, options: {
     toolbar.append(action('RootSound', 'wordmark brand-button', options.onWelcome));
     const modules = node('nav', 'workspace-tabs'); modules.setAttribute('aria-label', '切换创作工作区');
     if (options.onSampling) modules.append(action('采样获取', 'workspace-tab', options.onSampling));
-    modules.append(action('音色制作', 'workspace-tab', options.onSound), action('乐句谱写', 'workspace-tab is-active', () => {}));
+    modules.append(action('音色制作', 'workspace-tab', options.onSound), action('音乐谱写', 'workspace-tab is-active', () => {}));
     if (options.onSong) modules.append(action('歌曲编排', 'workspace-tab', options.onSong));
     toolbar.append(modules);
     const tools = node('nav', 'toolbar-tools');
-    if (!options.referenceContext) tools.append(action('新建乐句', 'quiet', startPhrase), action('我的乐句', 'quiet', openLibrary));
+    if (!options.referenceContext) tools.append(action('新建音乐', 'quiet', startPhrase), action('我的音乐', 'quiet', openLibrary));
     if (options.onLibrary) tools.append(action('素材', 'quiet', options.onLibrary));
     if (options.onExport) tools.append(action('导出音频', 'quiet', () => { stopPlayback(); options.onExport!(); }));
     if (options.onSettings) tools.append(action('设置', 'quiet', options.onSettings));
@@ -299,7 +299,7 @@ export function mountPhraseWorkspace(root: HTMLElement, options: {
       event.preventDefault(); event.stopPropagation();
       const current = phrase.read();
       if (!current.availableSounds.some(item => item.id === incoming.id)) { report('这个音色不属于当前可用素材。', true); return; }
-      if (current.body && current.body.parts.length >= 8) { report('一段乐句最多使用 8 个音色。', true); return; }
+      if (current.body && current.body.parts.length >= 8) { report('一段音乐最多使用 8 个音色。', true); return; }
       edit(() => {
         if (current.body && current.draft) selectedPart = phrase.addPart(incoming.id);
         else { if (options.onNewPhrase) options.onNewPhrase(incoming.id); else phrase.create(incoming.id); selectedPart = undefined; scrollLeft = 0; pasteBeat = 0; }
@@ -309,7 +309,7 @@ export function mountPhraseWorkspace(root: HTMLElement, options: {
     if (options.referenceContext) main.append(createReferenceNavigation(options.referenceContext));
     if (!view.body || !view.draft) {
       const empty = node('section', 'phrase-empty');
-      empty.append(node('h1', '', view.problem ? '暂时无法打开乐句' : '新建乐句'));
+      empty.append(node('h1', '', view.problem ? '暂时无法打开音乐' : '新建音乐'));
       if (view.problem) empty.append(node('p', 'muted', view.problem + ' 原稿已保留。'));
       empty.append(action(view.availableSounds.length ? '选择音色' : '制作音色', 'primary', view.availableSounds.length ? startPhrase : options.onSound));
       main.append(empty);
@@ -319,7 +319,7 @@ export function mountPhraseWorkspace(root: HTMLElement, options: {
       selectedPart = part?.id;
       const heading = node('div', 'phrase-heading');
       const title = node('div', 'phrase-title');
-      const name = node('input', 'sound-name'); name.value = view.draft.name; name.maxLength = 100; name.setAttribute('aria-label', '乐句名称');
+      const name = node('input', 'sound-name'); name.value = view.draft.name; name.maxLength = 100; name.setAttribute('aria-label', '音乐名称');
       const saveState = node('p', 'save-state', view.changed ? '编辑稿已保留' : '已保存');
       name.addEventListener('change', () => {
         try {
@@ -339,7 +339,7 @@ export function mountPhraseWorkspace(root: HTMLElement, options: {
 
       const controls = node('div', 'phrase-controls');
       const tempoLabel = node('label', 'phrase-tempo');
-      const tempoText = node('span', '', `速度 ${body.tempoBpm}`); const tempo = node('input'); tempo.type = 'range'; tempo.min = '40'; tempo.max = '240'; tempo.step = '1'; tempo.value = String(body.tempoBpm); tempo.setAttribute('aria-label', '乐句速度');
+      const tempoText = node('span', '', `速度 ${body.tempoBpm}`); const tempo = node('input'); tempo.type = 'range'; tempo.min = '40'; tempo.max = '240'; tempo.step = '1'; tempo.value = String(body.tempoBpm); tempo.setAttribute('aria-label', '音乐速度');
       tempo.addEventListener('input', () => {
         tempoText.textContent = `速度 ${tempo.value}`;
         liveBody = { ...phrase.read().body!, tempoBpm: Number(tempo.value) }; playbackTempo = liveBody.tempoBpm;
@@ -366,7 +366,7 @@ export function mountPhraseWorkspace(root: HTMLElement, options: {
       controls.append(undo, redo, help); main.append(controls);
 
       const voices = node('div', 'phrase-voices');
-      const tabs = node('div', 'phrase-part-tabs'); tabs.setAttribute('aria-label', '这段乐句使用的声音');
+      const tabs = node('div', 'phrase-part-tabs'); tabs.setAttribute('aria-label', '这段音乐使用的声音');
       body.parts.forEach((item, index) => {
         const soundName = view.availableSounds.find(sound => sound.id === item.timbreId)?.name ?? item.name;
         const tab = action(`${index + 1}  ${soundName}`, 'phrase-part' + (item.id === selectedPart ? ' is-active' : ''), () => { selectedPart = item.id; selectedNotes.clear(); render(); });

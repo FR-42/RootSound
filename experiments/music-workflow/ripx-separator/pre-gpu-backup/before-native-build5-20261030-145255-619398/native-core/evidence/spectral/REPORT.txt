@@ -1,0 +1,155 @@
+RipX spectral front end — static reconstruction, 2026-10-29
+
+Target: D:/#Software/ripx/RipX.exe
+SHA256: 5f088fa4fbbe1759ef75d8034c79f33c846e3bf5f13d5048dd95a6614d2ad441
+
+Implementation: native_spectral.py + native_fft.py
+Input is a bounded mono PCM callback, output is a generator of spectral-peak
+frames. No Demucs, Basic Pitch, model download or target execution occurs.
+The output is not musical notes, stems, or reconstructed audio.
+
+REA evidence reused:
+ev_fe806f1622cce01d8567300962445237f3a52a618ce47c229230d114364dd389
+  0x140326880; work/ripx-analysis/spectral-frame-analysis.c/.json.
+Related existing preprocessing evidence: 0x140343da0 copies task+0x10 float
+buffers into context+0x18 input; no arithmetic scaling in that copy.
+
+New independent static observations (GNU objdump and format-aware PE reads,
+not falsely presented as REA Evidence IDs):
+
+1. Window/Hop initialization recovered, not guessed
+  hop-config-direct.asm: 0x140365f70
+    t = trunc(float32(float32(Fs)*float32(1/64)))+1
+    H = highest power of two <= t, with observed min 2/max 32768.
+  window-config-direct.asm: 0x14031f5a0, 31f673..31f6e9
+    t = trunc(float32(float32(float32(Fs)/15)+float32(0.5001)))
+    N = same bounded power-of-two selection.
+  44100 and 48000 Hz: N=2048, H=512. 96000 Hz: N=4096, H=1024.
+  Fs is WAVEFORMATEX+4, copied to global 0x14098a150 by 368410 and read at
+  0x14098a154. Format-reading function .pdata range begins 0x1403681c0.
+  N/H/Fs globals are virtual-only/zero initialized on disk; these formulas
+  describe runtime assignments, not alleged fixed file defaults.
+  direct-constants.json preserves byte offsets and values for 1/64,15,0.5001.
+
+2. Window is symmetric Hann
+  spectral-helpers-direct.asm: 0x1406145a0
+    w[i] = 0.5 * (1 - cos(2*pi*i/(L-1)))
+  Scalar and two-lane vector constants agree; full bytes in direct-constants.
+  614580: sqrt(re*re+im*im), confirmed through sqrt IAT 0x140689b20.
+  614560: atan2(im,re), confirmed through atan2 IAT 0x140689b40.
+  Phase output added by reconstruction is explicitly center_bin_phase_radians.
+  326880 does not itself copy phase into its 16-byte output peak slots.
+  This extra phase is NOT the later harmonic-refinement/final-note phase.
+
+3. Peak extraction preserves native branch/rounding behavior
+  326880 uses N and 2N effective input, padded to 2N/4N transforms.
+  Cache/extraction alignment max(H,N/4) is distinct from the H frame clock.
+  Out-of-range PCM input is zero. Float32 PCM is widened for double windowing.
+  Mode 2 only contributes center frequencies strictly less than 220 Hz.
+  Peak score uses scale 2 and 1 for the two levels, compares local neighbors,
+  and applies threshold float32(2*retained_bins*0.7071067812*8).
+  Peaks sharing a base slot replace only on strictly greater score.
+  Frequency is a three-bin magnitude centroid, not parabolic interpolation.
+  spectral-frame-direct.asm 327197..3271ba confirms separate mulss/addss,
+  not FMA. All boundary comparisons and float32 operations are explicit.
+
+4. Main-executable PCM amplitude units are proven for the 16-bit path
+  pcm-submit-exe-direct.asm / bitdepth-references-direct.asm:
+  317fa0 checks bit depth ==16; 317faa reads context+0x258 int16 buffer;
+  317fb5 sign-extends, 317fbd converts to float32; 317fc0 jumps directly to
+  317fef/317ff4 store. No divide by 32768 or other normalization occurs.
+  3180c4 loads that float buffer and 3180c9 stores into task record+0x10.
+  Existing 343da0 copies this same field to the 326880 input buffer.
+  Therefore this verified path uses [-32768,32767]-scale PCM floats.
+  Do not multiply arbitrary normalized input by 32767 and claim an exact
+  import pipeline. A new front-end adapter can explicitly decode int16 PCM
+  and preserve integer values as float32; its codec/channel policy remains
+  an adapter choice unless independently aligned with the original reader.
+  DLL sibling corroboration: 18004ad10 produces int16; 180022770 22852..22889
+  sign-extends/converts/stores similarly. The EXE proof above is independent.
+
+5. Forward FFT sign and scaling statically established for the used power-of-two domain
+  fft-core-direct.asm: 528d80 creates the real plan, delegates complex setup to
+  610900 with forward flag zero. fft-config-direct.asm 6109a5..6109d2 uses
+  angle=(-2*pi*i)/length. 14079e740 contains -2*pi, bytes 182d4454fb2119c0.
+  Factorization 610a02..610a66 tries radix 4 then 2; power-of-two lengths need
+  no other radix. fft-worker-direct.asm 6119b0 copies leaf complex samples,
+  recursively transforms children, then uses inline radix 2 or calls 610e60.
+  The radix 2 add/subtract and complete radix 4 function (fft-radix4-direct.asm)
+  use twiddle multiplication and sums/differences with no 1/N division or
+  other normalization. The sole plan-angle division does not scale samples.
+  fft-core-direct.asm 528f50 recombines even/odd packed complex results:
+  DC=C0.real+C0.imag, Nyquist=C0.real-C0.imag; other bins use half factors
+  after adding paired spectra. These half factors undo real packing; they
+  do not normalize the transform. Its real-plan twiddles are
+  (-pi)*(k/half+0.5), observed 528eb0..528eee; -pi bytes 182d4454fb2109c0.
+  fft-wrapper-direct.asm 326510 only mirrors conjugates after 528f50.
+  Derivation: this reachable forward path is exp(-2*pi*i*k*n/N), unnormalized.
+  native_fft.py reconstructs the radix 4/2 recursion and real packing directly;
+  production spectral code now calls this implementation, not NumPy FFT.
+  Independent dense DFT and NumPy comparisons are tests, not the proof of
+  native scaling. The proof is the static reachable arithmetic above.
+  This establishes scale/sign, not bit-identical native runtime roundoff.
+
+API:
+  native_configuration(sample_rate) -> {sample_rate,base_window,hop}
+  iter_pcm_spectral_frames(read_pcm, sample_count=..., sample_rate=...,
+                           start_frame=0, stop_frame=None)
+    read_pcm(start,count) returns exactly count finite mono native-unit samples.
+    Each record includes frame_index, sample_index, time_seconds, windows and
+    peaks. Convert each SpectralPeak with dataclasses.asdict for JSON.
+    Last spectra at each resolution are reused; input reads are bounded to 2N.
+
+Executed verification:
+  C:/Users/38053/anaconda3/python.exe -m unittest discover -s work/ripx-native-next/spectral -v
+  13 tests passed in 0.485s: 9 spectral tests (silence/DC, asymmetric centroid,
+  220Hz cutoff, strict tie, inclusive threshold, invalid values, alignment,
+  boundaries, config/window, generated 440/880Hz PCM, truncated-reader rejection)
+  plus 4 FFT tests: impulse and DC scale, negative sine phase, complex FFT
+  against dense DFT, real packed FFT against independent NumPy reference.
+  FFT sizes through 8192, synthetic amplitudes through int16 scale; real FFT
+  max absolute complex error <1e-7, dense small DFT error <2e-12.
+  Generated 2 seconds @44100:173 frames/347 raw peaks,7.544s processing in one
+  warm Python/NumPy process with reconstructed Python FFT. This supersedes
+  the earlier 0.988s result that used NumPy FFT. This is not a user-music or
+  original RipX benchmark. CPU time, peak family memory and token cost were
+  not measured. The pure Python reconstruction is slower than optimized FFT.
+
+Remaining limits:
+  No original-runtime differential validation. Original math-library cosine,
+  sine and SIMD rounding may differ; no bit-identical equivalence claimed.
+  Only forward power-of-two FFT is reconstructed, sufficient for this front end;
+  inverse and mixed-radix behavior is outside the implementation scope.
+  The task-specific preceding/following context padding and actual producer's
+  frame-range selection are not fully reconstructed; sample-clock range is
+  explicit at this API boundary rather than guessed.
+  No peak-refinement, harmonic assignment, final note segmentation, or audio
+  resynthesis is substituted. Those remain separate work required for a full core.
+
+Optional compiler experiment (not production default):
+  native_fft_numba.py implements the SAME radix recursion and arithmetic with
+  njit(fastmath=False,cache=False), reusing scalar original-derived twiddles.
+  Existing local Numba/llvmlite were used, no installs. First experiment with
+  cache=True exited without Python diagnostic on second process startup;
+  recursive Numba disk caching is therefore disabled, not silently retried.
+  Two independent processes with cache=False passed 2-second full front-end
+  runs:173 frames,347 peaks, warm1.134s and1.159s. Cold compilation ~5 seconds.
+  Seven lengths 4..8192 compared bit-for-bit equal to the pure Python FFT
+  for one seeded random int16-scale input each; all13 tests also passed with
+  compiled FFT injected at test boundary. No FMA found in _mul assembly in
+  initial compiler experiment. This finite test set does not establish all
+  possible input equivalence or original-native runtime equivalence.
+  Benchmark harness: benchmark_numba.py. Integration remains parent-owned.
+
+REA cross-check after provider analysis completed:
+  All nine next-*.c/.json artifacts listed in rea-provenance.json were checked.
+  Their target SHA256 matches the directly examined executable. Ghidra12.1.4
+  confirms Hann formula, sqrt/atan2, forward flag zero, real twiddles/packing,
+  conjugate mirror, N/H power selection and WAVEFORMATEX sample-rate source.
+  No implementation correction was required. Complete Evidence IDs and paths
+  are retained in rea-provenance.json, separate from independent objdump files.
+  IMPORTANT attribution:528f50 error branch references a kiss_fft_usage_error
+  string. This supports a Kiss FFT origin for the embedded FFT primitive;
+  this is not evidence that FFT itself is a RipX-exclusive invention.
+  We reconstructed the embedded implementation from target evidence; RipX's
+  double-window/threshold pipeline is distinguished from its FFT dependency.

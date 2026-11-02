@@ -191,13 +191,13 @@ internal static class ProjectDirectoriesSelfTests
             using var m = new ProjectDirectoryManager(root);
             var p = m.Create("外部保护", m.DefaultLocation, Library("原件"));
             WriteDiskLibrary(p.Path, Library("外部修改"));
-            ExpectFailure(() => m.WriteLibrary(Library("不能覆盖")), "外部修改保护");
-            ExpectFailure(() => m.ReadLibrary(), "普通读取不接纳外部写基线");
+            Check(m.ReadLibrary().Value == Library("原件"), "草稿读取不接纳外部写基线");
+            m.WriteLibrary(Library("不能覆盖")); ExpectFailure(() => m.Save(), "保存才检查外部修改，保护原件");
             m.Open(p.Path); Check(m.ReadLibrary().Value == Library("外部修改"), "明确重开接纳有效版本");
             m.WriteLibrary(Library("合并")); m.Save();
             Check(DiskLibrary(p.Path + ".bak") == Library("外部修改"), "备份外部版本");
             File.Delete(p.Path);
-            ExpectFailure(() => m.ReadLibrary(), "缺失不能读空白");
+            Check(m.ReadLibrary().Value == Library("合并"), "源文件缺失也保留内存草稿");
             ExpectFailure(() => m.WriteLibrary(Library("不能重建")), "缺失不得重建");
             Check(!File.Exists(p.Path), "文件保持移走");
         });
@@ -209,7 +209,7 @@ internal static class ProjectDirectoriesSelfTests
             string scope = m.ReadLibrary().Scope;
             File.WriteAllText(p.Path, "{外部损坏");
             ExpectFailure(() => m.Open(p.Path), "重开须校验封装");
-            ExpectFailure(() => m.WriteLibrary(Library("不能覆盖"), scope), "失败不能接纳损坏基线");
+            m.WriteLibrary(Library("不能覆盖"), scope); ExpectFailure(() => m.Save(), "失败不能接纳损坏基线");
             Check(m.Current == p && File.ReadAllText(p.Path) == "{外部损坏", "失败保留会话和外部字节");
         });
 
@@ -358,7 +358,7 @@ internal static class ProjectDirectoriesSelfTests
             var bridge = new NativeProjectDirectories(m, _ => null, () => null);
             Check(Status(bridge.Read()) == "ready" && m.HasUnsavedChanges && m.List().Single().Name == "外部标题", "查询不接纳写基线");
             ExpectFailure(() => m.Save("本机标题"), "保存冲突保护");
-            ExpectFailure(() => m.ReadLibrary(), "元信息变化须明确重开");
+            Check(m.ReadLibrary().Value == Library("本机修改"), "元信息变化不替换内存草稿");
             Check(m.Current == p && File.ReadAllText(p.Path) == bytes, "外部字节与会话保留");
             m.Exit("discard"); Check(m.Current is null && File.ReadAllText(p.Path) == bytes, "放弃草稿释放会话且不写外部版本");
         });
@@ -701,7 +701,7 @@ internal static class ProjectDirectoriesSelfTests
             var project = manager.Create("永久操作", manager.DefaultLocation, Library("旧状态"));
             var storage = new NativeStorage(manager); var scope = manager.ReadLibrary().Scope;
             manager.WriteLibrary(Library("操作前其他编辑"));
-            Check(Ok(storage.WriteScopedCheckpoint(Library("已删除乐句草稿"), scope)) && manager.HasUnsavedChanges, "确认删除仍是未保存的工程修改");
+            Check(Ok(storage.WriteScopedCheckpoint(Library("已删除音乐草稿"), scope)) && manager.HasUnsavedChanges, "确认删除仍是未保存的工程修改");
             Check(DiskLibrary(project.Path) == Library("旧状态") && !File.Exists(project.Path + ".bak"), "确认不顺带写入其他编辑");
             manager.WriteLibrary(Library("后来普通编辑")); Check(manager.HasUnsavedChanges, "后续普通编辑仍标脏");
             manager.Exit("discard"); manager.Open(project.Path);
@@ -884,8 +884,8 @@ internal static class ProjectDirectoriesSelfTests
                 stamp = File.GetLastWriteTimeUtc(project.Path); backupStamp = File.GetLastWriteTimeUtc(project.Path + ".bak");
                 manager.Open(project.Path);
                 manager.WriteLibrary(Library("编辑器脚手架")); manager.FinishLoading(); Check(!manager.HasUnsavedChanges, "加载脚手架只成为逻辑干净基线");
-                manager.WriteLibrary(Library("未保存乐句与编排"));
-                Check(manager.ReadLibrary().Value == Library("未保存乐句与编排") && manager.HasUnsavedChanges, "当前会话可随意打草稿");
+                manager.WriteLibrary(Library("未保存音乐与编排"));
+                Check(manager.ReadLibrary().Value == Library("未保存音乐与编排") && manager.HasUnsavedChanges, "当前会话可随意打草稿");
                 Check(File.ReadAllBytes(project.Path).SequenceEqual(bytes) && File.ReadAllBytes(project.Path + ".bak").SequenceEqual(backup), "普通编辑不改原件与备份字节");
                 Check(File.GetLastWriteTimeUtc(project.Path) == stamp && File.GetLastWriteTimeUtc(project.Path + ".bak") == backupStamp, "普通编辑不触碰保存时间");
             }
@@ -920,8 +920,8 @@ internal static class ProjectDirectoriesSelfTests
         {
             var ready = MainWindow.ParseClosePreparation("{\"ready\":true,\"name\":\"未保存的标题\",\"canSave\":true}");
             Check(ready.Ready && ready.CanSave && ready.Name == "未保存的标题", "保存关闭传递当前标题");
-            var pending = MainWindow.ParseClosePreparation("{\"ready\":true,\"canSave\":false,\"saveMessage\":\"先处理乐句\"}");
-            Check(pending.Ready && !pending.CanSave && pending.SaveMessage == "先处理乐句", "仍可选择放弃但不能漏掉乐句保存");
+            var pending = MainWindow.ParseClosePreparation("{\"ready\":true,\"canSave\":false,\"saveMessage\":\"先处理音乐\"}");
+            Check(pending.Ready && !pending.CanSave && pending.SaveMessage == "先处理音乐", "仍可选择放弃但不能漏掉音乐保存");
             Check(!MainWindow.ParseClosePreparation("{\"ready\":false,\"message\":\"仍在提交\"}").Ready, "准备失败不能关窗");
             Check(!MainWindow.ParseClosePreparation("{\"ready\":true}").CanSave, "缺失保存能力按拒绝处理");
             ExpectFailure(() => MainWindow.ParseClosePreparation("{}"), "无效结果不能关窗");

@@ -1,4 +1,5 @@
-import { createMaterialLibrary, createMaterialCatalog, createReferenceEditing, createProjectPackages } from '../modules/materials/public.ts';
+import { createSampleBankAudio } from '../modules/timbre/sample-bank.ts';
+import { createMaterialCatalog, createReferenceEditing, createProjectPackages } from '../modules/materials/public.ts';
 import { createBrowserSoundRuntime } from '../modules/sound-runtime/public.ts';
 import { createTimbreEditor, createTimbrePlayback, createTimbreReferenceAdapter, createSpectralAudio } from '../modules/timbre/public.ts';
 import { createPhraseEditor, createPhrasePlayback, createPhraseReferenceAdapter } from '../modules/phrase/public.ts';
@@ -12,17 +13,19 @@ import { mountStudio, showMidiImportNotice } from '../modules/ui-rendering/publi
 import { createDesktopPlatform, isDesktopOrigin } from './platform/desktop.ts';
 import { createBrowserSoundFiles, createBrowserAudioFiles, createBrowserProjectFiles } from './platform/browser-files.ts';
 import { createWorkspacePreferences } from './platform/preferences.ts';
+import { createMusicWorkspaceState } from './platform/music-workspace-state.ts';
 import { createBrowserSampleFiles } from './platform/sample-files.ts';
 import { previewSavedSample } from './sample-preview.ts';
 import { createProjectSetup, projectName } from './project-setup.ts';
-import { beginProjectPhraseDraft, discardProjectPhraseDraft, assertProjectPhraseSaveReady, copyProjectPhrase, retainProjectPhrases, readProjectPhraseInfo, readProjectPhrases, renameProjectPhrase, deleteProjectPhrase } from './project-phrases.ts';
-import { ensureProjectMelodyTimbres, listProjectTimbres, addProjectPhraseTimbre, createProjectPhraseNoteGroup, changeProjectPhraseNoteGroupTimbre, removeProjectPhraseTimbre, reorderProjectTimbres, tryRemoveUnusedProjectTimbre, requiresTimbreDeleteConfirmation } from './project-timbres.ts';
+import { openMusicDocument, commitMusicDocument } from './music-document.ts';
+import { ensureProjectMelodyTimbres, listProjectTimbres, addProjectPhraseTimbre, createProjectPhraseNoteGroup, changeProjectPhraseNoteGroupTimbre, removeProjectTimbre, reorderProjectTimbres, requiresTimbreDeleteConfirmation } from './project-timbres.ts';
 import type { ProjectDirectoriesPort } from '../contracts/project-directory.ts';
 import { rememberMidiImportNotice, takeMidiImportNotice } from './platform/midi-notice.ts';
 import { createBrowserTimbreFiles } from './platform/timbre-files.ts';
 import { importProjectTimbre } from './project-timbre-import.ts';
 import { readTimbreImport } from './timbre-file-import.ts';
 import { createProjectClosePreparation } from './project-close.ts';
+import { openMaterialSession } from './material-library-session.ts';
 
 // Platform adapters share the same musical units and never silently switch stores.
 const STORAGE_KEY = 'rootsound.workstation.materials.v1';
@@ -40,26 +43,28 @@ try {
   };
   const directories = 'projectDirectories' in platform ? platform.projectDirectories as ProjectDirectoriesPort | undefined : undefined;
   const directoryState = await directories?.read();
-  const previous = platform.storage.read();
   const contentAdapters = [createTimbreReferenceAdapter(), createPhraseReferenceAdapter(), createSongReferenceAdapter(), createCoCreationReferenceAdapter(), createSampleReferenceAdapter()];
-  const library = createMaterialLibrary(platform.storage, { project: { rootKind: 'rootsound.song', adapters: contentAdapters } });
+  const { library, hasPrevious } = openMaterialSession(platform.storage, { project: { rootKind: 'rootsound.song', adapters: contentAdapters } });
   const decoder = createBrowserSampleDecoder();
-  const sampleAudio = createSampleAudio(library, decoder);
+  const payloads = 'samplePayloads' in platform ? platform.samplePayloads : undefined;
+  const sampleAudio = createSampleAudio(library, decoder, payloads);
   const spectralAudio = createSpectralAudio();
-  const timbre = createTimbreEditor(library, sampleAudio, spectralAudio);
-  const timbrePlayback = createTimbrePlayback(library, sampleAudio, spectralAudio);
+  const bankAudio = createSampleBankAudio(library, sampleAudio);
+  const timbre = createTimbreEditor(library, sampleAudio, spectralAudio, bankAudio);
+  const timbrePlayback = createTimbrePlayback(library, sampleAudio, spectralAudio, bankAudio);
   const phrasePlayback = createPhrasePlayback(library, timbrePlayback);
   const phrase = createPhraseEditor(library, timbrePlayback);
   const postProduction = createPostProduction();
   const song = createSongEditor(library, phrasePlayback, { defaultTempoMode: 'source', postProduction, initialTrackCount: 7 });
   const songPlayback = createSongPlayback(library, phrasePlayback, postProduction);
-  const sampling = createSampling(library, { files: platform.sampleFiles, decoder, capture: createBrowserSampleCapture() });
+  const sampling = createSampling(library, { files: platform.sampleFiles, decoder, capture: createBrowserSampleCapture(), payloads });
   const recognition = createMelodyRecognition(library, { analyzer: createBrowserMelodyAnalyzer(), currentSourceToken() {
     const source = sampling.read(); return source.phase === 'idle' ? source.audioToken : undefined;
   } });
   const references = createReferenceEditing(library, contentAdapters);
   const projects = createProjectPackages(library, contentAdapters, { rootKind: 'rootsound.song' });
   const preferences = createWorkspacePreferences({ getItem: key => localStorage.getItem(key), setItem: (key, value) => localStorage.setItem(key, value) });
+  if (directoryState?.current) openMusicDocument(library, song, phrase);
   // Creating dormant editors can add their initial drafts. Finish this one-time
   // loading phase before the user can edit; subsequent reloads cannot clear dirty state.
   if (directoryState?.current) {
@@ -67,6 +72,7 @@ try {
     await directories?.finishLoading?.();
   }
   const studio = mountStudio(root, { timbre, phrase, song, sampling, recognition, references,
+    workspaceState: directoryState?.current ? createMusicWorkspaceState(localStorage, directoryState.current.id) : undefined,
     projectName: directoryState?.current?.name,
     doubleClickIntervalMs: directoryState?.doubleClickIntervalMs,
     projectSetup: directories ? createProjectSetup(directories, notice => {
@@ -84,27 +90,13 @@ try {
       async prepareSave() {
         await studio.prepareClose({ allowProjectDialog: true });
         const id = song.read().draft?.id; if (!id) throw new Error('当前没有打开的歌曲。');
-        assertProjectPhraseSaveReady(library, id);
+        await bankAudio.materialize(phrase.read().body?.parts.filter(part => !part.unassigned).map(part => part.timbreId) ?? []);
+        commitMusicDocument(library, song, phrase);
       },
     }) : undefined,
-    onNewPhrase(timbreId, tempoBpm) {
-      const id = song.read().draft?.id; if (!id) throw new Error('先创建或打开一个歌曲项目。');
-      phrase.openDraft(beginProjectPhraseDraft(library, id, timbreId, tempoBpm).draftId);
-    },
-    onSavePhraseDraft: (id, mode) => library.saveDraft(id, mode),
-    onDiscardPhraseDraft(id) {
-      const songId = song.read().draft?.id; if (!songId) throw new Error('当前没有打开的歌曲。');
-      discardProjectPhraseDraft(library, songId, id);
-    },
-    onCopyPhrase() {
-      const songId = song.read().draft?.id; const draftId = phrase.read().draft?.id;
-      if (!songId || !draftId) throw new Error('先打开一个歌曲和乐句。');
-      phrase.openDraft(copyProjectPhrase(library, songId, draftId).draftId);
-    },
-    async onPrepareMelody() {
+    onPrepareMelody() {
       const songId = song.read().draft?.id; if (!songId) throw new Error('先打开一首歌曲。');
       ensureProjectMelodyTimbres(library, songId);
-      await platform.timbreFiles.sync?.(songId);
     },
     projectTimbres() {
       const songId = song.read().draft?.id;
@@ -126,59 +118,36 @@ try {
     },
     onAddPhraseTimbre(id, section) {
       const songId = song.read().draft?.id; const draftId = phrase.read().draft?.id;
-      if (!songId || !draftId) throw new Error('先打开一个歌曲和乐句。');
+      if (!songId || !draftId) throw new Error('先打开一个音乐项目。');
       return addProjectPhraseTimbre(library, songId, draftId, id, section);
     },
     onCreateNoteGroup(id) {
       const songId = song.read().draft?.id; const draftId = phrase.read().draft?.id;
-      if (!songId || !draftId) throw new Error('先打开一个歌曲和乐句。');
+      if (!songId || !draftId) throw new Error('先打开一个音乐项目。');
       return createProjectPhraseNoteGroup(library, songId, draftId, id);
     },
     onChangeNoteGroupTimbre(partId, timbreId) {
       const songId = song.read().draft?.id; const draftId = phrase.read().draft?.id;
-      if (!songId || !draftId) throw new Error('先打开一个歌曲和乐句。');
+      if (!songId || !draftId) throw new Error('先打开一个音乐项目。');
       changeProjectPhraseNoteGroupTimbre(library, songId, draftId, partId, timbreId);
     },
-    onRemovePhraseTimbre(id, section) {
+    onRemovePhraseTimbre(id) {
       const songId = song.read().draft?.id; const draftId = phrase.read().draft?.id;
-      if (!songId || !draftId) throw new Error('先打开一个歌曲和乐句。');
-      if (tryRemoveUnusedProjectTimbre(library, songId, id)) {
-        try { timbre.read(); }
-        catch {
-          const remaining = listProjectTimbres(library, songId);
-          if (remaining.length) timbre.open(remaining[0]!.id); else timbre.create();
-        }
-      } else removeProjectPhraseTimbre(library, songId, draftId, id, section);
+      if (!songId || !draftId) throw new Error('先打开一个音乐项目。');
+      removeProjectTimbre(library, songId, id);
+      try { timbre.read(); }
+      catch { const remaining=listProjectTimbres(library,songId);if(remaining.length)timbre.open(remaining[0]!.id);else timbre.create(); }
+
     },
     onReorderTimbres(id, targetIndex) {
       const songId = song.read().draft?.id; if (!songId) throw new Error('先打开一首歌曲。');
       reorderProjectTimbres(library, songId, id, targetIndex);
     },
-    onKeepPhrases(ids) {
-      const id = song.read().draft?.id; if (!id) throw new Error('当前没有打开的歌曲。');
-      retainProjectPhrases(library, id, ids);
-    },
-    phraseInfo(id) {
-      const songId = song.read().draft?.id; if (!songId) throw new Error('先打开一个歌曲项目。');
-      return readProjectPhraseInfo(library, songId, id);
-    },
-    projectPhrases() {
-      const songId = song.read().draft?.id; if (!songId) return [];
-      return readProjectPhrases(library, songId);
-    },
-    onDeletePhrase(id) {
-      const songId = song.read().draft?.id; if (!songId) throw new Error('当前没有打开的歌曲。');
-      deleteProjectPhrase(library, songId, id);
-    },
-    onRenamePhrase(id, name, ref) {
-      const songId = song.read().draft?.id; if (!songId) throw new Error('先打开一个歌曲项目。');
-      return renameProjectPhrase(library, songId, id, name, ref);
-    },
     onRenameProject(name) { song.rename(projectName(name)); },
     initialEntry: directoryState ? directoryState.current ? 'song' : 'welcome' : undefined,
     catalog: createMaterialCatalog(library, { currentProject: () => song.read().draft }), preferences,
     entities: createProjectAssets(library, () => song.read().draft),
-    sound: runtime, hasPrevious: previous !== null, files: platform.files, audioFiles: platform.audioFiles,
+    sound: runtime, hasPrevious, files: platform.files, audioFiles: platform.audioFiles,
     projects, projectFiles: platform.projectFiles,
     async previewContent(contentId, signal) {
       if (signal?.aborted) throw new Error('这次试听已取消。');
@@ -200,9 +169,14 @@ try {
   const closeHost = globalThis as typeof globalThis & { __rootSoundPrepareClose?: () => Promise<{ ready: boolean; name?: string; canSave?: boolean; saveMessage?: string }> };
   const prepareClose = createProjectClosePreparation({
     flush: () => studio.prepareClose(),
-    assertSaveReady() {
+    async assertSaveReady() {
       const id = song.read().draft?.id;
-      if (id) assertProjectPhraseSaveReady(library, id);
+      if (id) {
+        // A clean close must not invent edits just to repack unchanged bundled recordings.
+        if (!directories || (await directories.read()).hasUnsavedChanges)
+          await bankAudio.materialize(phrase.read().body?.parts.filter(part => !part.unassigned).map(part => part.timbreId) ?? []);
+        commitMusicDocument(library, song, phrase);
+      }
     },
     name: () => song.read().draft?.name,
   });

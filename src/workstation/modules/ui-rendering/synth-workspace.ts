@@ -35,7 +35,7 @@ export function mountSynthWorkspace(root: HTMLElement, options: Options) {
   const initialId = timbre.read().draft.id;
   function body(): SynthesizerBody {
     const current = timbre.read().body;
-    if (current.model === 'sample-instrument' || current.model === 'spectral-synth') throw new Error('当前音色类型已改变，请重新打开。');
+    if (current.model !== 'basic-synth' && current.model !== 'synthesizer') throw new Error('当前音色类型已改变，请重新打开。');
     return synthesisFromBasic(current);
   }
   const initialBody = JSON.stringify(body());
@@ -47,7 +47,7 @@ export function mountSynthWorkspace(root: HTMLElement, options: Options) {
   const tabs = node('nav', 'workspace-tabs'); tabs.setAttribute('aria-label', '创作工作区');
   if (options.onSampling) tabs.append(button('采样获取', 'workspace-tab', () => leave(options.onSampling!)));
   tabs.append(button('音色制作', 'workspace-tab is-active', () => {}));
-  if (options.onPhrase) tabs.append(button('乐句谱写', 'workspace-tab', () => leave(options.onPhrase!)));
+  if (options.onPhrase) tabs.append(button('音乐谱写', 'workspace-tab', () => leave(options.onPhrase!)));
   if (options.onSong) tabs.append(button('歌曲编排', 'workspace-tab', () => leave(options.onSong!)));
   toolbar.append(tabs); const tools = node('nav', 'toolbar-tools');
   tools.append(button('新建音色', 'secondary synth-new', () => leave(options.onNew)));

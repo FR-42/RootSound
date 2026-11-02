@@ -9,7 +9,7 @@ export function createProjectTransfer(projects: ProjectPackagesPort, files: Proj
   let busy = false;
   function ready(draftId: string): void {
     if (pendingReferenceEdits(references, draftId).length)
-      throw new Error('这首歌还有正在调整的乐句或声音。请先完成或取消这些调整，再保存工程文件，避免漏掉你的修改。');
+      throw new Error('这首歌还有正在调整的音乐或声音。请先完成或取消这些调整，再保存工程文件，避免漏掉你的修改。');
   }
   return {
     async save(draftId: string) {

@@ -1,12 +1,13 @@
 import type { MidiImportNotice, ProjectDirectoriesPort, ProjectSetupPort } from '../contracts/project-directory.ts';
 import { createMaterialLibrary } from '../modules/materials/public.ts';
 import { createTimbrePlayback, createTimbreReferenceAdapter } from '../modules/timbre/public.ts';
-import { createPhrasePlayback, createPhraseReferenceAdapter } from '../modules/phrase/public.ts';
+import { createPhraseEditor, createPhrasePlayback, createPhraseReferenceAdapter } from '../modules/phrase/public.ts';
 import { createSongEditor, createSongReferenceAdapter } from '../modules/song/public.ts';
 import { createCoCreationReferenceAdapter } from '../modules/co-creation/public.ts';
 import { createSampleReferenceAdapter } from '../modules/sampling/public.ts';
 import { ensureProjectMelodyTimbres } from './project-timbres.ts';
 import { createMidiProjectLibrary } from './midi-project.ts';
+import { openMusicDocument, commitMusicDocument } from './music-document.ts';
 
 export function projectName(input: string): string {
   const name = input.trim();
@@ -30,6 +31,8 @@ export function createInitialProjectLibrary(input: string): string {
   const song = createSongEditor(library, phrases, { defaultTempoMode: 'source', initialTrackCount: 7 });
   song.create(); song.rename(name);
   ensureProjectMelodyTimbres(library, song.read().draft!.id);
+  const score = createPhraseEditor(library, createTimbrePlayback(library));
+  openMusicDocument(library, song, score); commitMusicDocument(library, song, score);
   if (snapshot === null) throw new Error('未能准备新歌曲，尚未创建项目文件。');
   return snapshot;
 }
@@ -43,6 +46,8 @@ export function createProjectCopyLibrary(text: string, input: string, draftId: s
     { project: { rootKind: 'rootsound.song', adapters } });
   const song = createSongEditor(library, createPhrasePlayback(library, createTimbrePlayback(library)), { defaultTempoMode: 'source' });
   song.openDraft(draftId); song.rename(name);
+  const score = createPhraseEditor(library, createTimbrePlayback(library));
+  openMusicDocument(library, song, score); score.rename(name); commitMusicDocument(library, song, score);
   return snapshot;
 }
 
@@ -55,7 +60,10 @@ export function renameProjectLibrary(text: string, input: string): string {
     { project: { rootKind: 'rootsound.song', adapters } });
   const song = createSongEditor(library, createPhrasePlayback(library, createTimbrePlayback(library)), { defaultTempoMode: 'source' });
   if (!song.read().draft) throw new Error('这份项目没有可以改名的歌曲，原文件已保留。');
-  song.rename(name); return snapshot;
+  song.rename(name);
+  const score = createPhraseEditor(library, createTimbrePlayback(library));
+  openMusicDocument(library, song, score); score.rename(name); commitMusicDocument(library, song, score);
+  return snapshot;
 }
 
 export function createProjectSetup(directories: ProjectDirectoriesPort, enter: (notice?: MidiImportNotice) => void,
@@ -96,7 +104,7 @@ export function createProjectSetup(directories: ProjectDirectoriesPort, enter: (
           const ending = ` ${suffix++}`;
           name = base.slice(0, 80 - ending.length).replace(/[\uD800-\uDBFF]$/u, '').trimEnd() + ending;
         }
-        const text = name === base ? imported.libraryText : renameProjectLibrary(imported.libraryText, name);
+        const text = renameProjectLibrary(imported.libraryText, name);
         const created = await directories.create(name, state.defaultLocation, text);
         enter({ projectId: created.id, name, trackCount: imported.trackCount, noteCount: imported.noteCount, warnings: [...imported.warnings] });
       }

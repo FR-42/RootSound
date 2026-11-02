@@ -1,0 +1,62 @@
+Actual34dd10/34df10 event merge and residual labels
+
+Target D:/#Software/ripx/RipX.exe
+SHA2565f088fa4fbbe1759ef75d8034c79f33c846e3bf5f13d5048dd95a6614d2ad441
+Source:remaining-34dd10.c/json
+ev_5273b89e071a015a9f61bc3b7c980963bb16f4a98e5c9564d8d29f3783b06a47
+Source:remaining-34df10.c/json
+ev_cf8579cfa2d54969aaa976d21d580c2fd0482341482f6a698ccc8f10517fdb05
+
+merge_native_noise_event(events,destination,source,*,task_start_frame,
+ retained_events=()) ports34dd10:retained-identity selection, metadata bounds
+ union, actual owned sample addition, source sample release and pool removal.
+ It keeps the original retained-ID compare-after-adoption ordering.
+
+merge_native_noise_events(events,records_by_frame,*,context,columns,group_width,
+ task_start_frame,task_end_frame,retained_events=None,next_identity=0,
+ zero_initialized_frames=()) -> NativeNoiseMergeResult.
+Here task_end_frame is the actual native task+0x10 value.34df10 reads through
+that value INCLUSIVELY; the whole-song owner uses that SAME VALUE as its
+exclusive output frontier. Pass the original task_end_frame value directly;
+do not substitute347170's laterlookaheadlast=end+bc-1 or subtract1.
+columns/group_width are34b460's actual500Hz histogram geometry. Event samples
+retain their own shared first_frame/last_frame coordinate owner.
+next_identity is the currentDAT98a148 frontier(last issued ID); native adds1
+before assignment. Result fields events,retained_events,next_identity and
+merged_events name the mutated owners and updated counter explicitly.
+
+Source stages implemented:
+- Stable descending frequency-width sort and native contained-event merge,
+  including mode/flag92 temporal/frequency gates and10dB energy comparison.
+- Native0x12/0x40 type labeling and retained identity label propagation;
+  nonzero-mode adjacent-span merge and special-reference0x40 mean filter.
+- Mode0 low-band0x11/0x10 residual claim against later competing0x12 events;
+  onset-envelope transfer, contiguous identity coverage and prior-task reuse.
+- Actual350..500Hz to<=3000Hz per-side decaying strength transfer.
+- Neighbor-selected low-band continuation, provisional0x12 removal and native
+  >=3000Hz8192/16384/4096 onset/peak event creation, with0x600 pool capacity.
+- Per-side values and integer IDs remain separate. Source low-bin replacement
+  stores overwrite group1; frequency spreading and continuation add to group1.
+
+Inactive-slot provenance boundary
+Native343b46..343b6f allocates464*0xf8 record capacity usingoperatornew without
+zeroing it;343da0 clears only active count tables.34df10 at34f70f/34f71b reads
+the preceding frame's group1 values unconditionally, including inactive slots;
+34f7ab checks current count for the right neighbor, not preceding count. This
+was corroborated directly in noise-merge-inactive-read-direct.asm.347a90 starts
+fresh347170 production atmax(taskstart,restoredend), leaving the first task's
+earlier inactive record bytes unknown in the original program.
+
+The implementation never infers zeros from count0. Direct missing-bin reads
+fail unless the caller supplies zero_initialized_frames as explicit proof of
+its own reconstruction allocation policy. Root selected deterministic zero
+padding for inactive owned reconstruction rows and must label that policy
+'reconstruction-inactive-padding-zero,original-value-unknown'. This is not
+evidence that original bytes were zero and does not fill missing active input.
+Rows remain active-count preserving. Required owned coordinates include the
+history interval and task_start-2 through task_end+1 for native high-band reads.
+
+Validation:AST parsing/compilation and source inspection only. No imports,
+numeric/audio tests, original executable execution, GUI or media inspection.
+Original runtime behavior, listening quality and numerical equivalence remain
+unverified, including the explicitly declared inactive-padding policy.

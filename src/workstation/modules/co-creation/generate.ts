@@ -91,7 +91,7 @@ export function generateIdea(input: GenerateIdeaInput): IdeaGraph {
       const existing = mapped.get(part.timbreId);
       if (existing) { part.timbreId = existing; continue; }
       const source = sourceSounds.get(part.timbreId);
-      if (!source) throw new Error('这段乐句缺少使用的声音，请先恢复素材再继续。');
+      if (!source) throw new Error('这段音乐缺少使用的声音，请先恢复素材再继续。');
       title(source); const soundAdapter = createTimbreReferenceAdapter(); soundAdapter.slots(source);
       const original = readEditableTimbreBody(source.body);
       let next: ContentRecord;

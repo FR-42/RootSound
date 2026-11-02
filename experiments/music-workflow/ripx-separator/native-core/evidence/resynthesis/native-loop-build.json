@@ -1,0 +1,37 @@
+{
+  "format": "RipXReconstructedLoopBuild",
+  "abi": 1,
+  "backend": "source-derived-cpp-loops-strict-fp",
+  "source_sha256": "fb3005227fd84ebd43d61b1d5d9774a667b64b939fa1c7508c0c34a0248d7a03",
+  "dll_sha256": "4d93d3893e0bdce93abd45c25d2c58a0c35fcc898706ff0086737977807c25a3",
+  "compiler": "GCC15.2.0 existing local MinGW toolchain",
+  "flags": [
+    "-std=c++17",
+    "-O2",
+    "-fno-fast-math",
+    "-ffp-contract=off",
+    "-fno-tree-vectorize",
+    "-shared",
+    "-static",
+    "-s"
+  ],
+  "verified": [
+    "C++ build succeeded",
+    "DLL loaded and ABI1 returned",
+    "AST and NativePreparedPCM call contracts"
+  ],
+  "audio_run": false,
+  "numeric_kernel_run": false,
+  "performance_measured": false,
+  "source_functions": [
+    "32a1b0/3297a0 lookup correlation",
+    "328860 energy accumulation",
+    "3190b0 residual add/subtract",
+    "5afd00 render segment"
+  ],
+  "limitations": [
+    "No runtime numeric/original equivalence test",
+    "No speedup or resource measurements"
+  ],
+  "evidence_kind": "source-derived translation of retained reconstructed loops; own compiled tool DLL, no original loaded"
+}

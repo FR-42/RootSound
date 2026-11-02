@@ -43,7 +43,7 @@ internal sealed class ProjectTimbreMirror
         Directory.Delete(directory); observed.Remove(projectId); observedIndexes.Remove(projectId); return null;
     }
 
-    internal void Sync(string projectId, string libraryText, string? songDraftId = null, bool verifyPhysicalFiles = false)
+    internal void Sync(string projectId, string libraryText, string? songDraftId = null, bool verifyPhysicalFiles = false, Func<string, string>? expand = null)
     {
         string directory = DirectoryFor(projectId);
         RequireDirectory(root); RequireDirectory(directory);
@@ -73,6 +73,8 @@ internal sealed class ProjectTimbreMirror
             if (spectralFile) { var patch = JsonNode.Parse(body.GetProperty("patch").GetRawText())!.AsObject(); patch["name"] = name; text = patch.ToJsonString(); }
             else if (model is "basic-synth" or "synthesizer") text = JsonSerializer.Serialize(new { format = "RootSoundSound", version = model == "basic-synth" ? 1 : 2, name, timbre = body });
             else text = JsonSerializer.Serialize(new { format = "RootSoundTimbre", version = 1, timbre = tone, contents = Closure(tone, contents) });
+            if (text.Contains("host-asset", StringComparison.Ordinal))
+                text = (expand ?? throw new IOException("音色依赖音频缓存，尚未生成目录副本。"))(text);
             byte[] bytes = Utf8.GetBytes(text); string hash = Convert.ToHexString(SHA256.HashData(bytes));
             if (verifyPhysicalFiles || previous.GetValueOrDefault(file) != hash) WriteManaged(directory, file, bytes, hash, previous.GetValueOrDefault(file));
             next.Add(file, hash); entries.Add(new { id, name, file, sha256 = hash });
@@ -149,7 +151,7 @@ internal sealed class ProjectTimbreMirror
     private static bool EmptyPlaceholder(JsonElement part, JsonElement tone)
     {
         string name = part.GetProperty("name").GetString()!;
-        if (part.GetProperty("notes").GetArrayLength() != 0 || !Regex.IsMatch(name, "^乐句 [1-9]\\d* 音色$") || tone.GetProperty("name").GetString() != name || tone.GetProperty("dependencies").GetArrayLength() != 0) return false;
+        if (part.GetProperty("notes").GetArrayLength() != 0 || !Regex.IsMatch(name, "^音乐 [1-9]\\d* 音色$") || tone.GetProperty("name").GetString() != name || tone.GetProperty("dependencies").GetArrayLength() != 0) return false;
         var body = tone.GetProperty("body");
         return body.GetProperty("model").GetString() == "basic-synth" && body.GetProperty("character").GetString() == "warm"
             && body.GetProperty("attackSeconds").GetDouble() == .025 && body.GetProperty("releaseSeconds").GetDouble() == .55 && body.GetProperty("level").GetDouble() == .65;

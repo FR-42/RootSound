@@ -94,7 +94,7 @@ export function createSongInspector(onError: (error: unknown) => void) {
       commitName(); view = next; auditionButton = undefined; controls.clear(); detailNodes.length = 0;
       const identity = document.createElement('div'); identity.className = 'song-inspector-identity';
       name = document.createElement('input'); name.type = 'text'; name.className = 'song-inspector-name'; name.value = next.name; name.readOnly = true;
-      name.setAttribute('aria-label', next.kind === 'row' ? '行名称' : '乐句名称'); name.title = '双击修改名称';
+      name.setAttribute('aria-label', next.kind === 'row' ? '行名称' : '音乐名称'); name.title = '双击修改名称';
       name.addEventListener('dblclick', event => { if (!view?.onRename) return; event.preventDefault(); name!.readOnly = false; name!.focus(); name!.select?.(); });
       name.addEventListener('blur', commitName);
       name.addEventListener('keydown', event => {

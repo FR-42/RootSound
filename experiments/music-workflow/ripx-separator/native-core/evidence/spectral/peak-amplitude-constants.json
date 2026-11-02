@@ -1,0 +1,23 @@
+[
+  {
+    "address": "0x14068e120",
+    "offset": "0x68d320",
+    "format": "d",
+    "bytes": "28a29b501344e33f",
+    "value": 0.6020599913
+  },
+  {
+    "address": "0x14068e180",
+    "offset": "0x68d380",
+    "format": "d",
+    "bytes": "00000000c0ffdf40",
+    "value": 32767.0
+  },
+  {
+    "address": "0x14068e1b0",
+    "offset": "0x68d3b0",
+    "format": "f",
+    "bytes": "00feff46",
+    "value": 32767.0
+  }
+]

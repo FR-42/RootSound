@@ -1,0 +1,32 @@
+[
+  {
+    "address": "0x1406a7a60",
+    "offset": "0x6a6c60",
+    "bytes": "88898641",
+    "value": 16.817153930664062
+  },
+  {
+    "address": "0x1406a7a68",
+    "offset": "0x6a6c68",
+    "bytes": "88898e41",
+    "value": 17.817153930664062
+  },
+  {
+    "address": "0x14068e18c",
+    "offset": "0x68d38c",
+    "bytes": "00002041",
+    "value": 10.0
+  },
+  {
+    "address": "0x1406a7a50",
+    "offset": "0x6a6c50",
+    "bytes": "00000841",
+    "value": 8.5
+  },
+  {
+    "address": "0x1406a7a64",
+    "offset": "0x6a6c64",
+    "bytes": "88898a41",
+    "value": 17.317153930664062
+  }
+]

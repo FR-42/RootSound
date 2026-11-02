@@ -1,0 +1,320 @@
+[
+  {
+    "category": "键盘",
+    "key": "piano",
+    "name": "钢琴",
+    "midi": 60
+  },
+  {
+    "category": "键盘",
+    "key": "bright-piano",
+    "name": "明亮钢琴",
+    "midi": 60
+  },
+  {
+    "category": "键盘",
+    "key": "electric-piano",
+    "name": "电钢琴",
+    "midi": 60
+  },
+  {
+    "category": "键盘",
+    "key": "fm-piano",
+    "name": "清脆电钢琴",
+    "midi": 60
+  },
+  {
+    "category": "键盘",
+    "key": "harpsichord",
+    "name": "羽管键琴",
+    "midi": 60
+  },
+  {
+    "category": "键盘",
+    "key": "organ",
+    "name": "管风琴",
+    "midi": 60
+  },
+  {
+    "category": "键盘",
+    "key": "accordion",
+    "name": "手风琴",
+    "midi": 60
+  },
+  {
+    "category": "拨弦",
+    "key": "nylon-guitar",
+    "name": "尼龙吉他",
+    "midi": 60
+  },
+  {
+    "category": "拨弦",
+    "key": "steel-guitar",
+    "name": "钢弦吉他",
+    "midi": 60
+  },
+  {
+    "category": "拨弦",
+    "key": "clean-guitar",
+    "name": "清音电吉他",
+    "midi": 60
+  },
+  {
+    "category": "拨弦",
+    "key": "distorted-guitar",
+    "name": "失真电吉他",
+    "midi": 60
+  },
+  {
+    "category": "拨弦",
+    "key": "harp",
+    "name": "竖琴",
+    "midi": 60
+  },
+  {
+    "category": "拨弦",
+    "key": "guzheng",
+    "name": "日本筝",
+    "midi": 60
+  },
+  {
+    "category": "弦乐",
+    "key": "violin",
+    "name": "小提琴",
+    "midi": 60
+  },
+  {
+    "category": "弦乐",
+    "key": "viola",
+    "name": "中提琴",
+    "midi": 60
+  },
+  {
+    "category": "弦乐",
+    "key": "cello",
+    "name": "大提琴",
+    "midi": 48
+  },
+  {
+    "category": "弦乐",
+    "key": "contrabass",
+    "name": "低音提琴",
+    "midi": 36
+  },
+  {
+    "category": "弦乐",
+    "key": "string-ensemble",
+    "name": "弦乐合奏",
+    "midi": 60
+  },
+  {
+    "category": "木管",
+    "key": "piccolo",
+    "name": "短笛",
+    "midi": 72
+  },
+  {
+    "category": "木管",
+    "key": "flute",
+    "name": "长笛",
+    "midi": 72
+  },
+  {
+    "category": "木管",
+    "key": "clarinet",
+    "name": "单簧管",
+    "midi": 60
+  },
+  {
+    "category": "木管",
+    "key": "oboe",
+    "name": "双簧管",
+    "midi": 60
+  },
+  {
+    "category": "木管",
+    "key": "bassoon",
+    "name": "巴松",
+    "midi": 48
+  },
+  {
+    "category": "木管",
+    "key": "saxophone",
+    "name": "萨克斯",
+    "midi": 60
+  },
+  {
+    "category": "铜管",
+    "key": "trumpet",
+    "name": "小号",
+    "midi": 60
+  },
+  {
+    "category": "铜管",
+    "key": "horn",
+    "name": "圆号",
+    "midi": 60
+  },
+  {
+    "category": "铜管",
+    "key": "trombone",
+    "name": "长号",
+    "midi": 48
+  },
+  {
+    "category": "铜管",
+    "key": "tuba",
+    "name": "大号",
+    "midi": 36
+  },
+  {
+    "category": "低音",
+    "key": "electric-bass",
+    "name": "电贝司",
+    "midi": 36
+  },
+  {
+    "category": "低音",
+    "key": "synth-bass",
+    "name": "合成贝司",
+    "midi": 36
+  },
+  {
+    "category": "低音",
+    "key": "sub-bass",
+    "name": "深沉低音",
+    "midi": 36
+  },
+  {
+    "category": "打击",
+    "key": "acoustic-kick",
+    "name": "原声底鼓",
+    "midi": 60
+  },
+  {
+    "category": "打击",
+    "key": "electronic-kick",
+    "name": "电子底鼓",
+    "midi": 60
+  },
+  {
+    "category": "打击",
+    "key": "snare",
+    "name": "军鼓",
+    "midi": 60
+  },
+  {
+    "category": "打击",
+    "key": "clap",
+    "name": "拍手",
+    "midi": 60
+  },
+  {
+    "category": "打击",
+    "key": "closed-hat",
+    "name": "闭镲",
+    "midi": 60
+  },
+  {
+    "category": "打击",
+    "key": "open-hat",
+    "name": "开镲",
+    "midi": 60
+  },
+  {
+    "category": "打击",
+    "key": "crash",
+    "name": "吊镲",
+    "midi": 60
+  },
+  {
+    "category": "打击",
+    "key": "tom",
+    "name": "嗵鼓",
+    "midi": 60
+  },
+  {
+    "category": "打击",
+    "key": "tambourine",
+    "name": "铃鼓",
+    "midi": 60
+  },
+  {
+    "category": "打击",
+    "key": "shaker",
+    "name": "沙锤",
+    "midi": 60
+  },
+  {
+    "category": "打击",
+    "key": "xylophone",
+    "name": "木琴",
+    "midi": 60
+  },
+  {
+    "category": "打击",
+    "key": "marimba",
+    "name": "马林巴",
+    "midi": 60
+  },
+  {
+    "category": "打击",
+    "key": "celesta",
+    "name": "钢片琴",
+    "midi": 72
+  },
+  {
+    "category": "打击",
+    "key": "tubular-bells",
+    "name": "管钟",
+    "midi": 60
+  },
+  {
+    "category": "电子",
+    "key": "saw-lead",
+    "name": "锯齿主奏",
+    "midi": 60
+  },
+  {
+    "category": "电子",
+    "key": "square-lead",
+    "name": "方波主奏",
+    "midi": 60
+  },
+  {
+    "category": "电子",
+    "key": "synth-pluck",
+    "name": "拨弦合成",
+    "midi": 60
+  },
+  {
+    "category": "电子",
+    "key": "warm-pad",
+    "name": "温暖铺底",
+    "midi": 60
+  },
+  {
+    "category": "电子",
+    "key": "airy-pad",
+    "name": "空灵铺底",
+    "midi": 60
+  },
+  {
+    "category": "电子",
+    "key": "bell-pluck",
+    "name": "水晶拨弦",
+    "midi": 60
+  },
+  {
+    "category": "人声",
+    "key": "vocal-ah",
+    "name": "人声呜",
+    "midi": 60
+  },
+  {
+    "category": "人声",
+    "key": "choir",
+    "name": "合唱团",
+    "midi": 60
+  }
+]

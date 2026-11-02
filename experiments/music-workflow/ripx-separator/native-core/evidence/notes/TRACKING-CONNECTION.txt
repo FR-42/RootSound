@@ -1,0 +1,31 @@
+340630 normal type1 reconstruction (build only)
+
+native_tracking.NativeTrackingPolicy owns actual native frame rate/context/options.
+NativeTracker consumes selected321770 bytes0x3c18 once for each frame, including
+empty frames, over[first_frame,task_end_frame+context_bc). finish returns true
+NativeTrajectory0x28 headers with0x5c records, for native harmonic refinement.
+track_native_candidates is the batch interface. No user-supplied group IDs,
+notes, pitch tracker, callback scorer or public model is required.
+
+The association preserves the original strongest-harmonic anchor, signed balance
+gate, directional frequency window, gap/history gates, five-part cost, existing
+cost precedence, native group counter, gap interpolation, confidence flags,
+weighted stretch metadata, short/weak group removal and tail padding.
+It does not create final notes directly or claim raw0xd94 seeds are selected
+0x3c18 candidates. 33c5c0/319940 still owns the subsequent numeric refinement.
+
+Background normal-path closure:
+analysis-preprocess.c343da0 clears ctx+5a0 counts. peak-stage-driver.c335480
+calls347170 with mode1. OriginalPE instructions1403471b7..34722d set both query
+bounds0 whenflag92=false and return atonce for mode1. Hence this branch truly
+produces an empty table. NativeBackgroundCache owns that fact and gap queries
+return0 without inventing frequency samples. 347db0 independently also returns0
+for every positive query underflag92=false. Specialized flag92 tables can be
+read using actual0xf8 bytes and native pow conversions; their producer is not
+silently claimed implemented. NativeBackgroundGrid restores3198c0 and
+native_background_grids restores31f5a0's automatic grid.
+
+Unimplemented specialized branches: flags92/93,reduced989f11, nonharmonic
+instrument types, original pool pointer allocation/cache serialization.
+These branches fail explicitly. No original target or audio was executed.
+Only PythonAST syntax checking ran; no suite or numeric/audio test ran.

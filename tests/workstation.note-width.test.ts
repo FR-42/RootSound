@@ -1,10 +1,57 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import type { PhraseBody, PhraseNote } from '../src/workstation/contracts/phrase.ts';
-import { melodyGrid, melodyNoteRect, melodyScale } from '../src/workstation/modules/ui-rendering/melody-geometry.ts';
+import { readPhraseBody } from '../src/workstation/modules/phrase/public.ts';
+import { melodyGrid, melodyNoteRect, melodyScale, initialMelodyView, melodyDetailGrid, melodyDetailSteps, melodyPitchTop, melodyPitchHeight, melodyPitchAt } from '../src/workstation/modules/ui-rendering/melody-geometry.ts';
 
 const keys = [{ label: 'C4', frequencyHz: 261.6255653005986, accidental: false }];
 const close = (actual: number, expected: number) => assert(Math.abs(actual - expected) < 1e-8);
+
+test('six-beat bars with a three-beat pickup preserve notes and mark the real downbeats',()=>{
+  const score=readPhraseBody({...body(120),beatsPerBar:6,pickupBeats:3});
+  assert.equal(score.beatsPerBar,6);assert.equal(score.pickupBeats,3);
+  const lines=melodyDetailGrid(8,120,4,{leftSeconds:0,zoom:4,rowHeight:32},1000,6,3);
+  assert.deepEqual(lines.filter(line=>line.bar).map(line=>line.seconds),[1.5]);
+  assert.throws(()=>readPhraseBody({...body(120),beatsPerBar:6,pickupBeats:6}));
+  assert.throws(()=>readPhraseBody({...body(120),beatsPerBar:6.5}));
+});
+
+test('detail grid reveals beats, configured cells and finer cells in successive zoom levels', () => {
+  for (const stepsPerBeat of [2,3,4,9]) {
+    const score={...body(120),stepsPerBeat},view=initialMelodyView(score,1000);
+    const lines=(zoom:number)=>melodyDetailGrid(8,120,stepsPerBeat,{...view,zoom},1000);
+    assert(lines(view.zoom).every(line=>line.beat));
+    assert.equal(melodyDetailSteps(120,stepsPerBeat,melodyScale({...view,zoom:view.zoom*2},1000,8)),stepsPerBeat);
+    assert(lines(view.zoom*2).some(line=>!line.beat));
+    const finer=lines(view.zoom*4);close(finer[1]!.seconds-finer[0]!.seconds,.5/(stepsPerBeat*2));
+    assert(finer.filter(line=>line.bar).every(line=>line.seconds%2===0));
+    assert.equal(score.stepsPerBeat,stepsPerBeat);
+  }
+});
+
+test('deep zoom generates only visible lines for long music and retains configured subdivision multiples', () => {
+  for(const n of [2,3,9]) {
+    const view={leftSeconds:300,zoom:256,rowHeight:32},width=2000;
+    const divisions=melodyDetailSteps(40,n,melodyScale(view,width,1536));
+    assert.equal(divisions%n,0);assert(divisions<=4096);
+    const lines=melodyDetailGrid(1536,40,n,view,width);
+    assert(lines.length<50);assert(lines.length>0);
+    assert(lines.every(line=>line.seconds>=299.999&&line.seconds<=300+8/view.zoom+.001));
+  }
+});
+
+test('equal black and white rows share exact boundaries for drawing, hit testing, notes and zoom', () => {
+  const keyboard=[{label:'D4',frequencyHz:293.6647679174076,accidental:false},{label:'C#4',frequencyHz:277.1826309768721,accidental:true},keys[0]!];
+  for(const height of [12,32,44]) for(let row=0;row<keyboard.length;row++) {
+    const top=melodyPitchTop(keyboard,row,height),extent=melodyPitchHeight(keyboard,row,height);
+    close(extent,height);
+    close(melodyPitchTop(keyboard,row+1,height),top+extent);
+    assert.equal(melodyPitchAt(keyboard,top+.001,height),row);
+    assert.equal(melodyPitchAt(keyboard,top+extent-.001,height),row);
+    const rect=melodyNoteRect({id:'n',startBeat:0,durationBeats:.0002,durationSeconds:.0001,frequencyHz:keyboard[row]!.frequencyHz,velocity:1},body(120),keyboard,{leftSeconds:0,zoom:256,rowHeight:height},1000);
+    close(rect.y,top+1);close(rect.height,extent-2);assert(rect.width>0);
+  }
+});
 function body(tempoBpm: number): PhraseBody {
   return { model: 'note-phrase', version: 1, timeUnit: 'beat', tempoBpm, lengthBeats: 16,
     parts: [{ id: 'piano', name: '钢琴', timbreId: 'voice', notes: [] }] };

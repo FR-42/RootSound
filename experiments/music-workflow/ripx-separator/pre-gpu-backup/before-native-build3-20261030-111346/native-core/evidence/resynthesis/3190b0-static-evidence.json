@@ -1,0 +1,421 @@
+{
+  "target": "D:\\#Software\\ripx\\RipX.exe",
+  "sha256": "5f088fa4fbbe1759ef75d8034c79f33c846e3bf5f13d5048dd95a6614d2ad441",
+  "source": "independent PE bytes and objdump, not REA Evidence",
+  "constants": {
+    "0x1408501f8": {
+      "hex": "182d4454fb211940",
+      "double": 6.283185307179586
+    },
+    "0x1406a7a10": {
+      "hex": "83c8c96d305fb440",
+      "double": 5215.189175235227
+    },
+    "0x1406a7a80": {
+      "hex": "000000000000f041",
+      "double": 4294967296.0
+    },
+    "0x140850128": {
+      "hex": "000000000000e03f",
+      "double": 0.5
+    },
+    "0x1408502b0": {
+      "hex": "000000000000e043",
+      "double": 9.223372036854776e+18
+    }
+  },
+  "table_pointer_candidates": [
+    {
+      "va": "0x140319280",
+      "opcode": "488b05b9d0be14",
+      "unwind_range": [
+        "0x140319234",
+        "0x14031938f"
+      ]
+    },
+    {
+      "va": "0x1403192d2",
+      "opcode": "488b0567d0be14",
+      "unwind_range": [
+        "0x140319234",
+        "0x14031938f"
+      ]
+    },
+    {
+      "va": "0x14031931a",
+      "opcode": "488b051fd0be14",
+      "unwind_range": [
+        "0x140319234",
+        "0x14031938f"
+      ]
+    },
+    {
+      "va": "0x140319344",
+      "opcode": "488b05f5cfbe14",
+      "unwind_range": [
+        "0x140319234",
+        "0x14031938f"
+      ]
+    },
+    {
+      "va": "0x1403193ad",
+      "opcode": "488b058ccfbe14",
+      "unwind_range": [
+        "0x14031938f",
+        "0x140319705"
+      ]
+    },
+    {
+      "va": "0x140319440",
+      "opcode": "488b05f9cebe14",
+      "unwind_range": [
+        "0x14031938f",
+        "0x140319705"
+      ]
+    },
+    {
+      "va": "0x140319481",
+      "opcode": "488b05b8cebe14",
+      "unwind_range": [
+        "0x14031938f",
+        "0x140319705"
+      ]
+    },
+    {
+      "va": "0x1403194ac",
+      "opcode": "488b058dcebe14",
+      "unwind_range": [
+        "0x14031938f",
+        "0x140319705"
+      ]
+    },
+    {
+      "va": "0x1403194d2",
+      "opcode": "488b0567cebe14",
+      "unwind_range": [
+        "0x14031938f",
+        "0x140319705"
+      ]
+    },
+    {
+      "va": "0x140319505",
+      "opcode": "488b0534cebe14",
+      "unwind_range": [
+        "0x14031938f",
+        "0x140319705"
+      ]
+    },
+    {
+      "va": "0x1403195a0",
+      "opcode": "488b0599cdbe14",
+      "unwind_range": [
+        "0x14031938f",
+        "0x140319705"
+      ]
+    },
+    {
+      "va": "0x1403195f1",
+      "opcode": "488b0548cdbe14",
+      "unwind_range": [
+        "0x14031938f",
+        "0x140319705"
+      ]
+    },
+    {
+      "va": "0x140319637",
+      "opcode": "488b0502cdbe14",
+      "unwind_range": [
+        "0x14031938f",
+        "0x140319705"
+      ]
+    },
+    {
+      "va": "0x14031965f",
+      "opcode": "488b05daccbe14",
+      "unwind_range": [
+        "0x14031938f",
+        "0x140319705"
+      ]
+    },
+    {
+      "va": "0x1403196ad",
+      "opcode": "488b058cccbe14",
+      "unwind_range": [
+        "0x14031938f",
+        "0x140319705"
+      ]
+    },
+    {
+      "va": "0x140329f9b",
+      "opcode": "488b3d9ec3bd14",
+      "unwind_range": [
+        "0x1403297a0",
+        "0x14032a1a3"
+      ]
+    },
+    {
+      "va": "0x14036e574",
+      "opcode": "488b0dc57db914",
+      "unwind_range": [
+        "0x14036e570",
+        "0x14036e590"
+      ]
+    },
+    {
+      "va": "0x14036e5aa",
+      "opcode": "488b0d8f7db914",
+      "unwind_range": [
+        "0x14036e5a0",
+        "0x14036e655"
+      ]
+    },
+    {
+      "va": "0x14036e5f1",
+      "opcode": "488905487db914",
+      "unwind_range": [
+        "0x14036e5a0",
+        "0x14036e655"
+      ]
+    },
+    {
+      "va": "0x1405b00b0",
+      "opcode": "488b0589629514",
+      "unwind_range": [
+        "0x1405afdf7",
+        "0x1405b0ada"
+      ]
+    },
+    {
+      "va": "0x1405b00f3",
+      "opcode": "488b0546629514",
+      "unwind_range": [
+        "0x1405afdf7",
+        "0x1405b0ada"
+      ]
+    },
+    {
+      "va": "0x1405b0120",
+      "opcode": "488b0519629514",
+      "unwind_range": [
+        "0x1405afdf7",
+        "0x1405b0ada"
+      ]
+    },
+    {
+      "va": "0x1405b0148",
+      "opcode": "488b05f1619514",
+      "unwind_range": [
+        "0x1405afdf7",
+        "0x1405b0ada"
+      ]
+    },
+    {
+      "va": "0x1405b0179",
+      "opcode": "488b05c0619514",
+      "unwind_range": [
+        "0x1405afdf7",
+        "0x1405b0ada"
+      ]
+    },
+    {
+      "va": "0x1405b0200",
+      "opcode": "488b0d39619514",
+      "unwind_range": [
+        "0x1405afdf7",
+        "0x1405b0ada"
+      ]
+    },
+    {
+      "va": "0x1405b026f",
+      "opcode": "488b0dca609514",
+      "unwind_range": [
+        "0x1405afdf7",
+        "0x1405b0ada"
+      ]
+    },
+    {
+      "va": "0x1405b02c5",
+      "opcode": "488b0d74609514",
+      "unwind_range": [
+        "0x1405afdf7",
+        "0x1405b0ada"
+      ]
+    },
+    {
+      "va": "0x1405b031c",
+      "opcode": "488b0d1d609514",
+      "unwind_range": [
+        "0x1405afdf7",
+        "0x1405b0ada"
+      ]
+    },
+    {
+      "va": "0x1405b0387",
+      "opcode": "488b0db25f9514",
+      "unwind_range": [
+        "0x1405afdf7",
+        "0x1405b0ada"
+      ]
+    },
+    {
+      "va": "0x1405b0460",
+      "opcode": "488b05d95e9514",
+      "unwind_range": [
+        "0x1405afdf7",
+        "0x1405b0ada"
+      ]
+    },
+    {
+      "va": "0x1405b04a3",
+      "opcode": "488b05965e9514",
+      "unwind_range": [
+        "0x1405afdf7",
+        "0x1405b0ada"
+      ]
+    },
+    {
+      "va": "0x1405b04d0",
+      "opcode": "488b05695e9514",
+      "unwind_range": [
+        "0x1405afdf7",
+        "0x1405b0ada"
+      ]
+    },
+    {
+      "va": "0x1405b04f8",
+      "opcode": "488b05415e9514",
+      "unwind_range": [
+        "0x1405afdf7",
+        "0x1405b0ada"
+      ]
+    },
+    {
+      "va": "0x1405b0529",
+      "opcode": "488b05105e9514",
+      "unwind_range": [
+        "0x1405afdf7",
+        "0x1405b0ada"
+      ]
+    },
+    {
+      "va": "0x1405b05a2",
+      "opcode": "488b05975d9514",
+      "unwind_range": [
+        "0x1405afdf7",
+        "0x1405b0ada"
+      ]
+    },
+    {
+      "va": "0x1405b0629",
+      "opcode": "488b05105d9514",
+      "unwind_range": [
+        "0x1405afdf7",
+        "0x1405b0ada"
+      ]
+    },
+    {
+      "va": "0x1405b067f",
+      "opcode": "488b05ba5c9514",
+      "unwind_range": [
+        "0x1405afdf7",
+        "0x1405b0ada"
+      ]
+    },
+    {
+      "va": "0x1405b06d3",
+      "opcode": "488b05665c9514",
+      "unwind_range": [
+        "0x1405afdf7",
+        "0x1405b0ada"
+      ]
+    },
+    {
+      "va": "0x1405b0727",
+      "opcode": "488b05125c9514",
+      "unwind_range": [
+        "0x1405afdf7",
+        "0x1405b0ada"
+      ]
+    },
+    {
+      "va": "0x1405b07c2",
+      "opcode": "488b05775b9514",
+      "unwind_range": [
+        "0x1405afdf7",
+        "0x1405b0ada"
+      ]
+    },
+    {
+      "va": "0x1405b0805",
+      "opcode": "488b05345b9514",
+      "unwind_range": [
+        "0x1405afdf7",
+        "0x1405b0ada"
+      ]
+    },
+    {
+      "va": "0x1405b0832",
+      "opcode": "488b05075b9514",
+      "unwind_range": [
+        "0x1405afdf7",
+        "0x1405b0ada"
+      ]
+    },
+    {
+      "va": "0x1405b085a",
+      "opcode": "488b05df5a9514",
+      "unwind_range": [
+        "0x1405afdf7",
+        "0x1405b0ada"
+      ]
+    },
+    {
+      "va": "0x1405b088b",
+      "opcode": "488b05ae5a9514",
+      "unwind_range": [
+        "0x1405afdf7",
+        "0x1405b0ada"
+      ]
+    },
+    {
+      "va": "0x1405b0900",
+      "opcode": "488b0d395a9514",
+      "unwind_range": [
+        "0x1405afdf7",
+        "0x1405b0ada"
+      ]
+    },
+    {
+      "va": "0x1405b096a",
+      "opcode": "488b0dcf599514",
+      "unwind_range": [
+        "0x1405afdf7",
+        "0x1405b0ada"
+      ]
+    },
+    {
+      "va": "0x1405b09bb",
+      "opcode": "488b0d7e599514",
+      "unwind_range": [
+        "0x1405afdf7",
+        "0x1405b0ada"
+      ]
+    },
+    {
+      "va": "0x1405b0a0d",
+      "opcode": "488b0d2c599514",
+      "unwind_range": [
+        "0x1405afdf7",
+        "0x1405b0ada"
+      ]
+    },
+    {
+      "va": "0x1405b0a6d",
+      "opcode": "488b0dcc589514",
+      "unwind_range": [
+        "0x1405afdf7",
+        "0x1405b0ada"
+      ]
+    }
+  ]
+}

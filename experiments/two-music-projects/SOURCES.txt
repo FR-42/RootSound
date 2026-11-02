@@ -1,0 +1,12 @@
+V3：BeautifulDay 编曲，贝多芬《悲怆》第三乐章主题。钢琴录谱 aqtq314。
+作者视频：https://www.youtube.com/watch?v=TL_8UmASF3Q
+作者分享：https://www.mediafire.com/?vgi1jzco12iy2
+保留完整2713钢琴音符，电贝斯与鼓组为本次新增编配，不声称游戏原版分轨。
+
+三葉のテーマ：RADWIMPS／野田洋次郎。
+钢琴MIDI来源：https://github.com/callmeyyzx/midi
+参考配器的公开录谱：https://flat.io/score/65f42ebc2d7d555fd65f80b7-san-xie-note-ma
+保留712个钢琴音符，中提琴与大提琴为本次新增编配，不声称原OST弦乐逐音转录。
+上游文件名中的“官方原版”未核实，未据此宣称授权或商业使用权。
+
+音源：RootSound 自带 GeneralUser GS 2.0.3，录音与许可均嵌入工程。未进行实际听音验收。

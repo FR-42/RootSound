@@ -1,5 +1,190 @@
 # RootSound DECISIONS
 
+## D-2026-11-02-selected-family · Listen to the selected note family — ACTIVE
+
+- User requests that playing music while a note family is selected plays only
+  that family's notes. RB98 filters the transport's temporary listening body by
+  family ID, including when multiple families use the same sound. Selection is
+  not a saved mute, removal, or change to export data.
+- Implementation interpretation: selecting an individual note is distinct from
+  selecting the family card; note selection or clearing selection restores full
+  playback. Right-clicking blank space clears selection. Switching cards during
+  playback updates immediately at the existing head; empty families are silent.
+- User requests revising excessive sustain in the previously generated music,
+  after their own edits. RB98 revises the latest saved V3 and Mitsuha files,
+  reducing original pedal-expanded piano holds to source key-down durations,
+  preserving all other edits and separately backing up those saved versions.
+  This does not change general MIDI sustain-import policy or all music projects.
+
+## D-2026-11-02-c-labels · Sparse octave labels — ACTIVE
+
+- User suggests displaying only Cn on the vertical keyboard and stacking its
+  letter/octave when columns are narrow. RB97 adopts this display: every pitch
+  remains playable and retains its full accessible name and hover label.
+- User confirms the requested works are O2Jam V3 (Pathétique movement3) and
+  Theme of Mitsuha, with no local V3 source. The later casual suggestion that
+  the assistant could compose permits creative arrangement within this delivery;
+  it does not replace those requests or authorize a product-direction change.
+  Newly written accompaniment is distinguished from sourced piano transcription.
+
+## D-2026-11-02-vertical-roll · Vertical music workspace — ACTIVE
+
+- User requests equal black/white key lane widths, removal of the console and a
+  vertical piano roll, with implementation details delegated to the assistant.
+  RB96 makes the active project workspace time-downward and pitch-left-to-right
+  (low to high), with the keyboard above and time ruler on the left. This supersedes
+  the RB94 narrower-black-key layout. Bottom console is absent from the active UI.
+- Bottom note edges resize duration. Wheel/arrow movement and Ctrl zoom use their
+  physical screen axes; two-axis dragging, keyboard entry, same-family duration
+  reuse, dim notes, erasing and local context memory follow the new coordinates.
+  Double-click a family to replace its sound; shelf remove/preview controls remain.
+- Old local contexts retain time/scale but recenter the pitch area during orientation
+  migration; newly stored contexts are marked vertical. Fresh wide-range music fits
+  pitch columns within12–32px before manual adjustment; only current-time notes are
+  mounted, with selected/dragged notes retained. Legacy horizontal internals are not
+  a product-facing mode.
+- User also requests Chopin's B-flat minor nocturne. RB96 delivers Op.9 No.1 from
+  the attributed Mutopia edition as a separate editable project. Optional quarter
+  beats-per-bar and pickup fields support this score's6/4 meter and3-beat pickup;
+  legacy scores still default to four beats and no pickup. No new meter-settings UI
+  is implied by this implementation choice.
+
+## D-2026-11-02-workspace-memory · Return to work and reuse family note length — ACTIVE
+
+- User requests remembering the project workspace (location, row/column spacing,
+  selected note) and using a family's last adjusted note length for future notes.
+- RB95 stores local context per stable project ID, separately from the .rootsound
+  musical document: horizontal/vertical viewport, zoom/row height, selection,
+  paused playhead, entry octave/family and per-family length defaults. Reopening
+  restores valid identities; a missing unsaved/deleted note is never recreated.
+- Debounce context writes200ms and flush at explicit close/save/disposal. Workspace
+  persistence never saves music or changes its dirty state. This is local device
+  context, not a promise of cross-device workspace transfer.
+- Successful resize, duration input/wheel, or an explicitly drawn changed length
+  becomes that family's default in actual seconds. Mouse clicks and keyboard entry
+  reuse it without grid rounding; keyboard cursor advancement stays on the configured
+  grid. Other families are independent; dragging a new length remains available.
+
+## D-2026-11-02-roll-detail · Short notes and progressive grid detail — ACTIVE
+
+- User requests a lower note-duration floor, initial beat-only vertical lines,
+  progressively finer subdivisions when zooming horizontally, and slightly narrower
+  black-key pitch rows. This refines the RB91 initial grid rendering policy.
+- RB94 retains the comfortable underlying scale but initially draws only beat/bar
+  lines. Once configured cells are at least48px wide, reveal them, then reveal
+  successive binary subdivisions with further zoom. Finer drawing/moving follows
+  that detail; configured steps per beat and keyboard step entry remain unchanged.
+- Resize/seconds input use the existing audio boundary of0.0001s (0.1ms), with a
+  lower beat-storage floor. Duration-wheel increments shrink for very short notes.
+  Zoom can reach256; only visible grid lines are generated, even in long scores.
+- Black-key rows are80% of white-key height, consistently across labels, note
+  rectangles, hit testing, dragging, scroll bounds and keyboard-entry centering.
+  These pixel/ratio thresholds are implementation choices, not permanent limits.
+  Existing notes are not rewritten and edits still require explicit Save.
+
+## D-2026-11-02-exe-loading · EXE entry and lightweight project activation — ACTIVE
+
+- User reports slow EXE startup/project loading and requests removing the BAT entry.
+  RootSound.exe is now the sole product launch entry; RootSound.bat is removed.
+  This supersedes older instructions to retain that BAT. Developer build scripts
+  remain available; normal EXE launch does not rebuild or scan source files.
+- Project discovery reads a bounded metadata prefix for canonical envelopes;
+  full musical/audio validation occurs on Open. Reordered legacy envelopes fall
+  back to full scanning. Discovery may show a valid header with a bad body, which
+  Open rejects without replacing the active project.
+- Working draft reads/updates stay in memory rather than repeatedly hashing the
+  disk original. Explicit Save retains full conflict checks, including same-size,
+  same-timestamp external edits. External changes never become an implicit baseline.
+- Opening a .rootsound project defers derived timbre-directory synchronization;
+  explicit save/import/sync still maintains it. Opening the piano roll no longer
+  waits for a second synchronization. Source audio continues loading on demand.
+
+## D-2026-11-02-roll-spacing · Readable cells and conventional wheel axes — ACTIVE
+
+- User reports cramped piano-roll rows/cells and increasing subdivisions squeezing
+  cells inside fixed beat spacing. Shift should select horizontal wheel movement,
+  including with Ctrl. RB91 uses vertical by default, Shift horizontal, Ctrl vertical
+  zoom, Ctrl+Shift horizontal zoom on both the canvas and pitch labels.
+- Initial detail view targets32px cells and32px pitch rows rather than fitting the
+  complete score. Changing subdivisions scales horizontal zoom by the new/old ratio
+  to retain cell width; note beat positions and held seconds remain unchanged.
+  Pixel sizes are adjustable implementation choices. Previously requested selected
+  note duration adjustment with an unmodified wheel remains a specialized exception.
+  RB92 refinement: it requires hovering the selected note (including its resize
+  handle); blank canvas and other notes scroll vertically without changing selection
+  or duration. Navigation modifiers keep their usual meanings over notes too.
+  Navigation and subdivision changes never write the project file automatically.
+
+## D-2026-11-02-tap-tempo · Set tempo by tapping — ACTIVE
+
+- User requests translating a naturally tapped keyboard rhythm into BPM for people
+  who can feel a beat but do not know its numeric tempo.
+- RB90 adds Tap Tempo inside the top tempo menu: Space or a clickable pad, estimate
+  after4 taps, rolling refinement, explicit Apply, reset/cancel. Suppress held-key
+  repeats and isolate tapping from playback and keyboard note-entry shortcuts.
+- Keep the existing40–240 BPM range, show out-of-range estimates rather than silently
+  folding/clamping, and preserve note held seconds when applying. Applying remains
+  a working edit until explicit project Save. Timing thresholds are implementation
+  choices, not user-fixed product constraints.
+
+## D-2026-11-02-editable-sounds · Sound removal and inactive notes — ACTIVE
+
+- User reports added sounds cannot be removed and dimmed notes still become
+  selected. Dimmed notes belonging to another active family must not react to
+  picking, dragging or eraser sweeps. Select another family explicitly on the left.
+- RB89 provides a shelf remove button and working console removal: empty families
+  remove immediately, populated families prompt; two Delete presses remove the
+  selected family and its notes, with normal draft undo. Library deletion instead
+  removes the sound identity and preserves written notes as silent undefined-tone
+  families that can be reassigned. Both changes remain working edits until Save.
+
+## D-2026-11-02-sampled-palette · Replace synthesized imitations with sampled instruments — ACTIVE
+
+- User rejects RB87 realism and explicitly authorizes removing all current voices
+  and replacing them with more realistic ones. Previous voices were assistant-made
+  recipes using RootSound's existing synthesizers, not acoustic recordings.
+- RB88 uses an installed, pinned GeneralUser GS2.0.3 recording bank:53 visible
+  instrument entries and exact GM program/drum entries for MIDI. RootSound retains
+  its own audio boundary, loading key/velocity regions lazily. Explicit Save captures
+  every recording zone of used voices into ordinary project-owned sample records.
+- This implementation selects a principal recording per note and preserves tuning,
+  key/velocity zones, loops and amplitude settings. It is not a complete SoundFont
+  engine: not all filters, modulators, overlapping layers or articulations are
+  reproduced. Do not claim premium-library realism or user's listening acceptance.
+- Include the author's license, credit and pinned source provenance. License v2.0
+  permits software use/repackaging, while disclosing uncertain historical sample
+  origins; do not claim independently verified ownership of all contained samples.
+
+## D-2026-11-02-palette · Replace and systematically expand default instruments — ACTIVE
+
+- User authorizes clearing the existing timbre library and rebuilding an organized
+  default palette covering common instruments, with substantial assistant autonomy.
+- RB87 implementation:53 original synthesis recipes across9 families, category
+  navigation/search, contextual audition pitch/length, project-local independent
+  identities and the existing import/reorder/delete behavior. Defaults removed by
+  the user must not respawn. Acoustic names describe synthesized approximations;
+  neither recordings nor realistic acoustic performance are claimed.
+- The actual current project was empty of notes: replace its7 old defaults with
+  the new53 and remove its old managed timbre copies. This explicit one-time reset
+  is authorized; it does not authorize deleting original audio or experiment tools.
+
+## D-2026-11-02 · One music project, one editable score — ACTIVE
+
+- User removes the arrangement workspace and reusable sub-composition library.
+  Opening or creating a music project goes directly to the former piano-roll
+  editor. The former two musical levels become one; retired Chinese terminology
+  must not appear in the active product interface or messages.
+- Save / Ctrl+S writes the whole project; Save As creates another music project.
+  Keep disposable working edits and save/discard/cancel on exit. No automatic
+  formal-file saving is authorized.
+- Implementation retains older storage identifiers at the file compatibility
+  boundary, with one authoritative score per new project. Old placements and MIDI
+  lanes become editable score notes, preserving onset, held duration and per-note
+  mix; this is not a second user-facing musical hierarchy. Historical documents
+  below describe superseded interfaces, not instructions to restore them.
+- The preceding one-hour positioning discussion remains a proposal; this interface
+  decision does not silently establish a new final audience or product purpose.
+
 ## D-2026-10-29-structure-gpu · Local model GPU execution — EXPERIMENT SCOPE
 
 - User explicitly requests GPU integration after learning the model used CPU.

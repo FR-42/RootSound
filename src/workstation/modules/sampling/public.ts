@@ -1,13 +1,15 @@
 import type { ContentRecord, JsonValue, MaterialLibrary } from '../../contracts/content.ts';
 import type { SampleFilesPort } from '../../contracts/files.ts';
 import type { ReferenceAdapter } from '../../contracts/references.ts';
-import { MAX_RECORDING_SECONDS, type SampleBody, type SampleCapturePort, type SampleDecoderPort, type SampleRecording, type SampleSummary, type SamplingPort, type SamplingView } from '../../contracts/sampling.ts';
+import { MAX_RECORDING_SECONDS, type SampleBody, type SampleCapturePort, type SampleDecoderPort, type SamplePayloadPort, type SampleRecording, type SampleSummary, type SamplingPort, type SamplingView } from '../../contracts/sampling.ts';
 import { MAX_PCM_AUDIO_BYTES, MAX_SAMPLE_DURATION_SECONDS, type PcmAudio } from '../../contracts/sound.ts';
-import { checkSampleBytes, copyPcm, decodeBase64, encodeBase64, encodeFloatWav, validateBase64, waveform } from './audio.ts';
+import { checkSampleBytes, copyPcm, encodeBase64, encodeFloatWav, validateBase64, waveform } from './audio.ts';
+import { resolveSampleBytes, validateHostAsset } from './sample-payload.ts';
 
 export { createBrowserSampleCapture, createBrowserSampleDecoder } from './browser.ts';
 export { createSampleAudio } from './sample-audio.ts';
-export type { SampleBody, SampleAudioPort, SampleCapturePort, SampleDecoderPort, SampleRecording, SampleSummary, SamplingPort, SamplingView } from '../../contracts/sampling.ts';
+export { resolveSampleBytes } from './sample-payload.ts';
+export type { SampleBody, SampleAudioPort, SampleCapturePort, SampleDecoderPort, SamplePayloadPort, SampleRecording, SampleSummary, SamplingPort, SamplingView } from '../../contracts/sampling.ts';
 
 const KIND = 'rootsound.sample';
 const OWNER = 'sampling';
@@ -29,8 +31,9 @@ export function readSampleBody(value: unknown): SampleBody {
   if (source.kind !== 'file' && source.kind !== 'microphone') fail('采样来源无效。');
   const name = text(source.name, '原文件名称'); const mimeType = text(source.mimeType, '原文件类型', 256);
   const audio = object(body.audio, ['encoding', 'byteLength', 'data'], '采样原文件');
-  if (audio.encoding !== 'base64' || typeof audio.data !== 'string' || typeof audio.byteLength !== 'number') fail('采样原文件的编码无效。');
-  validateBase64(audio.data, audio.byteLength);
+  if ((audio.encoding !== 'base64' && audio.encoding !== 'host-asset') || typeof audio.data !== 'string' || typeof audio.byteLength !== 'number') fail('采样原文件的编码无效。');
+  if (audio.encoding === 'base64') validateBase64(audio.data, audio.byteLength);
+  else validateHostAsset(audio.data, audio.byteLength);
   const decoded = object(body.decoded, ['sampleRate', 'channels', 'frames', 'durationSeconds'], '采样试听信息');
   const { sampleRate, channels, frames, durationSeconds } = decoded;
   if (typeof sampleRate !== 'number' || !Number.isInteger(sampleRate) || sampleRate < 8000 || sampleRate > 192000
@@ -39,7 +42,7 @@ export function readSampleBody(value: unknown): SampleBody {
     || typeof durationSeconds !== 'number' || !Number.isFinite(durationSeconds) || durationSeconds <= 0 || durationSeconds > MAX_SAMPLE_DURATION_SECONDS
     || Math.abs(frames / sampleRate - durationSeconds) > Math.max(1, durationSeconds) * 1e-12) fail('采样试听的声道、时钟或长度信息无效。');
   return { model: 'audio-sample', version: 1, source: { kind: source.kind, name, mimeType },
-    audio: { encoding: 'base64', byteLength: audio.byteLength, data: audio.data }, decoded: { sampleRate, channels, frames, durationSeconds } };
+    audio: { encoding: audio.encoding, byteLength: audio.byteLength, data: audio.data }, decoded: { sampleRate, channels, frames, durationSeconds } };
 }
 export function createSampleReferenceAdapter(): ReferenceAdapter {
   function validate(record: ContentRecord): void {
@@ -59,7 +62,7 @@ export function createSampleReferenceAdapter(): ReferenceAdapter {
 type Pending = { audioToken: string; bytes: Uint8Array; audio: PcmAudio; waveform: number[]; source: SampleBody['source']; name: string; currentId?: string; savedName?: string; explicitName?: boolean };
 
 /** Acquisition stays private until an explicit immutable save into the common library. */
-export function createSampling(library: MaterialLibrary, options: { files: SampleFilesPort; decoder: SampleDecoderPort; capture: SampleCapturePort }): SamplingPort {
+export function createSampling(library: MaterialLibrary, options: { files: SampleFilesPort; decoder: SampleDecoderPort; capture: SampleCapturePort; payloads?: SamplePayloadPort }): SamplingPort {
   let pending: Pending | undefined; let phase: SamplingView['phase'] = 'idle'; let problem: string | undefined;
   let generation = 0; let disposed = false; let elapsedSeconds = 0; let inputLevel = 0;
   let recording: SampleRecording | undefined; let processing: Promise<void> | undefined;
@@ -109,7 +112,7 @@ export function createSampling(library: MaterialLibrary, options: { files: Sampl
   }
   async function savedAudio(id: string) {
     const record = library.readContent(id); if (!record || record.kind !== KIND || record.owner !== OWNER || record.schemaVersion !== 1 || record.dependencies.length) fail('找不到当前支持的已保存采样。');
-    const body = readSampleBody(record.body); const bytes = decodeBase64(body.audio.data, body.audio.byteLength);
+    const body = readSampleBody(record.body); const bytes = await resolveSampleBytes(body.audio, options.payloads);
     const audio = await options.decoder.decode(new Uint8Array(bytes)); return { record, body, bytes, audio };
   }
   async function consume(recorder: SampleRecording, token: number): Promise<void> {

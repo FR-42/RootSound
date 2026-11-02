@@ -98,13 +98,13 @@ internal static class TimbreFilesSelfTests
         {
             var state = JsonNode.Parse(Library(all: true))!.AsObject(); var records = state["contents"]!.AsArray();
             records.First(item => item!["id"]!.GetValue<string>() == "audio")!["body"]!["audio"] = new string('A', 4 * 1024 * 1024);
-            records.Add(JsonNode.Parse("{\"id\":\"phrase-for-edit\",\"kind\":\"rootsound.phrase\",\"revision\":1,\"name\":\"编辑乐句\",\"dependencies\":[],\"body\":{\"parts\":[],\"notePosition\":0}}"));
+            records.Add(JsonNode.Parse("{\"id\":\"phrase-for-edit\",\"kind\":\"rootsound.phrase\",\"revision\":1,\"name\":\"编辑音乐\",\"dependencies\":[],\"body\":{\"parts\":[],\"notePosition\":0}}"));
             using var manager = new ProjectDirectoryManager(directory); manager.Create("大采样", manager.DefaultLocation, state.ToJsonString());
             string path = manager.TimbreFilesState.directory!, sampleFile = Path.Combine(path, Entry(Index(path), "sample"));
             Check(new FileInfo(sampleFile).Length > 4 * 1024 * 1024, "多MiB采样图副本真实存在");
             long beforeRead = manager.TimbrePayloadBytesRead, beforeWrites = manager.TimbrePayloadFilesWritten;
             for (int note = 1; note <= 5; note++) { records[^1]!["body"]!["notePosition"] = note; manager.WriteLibrary(state.ToJsonString()); }
-            Check(manager.TimbrePayloadBytesRead == beforeRead && manager.TimbrePayloadFilesWritten == beforeWrites, "只改乐句时自动镜像不读取或重写未变音色副本");
+            Check(manager.TimbrePayloadBytesRead == beforeRead && manager.TimbrePayloadFilesWritten == beforeWrites, "只改音乐时自动镜像不读取或重写未变音色副本");
             File.AppendAllText(sampleFile, "外部改动"); manager.SyncTimbres();
             Check(manager.TimbreFilesState.status == "warning" && manager.TimbrePayloadBytesRead > beforeRead && File.ReadAllText(sampleFile).EndsWith("外部改动", StringComparison.Ordinal), "显式同步仍物理核验并保留外部改动");
             records[^1]!["body"]!["notePosition"] = 6; manager.WriteLibrary(state.ToJsonString()); Check(manager.TimbreFilesState.status == "warning", "普通自动写不虚报冲突已经修复");
@@ -181,7 +181,7 @@ internal static class TimbreFilesSelfTests
             JsonObject library = JsonNode.Parse(Library())!.AsObject(); JsonArray records = library["contents"]!.AsArray();
             var basic = records[0]!.AsObject(); basic["revision"] = 2; basic["body"]!["level"] = .8;
             foreach (string id in new[] { "member", "work", "added", "orphan", "foreign" }) { var tone = JsonNode.Parse(Basic)!.AsObject(); tone["id"] = id; tone["name"] = id; records.Add(tone); }
-            records.Add(JsonNode.Parse("{\"id\":\"phrase\",\"kind\":\"rootsound.phrase\",\"revision\":1,\"name\":\"乐句\",\"dependencies\":[\"orphan\"],\"body\":{\"parts\":[{\"name\":\"旧\",\"timbreId\":\"orphan\",\"notes\":[{}]}]}}"));
+            records.Add(JsonNode.Parse("{\"id\":\"phrase\",\"kind\":\"rootsound.phrase\",\"revision\":1,\"name\":\"音乐\",\"dependencies\":[\"orphan\"],\"body\":{\"parts\":[{\"name\":\"旧\",\"timbreId\":\"orphan\",\"notes\":[{}]}]}}"));
             JsonObject Song(string id, string dependency) => new() { ["id"] = id, ["kind"] = "rootsound.song", ["name"] = id, ["dependencies"] = new JsonArray(dependency), ["body"] = new JsonObject() };
             JsonObject Work(string id, string source, int revision, double level) { var draft = JsonNode.Parse(Basic)!.AsObject(); draft["id"] = id; draft["sourceId"] = source; draft["baseRevision"] = revision; draft["name"] = id; draft["body"]!["level"] = level; draft.Remove("revision"); return draft; }
             var phraseDraft = JsonNode.Parse(records[^1]!.ToJsonString())!.AsObject(); phraseDraft["id"] = "working-phrase"; phraseDraft["sourceId"] = "phrase"; phraseDraft["baseRevision"] = 1; phraseDraft.Remove("revision");
@@ -193,7 +193,7 @@ internal static class TimbreFilesSelfTests
                 ["members"] = new JsonArray(new[] { "basic", "member", "work" }.Select(id => (JsonNode)new JsonObject { ["id"] = id, ["scopeId"] = "a" }).ToArray()) };
             using var manager = new ProjectDirectoryManager(directory); manager.Create("归属", manager.DefaultLocation, library.ToJsonString()); manager.SyncTimbres("song-a");
             string path = manager.TimbreFilesState.directory!; var entries = Index(path); string[] expected = ["added", "basic", "member", "work"];
-            Check(entries.Select(item => item!["id"]!.GetValue<string>()).Order().SequenceEqual(expected), "只含当前根、显式成员和有效乐句工作稿引用，不含历史保管或其他歌曲");
+            Check(entries.Select(item => item!["id"]!.GetValue<string>()).Order().SequenceEqual(expected), "只含当前根、显式成员和有效音乐工作稿引用，不含历史保管或其他歌曲");
             using var current = JsonDocument.Parse(File.ReadAllText(Path.Combine(path, Entry(entries, "work"))));
             Check(current.RootElement.GetProperty("name").GetString() == "current-work" && current.RootElement.GetProperty("timbre").GetProperty("level").GetDouble() == .45, "有效工作音色版本可见");
             using var saved = JsonDocument.Parse(File.ReadAllText(Path.Combine(path, Entry(entries, "basic")))); Check(saved.RootElement.GetProperty("timbre").GetProperty("level").GetDouble() == .8, "过期baseRevision工作稿不覆盖当前保存版");

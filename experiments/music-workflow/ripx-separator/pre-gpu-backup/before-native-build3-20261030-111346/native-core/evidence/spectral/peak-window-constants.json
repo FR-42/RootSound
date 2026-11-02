@@ -1,0 +1,77 @@
+{
+  "source": "D:\\#Software\\ripx\\RipX.exe",
+  "sha256": "5f088fa4fbbe1759ef75d8034c79f33c846e3bf5f13d5048dd95a6614d2ad441",
+  "evidence_type": "independent PE bytes and objdump instructions",
+  "constants": [
+    {
+      "address": "0x1406a7a64",
+      "offset": "0x6a6c64",
+      "format": "f",
+      "bytes": "88898a41",
+      "value": 17.317153930664062
+    },
+    {
+      "address": "0x1406a7a94",
+      "offset": "0x6a6c94",
+      "format": "f",
+      "bytes": "00002442",
+      "value": 41.0
+    },
+    {
+      "address": "0x1406971a0",
+      "offset": "0x6963a0",
+      "format": "f",
+      "bytes": "0000e040",
+      "value": 7.0
+    },
+    {
+      "address": "0x1406a7af4",
+      "offset": "0x6a6cf4",
+      "format": "f",
+      "bytes": "88898a46",
+      "value": 17732.765625
+    },
+    {
+      "address": "0x1406a7908",
+      "offset": "0x6a6b08",
+      "format": "f",
+      "bytes": "8e06003f",
+      "value": 0.5001000165939331
+    },
+    {
+      "address": "0x1406a60f8",
+      "offset": "0x6a52f8",
+      "format": "f",
+      "bytes": "00002042",
+      "value": 40.0
+    },
+    {
+      "address": "0x14068e0e8",
+      "offset": "0x68d2e8",
+      "format": "f",
+      "bytes": "295c0f3d",
+      "value": 0.03500000014901161
+    },
+    {
+      "address": "0x140850030",
+      "offset": "0x84f230",
+      "format": "f",
+      "bytes": "0000803f",
+      "value": 1.0
+    },
+    {
+      "address": "0x1408501a0",
+      "offset": "0x84f3a0",
+      "format": "f",
+      "bytes": "00000040",
+      "value": 2.0
+    },
+    {
+      "address": "0x140697110",
+      "offset": "0x696310",
+      "format": "f",
+      "bytes": "9a99193e",
+      "value": 0.15000000596046448
+    }
+  ]
+}

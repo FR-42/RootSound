@@ -285,7 +285,7 @@ test('every sequence event validates before replacing the active preview or allo
   const invalid = { ...plan(), note: { ...plan().note, frequencyHz: Number.NaN } };
   await assert.rejects(runtime.preview(phrase([{ atSeconds: 0, sound: plan() }, { atSeconds: 1, sound: invalid }])), /有限数值/);
   await assert.rejects(runtime.preview(phrase([{ atSeconds: 0, sound: plan() }, { atSeconds: 1, sound: { ...plan(), sources: [{ waveform: 'sine', frequencyRatio: 64, level: 1 }] } } ])), /超出/);
-  await assert.rejects(runtime.preview(phrase([], 1)), /空乐句/);
+  await assert.rejects(runtime.preview(phrase([], 1)), /空音乐/);
   await assert.rejects(runtime.preview(phrase([{ atSeconds: 0, sound: plan() }], 601)), /600/);
   await assert.rejects(runtime.preview(phrase([{ atSeconds: 2, sound: plan() }], 2)), /结束前/);
   await assert.rejects(runtime.preview(phrase(Array.from({ length: 50_001 }, () => ({ atSeconds: 0, sound: plan() })))), /50000/);

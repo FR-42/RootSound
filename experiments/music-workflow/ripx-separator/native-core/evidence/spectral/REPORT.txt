@@ -3,7 +3,7 @@ RipX spectral front end — static reconstruction, 2026-10-29
 Target: D:/#Software/ripx/RipX.exe
 SHA256: 5f088fa4fbbe1759ef75d8034c79f33c846e3bf5f13d5048dd95a6614d2ad441
 
-Implementation: native_spectral.py
+Implementation: native_spectral.py + native_fft.py
 Input is a bounded mono PCM callback, output is a generator of spectral-peak
 frames. No Demucs, Basic Pitch, model download or target execution occurs.
 The output is not musical notes, stems, or reconstructed audio.
@@ -68,6 +68,29 @@ not falsely presented as REA Evidence IDs):
   DLL sibling corroboration: 18004ad10 produces int16; 180022770 22852..22889
   sign-extends/converts/stores similarly. The EXE proof above is independent.
 
+5. Forward FFT sign and scaling statically established for the used power-of-two domain
+  fft-core-direct.asm: 528d80 creates the real plan, delegates complex setup to
+  610900 with forward flag zero. fft-config-direct.asm 6109a5..6109d2 uses
+  angle=(-2*pi*i)/length. 14079e740 contains -2*pi, bytes 182d4454fb2119c0.
+  Factorization 610a02..610a66 tries radix 4 then 2; power-of-two lengths need
+  no other radix. fft-worker-direct.asm 6119b0 copies leaf complex samples,
+  recursively transforms children, then uses inline radix 2 or calls 610e60.
+  The radix 2 add/subtract and complete radix 4 function (fft-radix4-direct.asm)
+  use twiddle multiplication and sums/differences with no 1/N division or
+  other normalization. The sole plan-angle division does not scale samples.
+  fft-core-direct.asm 528f50 recombines even/odd packed complex results:
+  DC=C0.real+C0.imag, Nyquist=C0.real-C0.imag; other bins use half factors
+  after adding paired spectra. These half factors undo real packing; they
+  do not normalize the transform. Its real-plan twiddles are
+  (-pi)*(k/half+0.5), observed 528eb0..528eee; -pi bytes 182d4454fb2109c0.
+  fft-wrapper-direct.asm 326510 only mirrors conjugates after 528f50.
+  Derivation: this reachable forward path is exp(-2*pi*i*k*n/N), unnormalized.
+  native_fft.py reconstructs the radix 4/2 recursion and real packing directly;
+  production spectral code now calls this implementation, not NumPy FFT.
+  Independent dense DFT and NumPy comparisons are tests, not the proof of
+  native scaling. The proof is the static reachable arithmetic above.
+  This establishes scale/sign, not bit-identical native runtime roundoff.
+
 API:
   native_configuration(sample_rate) -> {sample_rate,base_window,hop}
   iter_pcm_spectral_frames(read_pcm, sample_count=..., sample_rate=...,
@@ -78,20 +101,55 @@ API:
     Last spectra at each resolution are reused; input reads are bounded to 2N.
 
 Executed verification:
-  python -m unittest discover -s work/ripx-native-next/spectral -v
-  9 tests passed: silence/DC, asymmetric centroid, 220Hz cutoff, strict tie,
-  inclusive amplitude threshold, invalid values, cache alignment, boundaries,
-  recovered config/window, generated 440/880Hz PCM, and truncated-reader rejection.
-  Generated 2 seconds @44100:173 frames/347 raw peaks,0.988s processing in one
-  warm NumPy process. This is not a benchmark on user music or original RipX.
+  C:/Users/38053/anaconda3/python.exe -m unittest discover -s work/ripx-native-next/spectral -v
+  13 tests passed in 0.485s: 9 spectral tests (silence/DC, asymmetric centroid,
+  220Hz cutoff, strict tie, inclusive threshold, invalid values, alignment,
+  boundaries, config/window, generated 440/880Hz PCM, truncated-reader rejection)
+  plus 4 FFT tests: impulse and DC scale, negative sine phase, complex FFT
+  against dense DFT, real packed FFT against independent NumPy reference.
+  FFT sizes through 8192, synthetic amplitudes through int16 scale; real FFT
+  max absolute complex error <1e-7, dense small DFT error <2e-12.
+  Generated 2 seconds @44100:173 frames/347 raw peaks,7.544s processing in one
+  warm Python/NumPy process with reconstructed Python FFT. This supersedes
+  the earlier 0.988s result that used NumPy FFT. This is not a user-music or
+  original RipX benchmark. CPU time, peak family memory and token cost were
+  not measured. The pure Python reconstruction is slower than optimized FFT.
 
 Remaining limits:
-  Uses NumPy unnormalized float64 FFT as mathematical numerical primitive.
-  326510 passes 528f50 output then mirrors conjugates without a scaling stage;
-  528f50/610a90 real/complex FFT kernels still need complete scale/roundoff audit.
-  No original-runtime differential validation. SIMD cosine/FFT roundoff may differ.
+  No original-runtime differential validation. Original math-library cosine,
+  sine and SIMD rounding may differ; no bit-identical equivalence claimed.
+  Only forward power-of-two FFT is reconstructed, sufficient for this front end;
+  inverse and mixed-radix behavior is outside the implementation scope.
   The task-specific preceding/following context padding and actual producer's
   frame-range selection are not fully reconstructed; sample-clock range is
   explicit at this API boundary rather than guessed.
   No peak-refinement, harmonic assignment, final note segmentation, or audio
   resynthesis is substituted. Those remain separate work required for a full core.
+
+Optional compiler experiment (not production default):
+  native_fft_numba.py implements the SAME radix recursion and arithmetic with
+  njit(fastmath=False,cache=False), reusing scalar original-derived twiddles.
+  Existing local Numba/llvmlite were used, no installs. First experiment with
+  cache=True exited without Python diagnostic on second process startup;
+  recursive Numba disk caching is therefore disabled, not silently retried.
+  Two independent processes with cache=False passed 2-second full front-end
+  runs:173 frames,347 peaks, warm1.134s and1.159s. Cold compilation ~5 seconds.
+  Seven lengths 4..8192 compared bit-for-bit equal to the pure Python FFT
+  for one seeded random int16-scale input each; all13 tests also passed with
+  compiled FFT injected at test boundary. No FMA found in _mul assembly in
+  initial compiler experiment. This finite test set does not establish all
+  possible input equivalence or original-native runtime equivalence.
+  Benchmark harness: benchmark_numba.py. Integration remains parent-owned.
+
+REA cross-check after provider analysis completed:
+  All nine next-*.c/.json artifacts listed in rea-provenance.json were checked.
+  Their target SHA256 matches the directly examined executable. Ghidra12.1.4
+  confirms Hann formula, sqrt/atan2, forward flag zero, real twiddles/packing,
+  conjugate mirror, N/H power selection and WAVEFORMATEX sample-rate source.
+  No implementation correction was required. Complete Evidence IDs and paths
+  are retained in rea-provenance.json, separate from independent objdump files.
+  IMPORTANT attribution:528f50 error branch references a kiss_fft_usage_error
+  string. This supports a Kiss FFT origin for the embedded FFT primitive;
+  this is not evidence that FFT itself is a RipX-exclusive invention.
+  We reconstructed the embedded implementation from target evidence; RipX's
+  double-window/threshold pipeline is distinguished from its FFT dependency.

@@ -9,7 +9,7 @@ function node<K extends keyof HTMLElementTagNameMap>(tag: K, cls = '', text = ''
 function button(label: string, cls: string, callback: () => void): HTMLButtonElement {
   const value = node('button', cls, label); value.type = 'button'; value.addEventListener('click', callback); return value;
 }
-const names: Record<string, string> = { 'rootsound.timbre': '音色', 'rootsound.phrase': '乐句', 'rootsound.song': '歌曲', 'rootsound.co-creation': '灵感旅途', 'rootsound.sample': '采样' };
+const names: Record<string, string> = { 'rootsound.timbre': '音色', 'rootsound.phrase': '音乐', 'rootsound.song': '歌曲', 'rootsound.co-creation': '灵感旅途', 'rootsound.sample': '采样' };
 
 export function mountCatalogWorkspace(root: HTMLElement, options: {
   catalog: MaterialCatalogPort; sound: SoundRuntimePort;
@@ -26,14 +26,14 @@ export function mountCatalogWorkspace(root: HTMLElement, options: {
   const tabs = node('nav', 'workspace-tabs'); tabs.setAttribute('aria-label', '切换创作工作区');
   if (options.onCoCreation) tabs.append(button('灵感共创', 'workspace-tab', options.onCoCreation));
   if (options.onSampling) tabs.append(button('采样获取', 'workspace-tab', options.onSampling));
-  tabs.append(button('音色制作', 'workspace-tab', options.onSound), button('乐句谱写', 'workspace-tab', options.onPhrase), button('歌曲编排', 'workspace-tab', options.onSong)); toolbar.append(tabs);
+  tabs.append(button('音色制作', 'workspace-tab', options.onSound), button('音乐谱写', 'workspace-tab', options.onPhrase), button('歌曲编排', 'workspace-tab', options.onSong)); toolbar.append(tabs);
   const tools = node('nav', 'toolbar-tools'); tools.append(button('素材管理', 'quiet is-current', () => {}), button('设置', 'quiet', options.onSettings)); toolbar.append(tools); page.append(toolbar);
   const main = node('main', 'catalog-workspace');
   const project = catalog.project?.();
   main.append(node('h1', 'workspace-title', project ? `${project.name} · 素材` : '工程素材'));
   const filters = node('div', 'catalog-filters'); const search = node('input', 'catalog-search'); search.type = 'search'; search.placeholder = '搜索本曲素材'; search.setAttribute('aria-label', '搜索本曲素材');
   const filterButtons = new Map<CatalogKind, HTMLButtonElement>();
-  for (const [id, label] of [['all', '全部'], ['rootsound.sample', '采样'], ['rootsound.timbre', '音色'], ['rootsound.phrase', '乐句'], ['rootsound.song', '歌曲']] as const) {
+  for (const [id, label] of [['all', '全部'], ['rootsound.sample', '采样'], ['rootsound.timbre', '音色'], ['rootsound.phrase', '音乐'], ['rootsound.song', '歌曲']] as const) {
     const control = button(label, 'catalog-filter', () => { kind = id; renderResults(); }); filterButtons.set(id, control); filters.append(control);
   }
   filters.append(search); main.append(filters);

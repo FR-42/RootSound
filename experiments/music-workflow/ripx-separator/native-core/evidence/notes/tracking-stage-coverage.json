@@ -1,0 +1,69 @@
+{
+  "stage": "340630-selected-candidates-to-native-trajectories",
+  "entrypoint": "native_tracking.track_native_candidates / NativeTracker.push_frame,finish",
+  "input": {
+    "per_frame_selected_candidates": "tuple[bytes0x3c18] produced by321770",
+    "raw_d94_accepted": false,
+    "actual_task_clock_required": true,
+    "task_span": "[first_frame,task_end_frame+context_bc)"
+  },
+  "output": {
+    "headers": "native0x28",
+    "frames": "native0x5c",
+    "identity": "owned native counter assigned internally; retained counter explicit for subsequent tasks",
+    "requires_subsequent_harmonic_refinement": true
+  },
+  "source_evidence": {
+    "340630": "ev_4c53aa3d4f3c1583fb94c33aebfd65609d99b2fddf016f7f7641079b57cc8629",
+    "callsite_assembly": "ev_b26f6466e0cc0ae84ef0518b55ec07a966c1d3adda4c9783f2af9650c3face34",
+    "346460": "ev_a8cdfc88b10db594a349c0437e878511d42e14e9e999d945ddc09007cb39ce5a",
+    "347db0": "ev_d179e8867d5e0f00ed2965902618414c3998ef667dcfe70b1d41fa19c89e008d",
+    "318820": "ev_e7007db09e6c91cd12f6d905238a8e395e103d436fbbf28da820032734d4b252",
+    "3463b0": "ev_4f77f20e7ad127a2d9b5a5194bf040fbb43d8331e9a1a2ddc0388b918de9d9ac",
+    "background_producer_normal": "independent direct-347170.asm1403471b7..34722d; originalPE, not a fabricated REA ID",
+    "background_count_initialization": "analysis-preprocess.c343da0:memset(ctx+5a0 count table,0)",
+    "background_caller": "peak-stage-driver.c335480:line184 passesmode1",
+    "background_grid_initializer": "next-31f5a0.c anddirect-background-grid-init.asm31f72f..31f863"
+  },
+  "implemented": [
+    "normal type1 chronological processing",
+    "stable descending candidate aggregate strength",
+    "strongest present harmonic selection",
+    "provisional current-frame suppression via native tolerance",
+    "gap/history strength requirement",
+    "native conditional gap window",
+    "signed balance hard gate",
+    "directional frequency tolerance with default347db0 zero-range behavior",
+    "native five-term cost: pitch,time,balance,48-harmonic L1 profile,amplitude ratio",
+    "existing following-frame cost precedence and provisional priority",
+    "group counter and harmonic ordinal allocation",
+    "backwards gap interpolation preserving multiply/divide/add float32 order",
+    "gap flags2/10 with actual0xf8 background input",
+    "confidence bit0x80",
+    "stretch strength accumulators",
+    "per-frame valid-group retention and short-envelope gates",
+    "native equal-length tail cloning with zero strengths",
+    "context-only group removal",
+    "native normal background empty production proved from343da0 and347170 ABI; no caller table required"
+  ],
+  "not_implemented": [
+    "flags92/93 specialized modes",
+    "global989f11 reduced harmonic mode",
+    "nonharmonic/instrument candidate kinds",
+    "native memory-pool address allocation/cache serialization"
+  ],
+  "external_native_input_boundary": {
+    "low_frequency_gap": "Default flag92=false automatically owns343da0 cleared counts plus347170(mode1) early-return empty production. Actual provided nonempty0xf8 tables require989fe0 bandwidth; never replaces a missing active table.",
+    "nonzero_mode14": "requires actual98a05c/98a060 globals"
+  },
+  "verification": {
+    "ast_syntax": "passed fornative_tracking.py andnative_background.py only",
+    "target_executed": false,
+    "audio_processed": false,
+    "numeric_tests_executed": false,
+    "runtime_equivalence_claimed": false
+  },
+  "independent_static_constants": "tracking-constants.json; rawPE initialized values, not synthetic REA Evidence",
+  "background_owner": "native_background.NativeBackgroundCache:347db0 grouped strength lookup and32c3e0 gap envelope; flag92true consumes actual native records but producer not integrated",
+  "background_grid": "native_background_grids(Fs,H) from31f5a0; NativeBackgroundGrid.frequency from3198c0 exact SSE sequence, direct-background-grid-init.asm anddirect-3198c0.asm independently corroborate"
+}

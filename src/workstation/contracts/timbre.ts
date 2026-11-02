@@ -22,6 +22,20 @@ export type SampleTimbreBody = {
   level: number;
   loop?: { startSeconds: number; endSeconds: number };
 };
+export type SampleBankZone = {
+  keyMin: number; keyMax: number; velocityMin: number; velocityMax: number;
+  rootFrequencyHz: number; startSeconds: number; endSeconds: number;
+  attackSeconds: number; releaseSeconds: number; level: number;
+  decaySeconds?: number; sustain?: number;
+  loop?: { startSeconds: number; endSeconds: number };
+  sampleId: string;
+};
+/** Empty zones use the immutable installed bank; confirmed projects embed used instruments' samples. */
+export type SampleBankTimbreBody = {
+  model: 'sample-bank'; version: 1; bank: 'generaluser-gs-2.0.3'; instrument: string;
+  attackSeconds: number; releaseSeconds: number; level: number; zones?: SampleBankZone[];
+  tuningSemitones?: number;
+};
 export type SynthesizerBody = {
   model: 'synthesizer'; version: 1;
   sources: { id: string; waveform: BasicWaveform; semitones: number; detuneCents: number; level: number; enabled: boolean }[];
@@ -51,7 +65,7 @@ export type SpectralTimbreBody = {
   /** Derived display metadata, validated against the patch. */
   attackSeconds: number; releaseSeconds: number; level: number;
 };
-export type EditableTimbreBody = TimbreBody | SampleTimbreBody | SynthesizerBody | SpectralTimbreBody;
+export type EditableTimbreBody = TimbreBody | SampleTimbreBody | SynthesizerBody | SpectralTimbreBody | SampleBankTimbreBody;
 
 export type TimbreView = {
   draft: Draft;

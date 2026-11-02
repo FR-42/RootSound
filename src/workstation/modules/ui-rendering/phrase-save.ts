@@ -19,7 +19,7 @@ export function savePhraseInPlace(options: {
 }): PhraseSaveContinuation {
   const { phrase, references, selection } = options;
   const view = phrase.read(); const draft = view.draft;
-  if (!draft || !view.body) throw new Error(view.problem ?? '先打开一个乐句。');
+  if (!draft || !view.body) throw new Error(view.problem ?? '先打开一个音乐。');
   let session = references?.resume(draft.id);
   // New project phrases are already saved empty entities. A clean save need
   // not pass the older note editor's intentional empty-phrase save guard.
@@ -29,7 +29,7 @@ export function savePhraseInPlace(options: {
     const mode = draft.sourceId ? 'overwrite' : 'new';
     const saved = options.saveDraft ? options.saveDraft(draft.id, mode) : phrase.save(mode);
     if (saved.status !== 'saved') throw new Error(saved.status === 'storage-error' ? saved.message
-      : saved.status === 'conflict' ? saved.reason : '乐句还未保存，请检查使用位置。');
+      : saved.status === 'conflict' ? saved.reason : '音乐还未保存，请检查使用位置。');
     return complete({ id: saved.content.id });
   }
   const selectedLocations = selection ? new Set(references.locations(session.draftId).locations

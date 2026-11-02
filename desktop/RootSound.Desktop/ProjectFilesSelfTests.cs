@@ -46,7 +46,7 @@ internal static class ProjectFilesSelfTests
         Case("v2-members-exact-roundtrip", directory =>
         {
             var path = Path.Combine(directory, "完整工程 🌧.rsproject"); var old = Project("旧格式");
-            var text = "{\"format\":\"RootSoundProject\",\"version\":2,\"rootId\":\"歌曲\",\"memberIds\":[\"未编排乐句\",\"音色\"],\"contents\":[{\"保留原文\":\"🌧\\n素材由所属模块验证\"}]}";
+            var text = "{\"format\":\"RootSoundProject\",\"version\":2,\"rootId\":\"歌曲\",\"memberIds\":[\"未编排音乐\",\"音色\"],\"contents\":[{\"保留原文\":\"🌧\\n素材由所属模块验证\"}]}";
             Check(NativeProjectFiles.ValidateText(text) == text, "平台必须接受版本 2，并把成员和音乐内容交由材料模块验证。");
             NativeProjectFiles.WriteAtomic(path, old); NativeProjectFiles.WriteAtomic(path, text);
             Check(NativeProjectFiles.ReadProject(path) == text, "版本 2 的显式成员工程必须原文读回。");
