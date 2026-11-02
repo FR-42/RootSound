@@ -12,7 +12,7 @@ dist/
 /.test-output/
 /data/
 /timbres/
-/experiments
+/experiments/
 /RootSound.*.tmp
 bin/
 obj/
