@@ -31,6 +31,17 @@ test('music document starts as one empty named score and reopens without creatin
   assert.equal(open(f.snapshot()).score.read().draft!.sourceId, f.score.read().draft!.sourceId);
 });
 
+test('opening an externally renamed file gives both editor drafts the filename without altering the music', () => {
+  const f = open(createInitialProjectLibrary('旧内部名称'));
+  const original = structuredClone(f.score.read().body);
+  openMusicDocument(f.library, f.song, f.score, '资源管理器里的新名称');
+  assert.equal(f.song.read().draft!.name, '资源管理器里的新名称');
+  assert.equal(f.score.read().draft!.name, '资源管理器里的新名称');
+  assert.deepEqual(f.score.read().body, original);
+  commitMusicDocument(f.library, f.song, f.score);
+  assert.equal(open(f.snapshot()).score.read().draft!.name, '资源管理器里的新名称');
+});
+
 test('music edits stay in the working snapshot; saving/reopening retains notes, names and tempo', () => {
   const original = createInitialProjectLibrary('草稿'); const f = open(original);
   const tone = f.library.listContentInfo().find(item => item.kind === 'rootsound.timbre')!;

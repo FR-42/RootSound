@@ -64,7 +64,7 @@ try {
   const references = createReferenceEditing(library, contentAdapters);
   const projects = createProjectPackages(library, contentAdapters, { rootKind: 'rootsound.song' });
   const preferences = createWorkspacePreferences({ getItem: key => localStorage.getItem(key), setItem: (key, value) => localStorage.setItem(key, value) });
-  if (directoryState?.current) openMusicDocument(library, song, phrase);
+  if (directoryState?.current) openMusicDocument(library, song, phrase, directoryState.current.name);
   // Creating dormant editors can add their initial drafts. Finish this one-time
   // loading phase before the user can edit; subsequent reloads cannot clear dirty state.
   if (directoryState?.current) {

@@ -10,16 +10,19 @@ dist/
 # 本机桌面依赖、构建、测试与创作数据
 /.cache/
 /.test-output/
+/release/
 /data/
 /timbres/
 /experiments/
 /RootSound.*.tmp
+/release/
 bin/
 obj/
 
 # 系统垃圾
 Thumbs.db
 .DS_Store
+__pycache__/
 
 
 # ==========================================

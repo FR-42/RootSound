@@ -1,5 +1,6 @@
 import type { ContentRecord, Draft, MaterialLibrary, SaveResult } from '../contracts/content.ts';
 import type { SongClipRef } from '../contracts/song.ts';
+import { phraseDurationSeconds } from '../contracts/phrase-time.ts';
 import { createMaterialLibrary, createReferenceEditing, countUsagePositions } from '../modules/materials/public.ts';
 import { createTimbreEditor, createTimbrePlayback, createTimbreReferenceAdapter } from '../modules/timbre/public.ts';
 import { createPhraseEditor, createPhrasePlayback, createPhraseReferenceAdapter, readPhraseBody } from '../modules/phrase/public.ts';
@@ -211,7 +212,7 @@ function savedPhraseInfo(library: MaterialLibrary, phraseId: string): ProjectPhr
   if (!phrase || phrase.kind !== 'rootsound.phrase' || phrase.owner !== 'phrase' || phrase.schemaVersion !== 1) throw new Error('找不到当前支持的音乐。');
   createPhraseReferenceAdapter().slots(phrase);
   const body = readPhraseBody(phrase.body);
-  return { id: phrase.id, name: phrase.name, tempoBpm: body.tempoBpm, durationSeconds: body.lengthBeats * 60 / body.tempoBpm };
+  return { id: phrase.id, name: phrase.name, tempoBpm: body.tempoBpm, durationSeconds: phraseDurationSeconds(body) };
 }
 
 /** Current reusable identities only; neither global starters nor undo custody are library tiles. */

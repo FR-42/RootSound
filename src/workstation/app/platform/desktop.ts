@@ -52,6 +52,8 @@ function responseError(value: Record<string, unknown>, key: 'error' | 'message')
 
 function hostBridge(): DesktopBridge {
   if (!isDesktopOrigin()) fail('当前页面不是受信任的桌面界面。');
+  const portable = (globalThis as typeof globalThis & { rootSoundDesktop?: DesktopBridge }).rootSoundDesktop;
+  if (portable) return portable;
   const host = (globalThis as typeof globalThis & {
     chrome?: { webview?: { hostObjects?: { sync?: { storage?: DesktopBridge['storage'] }; files?: DesktopBridge['files']; audioFiles?: DesktopBridge['audioFiles']; projectFiles?: DesktopBridge['projectFiles']; sampleFiles?: DesktopBridge['sampleFiles']; projectDirectories?: NativeProjectDirectoriesBridge; timbreFiles?: NativeTimbreFilesBridge } } };
   }).chrome?.webview?.hostObjects;

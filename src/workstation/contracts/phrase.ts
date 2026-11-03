@@ -33,12 +33,16 @@ export type PhrasePart = {
   /** Unassigned tone uses keep notes and origin identity for rebinding but remain silent. */
   unassigned?: boolean;
   notes: PhraseNote[];
+  /** Notes outside a shortened BPM roll, with startBeat local to that roll. */
+  hiddenNotes?: { sectionId: string; note: PhraseNote }[];
 };
 export type PhraseBody = {
   model: 'note-phrase';
   version: 1;
   timeUnit: 'beat';
   tempoBpm: number;
+  /** Additional sequential BPM rolls; the first roll starts at beat0/tempoBpm. */
+  tempoSections?: { id: string; startBeat: number; tempoBpm: number; stepsPerBeat?: number }[];
   lengthBeats: number;
   /** Editing cells per beat only; changing this never quantizes existing notes. Omitted values are four. */
   stepsPerBeat?: number;
@@ -81,6 +85,14 @@ export interface PhraseEditorPort {
   openDraft(draftId: string): void;
   rename(name: string): void;
   setTempo(tempoBpm: number, options?: { preserveNoteDurations?: boolean }): void;
+  addTempoSection(): string;
+  setTempoSection(id: string, tempoBpm: number): void;
+  /** Change one roll's grid, retaining all note timing and other rolls' resolutions. */
+  setTempoSectionSteps(id: string | undefined, stepsPerBeat: number): void;
+  previewTempoSectionStart(id: string, startBeat: number): PhraseBody;
+  setTempoSectionStart(id: string, startBeat: number): void;
+  previewLastTempoRollLength(lengthBeats: number): PhraseBody;
+  setLastTempoRollLength(lengthBeats: number): void;
   /** Changes the shared Melody/Rhythm editing grid, preserving every stored note coordinate and duration. */
   setStepsPerBeat(stepsPerBeat: number): void;
   setMasterLevel(level: number): void;
@@ -113,6 +125,8 @@ export interface PhraseEditorPort {
   previewNotePlan(partId: string, note: SoundPlan['note']): Promise<PlayableNotePlan>;
   /** Audition an available current-project tone without adding a part or musical history. */
   previewTimbrePlan(timbreId: string, note: SoundPlan['note']): Promise<PlayableNotePlan>;
+  /** Reference piano remains available with no selected family, even if removed from the library. */
+  previewPianoPlan(note: SoundPlan['note']): Promise<PlayableNotePlan>;
   /** A temporary body supports live gestures without changing the draft/history. */
   previewPlan(bodyOverride?: PhraseBody, options?: { allowSilence?: boolean }): SoundSequencePlan;
   save(mode: 'overwrite' | 'new', confirmation?: SaveConfirmation): SaveResult;

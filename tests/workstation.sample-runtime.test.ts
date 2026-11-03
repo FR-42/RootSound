@@ -120,6 +120,22 @@ function sequence(sound: SampleSoundPlan, events = [0, 0.6], durationSeconds = 2
 function close(actual: number, expected: number, tolerance = 1e-10): void { assert.ok(Math.abs(actual - expected) <= tolerance, `${actual} vs ${expected}`); }
 function pcm(bytes: Uint8Array, frame: number, channel: number): number { const at = 44 + frame * 6 + channel * 3; const value = bytes[at]! | bytes[at + 1]! << 8 | bytes[at + 2]! << 16; return value & 0x800000 ? value - 0x1000000 : value; }
 
+test('layered GM notes allocate and render every original recording with linked gains',async()=>fixture(async()=>{
+  const primary=sample(),second={...sample(),source:{...primary.source,id:'second-layer'},level:.25};
+  const layered={...primary,layers:[second],layerReferenceLevel:primary.level};
+  const runtime=createBrowserSoundRuntime();
+  const session=await runtime.preview({...layered,level:.25});
+  assert.equal(audio().samples.length,2);assert.equal(audio().buffers.length,1,'identical PCM shares the device buffer, while both layers sound');
+  assert.equal(audio().oscillators.length,0);
+  close(audio().samples[0]!.startTime,audio().samples[1]!.startTime);
+  close(audio().gains[0]!.gain.at(session.startedAtSeconds+.1),.2);
+  close(audio().gains[1]!.gain.at(session.startedAtSeconds+.1),.1);
+  const rendered=await runtime.render({...layered,level:.25},{sampleRate:48000});
+  // Both constant PCM layers contribute at 100 ms, including equal-power pan.
+  close(pcm(rendered.bytes,4800,0),.15*Math.SQRT1_2*8388607,2);
+  await runtime.dispose();
+}));
+
 test('one-shot sample notes use exact trim, rate, velocity and release on the global clock', async () => fixture(async () => {
   const runtime = createBrowserSoundRuntime(); const input = sample(); const playing = runtime.preview(input); input.source.audio.channels[0]!.fill(0);
   const session = await playing; const node = audio().samples[0]!;

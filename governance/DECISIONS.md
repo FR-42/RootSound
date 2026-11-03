@@ -1,5 +1,301 @@
 # RootSound DECISIONS
 
+## D-2026-11-03-full-sf2 · Execute the original SoundFont rules — ACTIVE
+
+- User asks what omitted SoundFont modulation means, how it affects timbre and
+  whether it can be implemented fully. RB125 selects the Apache-2.0 complete
+  SpessaSynth core, within the previously authorized open-source approach and
+  1GB sample-bank budget. It still plays original samples; actual DSP stays
+  behind the global sound-runtime boundary. This supersedes RB124's PCM-only
+  playback limitation, not its naming/isolation/manual-save principles.
+- Full source-rule execution does not imply more recording detail, studio
+  realism, new articulations or complete MIDI-controller automation import.
+  User listening acceptance and physical-device latency remain unverified.
+
+## D-2026-11-03-tempo-held-beats · BPM scales held duration — IMPLEMENTED READING
+
+- Latest wording: “更改bpm后 音符时值也会相应变化”. RB125 reads this as a new
+  current-UI rule, stated in commentary: preserve musical held length while
+  scaling seconds with tempo, including legacy seconds-based and hidden notes.
+  120BPM/one beat0.5s ->240BPM/0.25s, with pitch unchanged. This supersedes the
+  older UI held-seconds rule under this reading; it is not a separate user
+  confirmation of listening quality. Explicit domain preserve-seconds mode
+  remains for compatibility. Revisit the original wording if the user clarifies
+  that it was intended as a bug report instead.
+
+## D-2026-11-03-sampled-gm · Complete GM palette within 1 GB — ACTIVE
+
+- User requests128 GM instrument categories using accurate samples, avoiding
+  the previous oscillator-imitation tools; MIDI files must open as projects.
+  User answers the size question: keep the sample library within about1GB.
+- RB124 implementation choice: expose all128 GeneralUser GS2.0.3 programs plus
+  47 standard drum keys, preserve original PCM and overlapping sample layers,
+  use the existing editable MIDI import. Preserve project isolation, manual-save
+  policy and deleted-default intent. The choice of bank is an assistant delivery
+  decision, not user listening acceptance. RB124 did not include a complete SF2
+  engine; RB125 supersedes that execution limit. Premium realism is not claimed.
+
+## D-2026-11-03-project-filename · One name for the file and editable music — ACTIVE
+
+- User approves the proposed rule: discovery/opening of a .rootsound file uses
+  its filename without extension; editing its name in RootSound and saving updates
+  the filename, envelope name and music editor names together. Library rename is
+  itself an explicit save. Opening never rewrites the existing file automatically.
+- RB123 passes the physical name into music-document loading before establishing
+  the clean baseline. Native saves retain the containing folder and stable project
+  ID; transfer ownership to the new path, restore the old path if writing fails,
+  and reject an occupied destination. Case-only renames work. No backup is created.
+  Bridge rename results may use the correctly named sibling path. Legacy directory
+  projects retain their compatibility behavior; this policy concerns .rootsound.
+
+## D-2026-11-03-recursive-project-library · Discover projects in subdirectories — ACTIVE
+
+- User requests scanning all .rootsound files beneath project. RB122 recursively
+  lists valid files at every depth, including case-insensitive extensions. The
+  library remains one sorted list; nested projects can open, save, rename and delete
+  through existing library actions. Creation still defaults to the project root.
+- Directory links are not traversed; inaccessible branches and malformed files
+  do not prevent other projects from appearing. Managed creation/deletion/rename
+  staging folders remain excluded; direct legacy-folder compatibility is retained.
+
+## D-2026-11-03-remove-qweasd · Remove QWEASD editing shortcuts — ACTIVE
+
+- User removes Q/W/E/A/S/D editing shortcuts. RB121 removes note gain/pan nudges,
+  fine time nudges and double-A/D whole-beat movement from the active piano roll,
+  including repeat handling. Standard modified shortcuts such as Ctrl+S remain.
+  This supersedes older QWEASD/double-nudge interaction decisions.
+
+## D-2026-11-03-remove-save-as-button · Remove topbar Save As — ACTIVE
+
+- User temporarily removes the topbar Save As button. RB120 removes that button;
+  the existing copy service and Ctrl/Command+Shift+S binding remain available.
+
+## D-2026-11-03-no-bak · Do not retain automatic .bak files — ACTIVE
+
+- User explicitly requests deleting all existing .bak files and no future automatic
+  backups. RB119 clears1368 workspace .bak files, including5 in project, preserving
+  the actual music files. Protected Git/agent/config directories are excluded.
+- Current RootSound library/project, sound and audio saves retain atomic temporary
+  replacement and failure/conflict handling, but File.Replace has no backup path.
+  Desktop build-pointer and launcher publishing also use true null backup paths.
+  No replacement backup extension is introduced. This supersedes older automatic
+  previous-save backup requirements; existing historical file recognition stays for
+  compatibility. Restart the application to use the updated saving implementation.
+
+## D-2026-11-03-centered-transport · Remove topbar volume and keep controls centered — ACTIVE
+
+- User removes topbar volume and asks to recenter the remaining elements. RB118
+  removes its icon/popover/input binding and uses equal flexible side columns,
+  center-aligned transport, including narrow layouts. Existing saved master gain
+  and the dormant overview console remain intact; music is not rewritten.
+
+## D-2026-11-03-remove-playback-rate · Remove topbar playback speed — ACTIVE
+
+- User temporarily removes playback-rate selection from the topbar. RB117 removes
+  its1x/0.75x/1.25x menu and UI binding; playback defaults to1x. Music BPM, timing,
+  project files and the underlying transport capability remain unchanged.
+
+## D-2026-11-03-remove-empty-settings · Remove the empty settings entry — ACTIVE
+
+- User asks to remove the currently unused settings box. RB116 removes the music
+  toolbar button and its empty-dialog connection; retired performance entry stays
+  disabled. No preferences, projects or stored editing context are deleted.
+- User also asks whether MIDI can replace the project format. Assistant recommends
+  retaining .rootsound for exact project/sound/roll state and MIDI for interchange;
+  this discussion does not authorize a format migration or add MIDI export.
+
+## D-2026-11-03-narrow-roll-controls · Narrower summaries, fewer duplicate controls — ACTIVE
+
+- User removes tap tempo from the roll summaries and grid divisions from the BPM
+  popover. Keep tap beside the numeric input in the popover; each summary keeps only
+  numeric tempo and its own grid. This supersedes RB114's duplicated control layout.
+- RB115 assistant tuning: control column64→46px, summary numeric36px, popover input
+  78→54px. Summary displays at most one decimal; actual fractional tempo and the
+  editable value remain exact. Head stays above labels in the rightmost8px, text
+  stays clear. No music/project/grid-resolution or timing rewrite.
+
+## D-2026-11-03-roll-grid-controls · Independent roll grids and compact tempo controls — ACTIVE
+
+- User removes New BPM roll from the tempo menu; the bottom plus remains the sole
+  creation entry. Put a small tap-tempo button beside each numeric BPM control and
+  grid divisions below. Remove the corner's visible BPM suffix and select arrows.
+  RB114 applies the arrangement to the corner, each later roll and the BPM popover.
+  The small tap button reads 敲, with full accessible name/title 敲击定速.
+- Each roll owns its grid resolution2–9. First uses body.stepsPerBeat; additional
+  tempoSections can store stepsPerBeat, with legacy fallback to the body's value.
+  Editing the first roll freezes existing implicit later resolutions. New rolls
+  inherit the last roll's tempo and resolution. Changing divisions only changes
+  the editing grid, never note onsets, held seconds or playback. Manual save/undo
+  retain the choice. Existing boundary dragging and last-edge resizing remain.
+- User initially requests changing Fantaisie-Impromptu to three beats, then withdraws
+  that request after clarification: the adopted Mutopia1693 score explicitly uses
+  4/4 (cached fantaisie.ly line202); three-way left-hand subdivision coexists with
+  four-way right-hand subdivision. Leave the music project entirely unchanged.
+  No three-grid rewrite was applied before withdrawal. This is not a request to
+  quantize the piece or replace its existing tempo rolls.
+
+## D-2026-11-03-compact-roll-controls · Compact roll controls and explicit roll creation — ACTIVE
+
+- User moves grid divisions from the transport to the piano-roll control block,
+  removes the wide separator between head and BPM labels, and removes the bottom
+  horizontal scrollbar. RB113 uses one64px control column: compact BPM/grid controls
+  at the keyboard corner, full-width boundary labels and an8px head indicator at
+  their right edge, above the labels and outside their text. No extra divider.
+- User changes the bottom plus to create a new piano roll, not extend a measure.
+  It uses the existing undoable four-bar/inherited-tempo creation. The actual lower
+  edge of the last roll now resizes that roll. Later labels still resize earlier
+  rolls. Cropped music remains hidden/silent and recoverable, including the last
+  roll. No autosave or existing-project rewrite.
+- Assistant tuning: manual browsing can leave three quarters of a viewport beyond
+  the end to reach/pull the bottom edge; this camera allowance never adds music.
+  Bottom resizing uses continuous preview, whole-bar settlement, one undo step,
+  cancel/Escape and minimum one bar, matching label resizing. Keyboard arrows work.
+- Right locator becomes a10px track/6px gray thumb, with a small red head-position
+  tick instead of a sentence callout. Existing reveal/hide/follow behavior remains.
+  These replace RB112's add-bar footer and separate22/56px head/label lanes.
+
+## D-2026-11-03-resize-bpm-rolls · Resize upper rolls without deleting cropped music — ACTIVE
+
+- Placement/extension and separate lanes below are superseded by RB113 above.
+  User returns the add-bar control to the bottom of the piano roll. It extends
+  only the last BPM roll. Dragging a later roll's left label down/up increases/
+  decreases the preceding roll's bar count and translates all subsequent rolls
+  with their music, preserving positions within each roll.
+- Music in cropped bars must be hidden and silent, retained for restoration when
+  that roll is expanded again. RB112 saves hiddenNotes per family, with stable
+  roll identity and local note starts. Persistence, undo and fresh reopening retain
+  those notes; they are excluded from drawing and playback until restored.
+- Assistant interaction choices: smooth transient resize preview, whole-bar
+  settlement on release, one undo step; Escape/cancel discards it. Each preceding
+  roll keeps at least one bar, within the existing total length limit. Arrow keys
+  on a label resize by one bar. Original explicit held seconds are retained.
+- User reports head/label occlusion. RB112 separates a22px head lane from56px BPM
+  labels in the left ruler; head also draws above labels. No onset snapping,
+  autosave or existing-project rewrite is introduced.
+
+## D-2026-11-03-fantaisie-reset · Restore Fantaisie-Impromptu's tempo rolls — ACTIVE
+
+- User explicitly requests resetting Chopin's Fantaisie-Impromptu after adding
+  BPM rolls. RB111 rebuilds this one default-library project from its cached
+  original MIDI and the RB109 key-down/hand-balance reference. The original is
+  backed up outside the library before replacement; other projects are untouched.
+- Restore original beat positions and all five tempo spans, preserving all3014
+  pitches, onset seconds, explicit key holds and balanced velocities. Four-against-
+  three is retained, never quantized into four equal cells. No new app build or
+  general MIDI-import change is implied. Existing project path/entry ID retained.
+
+## D-2026-11-03-bpm-rolls · Sequential BPM rolls beside the keyboard — ACTIVE
+
+- User moves BPM from the top transport to the blank corner left of the keyboard.
+  Its click menu retains tap tempo and adds New BPM roll. New rolls follow the
+  current timeline end, drag together and share horizontal pitch navigation.
+  RB110 placed the add-bar control beside the last row; RB112 supersedes this
+  placement with the user's requested bottom control and label resizing.
+- RB110 implements continuous tempo sections in one shared piano/pitch canvas.
+  Each section has its own BPM, local beat/bar grid and boundary marker; the common
+  keyboard and camera remain aligned. New sections initially append four bars and
+  inherit the last section's BPM (assistant defaults). The corner edits the visible
+  section; boundary buttons select their respective sections. Addition is undoable.
+- Saved optional tempoSections uses stable IDs/start beats/BPM. A shared beat/second
+  clock drives note editing, playback, duration/export and file reopening. Explicit
+  held seconds stay unchanged; changing an earlier tempo moves following sections
+  in physical time. No onset quantization or autosave is introduced.
+- Existing flat projects remain intact unless separately requested; this UI request
+  does not silently rewrite coordinates or infer lost tempo maps. RB111 is the
+  user's subsequent explicit reset of Fantaisie-Impromptu; general MIDI tempo-map
+  reconstruction remains follow-up work.
+
+## D-2026-11-03-free-onsets · Free note heads and keyboard browsing — ACTIVE
+
+- User rejects note-onset snapping, including finer displayed grid divisions,
+  to permit microtiming and triplets against a four-cell background. RB109 creates
+  heads at the exact clicked time and preserves dragged starts on release; the
+  start-time field no longer rounds. Grid division is not an onset constraint.
+- Assistant implementation: single A/D nudges5ms from the existing exact onset;
+  the established150ms double press still moves a whole beat from that origin.
+  Pitch lanes and default/drawn duration behavior remain separate from onset.
+- Keyboard clicking without an assigned selection auditions the installed piano,
+  even if its project-library entry was removed, without adding content/history.
+  A valid selected family retains its own sound. User requests horizontal dragging
+  from the keyboard with or without selection; this pans pitch only and does not
+  create notes, seek or trigger an extra click audition after dragging.
+- User also requests Beethoven's three Moonlight Sonata movements and Chopin's
+  Fantaisie-Impromptu. RB109 delivers separate editable default-library projects
+  from attributed Mutopia scores/MIDI, not original composition or a named pianist's
+  performance. See TODO for tempi, traversal, changes and verification boundaries.
+
+## D-2026-11-03-page-follow · Instant page following and quick time navigation — ACTIVE
+
+- User replaces smooth/early follow with a single camera jump just before the
+  head leaves the bottom, placing it at the top. RB108 uses a2px edge tolerance;
+  the final page can show blank space after the ending to honor this placement.
+  This supersedes RB106's86%/24%/240ms tuning, preserving RB107's30-second manual
+  browsing grace and immediate resumption when the head returns into view.
+- User requests a small right-side locator after sustained vertical browsing,
+  with above/below head indication while dragging. It moves the camera, never
+  seeks or edits music. Assistant tuning: reveal after about0.6s/48px cumulative
+  navigation or0.75 viewport of movement; hide2s after inactivity unless engaged.
+  Dragging owns navigation; pitch/zoom remain unchanged. Keyboard navigation is
+  also supported on the locator. Appearance/timing remain adjustable.
+
+## D-2026-11-03-light-follow · Light canvas and user-controlled playback browsing — ACTIVE
+
+- User replaces the dark palette with white/light surfaces, returns the family
+  shelf to the left and removes performance mode: settings opens an empty dialog.
+  RB107 disables the retired mode even when an older preference enabled it.
+- Manual navigation that moves the playhead out of view suspends automatic
+  following for30 seconds. Further navigation away renews the interval. Small
+  movements that keep it visible, or returning the view to it, resume following
+  immediately. Active pointer gestures still own the view; pause does not follow.
+- RB106 rendering/opening optimizations remain. Follow placement/timing is updated
+  by RB108; presentation changes do not change music or manual saving.
+
+## D-2026-11-03-dark-follow · Dark canvas, top families and playback follow — PRESENTATION SUPERSEDED BY RB107
+
+- User requests a dark application palette, note-family/sound shelf above the
+  vertical piano roll, automatic camera scrolling before the playing head leaves
+  the bottom, smoother interaction and shorter project-opening time.
+- RB106 implements neutral dark surfaces across reachable views/dialogs and a
+  compact horizontally scrolling family strip. Playback follows time vertically;
+  pitch position/spacing and zoom remain under user control. Paused navigation
+  does not follow; active pointer gestures temporarily own the view.
+- The86% trigger,24% landing position and up-to240ms easing are assistant-chosen
+  tuning values, not separate user decisions. Stop/end clamping and backward
+  playback seeks keep the head visible. This changes presentation, not music or
+  the manual-save policy. Native EXE reuses the existing public/current-feature
+  bootstrap instead of initializing unreachable editors. Existing release ZIPs
+  are not implicitly rebuilt or republished by this UI request.
+
+## D-2026-11-03-icon-project-bundle · App identity and requested example projects — ACTIVE
+
+- User requests a white-background gray musical-note app icon and explicitly asks
+  to include their current projects in both release ZIPs. RB102 includes the five
+  current default-directory .rootsound files as byte-preserved saved snapshots,
+  excluding .bak/history/cache. This overrides RB101's project exclusion for this
+  requested delivery; future builds include personal projects only by explicit opt-in.
+- The shared icon is authored as vector geometry and delivered in SVG/PNG/ICO/ICNS.
+  Windows executable/window icons and the Mac app icon use it; no icon style beyond
+  white background/gray note is a new permanent user requirement.
+- Bundled projects enter each platform's writable default project library once.
+  Existing same-name projects are never overwritten; deliberately deleted examples
+  are not revived on the next launch. Seeding is distribution setup, not autosave.
+
+## D-2026-11-03-public-release · Windows and Apple Silicon packages — ACTIVE
+
+- User requests the final release files under root/release, targeting Windows
+  and Apple Silicon Mac; Intel Mac is explicitly deferred. Ship only currently
+  accessible product features, excluding dormant arrangement UI and experiments.
+  Do not package the development root, private projects by default, caches or old
+  builds. RB102 is the user's explicit exception for five current project snapshots.
+- RB101 implementation choice: dedicated current UI entry and Electron shell,
+  sharing the existing .rootsound file manager as a portable .NET sidecar. The
+  internal song adapter remains a format boundary, not an arrangement entry.
+  Mac default data location is Music/RootSound; Windows ZIP remains portable.
+- These are preview artifacts. Local Mac signing/resource checks do not establish
+  actual macOS execution, Developer ID trust or Apple notarization. Current request
+  authorizes local packaging, not uploading/publishing a GitHub Release. No account,
+  signing identity, certificates or Intel support have been supplied or assumed.
+
 ## D-2026-11-02-selected-family · Listen to the selected note family — ACTIVE
 
 - User requests that playing music while a note family is selected plays only

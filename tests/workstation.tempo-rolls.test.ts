@@ -1,0 +1,182 @@
+import assert from 'node:assert/strict';
+import { test } from 'node:test';
+import { createInitialProjectLibrary } from '../src/workstation/app/project-setup.ts';
+import { openMusicDocument, commitMusicDocument } from '../src/workstation/app/music-document.ts';
+import { createMaterialLibrary } from '../src/workstation/modules/materials/public.ts';
+import { createTimbrePlayback, createTimbreReferenceAdapter } from '../src/workstation/modules/timbre/public.ts';
+import { createPhraseEditor, createPhrasePlayback, createPhraseReferenceAdapter, readPhraseBody } from '../src/workstation/modules/phrase/public.ts';
+import { createSongEditor, createSongReferenceAdapter } from '../src/workstation/modules/song/public.ts';
+import { phraseBeatSeconds, phraseSecondsBeat, phraseDurationSeconds, phraseStepsAtBeat } from '../src/workstation/contracts/phrase-time.ts';
+import { melodyScoreGrid } from '../src/workstation/modules/ui-rendering/melody-geometry.ts';
+import { musicClockVoice } from './music-clock-fixture.ts';
+
+function fixture(input = createInitialProjectLibrary('多段BPM')) {
+  let text = input;
+  const library = createMaterialLibrary({ read: () => text, write: next => { text = next; } }, { project: { rootKind: 'rootsound.song',
+    adapters: [createTimbreReferenceAdapter(), createPhraseReferenceAdapter(), createSongReferenceAdapter()] } });
+  const tones = createTimbrePlayback(library, undefined, undefined, musicClockVoice), phrase = createPhraseEditor(library, tones);
+  const song = createSongEditor(library, createPhrasePlayback(library, tones), { defaultTempoMode: 'source' });
+  openMusicDocument(library, song, phrase);
+  return { library, phrase, song, text: () => text };
+}
+test('sequential BPM rolls share one exact clock and preserve held seconds when either tempo changes', async () => {
+  const f = fixture(), p = f.phrase; p.setLength(16);
+  const part = p.addPart(p.read().availableSounds[0]!.id);
+  p.addNote(part, { startBeat: 4, durationBeats: 1, durationSeconds: .3, frequencyHz: 440, velocity: .7 });
+  const section = p.addTempoSection(); assert.equal(p.read().body!.lengthBeats, 32);
+  p.setTempoSection(section, 60);
+  p.addNote(part, { startBeat: 18, durationBeats: 1, durationSeconds: .3, frequencyHz: 660, velocity: .7 });
+  let body = p.read().body!;
+  assert.equal(phraseDurationSeconds(body), 24);
+  for (const beat of [0, 4, 15.999, 16, 16.001, 18, 32]) assert(Math.abs(phraseSecondsBeat(body, phraseBeatSeconds(body, beat)) - beat) < 1e-10);
+  await p.preparePreview(); assert.deepEqual(p.previewPlan().events.map(e => e.atSeconds), [2, 10]);
+  p.setTempo(240, { preserveNoteDurations: true }); body = p.read().body!;
+  await p.preparePreview(); assert.deepEqual(p.previewPlan().events.map(e => e.atSeconds), [1, 6]);
+  assert(p.previewPlan().events.every(e => Math.abs(e.sound.note.holdSeconds-.3)<1e-12));
+  assert.equal(body.tempoSections![0]!.tempoBpm, 60); assert.equal(phraseDurationSeconds(body), 20);
+});
+
+test('normal BPM edits retain musical note lengths and scale seconds in the affected rolls',async()=>{
+  const f=fixture(),p=f.phrase;p.setLength(16);
+  const part=p.addPart(p.read().availableSounds[0]!.id);
+  p.addNote(part,{startBeat:4,durationBeats:1,durationSeconds:.3,frequencyHz:440,velocity:.7});
+  const section=p.addTempoSection();p.setTempoSection(section,60);
+  p.addNote(part,{startBeat:18,durationBeats:2,durationSeconds:.75,frequencyHz:660,velocity:.7});
+  p.setTempo(240);await p.preparePreview();
+  let plan=p.previewPlan();assert(Math.abs(plan.events[0]!.sound.note.holdSeconds-.15)<1e-12);
+  assert(Math.abs(plan.events[1]!.sound.note.holdSeconds-.75)<1e-12);
+  assert.deepEqual(plan.events.map(e=>e.atSeconds),[1,6]);
+  p.setTempoSection(section,120);await p.preparePreview();plan=p.previewPlan();
+  assert(Math.abs(plan.events[1]!.sound.note.holdSeconds-.375)<1e-12);
+  assert.deepEqual(plan.events.map(e=>e.atSeconds),[1,5]);
+  const expected=p.read().body;commitMusicDocument(f.library,f.song,p);
+  assert.deepEqual(fixture(f.text()).phrase.read().body,expected);
+});
+
+test('reapplying an unchanged BPM does not rewrite legacy note lengths',()=>{
+  const f=fixture(),p=f.phrase,part=p.addPart(p.read().availableSounds[0]!.id);
+  p.addNote(part,{startBeat:0,durationBeats:1,frequencyHz:440,velocity:.7});
+  const section=p.addTempoSection(),before=structuredClone(p.read().body);
+  p.setTempo(before!.tempoBpm);p.setTempoSection(section,before!.tempoSections![0]!.tempoBpm);
+  assert.deepEqual(p.read().body,before);
+});
+
+test('held notes crossing a BPM boundary keep their complete beat span, including hidden notes',async()=>{
+  const f=fixture(),p=f.phrase;p.setLength(16);const section=p.addTempoSection();p.setTempoSection(section,60);
+  const part=p.addPart(p.read().availableSounds[0]!.id);
+  p.addNote(part,{startBeat:15,durationBeats:3,durationSeconds:2.5,frequencyHz:440,velocity:.7});
+  p.addNote(part,{startBeat:14,durationBeats:1,durationSeconds:.5,frequencyHz:660,velocity:.7});
+  p.setTempoSection(section,120);await p.preparePreview();
+  assert(Math.abs(p.previewPlan().events.find(event=>event.sound.note.frequencyHz===440)!.sound.note.holdSeconds-1.5)<1e-12);
+  p.setTempoSectionStart(section,8);assert.equal(p.read().body!.parts[0]!.hiddenNotes!.length,2);
+  p.setTempo(240);p.setTempoSectionStart(section,16);await p.preparePreview();
+  assert(Math.abs(p.previewPlan().events.find(event=>event.sound.note.frequencyHz===660)!.sound.note.holdSeconds-.25)<1e-12);
+  p.undo();assert.equal(p.read().body!.parts[0]!.notes.length,0);
+});
+test('BPM rolls survive manual project commit and fresh reopen, with undo for adding and editing rolls', async () => {
+  const f = fixture(); f.phrase.setLength(16); const before = f.phrase.read().body;
+  const section = f.phrase.addTempoSection(); f.phrase.setTempoSection(section, 90);
+  f.phrase.undo(); assert.equal(f.phrase.read().body!.tempoSections![0]!.tempoBpm, 120);
+  f.phrase.undo(); assert.deepEqual(f.phrase.read().body, before);
+  f.phrase.redo(); f.phrase.redo();
+  const expected = f.phrase.read().body;
+  commitMusicDocument(f.library, f.song, f.phrase);
+  const reopened = fixture(f.text()); assert.deepEqual(reopened.phrase.read().body, expected);
+  await reopened.phrase.preparePreview();
+  assert.equal(reopened.phrase.previewPlan(undefined, { allowSilence: true }).durationSeconds, 8 + 16 * 60 / 90);
+});
+test('each roll restarts its local grid and tempo validation rejects ambiguous or unordered boundaries', () => {
+  const f = fixture(); f.phrase.setLength(16); const id = f.phrase.addTempoSection(); f.phrase.setTempoSection(id, 60);
+  const body = f.phrase.read().body!, view = { leftSeconds: 6, zoom: .5, rowHeight: 24 };
+  const beats = melodyScoreGrid(body, view, 1000).filter(line => line.beat).map(line => line.seconds);
+  assert(beats.includes(7.5)); assert(beats.includes(8)); assert(beats.includes(9)); assert(!beats.includes(8.5));
+  assert.throws(() => readPhraseBody({ ...body, tempoSections: [{ id, startBeat: 0, tempoBpm: 60 }] }));
+  assert.throws(() => readPhraseBody({ ...body, tempoSections: [{ id, startBeat: 16, tempoBpm: 30 }] }));
+});
+
+test('shrinking an upper roll hides its notes, shifts later rolls with their notes, and restores hidden music after save/reopen',async()=>{
+  const f=fixture(),p=f.phrase;p.setLength(16);
+  const part=p.addPart(p.read().availableSounds[0]!.id),first=p.addTempoSection(),second=p.addTempoSection();
+  p.setTempoSection(first,60);p.setTempoSection(second,180);
+  const add=(startBeat:number,frequencyHz:number)=>p.addNote(part,{startBeat,durationBeats:.5,durationSeconds:.25,frequencyHz,velocity:.7});
+  const a=add(6,220),hidden=add(14,330),boundary=add(16,440),b=add(18,550),c=add(34,660);
+  const before=p.read().body!;
+  p.setTempoSectionStart(first,8);let body=p.read().body!,voice=body.parts[0]!;
+  assert.deepEqual(body.tempoSections!.map(s=>s.startBeat),[8,24]);assert.equal(body.lengthBeats,40);
+  assert.deepEqual(voice.notes.map(n=>n.id),[a,boundary,b,c]);
+  assert.deepEqual(voice.notes.map(n=>n.startBeat),[6,8,10,26]);
+  assert.equal(voice.hiddenNotes![0]!.note.id,hidden);assert.equal(voice.hiddenNotes![0]!.note.startBeat,14);
+  assert.equal(voice.hiddenNotes![0]!.sectionId,'first');
+  await p.preparePreview();assert.equal(p.previewPlan().events.length,4,'cropped note is silent');
+  commitMusicDocument(f.library,f.song,p);
+  const opened=fixture(f.text());assert.equal(opened.phrase.read().body!.parts[0]!.hiddenNotes!.length,1);
+  opened.phrase.setTempoSectionStart(first,16);body=opened.phrase.read().body!;
+  assert.equal(body.parts[0]!.hiddenNotes,undefined);assert.deepEqual(body.tempoSections,before.tempoSections);
+  for(const note of before.parts[0]!.notes){const restored=body.parts[0]!.notes.find(n=>n.id===note.id)!;assert.deepEqual(restored,note);}
+  await opened.phrase.preparePreview();assert.equal(opened.phrase.previewPlan().events.length,5);
+});
+
+test('preview is transient, boundary changes are one undo step and hidden notes keep their own roll through other resizes',()=>{
+  const f=fixture(),p=f.phrase;p.setLength(16);const first=p.addTempoSection(),second=p.addTempoSection();
+  const part=p.addPart(p.read().availableSounds[0]!.id);
+  const id=p.addNote(part,{startBeat:30,durationBeats:.5,durationSeconds:.25,frequencyHz:440,velocity:.7});
+  const original=p.read().body!,text=f.text();
+  const preview=p.previewTempoSectionStart(second,28);assert.equal(preview.parts[0]!.hiddenNotes![0]!.note.id,id);
+  assert.equal(f.text(),text);assert.deepEqual(p.read().body,original);
+  p.setTempoSectionStart(second,28);p.undo();assert.deepEqual(p.read().body,original);p.redo();
+  p.setTempoSectionStart(first,20);let body=p.read().body!;
+  assert.deepEqual(body.tempoSections!.map(s=>s.startBeat),[20,32]);
+  assert.equal(body.parts[0]!.hiddenNotes![0]!.sectionId,first);assert.equal(body.parts[0]!.hiddenNotes![0]!.note.startBeat,14);
+  p.setTempoSectionStart(second,36);body=p.read().body!;assert.equal(body.parts[0]!.notes[0]!.id,id);assert.equal(body.parts[0]!.notes[0]!.startBeat,34);
+  assert.equal(body.parts[0]!.hiddenNotes,undefined);
+  assert.throws(()=>p.setTempoSectionStart(first,0));
+});
+
+test('a roll can retain only hidden notes and still be saved and compiled as silence',async()=>{
+  const f=fixture(),p=f.phrase;p.setLength(16);const section=p.addTempoSection(),part=p.addPart(p.read().availableSounds[0]!.id);
+  p.addNote(part,{startBeat:14,durationBeats:1,durationSeconds:.5,frequencyHz:440,velocity:.7});
+  p.setTempoSectionStart(section,8);await p.preparePreview();assert.equal(p.previewPlan().events.length,0);
+  commitMusicDocument(f.library,f.song,p);const reopened=fixture(f.text());assert.equal(reopened.phrase.read().body!.parts[0]!.hiddenNotes!.length,1);
+  reopened.phrase.setTempoSectionStart(section,16);assert.equal(reopened.phrase.read().body!.parts[0]!.notes.length,1);
+});
+
+test('the last roll edge resizes alone, preserves cropped notes across reopen and restores them without moving other rolls',async()=>{
+  for(const multiple of [false,true]){
+    const f=fixture(),p=f.phrase;p.setLength(16);const section=multiple?p.addTempoSection():undefined;
+    if(section)p.setTempoSection(section,90);
+    const part=p.addPart(p.read().availableSounds[0]!.id),end=p.read().body!.lengthBeats;
+    const id=p.addNote(part,{startBeat:end-2,durationBeats:.5,durationSeconds:.25,frequencyHz:440,velocity:.7});
+    const original=p.read().body!,text=f.text();
+    const preview=p.previewLastTempoRollLength(end-4);assert.equal(preview.lengthBeats,end-4);
+    assert.equal(preview.parts[0]!.hiddenNotes![0]!.note.id,id);assert.equal(f.text(),text);
+    p.setLastTempoRollLength(end-4);assert.deepEqual(p.read().body!.tempoSections,original.tempoSections);
+    await p.preparePreview();assert.equal(p.previewPlan().events.length,0);
+    p.undo();assert.deepEqual(p.read().body,original);p.redo();
+    commitMusicDocument(f.library,f.song,p);const reopened=fixture(f.text());
+    reopened.phrase.setLastTempoRollLength(end);assert.deepEqual(reopened.phrase.read().body,original);
+    assert.throws(()=>reopened.phrase.setLastTempoRollLength((section?16:0)+3));
+    assert.throws(()=>reopened.phrase.setLastTempoRollLength(1025));
+  }
+});
+
+test('roll resolutions are independent, persist, inherit on addition and never retime notes or playback',async()=>{
+  const f=fixture(),p=f.phrase;p.setLength(16);const second=p.addTempoSection(),part=p.addPart(p.read().availableSounds[0]!.id);
+  p.addNote(part,{startBeat:2/3,durationBeats:.4,durationSeconds:.2,frequencyHz:440,velocity:.7});
+  p.addNote(part,{startBeat:16+1/3,durationBeats:.4,durationSeconds:.2,frequencyHz:660,velocity:.7});
+  const notes=structuredClone(p.read().body!.parts);await p.preparePreview();const before=p.previewPlan().events.map(e=>[e.atSeconds,e.sound.note.holdSeconds]);
+  p.setTempoSectionSteps(second,3);let body=p.read().body!;
+  assert.equal(phraseStepsAtBeat(body,0),4);assert.equal(phraseStepsAtBeat(body,16),3);assert.deepEqual(body.parts,notes);
+  // Fine enough zoom to expose both grids; their intervals differ within one canvas.
+  const lines=melodyScoreGrid(body,{leftSeconds:7.8,zoom:1,rowHeight:24},4000).map(line=>line.seconds);
+  assert(lines.some(t=>Math.abs(t-(8+1/6))<1e-8));assert(!lines.some(t=>Math.abs(t-(8+1/8))<1e-8));
+  p.setTempoSectionSteps(undefined,5);body=p.read().body!;assert.equal(phraseStepsAtBeat(body,0),5);assert.equal(phraseStepsAtBeat(body,16),3);
+  const third=p.addTempoSection();assert.equal(p.read().body!.tempoSections!.find(s=>s.id===third)!.stepsPerBeat,3);
+  p.undo();p.undo();assert.equal(phraseStepsAtBeat(p.read().body!,0),4);assert.equal(phraseStepsAtBeat(p.read().body!,16),3);p.redo();
+  commitMusicDocument(f.library,f.song,p);const reopened=fixture(f.text());body=reopened.phrase.read().body!;
+  assert.equal(phraseStepsAtBeat(body,0),5);assert.equal(phraseStepsAtBeat(body,16),3);assert.deepEqual(body.parts,notes);
+  await reopened.phrase.preparePreview();assert.deepEqual(reopened.phrase.previewPlan().events.map(e=>[e.atSeconds,e.sound.note.holdSeconds]),before);
+  assert.throws(()=>p.setTempoSectionSteps(second,1));assert.throws(()=>p.setTempoSectionSteps(second,10));
+  const legacy=readPhraseBody({...body,tempoSections:body.tempoSections!.map(({stepsPerBeat,...rest})=>rest)});
+  const g=fixture(f.text());g.library.updateDraft(g.phrase.read().draft!.id,{body:legacy});g.phrase.setTempoSectionSteps(undefined,2);
+  assert.equal(phraseStepsAtBeat(g.phrase.read().body!,16),5,'changing first roll freezes legacy implicit resolutions');
+});

@@ -22,6 +22,6 @@ $taskSourcePaths = @($taskSources | ForEach-Object { Join-Path $taskRoot ('deskt
 foreach ($taskSource in $taskSourcePaths) { if (!(Test-Path -LiteralPath $taskSource)) { throw "Missing launcher source: $taskSource" } }
 New-Item -ItemType Directory -Force -Path (Split-Path -Parent $taskOutput) | Out-Null
 $taskArguments = @('/nologo', '/optimize+', '/platform:x64', '/langversion:5', '/codepage:65001', '/reference:System.Windows.Forms.dll',
-    "/target:$taskTarget", "/main:$taskMain", "/out:$taskOutput") + $taskSourcePaths
+    "/target:$taskTarget", "/main:$taskMain", "/out:$taskOutput", "/win32icon:$(Join-Path $taskRoot 'desktop/assets/RootSound.ico')") + $taskSourcePaths
 & $taskCompiler @taskArguments
 if ($LASTEXITCODE -ne 0 -or !(Test-Path -LiteralPath $taskOutput)) { throw 'Could not compile the Windows launcher.' }

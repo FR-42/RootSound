@@ -7,7 +7,7 @@ namespace RootSound.Desktop;
 internal sealed class MainWindow : Form
 {
     private const string Origin = DesktopResourceRouter.Origin;
-    private readonly WebView2 view = new() { Dock = DockStyle.Fill, DefaultBackgroundColor = Color.FromArgb(20, 23, 21) };
+    private readonly WebView2 view = new() { Dock = DockStyle.Fill, DefaultBackgroundColor = Color.FromArgb(250, 251, 253) };
     private readonly ProjectDirectoryManager projects;
     private readonly string dataDirectory;
     private bool closeAccepted;
@@ -18,10 +18,11 @@ internal sealed class MainWindow : Form
         this.projects = projects;
         this.dataDirectory = dataDirectory;
         Text = "RootSound";
+        Icon = System.Drawing.Icon.ExtractAssociatedIcon(Application.ExecutablePath);
         ClientSize = new Size(1180, 800);
         MinimumSize = new Size(860, 640);
         StartPosition = FormStartPosition.CenterScreen;
-        BackColor = Color.FromArgb(20, 23, 21);
+        BackColor = Color.FromArgb(250, 251, 253);
         Controls.Add(view);
         Shown += async (_, _) => await InitializeView();
         FormClosing += ConfirmWindowClose;

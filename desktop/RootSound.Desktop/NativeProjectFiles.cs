@@ -102,7 +102,7 @@ public sealed class NativeProjectFiles
             {
                 stream.Write(bytes); stream.Flush(true);
             }
-            if (File.Exists(target)) File.Replace(temporary, target, target + ".bak");
+            if (File.Exists(target)) File.Replace(temporary, target, null);
             else File.Move(temporary, target);
         }
         finally

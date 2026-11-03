@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <UseAppHost>false</UseAppHost>
+    <AssemblyName>RootSound.Host</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../RootSound.Desktop/AtomicTextStore.cs" Link="Core/AtomicTextStore.cs" />
+    <Compile Include="../RootSound.Desktop/ProjectDirectoryManager.cs" Link="Core/ProjectDirectoryManager.cs" />
+    <Compile Include="../RootSound.Desktop/ProjectTimbreMirror.cs" Link="Core/ProjectTimbreMirror.cs" />
+    <Compile Include="../RootSound.Desktop/SessionPayloadStore.cs" Link="Core/SessionPayloadStore.cs" />
+    <Compile Include="../RootSound.Desktop/StreamingWorkspaceCodec.cs" Link="Core/StreamingWorkspaceCodec.cs" />
+    <Compile Include="../RootSound.Desktop/LargeJsonText.cs" Link="Core/LargeJsonText.cs" />
+  </ItemGroup>
+</Project>

@@ -3,5 +3,5 @@ https://www.schristiancollins.com/generaluser.php
 Source: https://github.com/mrbumpy409/GeneralUser-GS
 Pinned commit: 684543d5e5efaef08d02be50dcda8d552478fa60
 RootSound repackaging: selected, uncompressed original PCM regions and pitch/key/velocity/loop metadata.
-Not a complete SoundFont renderer; filters, modulators and layered articulations are not reproduced in full.
+The original SF2 is included for full streamed playback using spessasynth_core. Extracted PCM zones remain available for project custody and legacy playback; the legacy PCM-only fallback does not reproduce the complete SF2 modulation model.
 See LICENSE.txt for the author's complete terms and source-provenance statement.

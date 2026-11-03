@@ -27,6 +27,8 @@ export type SampleBankZone = {
   rootFrequencyHz: number; startSeconds: number; endSeconds: number;
   attackSeconds: number; releaseSeconds: number; level: number;
   decaySeconds?: number; sustain?: number;
+  /** Original SF2 release timecents and velocity modulators, for timeline bounds only. */
+  sf2Release?: { base:number; velocity:number; inverseVelocity:number };
   loop?: { startSeconds: number; endSeconds: number };
   sampleId: string;
 };
@@ -84,6 +86,8 @@ export interface TimbrePlaybackPort {
   readSaved(contentId: string): { content: ContentRecord; body: EditableTimbreBody };
   prepareForSaved(contentId: string, notes?: readonly SoundPlan['note'][]): Promise<void>;
   planForSaved(contentId: string, note: SoundPlan['note']): PlayableNotePlan;
+  /** Built-in keyboard reference, independent of project membership or edits. */
+  previewPianoPlan(note: SoundPlan['note']): Promise<PlayableNotePlan>;
 }
 
 export interface TimbreEditorPort {

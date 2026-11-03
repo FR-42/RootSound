@@ -242,7 +242,7 @@ public sealed class ProjectDirectoryManager : IDisposable
                 activeStore.VerifyUnchanged();
                 beforeSaveCommit?.Invoke(current.Path);
                 WriteStoredLibrary(currentSnapshot ?? throw new IOException("当前歌曲资料不可用。"), nextName, verifyTimbres: true);
-                current = nextProject; committedSnapshot = savedSnapshot = currentSnapshot; loadingCompleted = true;
+                current = nextProject with { Path = activeStore.FilePath }; committedSnapshot = savedSnapshot = currentSnapshot; loadingCompleted = true;
                 return current;
             }
             byte[] originalManifest = RequireManifestUnchanged();
@@ -341,7 +341,7 @@ public sealed class ProjectDirectoryManager : IDisposable
         }
     }
 
-    /// <summary>Read only direct project files and supported legacy folders in the default location.</summary>
+    /// <summary>Discover project files throughout the default tree, plus direct legacy folders.</summary>
     public IReadOnlyList<ProjectDirectoryInfo> List()
     {
         lock (gate)
@@ -349,7 +349,9 @@ public sealed class ProjectDirectoryManager : IDisposable
             ThrowIfDisposed();
             if (!Directory.Exists(DefaultLocation) || IsLink(DefaultLocation)) return Array.Empty<ProjectDirectoryInfo>();
             var projects = new List<ProjectDirectoryInfo>();
-            foreach (string path in Directory.EnumerateFiles(DefaultLocation, "*.rootsound"))
+            var scan = new EnumerationOptions { RecurseSubdirectories = true, IgnoreInaccessible = true,
+                AttributesToSkip = FileAttributes.ReparsePoint, MatchCasing = MatchCasing.CaseInsensitive };
+            foreach (string path in Directory.EnumerateFiles(DefaultLocation, "*.rootsound", scan))
             {
                 try { if (IsKnownProjectPath(path)) projects.Add(ReadEnvelope(path).Project); }
                 catch (IOException) { } catch (UnauthorizedAccessException) { } catch (InvalidDataException) { }
@@ -435,9 +437,9 @@ public sealed class ProjectDirectoryManager : IDisposable
                 beforeSaveCommit?.Invoke(path);
                 RequireEditableSelection(path, expectedId); ownership.VerifyUnchanged();
                 if (RenameToken(path) != expectedToken) throw new IOException("这首歌刚刚发生变化，本次未修改名称。");
-                ownership.WriteStream(stream => StreamingWorkspaceCodec.Write(stream, envelope, libraryText, inspected));
+                WriteNamedProject(ownership, name, stream => StreamingWorkspaceCodec.Write(stream, envelope, libraryText, inspected));
                 if (inspections.Remove(path, out var used)) used.Store.Dispose();
-                return parsed.Project with { Name = name };
+                return parsed.Project with { Name = name, Path = ownership.FilePath };
             }
             using var legacy = new AtomicTextStore(path);
             byte[] originalManifest = ReadManifestBytes(path); var selected = ParseManifest(path, originalManifest);
@@ -753,9 +755,25 @@ public sealed class ProjectDirectoryManager : IDisposable
     private bool IsKnownProjectPath(string path)
     {
         string? parent = Path.GetDirectoryName(path);
-        if (parent is null || !SamePath(parent, DefaultLocation) || !Path.Exists(path) || !Directory.Exists(DefaultLocation) || IsLink(DefaultLocation) || IsLink(path)) return false;
-        if (File.Exists(path)) return string.Equals(Path.GetExtension(path), ".rootsound", StringComparison.OrdinalIgnoreCase)
-            && new FileInfo(path).Length is > 0 and <= AtomicTextStore.MaximumBytes;
+        if (parent is null || !Path.Exists(path) || !Directory.Exists(DefaultLocation) || IsLink(DefaultLocation) || IsLink(path)) return false;
+        if (File.Exists(path))
+        {
+            if (!path.StartsWith(Path.TrimEndingDirectorySeparator(DefaultLocation) + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)) return false;
+            string? directory = parent;
+            while (directory is not null && !SamePath(directory, DefaultLocation))
+            {
+                if (IsLink(directory)) return false;
+                string name = Path.GetFileName(directory);
+                if (name.StartsWith(".rootsound-create-", StringComparison.OrdinalIgnoreCase)
+                    || name.StartsWith(".rootsound-delete-", StringComparison.OrdinalIgnoreCase)
+                    || name.StartsWith(".rootsound-rename-", StringComparison.OrdinalIgnoreCase)) return false;
+                directory = Path.GetDirectoryName(directory);
+            }
+            if (directory is null) return false;
+            return string.Equals(Path.GetExtension(path), ".rootsound", StringComparison.OrdinalIgnoreCase)
+                && new FileInfo(path).Length is > 0 and <= AtomicTextStore.MaximumBytes;
+        }
+        if (!SamePath(parent, DefaultLocation)) return false;
         foreach (string name in new[] { "project.json", "materials.json" })
         {
             string file = Path.Combine(path, name);
@@ -782,10 +800,25 @@ public sealed class ProjectDirectoryManager : IDisposable
         if (fileEnvelope is null) { activeStore!.Write(library); MirrorTimbres(library, verifyTimbres); return; }
         var envelope = (JsonObject)fileEnvelope.DeepClone();
         if (name is not null) envelope["name"] = name;
-        activeStore!.WriteStream(stream => StreamingWorkspaceCodec.Write(stream, envelope, library, payloads));
+        WriteNamedProject(activeStore!, name ?? current!.Name, stream => StreamingWorkspaceCodec.Write(stream, envelope, library, payloads));
         // Working/committed snapshots already own the library. Keep only the
         // small envelope metadata so subsequent saves do not clone audio again.
         fileEnvelope = envelope; MirrorTimbres(library, verifyTimbres);
+    }
+
+    private static void WriteNamedProject(AtomicTextStore store, string name, Action<Stream> write)
+    {
+        string original = store.FilePath;
+        string destination = Path.Combine(Path.GetDirectoryName(original)!, ValidateName(name) + ".rootsound");
+        store.MoveTo(destination);
+        try { store.WriteStream(write); }
+        catch (Exception error)
+        {
+            try { store.MoveTo(original); }
+            catch (Exception recovery) when (recovery is IOException or UnauthorizedAccessException)
+            { throw new IOException("保存未完成，工程保留在：" + store.FilePath, new AggregateException(error, recovery)); }
+            throw;
+        }
     }
 
     private ProjectDirectoryInfo ActivateFile(string path, bool synchronizeTimbres = false)
@@ -843,8 +876,9 @@ public sealed class ProjectDirectoryManager : IDisposable
     private static (ProjectDirectoryInfo Project, JsonObject Envelope, string Library) ReadWorkspaceCore(string path, Stream stream, SessionPayloadStore? cache, bool metadataOnly)
     {
         var result = StreamingWorkspaceCodec.Read(stream, cache, metadataOnly);
-        var root = result.Metadata;
-        return (ProjectFromMetadata(path, root), root, result.Library);
+        var root = result.Metadata; var project = ProjectFromMetadata(path, root);
+        root["name"] = project.Name;
+        return (project, root, result.Library);
     }
 
     private static ProjectDirectoryInfo ProjectFromMetadata(string path, JsonObject root)
@@ -856,7 +890,7 @@ public sealed class ProjectDirectoryManager : IDisposable
             || root["createdAtUtc"]?.GetValueKind() != JsonValueKind.String
             || !DateTimeOffset.TryParse(root["createdAtUtc"]!.GetValue<string>(), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var timestamp) || timestamp.Offset != TimeSpan.Zero)
             throw new InvalidDataException("所选文件不是受支持的 RootSound 歌曲项目。");
-        return new(root["id"]!.GetValue<string>(), root["name"]!.GetValue<string>(), Path.GetFullPath(path));
+        return new(root["id"]!.GetValue<string>(), Path.GetFileNameWithoutExtension(path), Path.GetFullPath(path));
     }
 
     private ProjectDirectoryInfo Activate(string path)

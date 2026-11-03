@@ -26,17 +26,14 @@ if ([IO.File]::Exists($taskEntryPath)) {
 
 $taskPublishId = [Guid]::NewGuid().ToString('N')
 $taskEntryCandidate = $taskEntryPath + '.' + $taskPublishId + '.tmp'
-$taskEntryBackup = $taskEntryPath + '.' + $taskPublishId + '.bak'
 try {
     [IO.File]::Copy($taskLauncherPath, $taskEntryCandidate, $false)
     if ([IO.File]::Exists($taskEntryPath)) {
-        # Windows PowerShell converts a $null string argument to "" here. Use
-        # an explicit sibling backup so File.Replace works on repeated builds.
-        [IO.File]::Replace($taskEntryCandidate, $taskEntryPath, $taskEntryBackup)
+        # NullString passes a genuine null to .NET, without generating a backup.
+        [IO.File]::Replace($taskEntryCandidate, $taskEntryPath, [NullString]::Value)
     } else {
         [IO.File]::Move($taskEntryCandidate, $taskEntryPath)
     }
 } finally {
     if ([IO.File]::Exists($taskEntryCandidate)) { [IO.File]::Delete($taskEntryCandidate) }
-    if ([IO.File]::Exists($taskEntryBackup)) { [IO.File]::Delete($taskEntryBackup) }
 }

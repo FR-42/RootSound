@@ -9,6 +9,7 @@ export function createPhraseCompositionTransport(options: {
   prepare(): Promise<void>;
   tempoBpm(): number;
   lengthBeats?(): number;
+  durationSeconds?(): number;
   runtime: SoundRuntimePort;
   onChange(state: PlaylistTransportState): void;
   onError(error: unknown): void;
@@ -18,7 +19,7 @@ export function createPhraseCompositionTransport(options: {
   let state: PlaylistTransportState = { playing: false, preparing: false, rate: 1, position: 0 };
   let endTimer: ReturnType<typeof setTimeout> | undefined;
   let disposed = false;
-  const duration = () => (options.lengthBeats?.() ?? PHRASE_COMPOSITION_BEATS) * 60 / tempo;
+  const duration = () => options.durationSeconds?.() ?? (options.lengthBeats?.() ?? PHRASE_COMPOSITION_BEATS) * 60 / tempo;
 
   function clearEnd(): void {
     if (endTimer !== undefined) clearTimeout(endTimer);
@@ -88,7 +89,7 @@ export function createPhraseCompositionTransport(options: {
     refresh() {
       if (disposed) return;
       const nextTempo = options.tempoBpm();
-      if (nextTempo !== tempo) {
+      if (nextTempo !== tempo && !options.durationSeconds) {
         const beat = base.position() * tempo / 60;
         tempo = nextTempo;
         seek(beat * 60 / tempo);

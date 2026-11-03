@@ -1,6 +1,7 @@
 import type { KeyboardPitch, PhraseBody, PhraseNote } from '../../contracts/phrase.ts';
 import { PHRASE_STEPS_PER_BEAT, phraseStepsPerBeat } from '../../contracts/phrase.ts';
 import { phrasePitchRow } from './phrase-viewport.ts';
+import { phraseBeatSeconds, phraseSecondsBeat, phraseDurationSeconds, phraseHeldSeconds, phraseTempoSpans, phraseStepsAtBeat } from '../../contracts/phrase-time.ts';
 
 export type MelodyView = { leftSeconds: number; zoom: number; rowHeight: number };
 export const melodyPitchTop = (keys: readonly KeyboardPitch[], row: number, height: number) => Math.max(0, Math.min(keys.length, row)) * height;
@@ -8,9 +9,9 @@ export const melodyPitchHeight = (_keys: readonly KeyboardPitch[], _row: number,
 export function melodyPitchAt(keys: readonly KeyboardPitch[], y: number, height: number): number {
   return Math.max(0, Math.min(keys.length - 1, Math.floor(y / height)));
 }
-export const melodySeconds = (beats: number, tempo: number) => beats * 60 / tempo;
-export const melodyBeats = (seconds: number, tempo: number) => seconds * tempo / 60;
-export const melodyDuration = (body: PhraseBody) => melodySeconds(body.lengthBeats, body.tempoBpm);
+export const melodySeconds = (beats: number, tempo: number | PhraseBody) => typeof tempo === 'number' ? beats * 60 / tempo : phraseBeatSeconds(tempo, beats);
+export const melodyBeats = (seconds: number, tempo: number | PhraseBody) => typeof tempo === 'number' ? seconds * tempo / 60 : phraseSecondsBeat(tempo, seconds);
+export const melodyDuration = phraseDurationSeconds;
 /** Start with usable cells rather than fitting an arbitrarily long score on screen. */
 export function initialMelodyView(body: PhraseBody, width: number): MelodyView {
   return clampMelodyView({ leftSeconds: 0, zoom: 8 * 32 * phraseStepsPerBeat(body) * body.tempoBpm / (60 * Math.max(1, width)), rowHeight: 32 }, melodyDuration(body));
@@ -34,9 +35,21 @@ export function zoomMelody(view: MelodyView, width: number, duration: number, x:
 export function melodyNoteRect(note: PhraseNote, body: PhraseBody, keys: readonly KeyboardPitch[], view: MelodyView, width: number) {
   const scale = melodyScale(view, width, melodyDuration(body));
   const row = phrasePitchRow(note.frequencyHz, keys);
-  return { x: (melodySeconds(note.startBeat, body.tempoBpm) - view.leftSeconds) * scale,
+  return { x: (phraseBeatSeconds(body, note.startBeat) - view.leftSeconds) * scale,
     y: melodyPitchTop(keys, row, view.rowHeight) + 1,
-    width: Math.max(0, (note.durationSeconds ?? melodySeconds(note.durationBeats, body.tempoBpm)) * scale), height: melodyPitchHeight(keys, row, view.rowHeight) - 2 };
+    width: Math.max(0, phraseHeldSeconds(body, note) * scale), height: melodyPitchHeight(keys, row, view.rowHeight) - 2 };
+}
+export function melodyScoreGrid(body: PhraseBody, view: MelodyView, width: number) {
+  const result: ReturnType<typeof melodyDetailGrid> = [], end = view.leftSeconds + 8 / view.zoom;
+  for (const span of phraseTempoSpans(body)) {
+    if (span.endSeconds < view.leftSeconds || span.startSeconds > end) continue;
+    const local = { ...view, leftSeconds: view.leftSeconds - span.startSeconds };
+    for (const line of melodyDetailGrid(span.endSeconds - span.startSeconds, span.tempoBpm, phraseStepsAtBeat(body, span.startBeat), local, width, body.beatsPerBar ?? 4, span.startBeat === 0 ? body.pickupBeats ?? 0 : 0)) {
+      if (line.seconds >= span.endSeconds - span.startSeconds - 1e-8 && span.endBeat < body.lengthBeats) continue;
+      result.push({ ...line, seconds: line.seconds + span.startSeconds });
+    }
+  }
+  return result;
 }
 /** Only reveal subdivisions when there is room, then subdivide further as zoom increases. */
 export function melodyDetailSteps(tempo: number, steps: number, scale: number): number {

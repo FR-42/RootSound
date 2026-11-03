@@ -245,6 +245,12 @@ export function createTimbrePlayback(library: MaterialLibrary, sampleAudio?: Sam
     planForSaved(contentId, note) {
       return playable(planBody(contentId), note, sampleAudio, spectralAudio, bankAudio);
     },
+    async previewPianoPlan(note) {
+      const body: SampleBankTimbreBody = { model: 'sample-bank', version: 1, bank: 'generaluser-gs-2.0.3',
+        instrument: 'piano', level: .7, attackSeconds: 0, releaseSeconds: .03 };
+      await bankAudio.prepare(body, [note]);
+      return bankAudio.plan(body, note);
+    },
   };
 }
 

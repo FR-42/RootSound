@@ -1,5 +1,539 @@
 # RootSound TODO
 
+## RB125 Full SoundFont playback and tempo-scaled held notes — IMPLEMENTED 2026-11-03
+
+- Replace the current desktop's PCM-only bank execution with Apache-2.0
+  spessasynth_core4.4.4, using the immutable original GeneralUser GS2.0.3 SF2.
+  Generators/modulators, filters, both envelopes, LFO, pitch/pan, sample modes and
+  default chorus/reverb execute on a shared-per-stream AudioWorklet engine. Thin
+  plans preserve musical gain separately from MIDI velocity; no per-note long
+  PCM baking. Legacy PCM execution/custody remain. Installed bank + PCM/licensing
+  is72,691,124bytes (69.3MiB), within the user's1GB preference.
+- Integrate global audition/live/update/pause/resume and offline clocks, including
+  mixed/windowed raw voices. Acknowledged scheduling avoids offline first-block
+  silence; cancelled/failed preparation cannot write an export. SF2 added to an
+  already-playing empty document initializes asynchronously with latest-edit
+  ownership. Shared banks detach before core disposal so later streams survive.
+  Mid-head playback skips negative-time expired attacks and reconstructs held
+  notes/tails. Drums retain choke groups despite differing hit gain/pan. Original
+  release timecents/velocity metadata bounds tails instead of legacy4s clipping.
+- Current UI BPM changes now retain musical held length and scale seconds, even
+  for existing seconds-based notes, cross-roll lengths and hidden notes. Undo
+  and manual save/reopen retained. This implements the latest user wording as a
+  new rule; explicit low-level preserve-seconds option remains for compatibility.
+- 138 music/MIDI/domain checks pass, including the complete10-case SF2 suite;
+  38 final affected UI/tempo checks also pass (overlapping, plus an unchanged-BPM
+  no-rewrite regression), as do66 runtime regression checks.
+  Covers actual audio for128 programs and47 drums, a sample-identical reference
+  case, custom modulators/filter/LFO, bounded5267-note streaming, seek and choke.
+  Hidden native Chromium offline integration passes strict WASM-only CSP, actual
+  WAVs, repeat renders, mixed/windowed sounds, empty-to-SF2, moved head, pause/
+  resume and live edits. Separate hidden current UI/library/manual-save check
+  passes. No physical audio, user windows/screens or heavy/user-project checks.
+- Root EXE20261103-152743-065-63d880, type/native build0warnings/errors. Original
+  SF2 and958 WAV audit passes; licensing included. Evidence .test-output/rb125-
+  {music,font,runtime,pcm-audit,renderer,ui,build}.log. Release ZIPs/user projects
+  unchanged. docs/GM_INSTRUMENTS.md explains source, scope and remaining limits:
+  bank realism/recorded articulations, physical latency and complete MIDI
+  controller-automation import are not claimed as newly solved.
+
+## RB124 Complete sampled GM palette and MIDI playback — IMPLEMENTED 2026-11-03
+
+- User requests all128 GM programs using original samples, within roughly1GB.
+  Expand the53-entry palette to128 melodic programs +47 drum strikes (175 total),
+  preserving all old identities. Versioned project migration offers only new
+  entries; removed old starters and subsequent deletions stay removed. Nine
+  categories, GM-number search/tooltips, and imported-voice classification share
+  one catalogue. Existing MIDI picker remains .mid/.midi -> editable music.
+- Fix overlapping-zone playback: prepare all matching key/velocity recordings,
+  flatten layers at the global runtime boundary and retain linked note/track gain,
+  timing, pan, envelopes, deduplicated buffers and offline rendering. Correctly
+  retain audible pedal-hat recording alongside its silent control layer. Portable
+  explicit saves retain all zones and reopen without bank/network access.
+- GeneralUser GS2.0.3 original16-bit PCM,958 WAVs37,043,494 bytes; installed bank
+  including manifest/licensing39,979,982 bytes (38.1MiB). Source-checksum and
+  byte-for-byte re-extraction audit pass. This is a complete general-purpose bank,
+  not a studio-realism acceptance or a full SF2 filter/modulator implementation.
+-126 focused music/MIDI checks and66 runtime checks pass, including all128 program
+  changes and47 drum keys through actual PCM preparation, layered mixing and WAV
+  output. Hidden isolated renderer verifies175 cards and GM1–128, manual-save and
+  existing layout behavior; no user-window/screen/audio-device operation. No user
+  project or heavy user-file verification. Root EXE20261103-100901-048-5ceaca,
+  type/native build0warnings/errors. Release ZIPs unchanged.
+- Evidence: .test-output/rb124-{music,runtime,pcm-audit,build,ui}.log;
+  docs/GM_INSTRUMENTS.md records source/license, maintenance and rendering limits.
+
+## RB123 Synchronize file and project names — IMPLEMENTED 2026-11-03
+
+- Discovery metadata uses the physical basename. Release/browser loading passes
+  it through the domain before finishLoading; only explicit save persists it.
+  Save/library rename update the sibling file path with ownership transfer, no
+  destination overwrite or .bak, and path rollback after failed streamed writes.
+  Bridge validation accepts a correctly named sibling; project ID/notes retained.
+-120 focused music checks,3 small native-host integration flows and19 native
+  payload checks pass. Covers external rename/read-only opening, editor names,
+  manual sync, subsequent save/reopen, nested/library and case-only rename,
+  collision protection, corrupt-payload write rollback and retained audio.
+  Root EXE20261103-094531-865-fa1dd8, type check and both native/host builds0warnings/
+  errors. Hidden actual small renderer verifies externally renamed file's title
+  and unchanged disk bytes. Harness now uses current host DLL as well as current UI.
+  Evidence .test-output/rb123-{music,files,build,host-build,ui}.log and
+  rb123/payload-final/payload-cache-report.json. No user-project/heavy-file checks,
+  screen/user-window/audio-device use or release archive changes. Prior broad
+  legacy-native suites were not rerun/claimed passing under the new filename rule.
+
+## RB122 Recursive project discovery — IMPLEMENTED 2026-11-03
+
+- Recursive case-insensitive listing with link/inaccessible handling; known-project
+  validation accepts real descendants so all library operations work for them.
+-2 isolated native-host integration tests pass: existing full project workflow and
+  nested create/list/open/save/inspect/rename/delete, uppercase extension, bad/empty
+  files, outside sibling exclusion, external/loop junction rejection and read-only
+  discovery. Native/portable-host builds0warnings/errors; type check passes; root
+  EXE20261103-093239-416-ce3138. Evidence .test-output/rb122-{discovery,build,host-build}.log.
+  Link tests ran with approval for isolated junction creation after sandbox EPERM.
+  No user-project/heavy-file validation, GUI/audio use or release-archive changes.
+
+## RB121 Remove QWEASD note editing — IMPLEMENTED 2026-11-03
+
+- Remove six-key handler/nudge implementation and double-press state.27 current
+  workspace checks pass, including upper/lower case, repeated/double key presses
+  leaving note position/gain/pan/history unchanged. Type check/build0warnings/errors;
+  root EXE20261103-092238-506-88ea4c. Evidence .test-output/rb121-{workspace,build}.log.
+  No GUI/audio/heavy-file run or music/release changes.
+
+## RB120 Remove topbar Save As button — IMPLEMENTED 2026-11-03
+
+- Button removed;27 existing active workspace checks pass. Type check/native build
+  0warnings/errors; root EXE20261103-092054-187-c3efb4. Evidence rb120-workspace.log
+  and rb120-build.log in .test-output. No GUI/audio/heavy-file run or project changes.
+
+## RB119 Remove existing .bak files and stop producing save backups — IMPLEMENTED 2026-11-03
+
+- File.Replace backup paths removed in atomic text/stream, sound, audio/project
+  exporters; PowerShell publisher/build pointer use NullString.Value. Updated backup
+  expectations, retaining conflict/locked-target failure and retry coverage. Added
+  a lightweight selector for existing native disk checks to skip huge fixtures.
+- Deleted1368 .bak files/555285551bytes (project5, cache44, experiments3, test1316);
+  post-test scan found none. No project bodies or release ZIPs changed. Evidence
+  .test-output/rb119-bak-cleanup.json; no new backup copy or substitute extension.
+-28 small native atomic/audio/project checks,19 payload-cache disk checks and15
+  launcher publishing checks pass (62 total). Native build/type check0warnings/
+  errors; root EXE20261103-091720-785-08e3f3. Evidence rb119/no-backups-final/
+  no-backups-report.json, rb119/payload/payload-cache-report.json, rb119-entry.log,
+  rb119-build.log. No heavy/user-file verification, GUI/screen or audio use.
+  Native test fixture-only legacy .bak directories are not backup files.
+
+## RB118 Remove topbar volume and center transport — IMPLEMENTED 2026-11-03
+
+- Remove volume UI/mirrors, retaining saved gains and legacy console behavior.
+  Equal side columns and centered transport; update existing assertions.
+-119 music checks/type check pass, build0warnings/errors; root EXE
+ 20261103-064518-405-1544f7. Hidden small actual renderer verifies no volume control,
+  centered/nonoverlapping transport at full width and700px with a long title.
+  Evidence .test-output/rb118-{music,check,build,ui}.log. No user screen/window/audio
+  or heavy-file use; music files and release archives untouched.
+
+## RB117 Remove topbar playback-rate menu — IMPLEMENTED 2026-11-03
+
+- Removed rate menu/UI binding; updated existing assertions and layout harness.
+ 119 music checks/type check pass; native build0warnings/errors, root EXE
+ 20261103-064014-044-d8e863. Evidence .test-output/rb117-{music,check,build}.log.
+ No GUI/audio/heavy-file run or project/release changes for this small removal.
+
+## RB116 Remove empty settings entry — IMPLEMENTED 2026-11-03
+
+- Remove active studio settings import/callback and composition toolbar hook/button.
+  Update existing active/legacy assertions and hidden layout harness expectations.
+-119 focused music tests pass; type check and native build0warnings/errors pass.
+  Root EXE20261103-063740-168-08e3e0. Evidence .test-output/rb116-{music,check,build}.log.
+  No new hidden-renderer/desktop/audio/heavy-file run for this small removal; no
+  project/preferences/music-format or release-archive changes. MIDI-format discussion
+  is advice only, not implementation approval.
+
+## RB115 Narrower roll summaries and simpler BPM popover — IMPLEMENTED 2026-11-03
+
+- Summary tap buttons removed; popover grid removed. Per-roll grids remain in the
+  summary, corresponding-roll tap remains beside the popover input. Column46px,
+  numeric summary36px/input54px, summary one decimal without tempo data rounding.
+-119 focused music checks, type check and native build0warnings/errors pass.
+  Root EXE20261103-062738-633-9260bf. Hidden actual small renderer confirms widths,
+  no summary tap/popover grid, input/tap fit and head/text clearance. Evidence
+  .test-output/rb115-{music,check,build,ui}.log and rb115/ui-*/report.json. No user
+  screen/window/audio/heavy-file use; music files and release archives untouched.
+
+## RB114 Per-roll grid resolutions and compact tempo blocks — IMPLEMENTED 2026-11-03
+
+- Remove duplicate New BPM roll menu entry; footer plus retained. Numeric BPM and
+  small tap button share the top row, grid below, in corner/later labels/popover.
+  No corner BPM pseudo-label or native select arrow. Labels still drag to resize;
+  grid/tap pointer events do not seek or resize. Tap captures the intended roll ID.
+- Optional section.stepsPerBeat, validated2–9, with backward-compatible fallback.
+  Dedicated per-roll setter preserves implicit later grids when changing first;
+  append inherits last, score rendering/draw defaults consult the local resolution.
+  Notes/time/playback unchanged; undo, manual save and reopen retain resolutions.
+-119 focused checks pass, including local grid geometry, independence, legacy
+  inheritance, added-roll inheritance, persistence/undo, unchanged notes/playback,
+  corresponding-roll tap and popover edits. Type check and native build0warnings/
+  0errors; root EXE20261103-062029-422-85bc09. Hidden small actual renderer verifies
+  tap to the right/grid below, no suffix/arrows/duplicate creation, per-roll grid
+  independence, previous layout/follow controls and no automatic disk save.
+  Evidence .test-output/rb114-{music,check,build,ui}.log and rb114/ui-*/report.json.
+  User withdraws the Fantaisie music change; its file and all music/releases untouched.
+  No user-window/screen/audio-device or heavy-file verification.
+
+## RB113 Compact controls, new-roll footer and last-roll edge — IMPLEMENTED 2026-11-03
+
+- Narrow gray locator, red head tick, no sentence tooltip.64px integrated BPM/grid
+  column without the prior head divider; head8px wide above labels/text kept clear.
+  Direct-music topbar no longer has grid controls. Native horizontal scrollbar hidden;
+  keyboard/wheel/panning still work. Footer plus now appends a new BPM roll.
+- Actual last-roll lower edge has a10px pointer target and subtle line. Manual time
+  navigation permits75% viewport blank space after the score. Dragging resizes only
+  the last roll, with transient continuous preview, whole-bar commit, undo/cancel/
+  Escape/arrows/minimum one bar. Shared resize custody restores hidden notes after
+  save/reopen, including single-roll scores; other section boundaries stay unchanged.
+-117 focused music checks pass, type check and native build0warnings0errors.
+  Root EXE selected build20261103-060546-923-ad66a0. Permanently hidden tiny actual
+  renderer validates10px locator, text-free tick, hidden native scrollbar, corner
+  grid bounds, no ruler pseudo-divider, head/text separation, footer and reachable
+  bottom edge, plus unchanged disk project. Evidence .test-output/rb113-{music,check,
+  build,ui}.log and rb113/ui-*/report.json. No user-window/screen/audio/heavy-file
+  operation; existing music projects and release ZIPs untouched.
+
+## RB112 Label resizing, recoverable cropped notes and bottom extension — IMPLEMENTED 2026-11-03
+
+- Restore32px bottom add-bar strip; extends only the final roll. Drag any later
+  BPM marker vertically to resize the preceding roll, translating later starts,
+  notes and total length together. Frame-coalesced continuous preview; whole-bar
+  commit in one undo step; cancel/Escape restores original, arrows move one bar.
+  Keep the preceding roll at least one bar; existing1024beat total cap retained.
+- New optional part.hiddenNotes stores roll ID/local-start note records. Cropped
+  heads move out of visible notes into this custody, then return with their IDs,
+  pitch/hold/velocity when expanded. Other roll resizes preserve affinity/local
+  position. Hidden notes count toward budgets, survive manual save/fresh reopen,
+  cannot be silently pruned as empty families, and are excluded from sound/index.
+  All-hidden scores may save/play silence. Family-removal warning counts them.
+- Ruler widened to78px: head occupies the first22px, BPM markers the following56px.
+  Handle right20px < marker left22px; handle layer9 > label7. Recovered full-width
+  footer avoids the former side button. Music projects/releases remain unchanged.
+-115 focused music tests pass: crop/restore after save/reopen, later-roll movement,
+  transient preview, one-step undo, independent hidden affinity, boundary notes,
+  silent retained scores, playing preview, cancellation, keyboard and final-only
+  extension. Type check/native build0warnings0errors; root EXE selected build
+  20261103-052636-441-9a2e57. Permanently hidden actual small renderer/service fixture
+  verifies footer32px/full width, separate head/label lanes and previous layout/
+  manual saving. Evidence .test-output/rb112-{music,check,build,ui}.log and
+  .test-output/rb112/ui-*/report.json. No screen/user-window/audio-device use or
+  heavy-file validation; no repeat of unrelated legacy suites or release packaging.
+
+## RB111 Fantaisie-Impromptu reset to five BPM rolls — DELIVERED 2026-11-03
+
+- User requests resetting the one work. Rebuilt default project/肖邦 · 幻想即兴曲
+  Op.66.rootsound from cached Mutopia MIDI and RB109 key-down/balanced-hand reference;
+  original sourceSHA256b29f6add7473b6e931c2e66349e860bf0e884cf68e19e90420a4870aae689f96.
+ 3014notes, two piano hands,552quarter beats,253.523384s. Tempo spans at beats
+ 0/160/168/328/540:168.000403/60/90.00009/168.000403/120 BPM.
+- Exact original beat starts restored, section bar downbeats verified. Every
+  pitch/onset second/explicit key hold/velocity matches the source reference.
+  Four-against-three is not quantized to a four-cell grid. Fresh domain reopen
+  with external bank forbidden verifies all3014 decoded-sample playback events.
+- Backup experiments/moonlight-and-fantaisie/bpm-reset/before.rootsound; staged
+  reset.rootsound/report.json. Preserved project entryID/path. Replaced only after
+  verification while holding native per-path project lock and checking original/
+  staged digests; applied2026-11-03T05:10:10Z. Other projects/releases/app/EXE intact.
+  No device audition, screen/desktop use, heavy files or repeated full regression.
+  Evidence .test-output/rb111-{reset,apply}.log; reset-fantaisie.mjs retains workflow.
+- Experiment writer adds optional outputDirectory for staging; ordinary default
+  delivery unchanged. Earlier verification helper now uses the shared tempo clock.
+
+## RB110 Sequential BPM rolls and side extension control — IMPLEMENTED 2026-11-03
+
+- Current topbar no longer displays BPM.56x48 keyboard corner has a click menu:
+  numeric BPM, tap tempo, New BPM roll. Adds4bars after the last section, inherited
+  tempo, pans to it; adjacent shaded/bordered sections and boundary BPM buttons
+  share one pitch keyboard/camera, horizontal pan/zoom and musical transport.
+ 28x28 add-bar box follows the end row at the right edge, hidden offscreen.
+- Optional ordered tempoSections with stable IDs is validated/saved/undoable.
+  Shared binary-search clock maps beats/seconds for note rendering/index/grid,
+  free placement/drag/resize/wheel, source compilation, transport length, export,
+  source-song duration and compatibility flattening. Original explicit holds stay
+  in seconds. Earlier BPM edits shift subsequent section starts; no autosave.
+-111 focused tests/type check pass, including mixed120/60/240 clocks, inverse
+  conversion/boundaries, independent tempo edits, exact note holds, add/edit undo,
+  manual commit/fresh reopen, local grids, topbar relocation, menu creation,
+  second-section drawing and side-plus length extension; variable transport does
+  not stop at the former global-tempo ending or rescale head by one BPM ratio.
+  Native build0warnings0errors, root EXE20261103-045944-853-5540b5.
+- Permanently hidden actual renderer/service fixture verifies corner alignment,
+  no topbar BPM, contiguous120/60 sections and28px end-plus within canvas, plus
+  previous light/left/locator/settings/manual-save layout. Test-only close events
+  and synchronous menu paints handle hidden-window rendering-task deferral; queued
+  frames are tested independently. No screen capture/user-window/audio device use.
+  Evidence .test-output/rb110-{music,tempo,check,build,ui}.log and rb110/ui-*/report.json.
+- Existing music files and release ZIPs untouched; no heavy-file validation.
+  Follow-up, not completed here: reconstruct MIDI tempo maps in incoming projects
+  and create a faithful segmented copy of the earlier flat Fantaisie-Impromptu.
+  Existing tempo-free files continue using their single BPM without migration.
+
+## RB109 Free onsets, piano keyboard and four classical projects — IMPLEMENTED 2026-11-03
+
+- Remove time-grid rounding at creation, drag release, start input and A/D nudges;
+  minimum note boundary replaces last-full-cell placement. Single A/D5ms, established
+ 150ms double press retains a whole beat. Drawing/default duration remains separate.
+- Keyboard click falls back to an installed sampled piano without adding project
+  members, even after its entry was removed. Async scope/cancellation retained.
+  Key drag pans pitch horizontally regardless of selection; no notes/seeking or
+  post-drag click audition. Existing selected-family sound remains the audition.
+-106 current music tests/type check pass: exact triplet creation on a four-cell
+  grid,3px drag retains its ghost start, fine/double nudge, keyboard pitch drag,
+  piano fallback/no content or history mutation and prior playback/save behavior.
+  Native build0warnings0errors; root EXE20261103-042754-349-a33150. Hidden isolated
+  renderer verifies unchanged light/left layout/locator/manual saving. Evidence
+  .test-output/rb109-{music,check,build,ui}.log. No desktop/audio-device control.
+- Additional old horizontal/rhythm suites were sampled, not counted as passing:
+  their pre-RB106 fixtures lack animation-frame globals and retain superseded grid,
+  wheel and dim-note assumptions. A temporary fixture shim was reverted; failures
+  remain recorded in rb109-roll-regression.log, not silently declared passed.
+  Current queued-frame suite covers the requested reachable workspace changes.
+- Delivered default project/ four new files: Moonlight I1142notes/306.67s,
+  II373/99.44s, III4863/300.64s and Fantaisie-Impromptu3014/253.52s; two editable
+  piano hands each, embedded GeneralUserGS2.0.3 recordings/licenses. Source:
+  Mutopia276/Stewart Holmes (CC BY-SA2.5) and1693/Guy D. Lederfein (Public Domain).
+- Beethoven source's default60 quarter clock is rescaled to54/108/160BPM, all
+  source pitches/traversal/time ratios retained; no additional repeat unfolding.
+  I grid4quarter beats x3cells represents2/2; II3/4 with1beat pickup; III4/4.
+  Chopin retains exact source tempo-change seconds and4-against3, uniform editing
+ 168BPM background is not a full tempo map. Balance hands/short releases, remove
+ 446 Chopin pedal events in a private copy. Sources and transformations in
+  experiments/moonlight-and-fantaisie/{SOURCES.txt,create-projects.mjs,results.json}.
+- Fresh reopen forbids external assets and verifies all9392 new notes' pitches,
+  onsets, key durations/velocities and decoded sample plans; verification.json.
+  No actual listening or claim of human-performance quality. Existing projects,
+  heavy user files and release ZIPs untouched; default directory confirmed from
+  current native ProjectDirectoryManager, collision-safe new-file writes only.
+
+## RB108 Instant edge flip and quick vertical locator — IMPLEMENTED 2026-11-03
+
+- Replace follow easing with a single top-aligned jump at2px from the bottom;
+  allow trailing blank space on the final page. Preserve manual grace/return rules.
+- Sustained or large time browsing reveals a narrow right rail. Track click/thumb
+  drag and keyboard move the camera; dragging displays above/below/in-view head
+  status and prevents follow takeover. Inactive rail hides after2s. Viewport paints
+  remain frame-coalesced; no score editing, seeking or autosaving from navigation.
+-103 focused music tests pass, including edge timing, instant/final-page placement,
+ 30s grace, wheel/pan reveal, thumb offset, head directions, drag cancellation,
+  follow ownership and keyboard endpoints. Type check/native build0warnings0errors;
+  root EXE selected build20261103-041217-750-c75b9d.
+- Permanently hidden actual renderer/service tiny fixture verifies20px rail inside
+  canvas, thumb sizing, Home positioning, automatic hiding, light/left layout,
+  empty settings and manual saving. Evidence .test-output/rb108-{music,check,build,ui}.log,
+  .test-output/rb108/ui-*/report.json and scripts/test-workspace-layout.mjs.
+  No heavy/user music validation, screen/desktop/audio-device use or release ZIP changes.
+
+## RB107 Light/left workspace and manual browsing grace — IMPLEMENTED 2026-11-03
+
+- Restore white/light surfaces, native backgrounds and the left132px family shelf.
+  Settings contains only its title/close control; performance mode stays disabled
+  even with an old enabled preference. RB106 performance improvements retained.
+- Manual pan/wheel/arrow navigation outside the head suspends follow for30 seconds;
+  further browsing away renews the grace. Keeping/returning the head in view clears
+  it immediately. Tests use simulated time, not a30-second blocking wait.
+-101 focused music tests pass, including timeout renewal, small moves/return,
+  empty settings and old preferences. Type check/native build0warnings0errors;
+  root EXE selected build20261103-034707-452-06ed3e. Permanently hidden actual
+  renderer/service with a tiny isolated fixture verifies light canvas/dialogs,
+  left shelf, virtualized notes, empty settings and preserved manual saving.
+- Evidence .test-output/rb107-music.log, rb107-build.log, rb107-ui.log and
+  .test-output/rb107/ui-*/report.json. Harness renamed to
+  scripts/test-workspace-layout.mjs. No user music/heavy-file validation,
+  screen capture, desktop control, sound device or release ZIP modification.
+
+## RB106 Dark/top-family workspace, follow and opening performance — IMPLEMENTED 2026-11-03
+
+Presentation/follow ownership amended by RB107; implementation below is historical.
+
+- Neutral dark theme shared by welcome, current music canvas, top transport,
+  tone/project libraries, settings, tap tempo, save/exit/import dialogs and native
+  window backgrounds. Family shelf is above vertical roll, horizontally scrollable,
+  with existing add/replace/audition/removal actions retained; pitch canvas full width.
+- Playback approaching86% of the visible time span smoothly advances toward24%,
+  with short bounded easing, clamping at song end and immediate reveal on backward
+  seek. Pause and pointer gestures do not take over navigation; pitch/zoom remain
+  unchanged. Head uses compositor translation, avoids frame-by-frame layout reads.
+- Interval index looks up time-visible notes including long overlapping holds;
+  per-note render edits avoid full-score copies. Pan/wheel viewport repaints share
+  a frame. Idle gestures skip full-score audio-preview copies; playing previews
+  coalesce per frame and cancel stale previews on release. Existing live feedback
+  and undo/manual-save semantics retained.
+- Opening skips obsolete hidden overview paints, reuses view snapshots/names,
+  and small fixture asserts at most3 complete score reads. Build-Desktop now uses
+  the existing release/current-feature bootstrap and audit: no dormant recognition,
+  arrangement or sampling UI initialization. JS386.77KB to330.86KB in corresponding
+  builds,gzip127.05KB to108.54KB; not a wall-clock speed claim for user projects.
+-99 focused music tests pass: follow/reverse/pause invariants, interval overlap,
+  queued previews, virtualized wheel/zoom and previous save/edit/import behavior.
+  Type check/native build0warnings0errors; root EXE updated, selected build
+  20261103-033145-198-327666. Actual final renderer in permanently hidden independent
+  Electron/native-service fixture confirms dark computed styles, top50px shelf,
+  full-width roll, >500px time viewport, virtualized notes, dialogs and no autosave.
+  This is DOM/layout verification, no screen capture/mouse/user-window/audio device.
+  Small fixture opening timing is not cold-EXE/heavy-project benchmarking.
+- Evidence .test-output/rb106-*, .test-output/rb106/ui-*/report.json;
+  scripts/test-dark-workspace.mjs. No existing music parsed/edited, no heavy user-file
+  verification and no release ZIP changes. Final appearance/fluidity on user's
+  hardware remains user acceptance, not inferred from programmatic checks.
+
+## RB105 Grand Escape actual-video transcription — DRAFT DELIVERED 2026-11-03
+
+- User requests Animenz's Weathering with You / Grand Escape. Verified official
+  Animenzzz video BV1cp4y147ex through public metadata and obtained its normally
+  accessible audio; no other performer's cover/score supplied the notes.
+- Reused cached official Note_pedal model/isolated packages from RB104, CPU4threads
+  about279s. Source286.912s, audioSHA256
+  ab325b3c8acc20eaa03f612af82ac7e725cf8a356ecbacf0743a8b8c415e326a.
+  Produced3416 notes/216 estimated pedal events. Saved default-library
+  project/Grand Escape · Animenz 演奏转录.rootsound,4733962bytes,283.57s,
+  one editable sampled-piano family; original onset/key-release seconds, pitches
+  and velocities retained, no quantization.146BPM/4-4/4cells is a provisional
+  editing grid, not measured uniform performance tempo or exact bar alignment.
+- Raw MIDI retains detected pedal events; project uses key durations plus70ms
+  sampled-piano release without extra sustain prolongation. Holds median476ms,
+  95th1.656s,max5.996s. Fresh domain reopen with external bank forbidden verifies
+  all3416 conversions/decoded-sample events and embedded audio portability.
+  Checks establish format/audio availability, not note accuracy or listening.
+  No actual audition, manual note correction, UI/screen control or heavy-user-file
+  testing. Source/scripts/raw events/model outputs/log/reports under
+  experiments/grand-escape-animenz; existing projects/app/EXE/releases untouched.
+- Answered video-access question with current-tool scope: public metadata and
+  accessible media may be processed, images/frames can be inspected, piano audio
+  uses a separate specialist model; this is not claimed as uninterrupted human-like
+  audiovisual watching/listening. Bilibili audio access worked here; arbitrary
+  Bilibili/YouTube access is not guaranteed. No screen-control permission inferred.
+
+## RB104 Actual Animenz video piano transcription — DRAFT DELIVERED 2026-11-03
+
+- User rejected RB103 and asked for the actual BV1ss411s7mD performance. Clarified
+  RB103's source is Synthz/tcy_justice, mainly a source-score conversion rather
+  than an independently composed arrangement. Existing substitute file preserved.
+- Obtained the specified public Bilibili video's audio normally through its
+  unauthenticated playback API; no paid/login restriction bypass. Audio265.56s,
+  SHA2566cf9e0fd9cb5d9c9a1fe53079d4f8ae0efded132424b511f643c63f71b164711.
+  Official piano_transcription_inference0.0.6 Note_pedal model from Zenodo4034264,
+  verified published MD522b961b77c1878239fec963362097045, CPU4threads344s, default
+  thresholds, no different score used as a note source. Packages/model remain
+  isolated under .cache/railgun-*; no system install or app/runtime change.
+- Delivered project/Only My Railgun · Animenz 演奏转录.rootsound,5073188bytes,
+  4088notes in one editable piano family,first onset2.224s,last release257.670s.
+  Detected pitches/onset seconds/key-release seconds/velocities retained exactly,
+  no quantization; fixed142BPM display grid is provisional, not measured constant
+  tempo or accurate score-bar alignment.267 model pedal events retained in raw
+  MIDI, not used for extra key holds in project.70ms piano sample release; holds
+  median281ms,95th1.083s,max3.826s. GeneralUser piano differs from video recording.
+- Fresh domain reopen with external bank access forbidden verifies4088 converted
+  events and4088 decoded-sample playback events. These are format/portability
+  checks, NOT musical transcription accuracy or listening acceptance. No actual
+  audition, manual dense-passage correction, desktop control or heavy-user-file
+  validation. Automatic transcription draft remains subject to listening/revision;
+  not an authenticated official Animenz score, no exact-reconstruction claim.
+  Source, raw MIDI/events/model outputs, scripts/log/results and verification in
+  experiments/only-my-railgun-animenz. Existing projects/releases unchanged.
+
+## RB103 Only My Railgun alternative piano project — DELIVERED 2026-11-03
+
+- Listening outcome: user rejected this substitute and now requests transcription
+  of the actual Animenz video. The artifact was delivered but is NOT accepted.
+  Clarified that this was a Synthz/tcy_justice score conversion with voicing edits,
+  not an independently authored piano arrangement. See subsequent RB104 work.
+- User requested Animenzzz BV1ss411s7mD, allowing an independent alternative if
+  no matching MIDI was available. Confirmed the requested full-version video;
+  official current sheet is paid, accessible early Animenz MIDI is only90s.
+  No paid/login download was bypassed and no early version passed off as full.
+- Delivered project/Only My Railgun · 钢琴编配.rootsound,4965757bytes,
+  331.47s,3568notes,144BPM,4/4,4cells/beat. This is a different full piano-score
+  adaptation, NOT an exact Animenz transcription or original-composition claim.
+  Public source synthz.net/song/137; PDF credits arranger tcy_justice, not the
+  site's operator Thomas. Source/terms/limitations are recorded in the envelope
+  and experiments/only-my-railgun-animenz/SOURCE.txt. Not added to release ZIPs;
+  site educational/noncommercial terms do not establish commercial redistribution.
+- Preserve all source pitches/rhythm positions; remove the empty opening bar.
+  Split simultaneous right-hand highest notes, other right-hand notes and left
+  hand into3 editable families; modest relative dynamic/pan adaptation. This
+  split is an editing aid, not guaranteed melodic-source separation. Private
+  MIDI copy removes484CC64 events, restoring3422 pedal-extended key durations;
+  median208ms,95th521ms,max2.52s,70ms piano release. Original download unchanged.
+- Fresh domain reopen with all external audio forbidden verifies3568 pitches,
+  onsets/key durations,3 families,grid and3568 decoded-sample playback events.
+  Piano recordings/licenses embedded. Only this new normal-size artifact tested;
+  existing projects untouched, no desktop control, heavy-file tests or actual
+  audition. Hearing acceptance pending. Generation/verification in the experiment
+  directory; no app-code/EXE change and no redundant full regression/rebuild.
+
+## RB102 White/gray icon and requested project snapshots — DELIVERED 2026-11-03
+
+- release/ now contains preview.2 ZIPs: Windows243960408bytes, Mac202569843bytes,
+  updated notes/checksums. Preview.1 files preserved under .cache/release-archive;
+  publication record .test-output/rb102-publication.json. No GitHub upload.
+- Authored white rounded-square/neutral-gray beamed notes as SVG geometry; generated
+  PNG, multi-resolution ICO and ICNS under desktop/assets. Windows PE icon resources
+  patched, Electron window icon set, Mac ICNS replaced and bundle re-signed. Native
+  desktop/launcher builds also embed the icon; root EXE updated, build0 errors/
+  warnings, native release20261103-005313-044-55617b. Extracted actual32px release
+  and root EXE icons verify white and neutral-gray pixels, no desktop capture.
+- Explicitly included the latest five saved projects: dddd, V3 rhythm arrangement,
+  Mitsuha piano/string arrangement, Liszt La Campanella and Chopin Op.9 No.1.
+  Streaming snapshot copies preserve byte contents/user edits, without parsing or
+  auditioning music and without .bak/cache/mirror/history files alongside projects.
+- Both packages store seed-projects internally; first launch copies missing names
+  into the writable default library. COPYFILE_EXCL protects existing names and a
+  completed-name marker prevents reimporting deliberately deleted examples. Future
+  Build-Release includes snapshots only with -IncludeCurrentProjects; default off.
+- Seed fixture test covers once-only import, same-name preservation, no resurrection
+  and traversal rejection. Actual packaged Windows renderer/bundled runtime hidden
+  integration confirms all5 examples visible,53 sounds, create/reload and manual save.
+  No screen/mouse/audio-device access or heavy project-content validation.
+- Final ZIP audit matches all5 snapshot byte lengths/SHA256 values on both platforms,
+  matches icon files, excludes other project files/backups/dormant UI/development.
+  Mac14 Unix links/modes and5 local signatures retained;1172 sealed resources checked.
+  Mac still lacks real-device/listening acceptance and Developer ID/notarization.
+  Evidence .test-output/rb102-*, release-package-verification.json; previous music
+  tests were not redundantly rerun for asset/packaging-only changes.
+
+## RB101 Windows x64 and Mac ARM64 preview release — DELIVERED 2026-11-03
+
+- release/ contains two0.1.0-preview.1 ZIPs, SHA256SUMS.txt and Chinese release notes:
+  Windows228104320bytes, Mac186936592bytes. No private projects, development tree,
+  node_modules, experiments, caches, source maps, debug symbols or old builds.
+  Official Electron45.2.1/.NET9.0.22 runtimes and their licenses are embedded, as
+  are958 installed bank recordings/licenses. No separate developer tools required.
+- Added dedicated release.ts bootstrap, Vite included-module audit and inactive
+  recorder-asset pruning. No old arrangement/co-creation/sampling editor or melody
+  recognition entry is bundled. Spectral worker is retained for reachable tone
+  imports; internal song/reference code remains required for .rootsound compatibility.
+- Electron isolated preload exposes named operations only; renderer has no Node
+  integration. Local-origin protocol streams UI/opaque payloads, rejects unknown
+  paths/origins; native file pickers, tone-directory memory, WAV save and close
+  save/discard/cancel are implemented. Mac data goes to Music/RootSound/project,
+  Windows to project beside the executable. Existing development launcher untouched.
+- Portable .NET host links the existing file manager/streaming payload/mirror code
+  without Windows Forms. Stdio RPC preserves scope checks, dirty tracking, manual
+  save, locks, atomic writes, project list/copy/rename/delete and source conflicts.
+-95 music checks plus fixture-only host flow pass. Actual packaged Windows UI and
+  bundled runtime checked in a permanently hidden independent window: welcome,
+  create/reload, one editable note,53 voices, save, no load-autosave, opaque asset
+  rejection and no old arrangement. No screenshot/mouse control/audio device used.
+- Mac minimum13.0, Apple ARM64 only. ZIP restores14 original Unix links and
+  executable modes. Four helpers and main executable locally ad-hoc signed;
+  bounded independent checker validates code/metadata digests and rejects a modified
+  page.1164 final ZIP resource digests checked. rcodesign's own verify warns of
+  known ad-hoc CMS bugs and was not counted as passing; Apple tools were not run.
+  No actual Mac execution, listening, Developer ID signing or notarization claimed.
+- Rebuild: scripts/Build-Release.ps1 -Version <new-version>; refuses existing assets.
+  Package scripts and verification reports under scripts/ and .test-output/release-*;
+  staging/dependency plan under .cache/release-*. All user music files unaccessed.
+  Real-Mac acceptance remains required before promoting beyond preview; future
+  runtime support/patch updates must be checked at release time. No GitHub upload.
+
 ## RB100 La Campanella compound-beat grid — IMPLEMENTED 2026-11-02
 
 - User asks to apply the discussed grid correction. Revised only the existing

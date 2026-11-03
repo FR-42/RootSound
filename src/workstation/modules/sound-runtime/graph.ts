@@ -1,8 +1,11 @@
 import { samePcm } from './pcm.ts';
 import { envelopeValue } from './envelope.ts';
 import { noteDuration, type SampleSourceSnapshot, type ScheduledPreview, type ScheduledSound } from './plan.ts';
+import {createSoundFontSource} from './soundfont-node.ts';
 
 export interface GraphResources {
+  sourceErrors?:Promise<never>[];
+  sourceScheduling?:Promise<void>[];
   readonly oscillators: OscillatorNode[];
   readonly samples: AudioBufferSourceNode[];
   readonly bufferReleases: (() => void)[];
@@ -16,7 +19,8 @@ export interface GraphResources {
 type GraphStart =
   | { kind: 'oscillator'; node: OscillatorNode; gain: GainNode; atSeconds: number; duration: number; frequency: number; level: number; pitch?: Extract<ScheduledSound, { kind: 'basic-synth' }>['pitch'] }
   | { kind: 'noise'; node: AudioBufferSourceNode; gain: GainNode; atSeconds: number; duration: number; level: number }
-  | { kind: 'sample'; node: AudioBufferSourceNode; atSeconds: number; duration: number; plan: Extract<ScheduledSound, { kind: 'sample' }> };
+  | { kind: 'sample'; node: AudioBufferSourceNode; atSeconds: number; duration: number; plan: Extract<ScheduledSound, { kind: 'sample' }> }
+  | { kind: 'soundfont'; node: AudioBufferSourceNode; atSeconds: number; duration: number };
 export interface SoundGraph {
   readonly envelopes: { atSeconds: number; plan: ScheduledSound; node: GainNode }[];
   readonly starts: GraphStart[];
@@ -69,9 +73,26 @@ export function allocateGraph(audio: BaseAudioContext, preview: ScheduledPreview
     node.connect(destination); destination = node; output = { node, preview };
   }
   const graph: SoundGraph = { envelopes: [], starts: [], pans: [], ...(output ? { output } : {}) };
+  const fonts=preview.events.filter(event=>event.sound.kind==='sample'&&event.sound.soundFont);
+  if(fonts.length) {
+    const node=createSoundFontSource(audio,fonts.map(event=>{
+      const sound=event.sound as Extract<ScheduledSound,{kind:'sample'}>;
+      return {atSeconds:event.atSeconds,holdSeconds:sound.note.holdSeconds,releaseSeconds:sound.envelope.releaseSeconds,
+        level:sound.level,pan:event.pan??0,font:sound.soundFont!};
+    }));
+    (resources.sourceErrors??=[]).push(node.failure);
+    (resources.sourceScheduling??=[]).push(node.scheduled);
+    const gain=audio.createGain();resources.gains.push(gain);resources.samples.push(node);node.connect(gain);gain.connect(destination);
+    if(ended)node.onended=ended;
+    const original=fonts[0]!.sound as Extract<ScheduledSound,{kind:'sample'}>;
+    const {soundFont:_font,...clock}=original;
+    graph.envelopes.push({atSeconds:0,node:gain,plan:{...clock,level:1,note:{...clock.note,velocity:1,holdSeconds:preview.durationSeconds},envelope:{attackSeconds:0,releaseSeconds:0},envelopeBaked:true}});
+    graph.starts.push({kind:'soundfont',node,atSeconds:0,duration:preview.durationSeconds});
+  }
   const buffers = new Map<SampleSourceSnapshot, AudioBuffer>();
   for (const event of preview.events) {
     const plan = event.sound;
+    if(plan.kind==='sample'&&plan.soundFont)continue;
     const envelope = audio.createGain();
     resources.gains.push(envelope);
     graph.envelopes.push({ atSeconds: event.atSeconds, plan, node: envelope });
@@ -125,6 +146,10 @@ export function allocateGraph(audio: BaseAudioContext, preview: ScheduledPreview
     }
   }
   return graph;
+}
+
+export function watchSourceErrors(resources:GraphResources,failed:(error:unknown)=>void):void {
+  for(const pending of resources.sourceErrors??[])void pending.catch(failed);
 }
 
 export function scheduleGraph(graph: SoundGraph, normalization: number, start: number, fromSeconds = 0, transitionSeconds = 0): void {
@@ -197,7 +222,7 @@ export function scheduleGraph(graph: SoundGraph, normalization: number, start: n
       if (pitch && age < pitch.seconds) scheduled.node.frequency.linearRampToValueAtTime(scheduled.frequency, start + scheduled.atSeconds + pitch.seconds);
       scheduled.gain.gain.setValueAtTime(scheduled.level, time);
     } else if (scheduled.kind === 'sample') scheduled.node.playbackRate.setValueAtTime(scheduled.plan.playbackRate, time);
-    else scheduled.gain.gain.setValueAtTime(scheduled.level, time);
+    else if(scheduled.kind==='noise')scheduled.gain.gain.setValueAtTime(scheduled.level, time);
   }
   for (const scheduled of graph.pans) scheduled.node.pan.setValueAtTime(scheduled.pan, start + Math.max(scheduled.atSeconds, fromSeconds));
 }
@@ -224,6 +249,7 @@ export function startGraphSource(scheduled: GraphStart, origin: number, fromSeco
   const age = Math.max(0, fromSeconds - scheduled.atSeconds);
   if (age >= scheduled.duration) { scheduled.node.onended = null; scheduled.node.disconnect(); return undefined; }
   const time = origin + Math.max(scheduled.atSeconds, fromSeconds);
+  if(scheduled.kind==='soundfont'){scheduled.node.start(time,age);scheduled.node.stop(origin+scheduled.duration+.001);return time;}
   if (scheduled.kind === 'sample') {
     let offset = scheduled.plan.startSeconds + age * scheduled.plan.playbackRate;
     const loop = scheduled.plan.loop;

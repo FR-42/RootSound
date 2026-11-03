@@ -58,6 +58,13 @@ export interface SampleSoundPlan {
   readonly envelopeBaked?: true;
   readonly note: SoundPlan['note'];
   readonly level: number;
+  /** Original overlapping recording zones; flattened by the global sound runtime. */
+  readonly layers?: readonly Omit<SampleSoundPlan, 'layers' | 'layerReferenceLevel'>[];
+  /** Initial root gain, so later note/track/master edits also scale every layer. */
+  readonly layerReferenceLevel?: number;
+  /** Complete installed SoundFont recipe; PCM is streamed by the global renderer. */
+  readonly soundFont?: { readonly bank: 'generaluser-gs-2.0.3'; readonly program: number; readonly key: number;
+    readonly velocity: number; readonly cents: number; readonly drums: boolean };
 }
 export type PlayableNotePlan = SoundPlan | SampleSoundPlan;
 

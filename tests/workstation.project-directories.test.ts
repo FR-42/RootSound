@@ -34,6 +34,9 @@ test('library rename uses a versioned native snapshot and validates path identit
   bridge.Rename = (path, id, name, text, token) => { calls.push(['rename', path, id, name, text, token]); return raw({ status: 'renamed', project: { ...entry, name } }); };
   assert.deepEqual(await port.rename!(entry, '新名称', '完整修改件', 'file-token'), { ...entry, name: '新名称' });
   assert.deepEqual(calls, [['inspect', entry.path, entry.id], ['rename', entry.path, entry.id, '新名称', '完整修改件', 'file-token']]);
+  const renamedPath = entry.path.replace(/[^\\/]+$/u, '新名称.rootsound');
+  bridge.Rename = () => raw({ status: 'renamed', project: { ...entry, path: renamedPath, name: '新名称' } });
+  assert.equal((await port.rename!(entry, '新名称', '完整修改件', 'file-token')).path, renamedPath);
   for (const value of [{ status: 'snapshot', project: { ...entry, id: 'replaced' }, libraryText: '原件', token: 'token' },
     { status: 'snapshot', project: entry, libraryText: '', token: 'token' }, { status: 'snapshot', project: entry, libraryText: '原件', token: '' }]) {
     bridge.Inspect = () => raw(value); await assert.rejects(port.inspect!(entry), /无效/);

@@ -15,7 +15,7 @@ export function readSampleBankBody(value: JsonValue): SampleBankTimbreBody {
   if (value.zones !== undefined) {
     if (!Array.isArray(value.zones) || !value.zones.length || value.zones.length > 512) return fail();
     zones = value.zones.map(raw => {
-      if (!raw || typeof raw !== 'object' || Array.isArray(raw) || Object.keys(raw).some(key => !['keyMin','keyMax','velocityMin','velocityMax','rootFrequencyHz','startSeconds','endSeconds','attackSeconds','releaseSeconds','decaySeconds','sustain','level','loop','sampleId'].includes(key))
+      if (!raw || typeof raw !== 'object' || Array.isArray(raw) || Object.keys(raw).some(key => !['keyMin','keyMax','velocityMin','velocityMax','rootFrequencyHz','startSeconds','endSeconds','attackSeconds','releaseSeconds','decaySeconds','sustain','level','loop','sampleId','sf2Release'].includes(key))
         || typeof raw.sampleId !== 'string' || !raw.sampleId.trim()) return fail();
       const startSeconds=number(raw.startSeconds,0,120), endSeconds=number(raw.endSeconds,startSeconds+.000001,120);
       const zone: SampleBankZone = {sampleId:raw.sampleId,keyMin:number(raw.keyMin,0,127),keyMax:number(raw.keyMax,0,127),
@@ -23,6 +23,11 @@ export function readSampleBankBody(value: JsonValue): SampleBankTimbreBody {
         attackSeconds:number(raw.attackSeconds,0,2),releaseSeconds:number(raw.releaseSeconds,.01,4),level:number(raw.level,0,1)};
       if(raw.decaySeconds!==undefined)zone.decaySeconds=number(raw.decaySeconds,0,5);
       if(raw.sustain!==undefined)zone.sustain=number(raw.sustain,0,1);
+      if(raw.sf2Release!==undefined){
+        const r=raw.sf2Release;
+        if(!r||typeof r!=='object'||Array.isArray(r)||Object.keys(r).some(key=>!['base','velocity','inverseVelocity'].includes(key)))return fail();
+        zone.sf2Release={base:number(r.base,-32768,32767),velocity:number(r.velocity,-65536,65536),inverseVelocity:number(r.inverseVelocity,-65536,65536)};
+      }
       if (zone.keyMin>zone.keyMax || zone.velocityMin>zone.velocityMax) return fail();
       if (raw.loop !== undefined) {
         if (!raw.loop || typeof raw.loop !== 'object' || Array.isArray(raw.loop) || Object.keys(raw.loop).some(key => !['startSeconds','endSeconds'].includes(key))) return fail();
@@ -37,6 +42,14 @@ export function readSampleBankBody(value: JsonValue): SampleBankTimbreBody {
     ...(value.tuningSemitones===undefined?{}:{tuningSemitones:number(value.tuningSemitones,-127,127)})};
 }
 export function bankSampleIds(body: SampleBankTimbreBody): string[] { return [...new Set(body.zones?.map(zone=>zone.sampleId) ?? [])]; }
+/** All matching regions sound together; nearest-region fallback is only for gaps. */
+export function selectBankZones<T extends Omit<SampleBankZone,'sampleId'>>(zones: readonly T[], frequency: number, velocity: number): T[] {
+  const key = Math.round((69+12*Math.log2(frequency/440))*1e8)/1e8, strength=Math.round(velocity*127);
+  const matching=zones.filter(zone=>key>=zone.keyMin&&key<=zone.keyMax&&strength>=zone.velocityMin&&strength<=zone.velocityMax);
+  if (!matching.length) return [selectBankZone(zones,frequency,velocity)];
+  const primary=selectBankZone(matching,frequency,velocity);
+  return [primary,...matching.filter(zone=>zone!==primary)];
+}
 export function selectBankZone<T extends Omit<SampleBankZone,'sampleId'>>(zones: readonly T[], frequency: number, velocity: number): T {
   const key=69+12*Math.log2(frequency/440), strength=Math.round(velocity*127);
   let best: T | undefined; let distance=Infinity;

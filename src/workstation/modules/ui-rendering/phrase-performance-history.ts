@@ -1,4 +1,5 @@
 import type { PhraseEditorPort, PhraseView } from '../../contracts/phrase.ts';
+import { phraseBeatSeconds } from '../../contracts/phrase-time.ts';
 
 type Entry = { beforeBeat: number; afterBeat: number };
 const histories = new WeakMap<PhraseEditorPort, Map<string, Map<string, Entry>>>();
@@ -22,7 +23,7 @@ function moveHistory(phrase: PhraseEditorPort, redo: boolean): number | undefine
   const changed = [...(redo ? next : previous)].filter(id => !(redo ? previous : next).has(id));
   if (changed.length !== 1) return;
   const entry = entries.get(changed[0]!); if (!entry) return;
-  return (redo ? entry.afterBeat : entry.beforeBeat) * 60 / after.body.tempoBpm;
+  return phraseBeatSeconds(after.body, redo ? entry.afterBeat : entry.beforeBeat);
 }
 
 /** Returns a restored cursor only when undo/redo adds or removes a typed note. */

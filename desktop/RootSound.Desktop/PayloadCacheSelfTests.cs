@@ -112,7 +112,8 @@ internal static class PayloadCacheSelfTests
             Check(new NativeStorage(manager).WriteScoped(changed, snapshot.Scope) == "{\"ok\":true}", "范围正确的草稿修改成功");
             Check(manager.HasUnsavedChanges && Hash(fixture.Path) == originalHash && File.GetLastWriteTimeUtc(fixture.Path) == stamp, "普通修改不写正式文件");
             manager.Save("修改后的歌曲");
-            Check(!manager.HasUnsavedChanges && Hash(fixture.Path + ".bak") == originalHash, "明确保存才提交并备份");
+            fixture = fixture with { Path = manager.Current!.Path };
+            Check(!manager.HasUnsavedChanges && !File.Exists(fixture.Path + ".bak"), "明确保存提交且不生成备份");
             string saved = File.ReadAllText(fixture.Path, Utf8);
             Check(!saved.Contains("rootsound-payload:", StringComparison.Ordinal), "正式工程无会话token");
             Check(Audio(DiskLibrary(fixture.Path)).AsSpan().SequenceEqual(fixture.Audio), "保存的原始音频逐字节不变");
@@ -175,10 +176,10 @@ internal static class PayloadCacheSelfTests
             var fixture = WriteFixture(root); string hash = Hash(fixture.Path);
             using var manager = new ProjectDirectoryManager(root, 128); manager.Open(fixture.Path);
             string changed = RenameDraft(manager.ReadLibrary().Value!, "待保存"); manager.WriteLibrary(changed);
-            Directory.CreateDirectory(fixture.Path + ".bak");
-            ExpectFailure(() => manager.Save(), "备份路径冲突时保存失败");
+            using (var locked = new FileStream(fixture.Path, FileMode.Open, FileAccess.Read, FileShare.Read))
+                ExpectFailure(() => manager.Save(), "文件占用时保存失败");
             Check(manager.HasUnsavedChanges && manager.ReadLibrary().Value == changed && Hash(fixture.Path) == hash, "失败保留草稿与原件");
-            Directory.Delete(fixture.Path + ".bak", false); manager.Save();
+            manager.Save();
             Check(!manager.HasUnsavedChanges && Audio(DiskLibrary(fixture.Path)).AsSpan().SequenceEqual(fixture.Audio), "解除冲突后可重试");
         });
 
@@ -190,7 +191,9 @@ internal static class PayloadCacheSelfTests
             string cache = Directory.GetFiles(manager.ActivePayloadDirectory!, "*.bin").Single();
             byte[] changed = File.ReadAllBytes(cache); changed[^1] ^= 1; File.WriteAllBytes(cache, changed);
             ExpectFailure(() => { using var ignored = manager.OpenPayloadStream(token); }, "等长缓存损坏也被发现");
-            ExpectFailure(() => manager.Save(), "缓存损坏不能保存坏的便携工程");
+            ExpectFailure(() => manager.Save("失败候选"), "缓存损坏不能保存坏的便携工程");
+            Check(!File.Exists(Path.Combine(Path.GetDirectoryName(fixture.Path)!, "失败候选.rootsound"))
+                && manager.Current!.Path == fixture.Path, "改名后写入失败必须恢复原路径");
             Check(Hash(fixture.Path) == hash && !File.Exists(fixture.Path + ".bak"), "失败不覆盖原件或制造新备份");
             manager.Exit("discard"); manager.Open(fixture.Path);
             using var recovered = manager.OpenPayloadStream(Token(manager.ReadLibrary().Value!));
@@ -206,6 +209,7 @@ internal static class PayloadCacheSelfTests
             var selected = manager.Inspect(fixture.Path, fixture.Id);
             Check(selected.LibraryText.Contains("host-asset", StringComparison.Ordinal), "改名检查也是轻量库");
             var renamed = manager.Rename(fixture.Path, fixture.Id, "库中新名", RenameDraft(selected.LibraryText, "库中新名"), selected.Token);
+            fixture = fixture with { Path = renamed.Path };
             Check(renamed.Name == "库中新名" && manager.Current is null && manager.List().Single().Name == "库中新名", "库中改名不进入工程");
             Check(Audio(DiskLibrary(fixture.Path)).AsSpan().SequenceEqual(fixture.Audio), "库中改名仍保存自包含音频");
             Check(!File.ReadAllText(fixture.Path, Utf8).Contains("rootsound-payload:", StringComparison.Ordinal), "改名不泄漏cache引用");

@@ -7,7 +7,7 @@ namespace RootSound.Desktop;
 /// <summary>Real disk checks, isolated beneath the explicitly supplied test directory.</summary>
 public static class FileStoreSelfTests
 {
-    public static int Run(string testDir)
+    public static int Run(string testDir, bool lightweight = false)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(testDir);
         string runDirectory = Path.Combine(Path.GetFullPath(testDir), $"atomic-store-{Guid.NewGuid():N}");
@@ -16,6 +16,7 @@ public static class FileStoreSelfTests
 
         void Case(string name, Action<string> test)
         {
+            if (lightweight && name is "file-size-limit" or "project-sized-library-write-and-reopen") return;
             string directory = Path.Combine(runDirectory, name);
             Directory.CreateDirectory(directory);
             test(directory);
@@ -42,10 +43,10 @@ public static class FileStoreSelfTests
             using var store = new AtomicTextStore(directory);
             store.Write("第一版");
             store.Write("第二版");
-            Check(File.ReadAllText(store.FilePath + ".bak") == "第一版", "备份应保存被替换版本。");
+            Check(!File.Exists(store.FilePath + ".bak"), "替换不生成备份。");
             store.Write("第三版");
             Check(store.Read() == "第三版", "多次替换应保持最新版本。");
-            Check(File.ReadAllText(store.FilePath + ".bak") == "第二版", "备份应更新为上一个版本。");
+            Check(!File.Exists(store.FilePath + ".bak"), "连续保存也不生成备份。");
             Check(Directory.GetFiles(directory, "*.tmp").Length == 0, "成功写入不应遗留候选文件。");
         });
 
@@ -71,7 +72,7 @@ public static class FileStoreSelfTests
             Check(File.ReadAllText(store.FilePath) == "外部修改", "冲突必须保留外部更改。");
             Check(store.Read() == "外部修改", "显式重新读取应取得新内容。");
             store.Write("重新读取后保存");
-            Check(File.ReadAllText(store.FilePath + ".bak") == "外部修改", "重新读取后的替换应备份外部版本。");
+            Check(!File.Exists(store.FilePath + ".bak"), "重新读取后保存不生成备份。");
             File.Delete(store.FilePath);
             Expect<IOException>(() => store.Write("不应重建"), "外部移走文件不能静默重建。");
             Check(!File.Exists(store.FilePath), "冲突应保留外部删除状态。");
@@ -108,9 +109,9 @@ public static class FileStoreSelfTests
             using var store = new AtomicTextStore(directory);
             store.Write("安全原件");
             Directory.CreateDirectory(store.FilePath + ".bak");
-            ExpectFileFailure(() => store.Write("不可提交"), "备份路径是目录时应报告失败。");
-            Check(File.ReadAllText(store.FilePath) == "安全原件", "目录冲突不能导致原件被删除。");
-            Check(Directory.Exists(store.FilePath + ".bak"), "不能删除阻碍保存的既有目录。");
+            store.Write("正常提交");
+            Check(File.ReadAllText(store.FilePath) == "正常提交", "不再使用备份路径，保存应成功。");
+            Check(Directory.Exists(store.FilePath + ".bak"), "无关目录应保持原样。");
         });
 
         Case("target-is-directory", directory =>

@@ -73,8 +73,7 @@ public sealed class NativeAudioFiles
         if (!string.Equals(Path.GetExtension(target), ".wav", StringComparison.OrdinalIgnoreCase))
             throw new IOException("请使用 .wav 后缀导出音频。");
         ValidateWave(bytes);
-        // File.Replace can remove an existing backup before failing. Coordinate
-        // RootSound writers across threads/processes before either touches it.
+        // Coordinate complete replacements across RootSound writers.
         // CreateNew never claims or deletes a pre-existing unknown lock file.
         using var targetLock = new FileStream(target + ".rootsound-save.lock", FileMode.CreateNew,
             FileAccess.ReadWrite, FileShare.None, 1, FileOptions.DeleteOnClose);
@@ -86,7 +85,7 @@ public sealed class NativeAudioFiles
                 stream.Write(bytes);
                 stream.Flush(true);
             }
-            if (File.Exists(target)) File.Replace(temporary, target, target + ".bak");
+            if (File.Exists(target)) File.Replace(temporary, target, null);
             else File.Move(temporary, target);
         }
         finally

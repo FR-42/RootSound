@@ -1,10 +1,13 @@
+import { listDefaultInstruments } from '../src/workstation/modules/timbre/instrument-catalog.ts';
 import assert from 'node:assert/strict';
 import { registerHooks } from 'node:module';
 import { test } from 'node:test';
-import type { SoundRuntimePort, SoundSequencePlan } from '../src/workstation/contracts/sound.ts';
+import type { PlayableNotePlan, SoundRuntimePort, SoundSequencePlan } from '../src/workstation/contracts/sound.ts';
 import type { ProjectDirectoriesPort } from '../src/workstation/contracts/project-directory.ts';
 import type { MusicWorkspaceStatePort } from '../src/workstation/contracts/workspace.ts';
+import type { PhraseBody } from '../src/workstation/contracts/phrase.ts';
 import { createMusicWorkspaceState } from '../src/workstation/app/platform/music-workspace-state.ts';
+import { createWorkspacePreferences } from '../src/workstation/app/platform/preferences.ts';
 import { createInitialProjectLibrary, createProjectSetup } from '../src/workstation/app/project-setup.ts';
 import { openMusicDocument, commitMusicDocument } from '../src/workstation/app/music-document.ts';
 import { createMaterialLibrary } from '../src/workstation/modules/materials/public.ts';
@@ -112,14 +115,22 @@ test('unified music opens directly in the piano roll, plays and saves the comple
   const root = new Element('main');
   const setup = createProjectSetup(directories, () => {}, { read: () => working, songDraftId: () => song.read().draft!.id,
     name: () => song.read().draft!.name, prepareSave() { commitMusicDocument(library, song, phrase); } });
+  let openingReads=0;const readPhrase=phrase.read.bind(phrase);phrase.read=()=>{openingReads++;return readPhrase();};
   const studio = mountStudio(root as unknown as HTMLElement, { timbre: createTimbreEditor(library), sound, hasPrevious: true,
+    preferences:createWorkspacePreferences({getItem:()=>JSON.stringify({version:1,keyboardPerformance:true}),setItem(){}}),
     phrase, song, projectSetup: setup, initialEntry: 'song' });
   try {
     await settle();
+    assert(openingReads<=3,'opening the active canvas must reuse its view instead of repeatedly reading the entire score');
     assert(root.querySelector('.melody-workspace'));
     assert.equal(root.querySelector('.melody-note')!.style.width,'30px','direct project entry uses equally wide pitch columns');
     assert(root.querySelector('.melody-workspace')!.classList.contains('is-vertical'));
     assert.equal(root.querySelector('.melody-console'),undefined,'active workspace has no bottom console');
+    assert.equal(root.querySelector('.song-topbar')!.querySelector('.song-tempo-panel'),undefined,'BPM is beside the keyboard, not in the topbar');
+    assert.equal(root.querySelector('.song-topbar')!.querySelector('.phrase-grid-button'),undefined,'grid division is beside BPM, not in the topbar');
+    assert(root.querySelector('.melody-tempo-dock')!.querySelector('.melody-tempo-button'));
+    const grid=root.querySelector('.melody-grid-select')!;grid.value='3';grid.emit('change');await settle();
+    assert.equal(phrase.read().body!.stepsPerBeat,3);grid.value='4';grid.emit('change');await settle();
     const openingLines=root.querySelectorAll('.melody-grid-line');
     assert(Math.abs(Number.parseFloat(String(openingLines[1]!.style.top))-Number.parseFloat(String(openingLines[0]!.style.top))-128)<1e-8);
     assert(openingLines.every(line=>line.classList.contains('is-beat')),'initial view shows only beat/bar lines');
@@ -130,11 +141,18 @@ test('unified music opens directly in the piano roll, plays and saves the comple
     assert.equal(root.querySelector('.song-new-phrase'), undefined);
     assert.equal(root.querySelector('.song-phrase-library'), undefined);
     assert.equal(root.querySelector('.song-project-name')!.textContent, '直达创作');
+    assert.equal(root.querySelector('.song-settings'),undefined,'empty settings entry is removed');
+    assert.equal(root.querySelector('.song-rate-choice'),undefined,'playback rate control is removed');
+    assert.equal(root.querySelector('.song-volume-panel'),undefined,'topbar volume control is removed');
+    assert.equal(root.querySelector('.workspace-settings-dialog'),undefined);
+    root.querySelector('.melody-tone')!.emit('click');
+    dom.document.emit('keydown',{key:'c'});
+    assert.equal(phrase.read().body!.parts.reduce((sum,part)=>sum+part.notes.length,0),1,'old enabled preferences cannot reactivate performance entry');
     root.querySelector('.melody-add-tone')!.emit('click');
-    assert.equal(root.querySelectorAll('.melody-library-tone').length, 53);
+    assert.equal(root.querySelectorAll('.melody-library-tone').length, 175);
     const category = (name: string) => root.querySelectorAll('.melody-library-category').find(item => item.textContent === name)!;
-    category('键盘').emit('click'); assert.equal(root.querySelectorAll('.melody-library-tone').length, 7);
-    category('打击').emit('click'); assert.equal(root.querySelectorAll('.melody-library-tone').length, 14);
+    category('键盘').emit('click'); assert.equal(root.querySelectorAll('.melody-library-tone').length, listDefaultInstruments().filter(item=>item.category==='键盘').length);
+    category('打击').emit('click'); assert.equal(root.querySelectorAll('.melody-library-tone').length, listDefaultInstruments().filter(item=>item.category==='打击').length);
     category('全部').emit('click'); const search = root.querySelector('.melody-library-search')!;
     search.value = 'flute'; search.emit('input');
     assert.equal(root.querySelectorAll('.melody-library-tone').length, 1);
@@ -163,7 +181,7 @@ test('unified music opens directly in the piano roll, plays and saves the comple
       assert.equal(phrase.read().body!.tempoBpm,120,'tapping alone cannot change the project');
       assert.equal(plans.length,1,'tap keys cannot start playback');
       root.querySelector('.tap-tempo-apply')!.emit('click');await settle();
-      assert.equal(phrase.read().body!.tempoBpm,150);assert.equal(phrase.read().body!.parts[0]!.notes[0]!.durationSeconds,.5);
+      assert.equal(phrase.read().body!.tempoBpm,150);assert.equal(phrase.read().body!.parts[0]!.notes[0]!.durationSeconds,.4);
       assert.equal(saves,1,'applying tempo is a working edit, not a disk save');
     }finally{if(originalPerformance)Object.defineProperty(globalThis,'performance',originalPerformance);}
   } finally { studio.dispose(); dom.restore(); }
@@ -232,7 +250,7 @@ test('tap dialog supports mouse and keyboard, reset, cancel and listener cleanup
   }finally{dialog.dispose();dom.restore();}
 });
 
-function editableRoll(options: { workspaceState?: MusicWorkspaceStatePort; performance?: boolean; orientation?: 'vertical' } = {}) {
+function editableRoll(options: { workspaceState?: MusicWorkspaceStatePort; performance?: boolean; orientation?: 'vertical'; playing?: boolean } = {}) {
   const dom=installDom();let text=createInitialProjectLibrary('交互测试');
   const library=createMaterialLibrary({read:()=>text,write:value=>{text=value;}});
   const tones=createTimbrePlayback(library,undefined,undefined,musicClockVoice),phrase=createPhraseEditor(library,tones);
@@ -241,16 +259,34 @@ function editableRoll(options: { workspaceState?: MusicWorkspaceStatePort; perfo
   const first=phrase.addPart(sounds[0]!.id),second=phrase.addPart(sounds[1]!.id),empty=phrase.addPart(sounds[2]!.id);
   const a=phrase.addNote(first,{startBeat:1,durationBeats:1,frequencyHz:261.6255653005986,velocity:.7});
   const b=phrase.addNote(second,{startBeat:1,durationBeats:1,frequencyHz:293.6647679174076,velocity:.7});
-  const root=new Element('main');const sound={cancelAudition(){},async audition(){}} as unknown as SoundRuntimePort;
+  const root=new Element('main'),auditions:PlayableNotePlan[]=[];const sound={cancelAudition(){},async audition(plan:PlayableNotePlan){auditions.push(plan);}} as unknown as SoundRuntimePort;
+  const previews:Array<PhraseBody|undefined>=[];
   const mount=()=>mountMelodyWorkspace(root as unknown as HTMLElement,{phrase,sound,gridBpm:()=>120,workspaceState:options.workspaceState,orientation:options.orientation,readPerformanceMode:()=>!!options.performance,
-    listTimbres:()=>sounds,onAddTimbre:id=>phrase.addPart(id),onChange(){},onPreview(){},onSeek(){}});
+    readIsPlaying:options.playing===undefined?undefined:()=>options.playing!,
+    listTimbres:()=>sounds,onAddTimbre:id=>phrase.addPart(id),onChange(){},onPreview(body){previews.push(body);},onSeek(){}});
   let roll=mount();
   const family=(id:string)=>root.querySelectorAll('.melody-tone').find(item=>item.dataset.partId===id)!;
   const remove=(id:string)=>family(id).parentElement!.querySelector('.melody-family-remove')!;
   const note=(id:string)=>root.querySelectorAll('.melody-note').find(item=>item.dataset.noteId===id)!;
-  return {...dom,root,get roll(){return roll;},phrase,first,second,empty,a,b,family,remove,note,read:()=>text,reopen(workspaceState=options.workspaceState){roll.dispose();options.workspaceState=workspaceState;roll=mount();},
-    cleanup(){roll.dispose();dom.restore();}};
+  return {...dom,root,get roll(){return roll;},phrase,first,second,empty,a,b,family,remove,note,previews,read:()=>text,reopen(workspaceState=options.workspaceState){roll.dispose();options.workspaceState=workspaceState;roll=mount();},
+    auditions,cleanup(){roll.dispose();dom.restore();}};
 }
+
+test('idle drag skips audio copies and playing drag previews only the latest frame',()=>{
+  for(const playing of [false,true]){
+    const f=editableRoll({playing});try{
+      const scroll=f.root.querySelector('.melody-scroll')!,block=f.note(f.a);
+      const from={clientX:Number.parseFloat(String(block.style.left))+2,clientY:Number.parseFloat(String(block.style.top))+2};
+      scroll.emit('pointerdown',{target:block,...from});
+      f.document.emit('pointermove',{...from,clientX:from.clientX+15});
+      f.document.emit('pointermove',{...from,clientX:from.clientX+30});
+      assert.equal(f.previews.filter(Boolean).length,0);
+      f.flushFrames();assert.equal(f.previews.filter(Boolean).length,playing?1:0);
+      f.document.emit('pointerup');assert.equal(f.previews.at(-1),undefined);
+      const count=f.previews.length;f.flushFrames();assert.equal(f.previews.length,count,'released gesture cannot replay a stale preview');
+    }finally{f.cleanup();}
+  }
+});
 
 test('added families can be removed, populated removal can be cancelled and note edits remain undoable',()=>{
   const f=editableRoll();try{
@@ -330,7 +366,7 @@ test('zoom reveals finer drawing cells and black and white pitch rows have equal
     const scroll=f.root.querySelector('.melody-scroll')!,canvas=f.root.querySelector('.melody-canvas')!;
     const lines=()=>f.root.querySelectorAll('.melody-grid-line');
     assert(lines().every(line=>line.classList.contains('is-beat')));
-    const zoom=()=>scroll.emit('wheel',{target:canvas,ctrlKey:true,shiftKey:true,deltaY:-Math.log(2)/.002,clientX:0,clientY:100});
+    const zoom=()=>{scroll.emit('wheel',{target:canvas,ctrlKey:true,shiftKey:true,deltaY:-Math.log(2)/.002,clientX:0,clientY:100});f.flushFrames();};
     zoom();assert(lines().some(line=>!line.classList.contains('is-beat')));
     zoom();const keys=f.root.querySelectorAll('.melody-key'),black=keys.find(key=>key.textContent==='C♯4'||key.textContent==='C#4')!;
     assert(black,'keyboard contains C sharp');const rowHeight=f.roll.readViewport().rowHeight;
@@ -469,7 +505,267 @@ test('vertical scroll renders notes in its visible time window without altering 
     assert.equal(f.root.querySelectorAll('.melody-note').find(note=>note.dataset.noteId===far),undefined);
     const before=structuredClone(f.phrase.read().body),scroll=f.root.querySelector('.melody-scroll')!,canvas=f.root.querySelector('.melody-canvas')!;
     scroll.emit('wheel',{target:canvas,deltaY:3000,clientX:200,clientY:100});
+    f.flushFrames();
     assert(f.note(far));assert.deepEqual(f.phrase.read().body,before);
+  }finally{f.cleanup();}
+});
+
+test('footer plus appends connected rolls and the BPM menu has no duplicate creation entry',()=>{
+  const f=editableRoll({orientation:'vertical'});try{
+    f.phrase.setLength(16);f.roll.refresh();
+    const first=structuredClone(f.phrase.read().body!.parts),scroll=f.root.querySelector('.melody-scroll')!,canvas=f.root.querySelector('.melody-canvas')!;
+    f.root.querySelector('.melody-tempo-button')!.emit('click');
+    assert(!f.root.querySelector('.melody-tempo-panel')!.hidden);
+    assert.equal(f.root.querySelector('.melody-add-tempo-roll'),undefined);
+    f.root.querySelector('.melody-extend')!.emit('click');
+    let body=f.phrase.read().body!;assert.equal(body.tempoSections!.length,1);assert.equal(body.tempoSections![0]!.startBeat,16);
+    assert.equal(body.lengthBeats,32);assert.deepEqual(body.parts,first);assert.equal(f.roll.readViewport().leftSeconds,8);
+    const input=f.root.querySelector('.melody-tempo-input')!;
+    f.root.querySelector('.melody-tempo-button')!.emit('click');input.value='60';input.emit('change');
+    body=f.phrase.read().body!;assert.equal(body.tempoBpm,120);assert.equal(body.tempoSections![0]!.tempoBpm,60);
+    f.root.querySelector('.melody-tempo-button')!.emit('click');
+    f.family(f.first).emit('click');
+    const view=f.roll.readViewport(),scale=melodyScale(view,scroll.clientHeight-48,melodyDuration(body));
+    scroll.emit('pointerdown',{target:canvas,clientX:200,clientY:(9-view.leftSeconds)*scale});f.document.emit('pointerup');
+    body=f.phrase.read().body!;const note=body.parts.find(p=>p.id===f.first)!.notes.at(-1)!;
+    assert(Math.abs(note.startBeat-17)<1e-10,'second roll uses its60BPM clock');
+    scroll.emit('wheel',{target:canvas,deltaY:-100,clientX:200,clientY:100});f.flushFrames();
+    assert.equal(f.root.querySelectorAll('.melody-bpm-roll').length,2,'both adjacent rolls move in the same canvas');
+    f.root.querySelector('.melody-quick-thumb')!.emit('keydown',{key:'End'});f.flushFrames();
+    const plus=f.root.querySelector('.melody-extend')!;assert(!plus.hidden);
+    assert.equal(plus.style.top,undefined,'footer plus has no time-positioned inline offset');
+    const old=body.lengthBeats;plus.emit('click');assert.equal(f.phrase.read().body!.lengthBeats,old+16);
+    assert.equal(f.phrase.read().body!.tempoSections![0]!.startBeat,16);
+    assert.equal(f.phrase.read().body!.tempoSections![1]!.startBeat,old);
+    assert.equal(f.phrase.read().body!.tempoSections![1]!.tempoBpm,60);
+  }finally{f.cleanup();}
+});
+
+test('each roll has its own arrow-free grid control and its tap button edits only that roll',()=>{
+  const f=editableRoll({orientation:'vertical'}),original=Object.getOwnPropertyDescriptor(globalThis,'performance');let now=0;
+  Object.defineProperty(globalThis,'performance',{configurable:true,value:{now:()=>now}});
+  try{
+    f.phrase.setLength(16);const section=f.phrase.addTempoSection();f.roll.refresh();
+    const scroll=f.root.querySelector('.melody-scroll')!,canvas=f.root.querySelector('.melody-canvas')!;
+    scroll.emit('wheel',{target:canvas,deltaY:1800,clientX:200,clientY:100});f.flushFrames();
+    const block=f.root.querySelectorAll('.melody-tempo-block').find(b=>b.dataset.sectionId===section)!;
+    assert(!block.hidden);const grid=block.querySelector('.melody-tempo-grid')!;
+    grid.value='3';grid.emit('change');let body=f.phrase.read().body!;
+    assert.equal(body.tempoSections![0]!.stepsPerBeat,3);assert.equal(body.stepsPerBeat,undefined);
+    block.querySelector('.melody-tempo-marker')!.emit('click');
+    assert.equal(f.root.querySelector('.melody-panel-grid'),undefined);
+    assert.equal(block.querySelector('.melody-tap-tempo'),undefined);
+    assert.equal(f.root.querySelector('.melody-tempo-dock')!.querySelector('.melody-tap-tempo'),undefined);
+    grid.value='5';grid.emit('change');
+    assert.equal(f.phrase.read().body!.tempoSections![0]!.stepsPerBeat,5);
+    f.root.querySelector('.melody-tempo-panel')!.querySelector('.melody-tap-tempo')!.emit('click');
+    for(const at of [0,400,800,1200]){now=at;f.root.querySelector('.tap-tempo-pad')!.emit('click');}
+    f.root.querySelector('.tap-tempo-apply')!.emit('click');body=f.phrase.read().body!;
+    assert.equal(body.tempoBpm,120);assert.equal(body.tempoSections![0]!.tempoBpm,150);assert.equal(body.tempoSections![0]!.stepsPerBeat,5);
+    f.phrase.undo();assert.equal(f.phrase.read().body!.tempoSections![0]!.tempoBpm,120);
+  }finally{f.cleanup();if(original)Object.defineProperty(globalThis,'performance',original);}
+});
+
+test('last roll edge is reachable after the end, previews without saving and resizes in one undo step',()=>{
+  const f=editableRoll({orientation:'vertical'});try{
+    f.phrase.setLength(16);const section=f.phrase.addTempoSection();
+    const late=f.phrase.addNote(f.first,{startBeat:30,durationBeats:.5,durationSeconds:.25,frequencyHz:440,velocity:.7});f.roll.refresh();
+    const scroll=f.root.querySelector('.melody-scroll')!,canvas=f.root.querySelector('.melody-canvas')!,edge=f.root.querySelector('.melody-roll-end')!;
+    scroll.emit('wheel',{target:canvas,deltaY:100000,clientX:200,clientY:100});f.flushFrames();
+    assert(!edge.hidden);const top=Number.parseFloat(String(edge.style.top));assert(top>0&&top<scroll.clientHeight-48-10,'the edge has blank space below it');
+    const before=f.phrase.read().body!,text=f.read(),scale=melodyScale(f.roll.readViewport(),scroll.clientHeight-48,melodyDuration(before));
+    edge.emit('pointerdown',{clientY:100});f.document.emit('pointermove',{clientY:100-2*scale});f.flushFrames();assert.equal(f.read(),text);
+    f.document.emit('pointerup');let body=f.phrase.read().body!;assert.equal(body.lengthBeats,28);
+    assert.equal(body.tempoSections![0]!.startBeat,16);assert.equal(body.tempoSections![0]!.id,section);assert(body.parts[0]!.hiddenNotes!.some(item=>item.note.id===late));
+    f.phrase.undo();assert.deepEqual(f.phrase.read().body,before);f.roll.refresh();
+    edge.emit('pointerdown',{clientY:100});f.document.emit('pointermove',{clientY:100+scale});f.flushFrames();f.document.emit('pointercancel');assert.deepEqual(f.phrase.read().body,before);
+    edge.emit('keydown',{key:'ArrowDown'});assert.equal(f.phrase.read().body!.lengthBeats,36);
+  }finally{f.cleanup();}
+});
+
+test('dragging a BPM label previews smoothly, commits once in bars, retains hidden notes and can be cancelled',()=>{
+  const f=editableRoll({orientation:'vertical',playing:true});try{
+    f.phrase.setLength(16);const section=f.phrase.addTempoSection();
+    const late=f.phrase.addNote(f.first,{startBeat:14,durationBeats:.5,durationSeconds:.25,frequencyHz:440,velocity:.7});
+    const lower=f.phrase.addNote(f.first,{startBeat:18,durationBeats:.5,durationSeconds:.25,frequencyHz:660,velocity:.7});f.roll.refresh();
+    const scroll=f.root.querySelector('.melody-scroll')!,canvas=f.root.querySelector('.melody-canvas')!;
+    scroll.emit('wheel',{target:canvas,deltaY:1800,clientX:200,clientY:100});f.flushFrames();
+    let marker=f.root.querySelectorAll('.melody-tempo-marker').find(m=>m.attributes.get('aria-label')==='卷帘 2 BPM')!;
+    const scale=melodyScale(f.roll.readViewport(),scroll.clientHeight-48,melodyDuration(f.phrase.read().body!));
+    const before=f.read(),viewport=f.roll.readViewport();
+    marker.emit('pointerdown',{clientY:100});f.document.emit('pointermove',{clientY:100-2*scale});f.flushFrames();
+    f.flushFrames();assert(f.previews.at(-1)?.parts[0]!.hiddenNotes?.some(item=>item.note.id===late),'playing preview receives the cropped score');
+    assert.equal(f.read(),before,'preview cannot change persisted working content');assert(!f.root.querySelector('.melody-tempo-resize-hint')!.hidden);
+    f.roll.setPlayhead(0,true);assert.deepEqual(f.roll.readViewport(),viewport,'label drag owns the camera');
+    f.document.emit('pointerup');
+    let body=f.phrase.read().body!;assert.equal(body.tempoSections![0]!.startBeat,12);assert.equal(body.parts[0]!.hiddenNotes![0]!.note.id,late);
+    assert.equal(body.parts[0]!.notes.find(n=>n.id===lower)!.startBeat,14);
+    f.phrase.undo();assert.equal(f.phrase.read().body!.tempoSections![0]!.startBeat,16);assert(f.phrase.read().body!.parts[0]!.notes.some(n=>n.id===late));f.roll.refresh();
+    marker=f.root.querySelectorAll('.melody-tempo-marker').find(m=>m.attributes.get('aria-label')==='卷帘 2 BPM')!;
+    const restored=f.read();marker.emit('pointerdown',{clientY:100});f.document.emit('pointermove',{clientY:100+scale});f.flushFrames();
+    f.document.emit('pointercancel');assert.equal(f.read(),restored);assert(f.root.querySelector('.melody-tempo-resize-hint')!.hidden);
+    assert(!marker.hasPointerCapture(1));
+    marker.emit('keydown',{key:'ArrowDown'});body=f.phrase.read().body!;assert.equal(body.tempoSections![0]!.startBeat,20);
+    assert.equal(body.tempoSections![0]!.id,section);
+  }finally{f.cleanup();}
+});
+
+test('off-grid note heads and triplets retain exact placement and QWEASD no longer edit the selected note',()=>{
+  const f=editableRoll({orientation:'vertical'});
+  try{
+    const scroll=f.root.querySelector('.melody-scroll')!,canvas=f.root.querySelector('.melody-canvas')!;
+    f.family(f.first).emit('click');const view=f.roll.readViewport(),scale=melodyScale(view,scroll.clientHeight-48,melodyDuration(f.phrase.read().body!));
+    for(const beat of [1/3,2/3]){
+      const at={clientX:200,clientY:beat*.5*scale};
+      scroll.emit('pointerdown',{target:canvas,...at});f.document.emit('pointerup',at);
+      const created=f.phrase.read().body!.parts.find(p=>p.id===f.first)!.notes.at(-1)!;
+      assert(Math.abs(created.startBeat-beat)<1e-10,'a triplet position is not floored to quarters');
+    }
+    const note=f.phrase.read().body!.parts.find(p=>p.id===f.first)!.notes.at(-1)!,block=f.note(note.id),bounds=block.getBoundingClientRect();
+    const at={clientX:bounds.left+4,clientY:bounds.top+2};
+    scroll.emit('pointerdown',{target:block,...at});f.document.emit('pointermove',{...at,clientY:at.clientY+3});
+    const ghost=f.note(note.id).style.top;f.document.emit('pointerup');
+    let edited=f.phrase.read().body!.parts.find(p=>p.id===f.first)!.notes.at(-1)!;
+    assert(Math.abs(edited.startBeat-(note.startBeat+6/scale))<1e-10);
+    assert.equal(f.note(note.id).style.top,ghost,'releasing does not jump the note head');
+    const before=structuredClone(f.phrase.read().body),working=f.read();
+    for(const key of 'qweasdQWEASD'){
+      f.document.emit('keydown',{target:scroll,key});f.document.emit('keydown',{target:scroll,key});
+      f.document.emit('keydown',{target:scroll,key,repeat:true});
+    }
+    assert.deepEqual(f.phrase.read().body,before,'position, gain, pan and other musical data stay unchanged');
+    assert.equal(f.read(),working,'removed shortcuts cannot add edit-history entries');
+  }finally{f.cleanup();}
+});
+
+test('keyboard auditions piano without selection and drags pitch independently with or without a selected family',async()=>{
+  const f=editableRoll({orientation:'vertical'});try{
+    const scroll=f.root.querySelector('.melody-scroll')!;
+    const piano=f.phrase.previewPianoPlan.bind(f.phrase);let pianoCalls=0;
+    f.phrase.previewPianoPlan=note=>{pianoCalls++;return piano(note);};
+    let key=f.root.querySelectorAll('.melody-key').find(k=>k.dataset.pitchLabel==='C4')!;
+    const music=structuredClone(f.phrase.read().body);
+    key.emit('click');await settle();assert.equal(pianoCalls,1);assert.equal(f.auditions.length,1);assert(Math.abs(f.auditions[0]!.note.frequencyHz-261.6255653005986)<1e-8);
+    for(const selected of [false,true]){
+      if(selected)f.family(f.first).emit('click');
+      key=f.root.querySelectorAll('.melody-key').find(k=>k.dataset.pitchLabel==='C4')!;
+      const before=f.roll.readViewport();const count:number=f.auditions.length;
+      scroll.emit('pointerdown',{target:key,clientX:500,clientY:10});
+      f.document.emit('pointermove',{clientX:460,clientY:10});f.document.emit('pointerup');f.flushFrames();
+      const after=f.roll.readViewport();assert.equal(after.top,before.top+40);assert.equal(after.leftSeconds,before.leftSeconds);
+      key.emit('click');await settle();assert.equal(f.auditions.length,count,'a drag must not also trigger a click audition');
+      assert.deepEqual(f.phrase.read().body,music);
+    }
+  }finally{f.cleanup();}
+});
+
+test('vertical playback flips instantly only at the bottom, keeps pitch zoom and never edits music',()=>{
+  const f=editableRoll({orientation:'vertical'});
+  const original=Object.getOwnPropertyDescriptor(globalThis,'performance');let now=0;
+  Object.defineProperty(globalThis,'performance',{configurable:true,value:{now:()=>now}});
+  try{
+    f.phrase.setLength(64);f.roll.refresh();
+    const before=structuredClone(f.phrase.read().body),start=f.roll.readViewport(),span=8/start.zoom;
+    f.roll.setPlayhead(start.leftSeconds+span*.99,true);
+    assert.equal(f.roll.readViewport().leftSeconds,start.leftSeconds,'no early movement or easing');
+    const time=start.leftSeconds+span*.999;
+    f.roll.setPlayhead(time,true);
+    assert.equal(f.roll.readViewport().leftSeconds,time,'one clock update puts the head exactly at the top');
+    assert.equal(f.root.querySelector('.melody-playhead')!.style.transform,'translateY(0px)');
+    now=400;f.roll.setPlayhead(time+.1,true);
+    const followed=f.roll.readViewport();
+    assert(time+.1>=followed.leftSeconds&&time+.1<followed.leftSeconds+span);
+    assert.equal(followed.top,start.top);assert.equal(followed.rowHeight,start.rowHeight);assert.equal(followed.zoom,start.zoom);
+    const head=f.root.querySelector('.melody-playhead')!;
+    assert(!head.hidden);assert(String(head.style.transform).startsWith('translateY('));
+    f.roll.setPlayhead(0,true);assert(!head.hidden,'seeking back during playback immediately reveals the head');
+    const paused=f.roll.readViewport();f.roll.setPlayhead(span*3,false);
+    assert.deepEqual(f.roll.readViewport(),paused,'paused seeking does not take over navigation');
+    f.roll.setPlayhead(31.5,true);
+    assert.equal(f.roll.readViewport().leftSeconds,31.5,'final page also leaves the head at the top');
+    assert.equal(f.root.querySelector('.melody-playhead')!.style.transform,'translateY(0px)');
+    assert(f.root.querySelector('.melody-quick-scroll')!.hidden,'automatic following cannot reveal the manual locator');
+    assert.deepEqual(f.phrase.read().body,before);
+    assert(!f.root.querySelector('.melody-shelf')!.classList.contains('is-family-strip'));
+  }finally{f.cleanup();if(original)Object.defineProperty(globalThis,'performance',original);}
+});
+
+test('manual browsing away suspends follow for30 seconds and further browsing restarts that interval',()=>{
+  const f=editableRoll({orientation:'vertical'});
+  const original=Object.getOwnPropertyDescriptor(globalThis,'performance');let now=0;
+  Object.defineProperty(globalThis,'performance',{configurable:true,value:{now:()=>now}});
+  try{
+    f.phrase.setLength(128);f.roll.refresh();const music=structuredClone(f.phrase.read().body);
+    const scroll=f.root.querySelector('.melody-scroll')!,canvas=f.root.querySelector('.melody-canvas')!;
+    f.roll.setPlayhead(.5,true);
+    const pan=()=>{scroll.emit('pointerdown',{target:canvas,altKey:true,clientX:200,clientY:200});f.document.emit('pointermove',{clientX:200,clientY:-800});f.document.emit('pointerup');f.flushFrames();};
+    pan();const away=f.roll.readViewport();assert(away.leftSeconds>.5);
+    now=29_999;f.roll.setPlayhead(.6,true);assert.deepEqual(f.roll.readViewport(),away);assert(f.root.querySelector('.melody-playhead')!.hidden);
+    pan();const further=f.roll.readViewport();
+    now=30_001;f.roll.setPlayhead(.7,true);assert.deepEqual(f.roll.readViewport(),further,'another manual pan restarts the grace period');
+    now=60_000;f.roll.setPlayhead(.8,true);assert(!f.root.querySelector('.melody-playhead')!.hidden,'following resumes after the latest30-second interval');
+    assert.deepEqual(f.phrase.read().body,music);
+  }finally{f.cleanup();if(original)Object.defineProperty(globalThis,'performance',original);}
+});
+
+test('small navigation keeps following and returning to the head cancels the browsing grace period',()=>{
+  const f=editableRoll({orientation:'vertical'});
+  const original=Object.getOwnPropertyDescriptor(globalThis,'performance');let now=0;
+  Object.defineProperty(globalThis,'performance',{configurable:true,value:{now:()=>now}});
+  try{
+    f.phrase.setLength(128);f.roll.refresh();
+    const scroll=f.root.querySelector('.melody-scroll')!,canvas=f.root.querySelector('.melody-canvas')!;
+    const wheel=(deltaY:number)=>{scroll.emit('wheel',{target:canvas,deltaY,clientX:200,clientY:100});f.flushFrames();};
+    const span=8/f.roll.readViewport().zoom;f.roll.setPlayhead(span*.5,true);
+    wheel(10);const slightly=f.roll.readViewport().leftSeconds;
+    f.roll.setPlayhead(slightly+span*.999,true);
+    assert(f.roll.readViewport().leftSeconds>slightly,'head remained visible after the small wheel move');
+    f.roll.setPlayhead(.5,false);wheel(3000);const away=f.roll.readViewport();
+    now=300;f.roll.setPlayhead(.6,true);assert.deepEqual(f.roll.readViewport(),away);
+    wheel(-10000);assert.equal(f.roll.readViewport().leftSeconds,0);
+    f.roll.setPlayhead(span*.999,true);
+    assert(f.roll.readViewport().leftSeconds>0,'bringing the head back into view resumes without waiting30 seconds');
+  }finally{f.cleanup();if(original)Object.defineProperty(globalThis,'performance',original);}
+});
+
+test('sustained time browsing reveals the locator and dragging reports the head direction without editing or seeking',()=>{
+  const f=editableRoll({orientation:'vertical'});
+  const original=Object.getOwnPropertyDescriptor(globalThis,'performance');let now=0;
+  Object.defineProperty(globalThis,'performance',{configurable:true,value:{now:()=>now}});
+  try{
+    f.phrase.setLength(256);f.roll.refresh();const music=structuredClone(f.phrase.read().body);
+    const scroll=f.root.querySelector('.melody-scroll')!,canvas=f.root.querySelector('.melody-canvas')!;
+    const quick=f.root.querySelector('.melody-quick-scroll')!,thumb=f.root.querySelector('.melody-quick-thumb')!,hint=f.root.querySelector('.melody-quick-hint')!;
+    const wheel=(deltaY:number)=>{scroll.emit('wheel',{target:canvas,deltaY,clientX:200,clientY:100});f.flushFrames();};
+    wheel(30);assert(quick.hidden,'a short scroll does not clutter the canvas');
+    now=650;wheel(30);assert(!quick.hidden,'continued small scrolls reveal the locator');
+    f.roll.setPlayhead(0,false);
+    quick.emit('pointerdown',{clientY:600});f.flushFrames();
+    const late=f.roll.readViewport();assert(late.leftSeconds>60);assert.equal(hint.textContent,'');assert.equal(thumb.attributes.get('aria-description'),'播放头在上方');assert(!hint.hidden);
+    now=40_000;f.roll.setPlayhead(.1,true);assert.deepEqual(f.roll.readViewport(),late,'drag owns navigation even past the grace timeout');
+    f.document.emit('pointermove',{clientY:0});f.flushFrames();assert.equal(f.roll.readViewport().leftSeconds,0);
+    f.roll.setPlayhead(100,false);assert.equal(thumb.attributes.get('aria-description'),'播放头在下方');
+    f.document.emit('pointerup');assert(hint.hidden);
+    quick.emit('pointerdown',{target:thumb,clientY:10});assert.equal(f.roll.readViewport().leftSeconds,0,'grabbing the thumb keeps its offset');
+    f.document.emit('pointermove',{clientY:350});f.flushFrames();assert(f.roll.readViewport().leftSeconds>0);
+    f.document.emit('pointercancel');assert(hint.hidden);assert(!quick.hasPointerCapture(1));
+    thumb.emit('keydown',{key:'End'});f.flushFrames();assert.equal(f.roll.readViewport().leftSeconds,128-2/f.roll.readViewport().zoom);
+    thumb.emit('keydown',{key:'Home'});f.flushFrames();assert.equal(f.roll.readViewport().leftSeconds,0);
+    assert.deepEqual(f.phrase.read().body,music,'locator moves the camera, not notes or tempo');
+  }finally{f.cleanup();if(original)Object.defineProperty(globalThis,'performance',original);}
+});
+
+test('a large canvas pan reveals the locator and the head hint also identifies an in-view head',()=>{
+  const f=editableRoll({orientation:'vertical'});try{
+    f.phrase.setLength(256);f.roll.refresh();
+    const scroll=f.root.querySelector('.melody-scroll')!,canvas=f.root.querySelector('.melody-canvas')!,quick=f.root.querySelector('.melody-quick-scroll')!;
+    scroll.emit('pointerdown',{target:canvas,altKey:true,clientX:200,clientY:200});
+    f.document.emit('pointermove',{clientX:200,clientY:-800});f.document.emit('pointerup');f.flushFrames();
+    assert(!quick.hidden);
+    quick.emit('pointerdown',{clientY:0});f.flushFrames();
+    f.roll.setPlayhead(.1,false);assert.equal(f.root.querySelector('.melody-quick-hint')!.textContent,'');
+    assert.equal(f.root.querySelector('.melody-quick-thumb')!.attributes.get('aria-description'),'播放头在视野内');
+    f.document.emit('pointerup');
   }finally{f.cleanup();}
 });
 

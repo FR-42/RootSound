@@ -3,9 +3,11 @@ import type { PhraseBody, PhraseEditorPort } from '../contracts/phrase.ts';
 import type { SongEditorPort } from '../contracts/song.ts';
 import { readPhraseBody } from '../modules/phrase/public.ts';
 import { readSongBody } from '../modules/song/public.ts';
+import { phraseBeatSeconds, phraseHeldSeconds } from '../contracts/phrase-time.ts';
 
 /** File compatibility boundary: one editable score, with no arrangement in the product. */
-export function openMusicDocument(library: MaterialLibrary, song: SongEditorPort, score: PhraseEditorPort): void {
+export function openMusicDocument(library: MaterialLibrary, song: SongEditorPort, score: PhraseEditorPort, fileName?: string): void {
+  if (fileName && song.read().draft && song.read().draft!.name !== fileName) song.rename(fileName);
   const root = song.read().draft;
   if (!root) return;
   const body = readSongBody(root.body);
@@ -30,18 +32,17 @@ export function openMusicDocument(library: MaterialLibrary, song: SongEditorPort
     const source = readPhraseBody(saved.body);
     const sourceBpm = body.tempoMode === 'song' ? body.tempoBpm : source.tempoBpm;
     const start = clip.startBeat * bpm / body.tempoBpm;
-    const scale = bpm / sourceBpm;
     const silent = track.muted || solo && !track.solo;
     for (const part of source.parts) {
       const key = JSON.stringify([part.timbreId, !!part.unassigned]);
       let target = groups.get(key);
       if (!target) { target = { ...part, id: crypto.randomUUID(), section: 'melody', notes: [] }; groups.set(key, target); parts.push(target); }
       target.notes.push(...part.notes.map(note => {
-        const startBeat = start + note.startBeat * scale;
-        const durationBeats = note.durationBeats * scale;
+        const startBeat = start + phraseBeatSeconds(source, note.startBeat) * source.tempoBpm / sourceBpm * bpm / 60;
+        const durationBeats = (phraseBeatSeconds(source, note.startBeat + note.durationBeats) - phraseBeatSeconds(source, note.startBeat)) * source.tempoBpm / sourceBpm * bpm / 60;
         end = Math.max(end, startBeat + durationBeats);
         return { ...note, id: crypto.randomUUID(), startBeat, durationBeats,
-          durationSeconds: note.durationSeconds ?? note.durationBeats * 60 / sourceBpm,
+          durationSeconds: note.durationSeconds ?? phraseHeldSeconds(source, note) * source.tempoBpm / sourceBpm,
           level: silent ? 0 : (note.level ?? 1) * (source.masterLevel ?? 1) * track.level * (clip.level ?? 1) * (body.masterLevel ?? 1),
           pan: Math.max(-1, Math.min(1, (note.pan ?? 0) + (clip.pan ?? track.pan) + (track.panOffset ?? 0))) };
       }));

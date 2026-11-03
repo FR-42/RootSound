@@ -4,11 +4,11 @@ import { defaultInstrumentInfo } from '../timbre/instrument-catalog.ts';
 
 /** A short-note lane has its own request lifetime, separate from the transport. */
 export function createPhraseAudition(
-  phrase: Pick<PhraseEditorPort, 'read' | 'previewNotePlan' | 'previewTimbrePlan'>,
+  phrase: Pick<PhraseEditorPort, 'read' | 'previewNotePlan' | 'previewTimbrePlan' | 'previewPianoPlan'>,
   sound: Pick<SoundRuntimePort, 'audition' | 'cancelAudition'>,
   currentPart: () => string | undefined,
   onError: (message: string) => void,
-): { request(frequencyHz: number, holdSeconds?: number, velocity?: number, ready?: void | Promise<void>): Promise<void>; requestTimbre(id: string): Promise<void>; sync(snapshot?: Pick<PhraseView, 'draft' | 'body'>): void; cancel(): void } {
+): { request(frequencyHz: number, holdSeconds?: number, velocity?: number, ready?: void | Promise<void>): Promise<void>; requestKeyboard(frequencyHz: number): Promise<void>; requestTimbre(id: string): Promise<void>; sync(snapshot?: Pick<PhraseView, 'draft' | 'body'>): void; cancel(): void } {
   let generation = 0;
   let scope = '';
   function currentScope(view: Pick<PhraseView, 'draft' | 'body'> = phrase.read()): string {
@@ -17,6 +17,20 @@ export function createPhraseAudition(
   }
   function cancel(): void { generation++; sound.cancelAudition(); }
   return {
+    async requestKeyboard(frequencyHz) {
+      if (currentScope()) return this.request(frequencyHz);
+      cancel(); const initial = phrase.read(), draftId = initial.draft?.id;
+      scope = currentScope(initial); const expected = scope, request = generation;
+      if (!draftId) return;
+      try {
+        const plan = await phrase.previewPianoPlan({ frequencyHz, holdSeconds: .35, velocity: .75 });
+        if (request !== generation || phrase.read().draft?.id !== draftId || currentScope() !== expected) return;
+        await sound.audition(plan);
+      } catch (error) {
+        if (request === generation && phrase.read().draft?.id === draftId && currentScope() === expected)
+          onError(`试音暂不可用：${error instanceof Error ? error.message : String(error)}`);
+      }
+    },
     async request(frequencyHz, holdSeconds = 0.35, velocity = 0.75, ready) {
       cancel(); scope = currentScope();
       const selected = currentPart(); if (!selected || !scope) return;

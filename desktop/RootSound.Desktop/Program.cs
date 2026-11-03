@@ -7,6 +7,25 @@ internal static class Program
     [STAThread]
     private static int Main(string[] args)
     {
+        var noBackupDirectory = Argument(args, "--test-save-without-backups");
+        if (noBackupDirectory is not null)
+        {
+            noBackupDirectory = Path.GetFullPath(noBackupDirectory); Directory.CreateDirectory(noBackupDirectory);
+            try
+            {
+                int store = FileStoreSelfTests.Run(noBackupDirectory, lightweight: true);
+                int audio = AudioFilesSelfTests.Run(noBackupDirectory);
+                int project = ProjectFilesSelfTests.Run(noBackupDirectory, lightweight: true);
+                File.WriteAllText(Path.Combine(noBackupDirectory, "no-backups-report.json"), JsonSerializer.Serialize(new
+                { passed = store + audio + project, store, audio, project, lightweightFixturesOnly = true, visibleWindowsCreated = false, soundDevicesOpened = false }));
+                return 0;
+            }
+            catch (Exception error)
+            {
+                File.WriteAllText(Path.Combine(noBackupDirectory, "no-backups-report.json"), JsonSerializer.Serialize(new { error = error.ToString() }));
+                return 1;
+            }
+        }
         var resourceTestDirectory = Argument(args, "--test-local-resources");
         if (resourceTestDirectory is not null)
         {

@@ -14,7 +14,7 @@ public sealed class AtomicTextStore : IDisposable
     private byte[]? observedHash;
     private bool disposed;
 
-    public string FilePath { get; }
+    public string FilePath { get; private set; }
 
     public AtomicTextStore(string directory) : this(directory, "materials.json", null) { }
 
@@ -88,7 +88,7 @@ public sealed class AtomicTextStore : IDisposable
                 }
                 RequireUnchanged();
                 if (observedHash is null) File.Move(temporary, FilePath);
-                else File.Replace(temporary, FilePath, FilePath + ".bak");
+                else File.Replace(temporary, FilePath, null);
                 observedHash = hash;
             }
             finally { try { File.Delete(temporary); } catch (IOException) { } catch (UnauthorizedAccessException) { } }
@@ -130,6 +130,37 @@ public sealed class AtomicTextStore : IDisposable
         }
     }
 
+    /// <summary>Rename in the same folder while retaining exclusive ownership of the new path.</summary>
+    internal void MoveTo(string destination)
+    {
+        lock (gate)
+        {
+            ThrowIfDisposed(); destination = Path.GetFullPath(destination);
+            if (string.Equals(FilePath, destination, StringComparison.Ordinal)) return;
+            if (!string.Equals(Path.GetDirectoryName(destination), directory, StringComparison.OrdinalIgnoreCase))
+                throw new IOException("改名必须保留在当前工程目录。");
+            RequireUnchanged();
+            AtomicTextStore? next = null;
+            try
+            {
+                bool sameLock = string.Equals(FilePath, destination, StringComparison.OrdinalIgnoreCase);
+                if (!sameLock)
+                {
+                    if (Path.Exists(destination)) throw new IOException("这个目录已有同名工程，请换一个名称。");
+                    next = ForProjectFile(destination);
+                    if (Path.Exists(destination)) throw new IOException("这个目录已有同名工程，请换一个名称。");
+                }
+                File.Move(FilePath, destination); // Never replace another file.
+                FilePath = destination;
+                if (next is not null)
+                {
+                    ownership?.Dispose(); ownership = next.ownership; next.ownership = null;
+                }
+            }
+            finally { next?.Dispose(); }
+        }
+    }
+
     public void Write(string value)
     {
         ArgumentNullException.ThrowIfNull(value);
@@ -154,7 +185,7 @@ public sealed class AtomicTextStore : IDisposable
                 if (observedHash is null)
                     File.Move(temporary, FilePath); // Never overwrite an unexpected new file.
                 else
-                    File.Replace(temporary, FilePath, FilePath + ".bak");
+                    File.Replace(temporary, FilePath, null);
                 observedHash = SHA256.HashData(bytes);
             }
             finally

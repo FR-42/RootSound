@@ -18,9 +18,9 @@ import { mountProjectStart } from './project-start.ts';
 import { mountProjectLibrary } from './project-library.ts';
 import { showProjectSaveAs } from './project-save-as.ts';
 import { showProjectExit } from './project-exit.ts';
-import { showWorkspaceSettings } from './settings.ts';
 import { showAudioExport } from './audio-export.ts';
 import './studio.css';
+import './theme.css';
 export { showMidiImportNotice } from './midi-import-notice.ts';
 
 export interface StudioOptions {
@@ -91,12 +91,13 @@ export function mountStudio(root: HTMLElement, options: StudioOptions): { dispos
   }
   function showMusic(): void {
     leave();
-    if (!options.phrase?.read().draft) { showWelcome(); return; }
-    const phrase = options.phrase;
-    editor = mountPhraseComposition(root, { phrase, sound: options.sound, directMusic: true,
+    const initialView = options.phrase?.read();
+    if (!initialView?.draft) { showWelcome(); return; }
+    const phrase = options.phrase!;
+    editor = mountPhraseComposition(root, { phrase, initialView, sound: options.sound, directMusic: true,
       workspaceState: options.workspaceState,
-      onSettings: options.preferences ? () => showWorkspaceSettings(root, options.preferences!, () => editor?.refresh()) : undefined,
-      readPerformanceMode: () => options.preferences?.read().keyboardPerformance ?? false,
+      // Retired mode cannot reactivate from a previously saved preference.
+      readPerformanceMode: () => false,
       onPrepareMelody: options.onPrepareMelody,
       listTimbres: options.projectTimbres, onImportTimbre: options.onImportTimbre,
       onAddTimbre: options.onAddPhraseTimbre, onCreateNoteGroup: options.onCreateNoteGroup,

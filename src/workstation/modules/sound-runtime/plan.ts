@@ -52,7 +52,7 @@ function fields(value: Record<string, unknown>, allowed: readonly string[], labe
 function readPlan(value: unknown, readSample: (value: unknown) => SampleSourceSnapshot): ScheduledSound {
   const plan = object(value, '声音执行计划');
   if (plan.kind === 'sample' && plan.version === 1) {
-    fields(plan, ['kind', 'version', 'source', 'startSeconds', 'endSeconds', 'playbackRate', 'envelope', 'note', 'level', 'loop', 'envelopeBaked'], '采样声音执行计划');
+    fields(plan, ['kind', 'version', 'source', 'startSeconds', 'endSeconds', 'playbackRate', 'envelope', 'note', 'level', 'loop', 'envelopeBaked', 'soundFont'], '采样声音执行计划');
     if (plan.envelopeBaked !== undefined && plan.envelopeBaked !== true) throw new Error('生成音色的包络标记无效。');
     const source = readSample(plan.source); const duration = source.audio.channels[0]!.length / source.audio.sampleRate;
     const startSeconds = number(plan.startSeconds, '采样开始位置', 0, duration);
@@ -65,9 +65,17 @@ function readPlan(value: unknown, readSample: (value: unknown) => SampleSourceSn
       if (loop.endSeconds <= loop.startSeconds) throw new Error('循环结束需要晚于循环开始。');
     }
     const common = readControls(plan);
+    let soundFont:SampleSoundPlan['soundFont'];
+    if(plan.soundFont!==undefined) {
+      const font=object(plan.soundFont,'SoundFont 音符');fields(font,['bank','program','key','velocity','cents','drums'],'SoundFont 音符');
+      if(font.bank!=='generaluser-gs-2.0.3'||typeof font.drums!=='boolean')throw new Error('SoundFont 音源无效。');
+      const program=number(font.program,'音源编号',0,127),key=number(font.key,'音源琴键',0,127),velocity=number(font.velocity,'音源力度',0,127);
+      if(![program,key,velocity].every(Number.isInteger))throw new Error('SoundFont 编号必须是整数。');
+      soundFont={bank:font.bank,program,key,velocity,cents:number(font.cents,'音源调音',-12700,12700),drums:font.drums};
+    }
     return { kind: 'sample', version: 1, source, startSeconds, endSeconds,
       playbackRate: number(plan.playbackRate, '采样播放倍率', 1 / 256, 256), ...common, ...(loop ? { loop } : {}),
-      ...(plan.envelopeBaked ? { envelopeBaked: true as const } : {}) };
+      ...(plan.envelopeBaked ? { envelopeBaked: true as const } : {}),...(soundFont?{soundFont}: {}) };
   }
   if (plan.kind !== 'basic-synth' || plan.version !== 1) {
     throw new Error('当前声音运行仅支持第 1 版基础合成计划。');
@@ -126,7 +134,7 @@ function readControls(plan: Record<string, unknown>): Pick<SoundPlan, 'envelope'
 
 export function noteDuration(sound: ScheduledSound): number {
   const envelope = sound.note.holdSeconds + sound.envelope.releaseSeconds;
-  return sound.kind === 'sample' && !sound.loop ? Math.min(envelope, (sound.endSeconds - sound.startSeconds) / sound.playbackRate) : envelope;
+  return sound.kind === 'sample' && !sound.loop && !sound.soundFont ? Math.min(envelope, (sound.endSeconds - sound.startSeconds) / sound.playbackRate) : envelope;
 }
 
 function sourceReader(previous?: ScheduledPreview): { read(value: unknown): SampleSourceSnapshot; sources: SampleSourceSnapshot[] } {
@@ -175,6 +183,7 @@ export function samePreviewSamples(left: ScheduledPreview | undefined, right: Sc
 }
 
 function samplePeak(sound: Extract<ScheduledSound, { kind: 'sample' }>, pan = 0): number {
+  if(sound.soundFont?.velocity===0)return 0;
   const channels = sound.source.audio.channels.length;
   if (channels === 1) return sound.source.peak;
   if (channels === 2) {
@@ -187,15 +196,31 @@ function samplePeak(sound: Extract<ScheduledSound, { kind: 'sample' }>, pan = 0)
   return sound.source.peak * channels;
 }
 
+function recordingLayers(value: unknown): unknown[] {
+  const plan=object(value,'声音执行计划');
+  if(plan.kind!=='sample' || plan.layers===undefined) return [value];
+  if(!Array.isArray(plan.layers) || plan.layers.length>15) throw new Error('一个采样音符最多支持 16 层原始录音。');
+  const reference=number(plan.layerReferenceLevel,'采样层参考音量',0,1);
+  const gain=number(plan.level,'采样音量',0,1);
+  const {layers,layerReferenceLevel:_reference,...root}=plan;
+  return [root,...layers.map(raw=>{
+    const layer=object(raw,'采样层');
+    if(layer.kind!=='sample' || layer.layers!==undefined || layer.layerReferenceLevel!==undefined) throw new Error('采样层不能嵌套。');
+    const initial=number(layer.level,'采样层音量',0,1);
+    return {...layer,note:root.note,level:reference ? initial*gain/reference : 0};
+  })];
+}
+
 export function readPreview(value: unknown, options: { allowEmptySequence?: boolean; previous?: ScheduledPreview; transportElapsed?: number } = {}): ScheduledPreview {
   const input = object(value, '声音执行计划');
   const sampleReader = sourceReader(options.previous);
   if (input.kind !== 'sequence') {
-    const sound = readPlan(input, sampleReader.read);
+    const sounds=recordingLayers(input).map(plan=>readPlan(plan,sampleReader.read));
+    const amplitude=sounds.reduce((sum,sound)=>sum+sound.level*sound.note.velocity*(sound.kind==='sample'?samplePeak(sound):1),0);
     return {
-      events: [{ atSeconds: 0, sound }],
-      durationSeconds: noteDuration(sound),
-      normalization: sound.kind === 'sample' ? 1 / Math.max(1, sound.level * sound.note.velocity * samplePeak(sound)) : 1,
+      events: sounds.map(sound=>({atSeconds:0,sound})),
+      durationSeconds: Math.max(...sounds.map(noteDuration))+(sounds.some(sound=>sound.kind==='sample'&&sound.soundFont)?3:0),
+      normalization: input.kind==='sample' ? 1/Math.max(1,amplitude) : 1,
       sequence: false,
       samples: sampleReader.sources,
     };
@@ -227,7 +252,12 @@ export function readPreview(value: unknown, options: { allowEmptySequence?: bool
     }
   }
   const boundaries: { time: number; amplitude: number; sources: number }[] = [];
-  const scheduled = Array.from(input.events, (raw: unknown) => {
+  const expanded=Array.from(input.events).flatMap((raw:unknown)=>{
+    const event=object(raw,'音乐音符');
+    fields(event,['atSeconds','sound','pan'],'音乐音符');
+    return recordingLayers(event.sound).map(sound=>({...event,sound}));
+  });
+  const scheduled = Array.from(expanded, (raw: unknown) => {
     const event = object(raw, '音乐音符');
     fields(event, ['atSeconds', 'sound', 'pan'], '音乐音符');
     const songAtSeconds = number(event.atSeconds, '音符开始时间（秒）', 0, duration);
@@ -275,6 +305,7 @@ export function readPreview(value: unknown, options: { allowEmptySequence?: bool
     while (onsets[index]!.time - onsets[begin]!.time > .35) upcomingSources -= onsets[begin++]!.sources;
     if (upcomingSources > MAX_LOOKAHEAD_SOURCES) throw new Error('音符过于密集：任意 0.35 秒内最多支持 4096 个波形声源，请减少极短音符。');
   }
+  if(scheduled.some(event=>event.sound.kind==='sample'&&event.sound.soundFont))durationSeconds+=3;
   return { events: scheduled, durationSeconds, normalization: 1 / peak, sequence: true, samples: sampleReader.sources, ...(output ? { output } : {}), ...(transport ? { transport, transportClock } : {}) };
 }
 

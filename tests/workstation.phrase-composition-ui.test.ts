@@ -166,24 +166,24 @@ test('the phrase console reads the complete current phrase and refreshes its met
   } finally { f.cleanup(); }
 });
 
-test('console volume previews live without writes and pointer release commits once while cancel restores both controls', async () => {
+test('console volume previews live without writes and pointer release commits once while cancel restores the control', async () => {
   const f = fixture(); try {
     const slider = f.root.querySelector('.phrase-console-volume')!;
-    const top = f.root.querySelectorAll('input').find(input => input.attributes.get('aria-label') === '总音量')!;
+    assert.equal(f.root.querySelector('.song-volume-panel'), undefined);
     f.root.querySelector('.song-play')!.emit('click'); await settle(); f.elapsed(1.5);
     const before = structuredClone(f.phrase.read().draft); const token = f.library.currentToken(); const level = f.plans.at(-1)!.events[0]!.sound.level;
     slider.emit('pointerdown', { pointerId: 17 }); slider.value = '.35'; slider.emit('input'); slider.value = '.45'; slider.emit('input'); await settle();
-    assert.deepEqual(f.phrase.read().draft, before); assert.equal(f.library.currentToken(), token); assert.equal(top.value, '0.45');
+    assert.deepEqual(f.phrase.read().draft, before); assert.equal(f.library.currentToken(), token);
     assert.equal(f.root.querySelector('.phrase-console-volume-value')!.textContent, '45%'); assert(f.plans.at(-1)!.events[0]!.sound.level < level);
     assert.equal(f.root.querySelector('.song-play')!.attributes.get('aria-label'), '暂停'); assert.equal(f.plans.at(-1)!.transport!.positionSeconds, 1.5);
     f.document.emit('pointerup', { pointerId: 17 }); slider.emit('change'); assert.equal(f.phrase.read().body!.masterLevel, .45);
     f.document.emit('keydown', { key: 'Backspace', target: f.viewport }); assert.equal(f.phrase.read().body!.masterLevel, undefined);
-    assert.equal(top.value, '1'); assert.equal(slider.value, '1');
+    assert.equal(slider.value, '1');
     const afterUndo = structuredClone(f.phrase.read().draft); const tokenAfterUndo = f.library.currentToken();
     slider.emit('pointerdown', { pointerId: 18 }); slider.value = '.2'; slider.emit('input'); await settle();
     f.document.emit('pointercancel', { pointerId: 18 }); await settle();
     assert.deepEqual(f.phrase.read().draft, afterUndo); assert.equal(f.library.currentToken(), tokenAfterUndo);
-    assert.equal(top.value, '1'); assert.equal(slider.value, '1'); assert.equal(f.root.querySelector('.phrase-console-volume-value')!.textContent, '100%');
+    assert.equal(slider.value, '1'); assert.equal(f.root.querySelector('.phrase-console-volume-value')!.textContent, '100%');
   } finally { f.cleanup(); }
 });
 
@@ -261,12 +261,12 @@ test('only the narrow ruler summons and smoothly drags the head; cancellation re
   } finally { f.cleanup(); }
 });
 
-test('empty phrases run a silent four-bar clock, and the topbar plays, pauses, resumes and changes head speed', async () => {
+test('empty phrases run a silent four-bar clock, and the topbar plays, pauses and resumes at normal speed', async () => {
   const f = fixture({}, { empty: true }); try {
     const play = f.root.querySelector('.song-play')!; assert.equal(play.disabled, false); play.emit('click'); await settle();
     assert.equal(f.plans[0]!.durationSeconds, 8); assert.deepEqual(f.plans[0]!.events, []); assert.equal(play.attributes.get('aria-label'), '暂停');
-    f.elapsed(2); f.root.querySelectorAll('.song-rate-choice')[1]!.emit('click'); await settle();
-    assert.equal(f.plans.at(-1)!.transport!.rate, .75);
+    f.elapsed(2); assert.equal(f.root.querySelector('.song-rate-choice'), undefined);
+    assert.equal(f.plans.at(-1)!.transport?.rate ?? 1, 1);
     play.emit('click'); assert.equal(play.attributes.get('aria-label'), '播放');
     play.emit('click'); await settle(); assert.equal(f.methods.at(-1), 'resume');
     f.root.querySelector('.song-stop')!.emit('click'); assert.equal(f.root.querySelector('.song-clock')!.textContent, '00:00.000');
@@ -297,7 +297,7 @@ test('the shared phrase header exposes 2–9 cells per beat and changing them pr
 
 test('a pending master-volume gesture cannot replace the requested cell-resolution value while the header flushes', () => {
   const f = fixture(); try {
-    const volume = f.root.querySelectorAll('input').find(input => input.attributes.get('aria-label') === '总音量')!;
+    const volume = f.root.querySelector('.phrase-console-volume')!;
     volume.value = '.4'; volume.emit('input');
     const field = f.root.querySelector('.phrase-grid-select')!; field.value = '7'; field.emit('change');
     assert.equal(f.phrase.read().body!.masterLevel, .4); assert.equal(f.phrase.read().body!.stepsPerBeat, 7); assert.equal(field.value, '7');
@@ -373,7 +373,7 @@ test('BPM preserves the beat position and volume gestures preview without repeat
     const bpm = f.root.querySelectorAll('input').find(item => item.attributes.get('aria-label') === 'BPM')!; bpm.value = '60'; bpm.emit('change');
     assert.equal(f.phrase.read().body!.tempoBpm, 60); assert.equal(f.root.querySelector('.song-clock')!.textContent, '00:08.000');
     bpm.value = '0'; bpm.emit('change'); assert.equal(f.phrase.read().body!.tempoBpm, 60); assert.equal(bpm.value, '60');
-    const volume = f.root.querySelectorAll('input').find(item => item.attributes.get('aria-label') === '总音量')!;
+    const volume = f.root.querySelector('.phrase-console-volume')!;
     volume.emit('pointerdown', { pointerId: 4 }); volume.value = '.2'; volume.emit('input'); volume.value = '.4'; volume.emit('input');
     assert.equal(f.phrase.read().body!.masterLevel, undefined); f.document.emit('pointerup', { pointerId: 4 });
     assert.equal(f.phrase.read().body!.masterLevel, .4); volume.emit('change'); f.phrase.undo(); assert.equal(f.phrase.read().body!.masterLevel, undefined);
@@ -409,7 +409,7 @@ test('Backspace undoes an overview edit once while text fields and composing key
       f.document.emit('keydown', { key: 'Backspace', target: f.viewport, ...extra });
       assert.equal(f.phrase.read().body!.masterLevel, .4);
     }
-    const volume = f.root.querySelectorAll('input').find(item => item.attributes.get('aria-label') === '总音量')!;
+    const volume = f.root.querySelector('.phrase-console-volume')!;
     f.document.emit('keydown', { key: 'Backspace', target: volume });
     assert.equal(f.phrase.read().body!.masterLevel, undefined, 'a focused volume slider does not swallow Undo');
   } finally { f.cleanup(); }
@@ -442,7 +442,7 @@ test('overview reads the saved full phrase length for playback, head endpoints a
 });
 
 test('overview arrow keys pan or zoom without moving the head or changing notes, with input and modal guards', () => {
-  let opened = 0; const f = fixture({ onSettings() { opened++; } }); try {
+  const f = fixture(); try {
     const before = structuredClone(f.phrase.read().body!);
     const press = (key: string, extra: Record<string, unknown> = {}) => f.document.emit('keydown', { key, target: f.viewport, ...extra });
     press('ArrowRight', { ctrlKey: true }); assert.equal(Number(f.viewport.dataset.zoom), 1.2);
@@ -453,8 +453,8 @@ test('overview arrow keys pan or zoom without moving the head or changing notes,
     const dialog = new FakeElement('dialog'); f.root.append(dialog); dialog.setAttribute('open', ''); press('ArrowRight', { ctrlKey: true }); dialog.remove();
     assert.equal(f.viewport.dataset.zoom, zoom); assert.equal(f.viewport.dataset.leftBeat, left);
     assert.equal(f.root.querySelector('.song-clock')!.textContent, '00:00.000'); assert.deepEqual(f.phrase.read().body, before);
-    const actions = f.root.querySelector('.song-file-actions')!.children; assert.equal(actions[0]!.textContent, '设置'); assert.equal(actions[1]!.textContent, '保存');
-    assert.equal(opened, 0);
+    const actions = f.root.querySelector('.song-file-actions')!.children; assert.equal(actions[0]!.textContent, '保存');
+    assert.equal(f.root.querySelector('.song-settings'), undefined);
   } finally { f.cleanup(); }
 });
 

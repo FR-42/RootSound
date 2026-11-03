@@ -1,5 +1,6 @@
 import type { PhraseEditorPort, PhraseSection, PhraseView } from '../../contracts/phrase.ts';
 import { phraseStepsPerBeat } from '../../contracts/phrase.ts';
+import { phraseDurationSeconds } from '../../contracts/phrase-time.ts';
 import type { SoundRuntimePort } from '../../contracts/sound.ts';
 import type { MusicWorkspaceStatePort } from '../../contracts/workspace.ts';
 import { createPhraseCompositionTransport } from './phrase-composition-transport.ts';
@@ -20,23 +21,23 @@ function node<K extends keyof HTMLElementTagNameMap>(tag: K, className = '', tex
 function action(text: string, className: string, callback: () => void): HTMLButtonElement {
   const button = node('button', className, text); button.type = 'button'; button.addEventListener('click', callback); return button;
 }
-function icon(kind: 'play' | 'pause' | 'stop' | 'tempo' | 'volume'): SVGSVGElement {
+function icon(kind: 'play' | 'pause' | 'stop' | 'tempo'): SVGSVGElement {
   const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg'); svg.setAttribute('viewBox', '0 0 24 24'); svg.setAttribute('aria-hidden', 'true');
   const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
   path.setAttribute('d', { play: 'M8 5v14l11-7z', pause: 'M7 5h3v14H7zM14 5h3v14h-3z', stop: 'M6 6h12v12H6z',
-    tempo: 'M9 3h6l5 18H4zM12 6v10m-3-4 7-5M8 18h8', volume: 'M4 9h4l5-4v14l-5-4H4zM16 8q5 4 0 8M19 5q7 7 0 14' }[kind]);
+    tempo: 'M9 3h6l5 18H4zM12 6v10m-3-4 7-5M8 18h8' }[kind]);
   path.setAttribute('fill', ['play', 'pause', 'stop'].includes(kind) ? 'currentColor' : 'none'); path.setAttribute('stroke', 'currentColor'); path.setAttribute('stroke-width', '1.5'); path.setAttribute('stroke-linejoin', 'round'); svg.append(path); return svg;
 }
 
 /** A bounded shared canvas is the phrase workspace; notes remain owned by the phrase domain. */
 export function mountPhraseComposition(root: HTMLElement, options: {
   phrase: PhraseEditorPort; sound: SoundRuntimePort;
+  initialView?: PhraseView;
   directMusic?: boolean;
   workspaceState?: MusicWorkspaceStatePort;
   onExport?(): void;
   onSave?(): void | Promise<void>; onSaveAs?(): void | Promise<void>; onExit?(): void | Promise<void>;
   onRename?(name: string): void | Promise<void>;
-  onSettings?(): void;
   readPerformanceMode?(): boolean;
   initialSection?: 'overview' | PhraseSection;
   onSectionChange?(section: 'overview' | PhraseSection): void;
@@ -50,7 +51,7 @@ export function mountPhraseComposition(root: HTMLElement, options: {
   onReorderTimbres?(id: string, targetIndex: number): void;
 }): { dispose(): void; refresh(): void; notify(message: string, error?: boolean): void; flush(): Promise<void> } {
   const { phrase, sound } = options;
-  let disposed = false; let current = phrase.read(); let draftId = current.draft?.id;
+  let disposed = false; let current = options.initialView ?? phrase.read(); let draftId = current.draft?.id;
   let view: MelodyView = { leftSeconds: 0, zoom: current.body ? 8 / (current.body.lengthBeats * 60 / current.body.tempoBpm) : 1, rowHeight: 24 };
   let detailViewInitialized = false;
   const keyboard = phrase.keyboard().slice().reverse();
@@ -69,7 +70,7 @@ export function mountPhraseComposition(root: HTMLElement, options: {
   let state = { playing: false, preparing: false, position: 0, rate: 1 };
   let playButton: HTMLButtonElement; let clock: HTMLElement; let viewport: HTMLElement; let ruler: HTMLElement;
   let playhead: HTMLElement; let handle: HTMLButtonElement; let notice: HTMLElement; let title: HTMLElement;
-  let tempoInput: HTMLInputElement; let masterInput: HTMLInputElement; let rateButton: HTMLButtonElement;
+  let tempoInput: HTMLInputElement;
   let subdivisionSelect: HTMLSelectElement; let subdivisionButton: HTMLButtonElement;
   let titleInput: HTMLInputElement | undefined; let titleCommit: Promise<boolean> | undefined;
   let tapTempoDialog: ReturnType<typeof showTapTempo> | undefined;
@@ -78,7 +79,7 @@ export function mountPhraseComposition(root: HTMLElement, options: {
   let gesture: { kind: 'head' | 'pan' | 'split'; id: number; capture: HTMLElement; lastX: number; lastY: number; section: PhraseSection; startRatio?: number; startTops?: Record<PhraseSection, number> } | undefined;
   const tempo = () => current.body?.tempoBpm ?? 120;
   const length = () => current.body?.lengthBeats ?? 16;
-  const duration = () => length() * 60 / tempo();
+  const duration = () => current.body ? phraseDurationSeconds(current.body) : 8;
   const timelineWidth = () => Math.max(1, viewport.clientWidth);
   const gridTempo = tempo;
   function report(message: string, error = false): void {
@@ -104,7 +105,7 @@ export function mountPhraseComposition(root: HTMLElement, options: {
       // Prepare the newly selected recordings before compiling that plan.
     } while (!disposed && scope !== playbackFamilyId);
   }
-  const transport = createPhraseCompositionTransport({ runtime: sound, tempoBpm: tempo, lengthBeats: length,
+  const transport = createPhraseCompositionTransport({ runtime: sound, tempoBpm: tempo, lengthBeats: length, durationSeconds: duration,
     prepare: preparePlayback, readPlan: () => phrase.previewPlan(playbackBody(), { allowSilence: true }),
     onChange(next) { state = next; updatePlayback(); }, onError: error => report(error instanceof Error ? error.message : String(error), true) });
 
@@ -123,20 +124,19 @@ export function mountPhraseComposition(root: HTMLElement, options: {
     }
     updateTitle();
     if (document.activeElement !== tempoInput) tempoInput.value = String(gridTempo());
-    if (document.activeElement !== masterInput) masterInput.value = String(masterPreview ?? current.body?.masterLevel ?? 1);
     if (document.activeElement !== subdivisionSelect) subdivisionSelect.value = String(phraseStepsPerBeat(current.body));
     subdivisionButton.textContent = `${phraseStepsPerBeat(current.body)}格`;
     syncConsole();
     for (const button of fileButtons) button.disabled = busy || !current.draft;
     if (playButton) playButton.disabled = busy || !current.body;
-    tempoInput.disabled = masterInput.disabled = busy || !current.body;
+    tempoInput.disabled = busy || !current.body;
     subdivisionSelect.disabled = subdivisionButton.disabled = busy || !current.body;
   }
   function positionHead(): void {
     if (disposed || !viewport) return;
     const seconds = transport.position();
     const ms = Math.round(seconds * 1000); clock.textContent = `${Math.floor(ms / 60000).toString().padStart(2, '0')}:${Math.floor(ms / 1000 % 60).toString().padStart(2, '0')}.${(ms % 1000).toString().padStart(3, '0')}`;
-    if (sectionEditor) { sectionEditor.setPlayhead(seconds); return; }
+    if (sectionEditor) { sectionEditor.setPlayhead(seconds, state.playing); return; }
     const beat = Math.max(0, Math.min(length(), seconds * tempo() / 60));
     const width = headWidth; const x = (Math.max(0, Math.min(duration(), seconds)) - view.leftSeconds) * melodyScale(view, width, duration());
     playhead.hidden = x < 0 || x > width; handle.hidden = playhead.hidden;
@@ -231,7 +231,7 @@ export function mountPhraseComposition(root: HTMLElement, options: {
     if (gesture?.id === event.pointerId) finishGesture(false);
     if (masterPointer === event.pointerId) {
       masterPointer = undefined; masterPreview = undefined; sync();
-      masterInput.value = consoleVolume.value = String(current.body?.masterLevel ?? 1);
+      consoleVolume.value = String(current.body?.masterLevel ?? 1);
       transport.refresh();
     }
   };
@@ -296,25 +296,19 @@ export function mountPhraseComposition(root: HTMLElement, options: {
   stopButton.setAttribute('aria-label', '停止并回到开头'); stopButton.title = '停止并回到开头'; stopButton.append(icon('stop'));
   playButton = action('', 'song-icon-button song-play', () => { if (!disposed && !busy && current.body) void transport.toggle(); });
   clock = node('output', 'song-clock', '00:00.000'); clock.setAttribute('aria-label', '当前时间');
-  const rate = node('div', 'song-popover'); rateButton = action('1x', 'song-icon-button', () => {}); rateButton.setAttribute('aria-label', '播放倍速');
-  const rates = node('div', 'song-popover-panel song-rate-options');
-  for (const value of [1, .75, 1.25]) rates.append(action(`${value}x`, 'song-rate-choice', () => {
-    if (disposed || busy) return; transport.setRate(value); rateButton.textContent = `${value}x`;
-  }));
-  rate.append(rateButton, rates);
   const bpm = node('div', 'song-popover'); const bpmButton = action('', 'song-icon-button', () => {}); bpmButton.setAttribute('aria-label', '速度 BPM'); bpmButton.append(icon('tempo'));
   const bpmPanel = node('div', 'song-popover-panel song-tempo-panel'); const bpmLabel = node('label', '', 'BPM');
   tempoInput = node('input'); tempoInput.type = 'number'; tempoInput.min = '40'; tempoInput.max = '240'; tempoInput.step = '1'; tempoInput.setAttribute('aria-label', 'BPM');
   tempoInput.addEventListener('change', () => {
     if (disposed || busy || !current.body) return;
-    try { const value = Number(tempoInput.value); if (!Number.isFinite(value) || value < 40 || value > 240) throw new Error('BPM 需在 40 至 240 之间。'); sectionEditor?.flush(); phrase.setTempo(value, { preserveNoteDurations: true }); refresh(); }
+    try { const value = Number(tempoInput.value); if (!Number.isFinite(value) || value < 40 || value > 240) throw new Error('BPM 需在 40 至 240 之间。'); sectionEditor?.flush(); phrase.setTempo(value, { preserveNoteDurations: false }); refresh(); }
     catch (error) { tempoInput.value = String(tempo()); report(error instanceof Error ? error.message : String(error), true); }
   });
   const tapTempo = action('敲击定速', 'song-tap-tempo', () => { void execute(() => {
     if(tapTempoDialog)return;
     tapTempoDialog=showTapTempo(root,{onApply(value){
       if(disposed||busy||!current.body)throw new Error('当前音乐尚未准备好，请稍后重试。');
-      sectionEditor?.flush();phrase.setTempo(value,{preserveNoteDurations:true});refresh();
+      sectionEditor?.flush();phrase.setTempo(value,{preserveNoteDurations:false});refresh();
     },onClose(){tapTempoDialog=undefined;}});
   }); });
   bpmLabel.append(tempoInput); bpmPanel.append(bpmLabel,tapTempo); bpm.append(bpmButton, bpmPanel);
@@ -331,22 +325,11 @@ export function mountPhraseComposition(root: HTMLElement, options: {
     catch (error) { subdivisionSelect.value = String(phraseStepsPerBeat(current.body)); report(error instanceof Error ? error.message : String(error), true); }
   });
   subdivisionLabel.append(subdivisionSelect); subdivisionPanel.append(subdivisionLabel); subdivision.append(subdivisionButton, subdivisionPanel);
-  const volume = node('div', 'song-popover'); const volumeButton = action('', 'song-icon-button', () => {}); volumeButton.setAttribute('aria-label', '音量'); volumeButton.append(icon('volume'));
-  const volumePanel = node('div', 'song-popover-panel song-volume-panel'); masterInput = node('input'); masterInput.type = 'range'; masterInput.min = '0'; masterInput.max = '1'; masterInput.step = '.01'; masterInput.setAttribute('aria-label', '总音量');
-  masterInput.addEventListener('pointerdown', event => { if (!disposed && !busy) masterPointer = event.pointerId; });
-  masterInput.addEventListener('input', () => {
-    if (disposed || busy || !current.body) return; const value = Number(masterInput.value); if (!Number.isFinite(value)) return;
-    masterPreview = Math.max(0, Math.min(1, value)); syncConsole(); transport.refresh();
-  });
   const volumeCommit = () => { if (disposed || busy) return; try { commitMaster(); } catch (error) { masterPreview = undefined; report(error instanceof Error ? error.message : String(error), true); sync(); } };
-  masterInput.addEventListener('change', volumeCommit); masterInput.addEventListener('blur', volumeCommit);
-  volumePanel.append(masterInput); volume.append(volumeButton, volumePanel);
-  controls.append(stopButton, playButton, clock, rate, bpm, subdivision, volume);
+  controls.append(stopButton, playButton, clock, ...(options.directMusic ? [] : [bpm, subdivision]));
   const files = node('div', 'song-file-actions');
   if (options.onExport) files.append(action('导出音频', 'song-save', () => { void execute(options.onExport); }));
-  if (options.onSettings) { const settings = action('设置', 'song-settings', () => { void execute(options.onSettings); }); files.append(settings); fileButtons.push(settings); }
   const save = action('保存', 'song-save', () => { void execute(options.onSave, true, true); }); files.append(save); fileButtons.push(save);
-  if (options.onSaveAs) { const saveAs = action('另存为', 'song-save', () => { void execute(options.onSaveAs, true); }); files.append(saveAs); fileButtons.push(saveAs); }
   if (options.onExit) { const exit = action('退出', 'song-exit', () => { void execute(options.onExit); }); files.append(exit); fileButtons.push(exit); }
   const identity = node('div', 'phrase-composition-identity');
   const back = action('‹', 'song-icon-button phrase-melody-back', () => { void execute(showOverview); });
@@ -398,7 +381,7 @@ export function mountPhraseComposition(root: HTMLElement, options: {
   consoleVolume.addEventListener('pointerdown', event => { if (!disposed && !busy) masterPointer = event.pointerId; });
   consoleVolume.addEventListener('input', () => {
     if (disposed || busy || !current.body) return; const value = Number(consoleVolume.value); if (!Number.isFinite(value)) return;
-    masterPreview = Math.max(0, Math.min(1, value)); syncConsole(); masterInput.value = String(masterPreview); transport.refresh();
+    masterPreview = Math.max(0, Math.min(1, value)); syncConsole(); transport.refresh();
   });
   consoleVolume.addEventListener('change', volumeCommit); consoleVolume.addEventListener('blur', volumeCommit);
   const melodyNotes = node('div', 'phrase-composition-notes'); melodySection.append(melodyNotes);
@@ -462,7 +445,7 @@ export function mountPhraseComposition(root: HTMLElement, options: {
     vertical.top = row * vertical.rowHeight - height / 2; clampVertical(section);
   }
   function paintOverview(): void {
-    if (disposed || sectionEditor) return;
+    if (disposed || sectionEditor || options.directMusic) return;
     cancelAnimationFrame(overviewFrame); overviewFrame = 0;
     layoutSections();
     view = clampMelodyView(view, duration()); headWidth = timelineWidth();
@@ -495,7 +478,7 @@ export function mountPhraseComposition(root: HTMLElement, options: {
       if (restored) await transport.seek(restored.playheadSeconds);
       if (disposed) return;
     }
-    paintOverview(); cancelAnimationFrame(overviewFrame); overviewFrame = 0;
+    if (!options.directMusic) paintOverview(); cancelAnimationFrame(overviewFrame); overviewFrame = 0;
     main.hidden = true; melodyRegion.hidden = false;
     activeSection = 'melody';
     try { sectionEditor = mountMelodyWorkspace(melodyRegion, { phrase, sound, initialView: current, gridBpm: gridTempo, readPerformanceMode: options.readPerformanceMode, includeAllSections: true,
@@ -515,6 +498,7 @@ export function mountPhraseComposition(root: HTMLElement, options: {
       onPreview(body) { if (disposed) return; previewBody = body; transport.refresh(); },
       onPlaybackFamilyChange(id) { if (disposed) return; playbackFamilyId = id; transport.refresh(); },
       readPlayhead: () => transport.position(),
+      readIsPlaying: () => state.playing || state.preparing,
       onSeek(seconds) { const ready = transport.seek(seconds); positionHead(); return ready; },
     }); } catch (error) { activeSection = undefined; main.hidden = false; melodyRegion.hidden = true; melodyRegion.replaceChildren(); throw error; }
     sectionLabel.textContent = '创作';
@@ -537,10 +521,16 @@ export function mountPhraseComposition(root: HTMLElement, options: {
   const resize = () => { if (!sectionEditor) scheduleOverview(); };
   window.addEventListener('resize', resize);
   if (typeof ResizeObserver !== 'undefined') { observer = new ResizeObserver(resize); observer.observe(viewport); }
-  sync(); paintOverview(); updatePlayback();
+  sync(current); if (!options.directMusic) paintOverview(); updatePlayback();
   const initialSection = options.directMusic ? 'melody' : options.initialSection;
   if (options.directMusic) main.hidden = true;
-  if (initialSection && initialSection !== 'overview') void execute(() => showSection(initialSection));
+  if (initialSection && initialSection !== 'overview') {
+    // Initial mounting is read-only setup, not a file action. Avoid execute's
+    // repeated full-score reads, save flushing and second editor repaint.
+    busy = true; sync(current);
+    void showSection(initialSection).catch(error => report(error instanceof Error ? error.message : String(error), true))
+      .finally(() => { if (!disposed) { busy = false; sync(current); } });
+  }
   return { dispose() {
     if (disposed) return; finishGesture(); disposed = true; tapTempoDialog?.dispose(); sectionEditor?.dispose(); sectionEditor = undefined; melodyOverview.dispose(); removeConsoleWheel(); transport.dispose(); observer?.disconnect(); cancelAnimationFrame(frame); cancelAnimationFrame(overviewFrame); overviewFrame = 0; window.clearTimeout(noticeTimer);
     document.removeEventListener('pointermove', move); document.removeEventListener('pointerup', up); document.removeEventListener('pointercancel', cancel); document.removeEventListener('keydown', key);

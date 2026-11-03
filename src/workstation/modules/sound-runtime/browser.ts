@@ -9,10 +9,11 @@ import type {
 } from '../../contracts/sound.ts';
 
 import { noteDuration, previewFingerprint, readPreview, samePreviewSamples, validateFrequency, type ScheduledPreview } from './plan.ts';
-import { allocateGraph, releaseGraph, scheduleGraph, startGraphSource, type GraphResources } from './graph.ts';
+import { allocateGraph, releaseGraph, scheduleGraph, startGraphSource, watchSourceErrors, type GraphResources } from './graph.ts';
 import { renderOffline } from './offline.ts';
 import { readPcmAudio } from './pcm.ts';
 import { WindowedGraph, WINDOWED_EVENT_THRESHOLD } from './windowed.ts';
+import {prepareSoundFont,hasSoundFont,soundFontReady} from './soundfont-node.ts';
 
 const DEVICE_RESUME_TIMEOUT_MS = 3000;
 const LIVE_TRANSITION_SECONDS = 0.005;
@@ -72,6 +73,7 @@ export function createBrowserSoundRuntime(): SoundRuntimePort {
   let mainMix: GainNode | null = null;
   let sequence = 0;
   let requestSequence = 0;
+  let fontUpdateSequence=0;
   let disposed = false;
   let disposePromise: Promise<void> | null = null;
   let deviceState: SoundRuntimeEvent = { type: 'device', status: 'idle' };
@@ -250,6 +252,8 @@ export function createBrowserSoundRuntime(): SoundRuntimePort {
       throw error;
     }
     if (disposed || request !== requestSequence) throw new Error('这次试听已取消。');
+    if(hasSoundFont(preview))await prepareSoundFont(audio,preview);
+    if (disposed || request !== requestSequence) throw new Error('这次试听已取消。');
     validateFrequency(preview, audio.sampleRate);
     let session: PlaybackSession = Object.freeze({
       id: `preview-${runtimeId}-${++sequence}`,
@@ -276,7 +280,7 @@ export function createBrowserSoundRuntime(): SoundRuntimePort {
       // Allocate the graph before choosing a start, so large phrases do not consume
       // their first notes while nodes are still being built. The small lead also
       // leaves room to send the following automation commands to the audio device.
-      const lead = voice.windowed?.leadSeconds ?? (preview.sequence ? 0.01 + graph.starts.length * 0.00004 + graph.envelopes.length * 0.00002 : 0.005);
+      const lead = (voice.windowed?.leadSeconds ?? (preview.sequence ? 0.01 + graph.starts.length * 0.00004 + graph.envelopes.length * 0.00002 : 0.005))+(hasSoundFont(preview)?.02:0);
       const start = audio.currentTime + lead;
       session = Object.freeze({ ...session, startedAtSeconds: start });
       voice.session = session;
@@ -288,6 +292,7 @@ export function createBrowserSoundRuntime(): SoundRuntimePort {
       if (active !== null) finish(active, 'stopped');
       if (disposed || request !== requestSequence) throw new Error('这次试听已取消。');
       active = voice;
+      watchSourceErrors(voice,error=>{if(active===voice&&voice.generation===generation)finish(voice,'failed',message(error));});
       if (voice.completion !== null) {
         // A zero-valued audio source completes on the device clock even through trailing silence.
         voice.completion.offset.setValueAtTime(0, start);
@@ -357,6 +362,8 @@ export function createBrowserSoundRuntime(): SoundRuntimePort {
     // or its pending start. Its completion is intentionally not a transport event.
     const audio = await ready(pendingAuditionResumes);
     if (disposed || request !== auditionSequence) throw new Error('这次试音已取消。');
+    if(hasSoundFont(preview))await prepareSoundFont(audio,preview);
+    if (disposed || request !== auditionSequence) throw new Error('这次试音已取消。');
     validateFrequency(preview, audio.sampleRate);
     const resources: GraphResources = { oscillators: [], samples: [], bufferReleases: [], gains: [], panners: [] };
     const voice: AuditionVoice = { resources, remaining: 0 };
@@ -365,7 +372,7 @@ export function createBrowserSoundRuntime(): SoundRuntimePort {
         if (auditionVoice !== voice) return;
         if (--voice.remaining === 0) releaseAudition(voice);
       });
-      const start = audio.currentTime + 0.005;
+      const start = audio.currentTime + 0.005+(hasSoundFont(preview)?.02:0);
       // Each lane is bounded to half scale during overlap. Duck the main lane
       // smoothly before this note starts, then restore it when this lane ends.
       ensureMainMix(audio);
@@ -373,6 +380,7 @@ export function createBrowserSoundRuntime(): SoundRuntimePort {
       if (audio.currentTime >= start || disposed || request !== auditionSequence) throw new Error('这次试音已取消，请重试。');
       voice.remaining = resources.oscillators.length + resources.samples.length;
       auditionVoice = voice;
+      watchSourceErrors(resources,error=>{if(auditionVoice===voice){releaseAudition(voice);device('failed',message(error));}});
       duckMain(true, start);
       for (const scheduled of graph.starts) startGraphSource(scheduled, start);
       deviceChanged();
@@ -395,6 +403,13 @@ export function createBrowserSoundRuntime(): SoundRuntimePort {
     }
     const preview = readPreview(input, { allowEmptySequence: true, previous: voice.preview, transportElapsed: elapsed(voice) });
     validateFrequency(preview, audio.sampleRate);
+    const fontUpdate=++fontUpdateSequence;
+    if(hasSoundFont(preview)&&!soundFontReady(audio)) {
+      void prepareSoundFont(audio,preview).then(()=>{
+        if(fontUpdate===fontUpdateSequence&&active===voice&&voice.session.status==='playing')update(sessionId,input);
+      }).catch(error=>{if(fontUpdate===fontUpdateSequence&&active===voice)finish(voice,'failed',message(error));});
+      return voice.session;
+    }
     const fingerprint = previewFingerprint(preview);
     if (voice.fingerprint === fingerprint && samePreviewSamples(voice.preview, preview)) {
       // The head may have changed speed during a long sustained tail without
@@ -424,7 +439,7 @@ export function createBrowserSoundRuntime(): SoundRuntimePort {
       }
       completion = audio.createConstantSource();
       retiringClock = audio.createConstantSource();
-      const cutover = Math.max(origin, audio.currentTime + (windowed?.leadSeconds ?? 0.005) + graph.starts.length * 0.000002 + graph.envelopes.length * 0.000001);
+      const cutover = Math.max(origin, audio.currentTime + (windowed?.leadSeconds ?? 0.005) + graph.starts.length * 0.000002 + graph.envelopes.length * 0.000001+(hasSoundFont(preview)?.02:0));
       const fromSeconds = cutover - origin;
       scheduleGraph(graph, preview.normalization, origin, fromSeconds, LIVE_TRANSITION_SECONDS);
       windowed?.prepare(origin, fromSeconds, LIVE_TRANSITION_SECONDS);
@@ -485,6 +500,8 @@ export function createBrowserSoundRuntime(): SoundRuntimePort {
       voice.filters = resources.filters;
       voice.completion = completion; voice.windowed = windowed;
       voice.generation += 1;
+      const generation=voice.generation;
+      watchSourceErrors(resources,error=>{if(active===voice&&voice.generation===generation)finish(voice,'failed',message(error));});
       voice.fadeGains = windowed ? [windowed.fade] : graph.envelopes.map(envelope => envelope.node);
       voice.fingerprint = fingerprint;
       voice.preview = preview;
@@ -531,6 +548,8 @@ export function createBrowserSoundRuntime(): SoundRuntimePort {
     cancelPendingResumes();
     const audio = await ready();
     if (disposed || request !== requestSequence || active !== voice || voice.session.status !== 'paused') throw new Error('这次试听已取消。');
+    if(hasSoundFont(preview))await prepareSoundFont(audio,preview);
+    if (disposed || request !== requestSequence || active !== voice || voice.session.status !== 'paused') throw new Error('这次试听已取消。');
     validateFrequency(preview, audio.sampleRate);
     const resources: GraphResources = { oscillators: [], samples: [], bufferReleases: [], gains: [], panners: [] };
     let completion: ConstantSourceNode | null = null;
@@ -541,7 +560,7 @@ export function createBrowserSoundRuntime(): SoundRuntimePort {
       windowed?.prime(fromSeconds);
       const graph = windowed?.graph ?? allocateGraph(audio, remaining, resources, undefined, mainMix ?? audio.destination);
       completion = audio.createConstantSource();
-      const start = audio.currentTime + (windowed?.leadSeconds ?? .01) + graph.starts.length * .00004 + graph.envelopes.length * .00002;
+      const start = audio.currentTime + (windowed?.leadSeconds ?? .01) + graph.starts.length * .00004 + graph.envelopes.length * .00002+(hasSoundFont(preview)?.02:0);
       const origin = start - fromSeconds;
       scheduleGraph(graph, preview.normalization, origin, fromSeconds, LIVE_TRANSITION_SECONDS);
       windowed?.prepare(origin, fromSeconds, LIVE_TRANSITION_SECONDS);
@@ -558,6 +577,8 @@ export function createBrowserSoundRuntime(): SoundRuntimePort {
       voice.fadeGains = windowed ? [windowed.fade] : graph.envelopes.map(item => item.node); voice.startTimes = starts;
       voice.preview = preview; voice.fingerprint = previewFingerprint(preview); voice.originSeconds = origin; voice.clockFloorSeconds = fromSeconds; voice.pausedElapsed = undefined;
       voice.session = Object.freeze({ ...voice.session, status: 'playing', durationSeconds: preview.durationSeconds });
+      const generation=voice.generation;
+      watchSourceErrors(resources,error=>{if(active===voice&&voice.generation===generation)finish(voice,'failed',message(error));});
       windowed?.run(error => { if (active === voice) finish(voice, 'failed', message(error)); });
       emit({ type: 'session', session: voice.session }); return voice.session;
     } catch (error) {

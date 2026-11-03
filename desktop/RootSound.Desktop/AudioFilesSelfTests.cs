@@ -46,9 +46,9 @@ internal static class AudioFilesSelfTests
             var second = Wave(); second[44] = 17;
             NativeAudioFiles.WriteAtomic(path, second);
             Check(File.ReadAllBytes(path).SequenceEqual(second), "替换应保存新版。");
-            Check(File.ReadAllBytes(path + ".bak").SequenceEqual(first), "替换应保留上一版音频。");
+            Check(!File.Exists(path + ".bak"), "替换不生成备份。");
             NativeAudioFiles.WriteAtomic(path, first);
-            Check(File.ReadAllBytes(path + ".bak").SequenceEqual(second), "反复保存时备份应保持上一版。");
+            Check(!File.Exists(path + ".bak"), "反复保存不生成备份。");
             var candidates = Enumerable.Range(0, 12).Select(index => { var bytes = Wave(); bytes[44] = (byte)index; return bytes; }).ToArray();
             int successful = 0;
             Parallel.ForEach(candidates, bytes =>
@@ -59,7 +59,7 @@ internal static class AudioFilesSelfTests
             });
             Check(successful > 0, "并发输出中至少应有一个完整写入成功。");
             Check(candidates.Any(bytes => bytes.SequenceEqual(File.ReadAllBytes(path))), "并发替换只能留下完整版本，不能混合音频字节。");
-            NativeAudioFiles.ValidateWave(File.ReadAllBytes(path + ".bak"));
+            Check(!File.Exists(path + ".bak"), "并发保存不生成备份。");
             Check(Directory.GetFiles(directory, "*.tmp").Length == 0, "完成后不应遗留候选文件。");
             Check(Directory.GetFiles(directory, "*.rootsound-save.lock").Length == 0, "完成后应释放临时输出锁。");
         });
@@ -83,8 +83,8 @@ internal static class AudioFilesSelfTests
             NativeAudioFiles.WriteAtomic(path, before);
             Directory.CreateDirectory(path + ".bak");
             File.WriteAllText(Path.Combine(path + ".bak", "keep.txt"), "保留此目录");
-            ExpectFailure(() => NativeAudioFiles.WriteAtomic(path, Wave(96000)), "不能替换备份目录时应明确失败。");
-            Check(File.ReadAllBytes(path).SequenceEqual(before), "备份失败必须保留原音频。");
+            NativeAudioFiles.WriteAtomic(path, Wave(96000));
+            Check(File.ReadAllBytes(path).SequenceEqual(Wave(96000)), "无关备份目录不应阻止保存。");
             Check(File.ReadAllText(Path.Combine(path + ".bak", "keep.txt")) == "保留此目录", "不能删除既有目录。");
         });
         Case("extension-and-invalid-content-preserved", directory =>

@@ -1,0 +1,39 @@
+import { phraseStepsPerBeat, type PhraseBody } from './phrase.ts';
+
+export type PhraseTempoSpan = { id?: string; startBeat: number; endBeat: number; startSeconds: number; endSeconds: number; tempoBpm: number };
+const clocks = new WeakMap<PhraseBody, PhraseTempoSpan[]>();
+/** All departments use the same beat/second boundary, including variable tempo. */
+export function phraseTempoSpans(body: PhraseBody): readonly PhraseTempoSpan[] {
+  const cached = clocks.get(body); if (cached) return cached;
+  const points = [{ startBeat: 0, tempoBpm: body.tempoBpm, id: undefined as string | undefined }, ...(body.tempoSections ?? [])];
+  let seconds = 0;
+  const spans = points.map((point, index) => {
+    const endBeat = points[index + 1]?.startBeat ?? body.lengthBeats, startSeconds = seconds;
+    seconds += (endBeat - point.startBeat) * 60 / point.tempoBpm;
+    return { ...point, endBeat, startSeconds, endSeconds: seconds };
+  });
+  clocks.set(body, spans); return spans;
+}
+function find(body: PhraseBody, position: number, field: 'startBeat' | 'startSeconds'): PhraseTempoSpan {
+  const spans = phraseTempoSpans(body); let low = 0, high = spans.length;
+  while (low < high) { const mid = (low + high) >>> 1; if (spans[mid]![field] <= position) low = mid + 1; else high = mid; }
+  return spans[Math.max(0, low - 1)]!;
+}
+export function phraseBeatSeconds(body: PhraseBody, beat: number): number {
+  const span = find(body, beat, 'startBeat'); return span.startSeconds + (beat - span.startBeat) * 60 / span.tempoBpm;
+}
+export function phraseSecondsBeat(body: PhraseBody, seconds: number): number {
+  const span = find(body, seconds, 'startSeconds'); return span.startBeat + (seconds - span.startSeconds) * span.tempoBpm / 60;
+}
+export const phraseDurationSeconds = (body: PhraseBody) => phraseBeatSeconds(body, body.lengthBeats);
+export const phraseTempoAtBeat = (body: PhraseBody, beat: number) => find(body, beat, 'startBeat').tempoBpm;
+export const phraseTempoSpanAtBeat = (body: PhraseBody, beat: number) => find(body, beat, 'startBeat');
+export function phraseStepsAtBeat(body: PhraseBody, beat: number): number {
+  const id = find(body, beat, 'startBeat').id;
+  const section = id ? body.tempoSections?.find(section => section.id === id) : undefined;
+  return phraseStepsPerBeat({ stepsPerBeat: section?.stepsPerBeat ?? body.stepsPerBeat });
+}
+export const phraseHeldSeconds = (body: PhraseBody, note: { startBeat: number; durationBeats: number; durationSeconds?: number }) =>
+  note.durationSeconds ?? phraseBeatSeconds(body, note.startBeat + note.durationBeats) - phraseBeatSeconds(body, note.startBeat);
+export const phraseHeldBeats = (body: PhraseBody, startBeat: number, seconds: number) =>
+  phraseSecondsBeat(body, phraseBeatSeconds(body, startBeat) + seconds) - startBeat;

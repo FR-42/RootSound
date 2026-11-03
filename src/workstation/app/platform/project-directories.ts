@@ -127,7 +127,9 @@ export function createDesktopProjectDirectories(bridge: NativeProjectDirectories
       const result = await call(() => bridge.Rename!(target.path, target.id, name, libraryText, token));
       if (result.status !== 'renamed') return fail();
       const renamed = project(result.project);
-      if (renamed.id !== target.id || renamed.path !== target.path || renamed.name !== name.trim()) return fail();
+      if (renamed.id !== target.id || renamed.name !== name.trim()) return fail();
+      if (renamed.path !== target.path && (renamed.path.replace(/[^\\/]+$/u, '') !== target.path.replace(/[^\\/]+$/u, '')
+        || renamed.path.split(/[\\/]/u).at(-1) !== `${name.trim()}.rootsound`)) return fail();
       return renamed;
     },
     async save(name) {

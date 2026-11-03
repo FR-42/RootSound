@@ -10,7 +10,11 @@ try {
         & npm.cmd ci
         if ($LASTEXITCODE -ne 0) { throw 'Could not install frontend dependencies.' }
     }
-    & npm.cmd run build
+    & npm.cmd run check
+    if ($LASTEXITCODE -ne 0) { throw 'Could not check the interface.' }
+    # The native desktop uses the same current-feature entry as public packages.
+    # Dormant sampling/recognition/arrangement editors must not initialize on open.
+    & npx.cmd vite build --config vite.release.config.ts --outDir dist
     if ($LASTEXITCODE -ne 0) { throw 'Could not build the interface.' }
     & dotnet restore 'desktop/RootSound.Desktop/RootSound.Desktop.csproj' --configfile 'desktop/NuGet.Config' --locked-mode
     if ($LASTEXITCODE -ne 0) { throw 'Could not restore desktop dependencies.' }
@@ -32,7 +36,7 @@ try {
     $taskPointer = Join-Path $taskRoot '.cache\desktop-build.current'
     $taskCandidate = $taskPointer + '.' + [Guid]::NewGuid().ToString('N') + '.tmp'
     [IO.File]::WriteAllText($taskCandidate, $taskReleaseRelative, (New-Object Text.UTF8Encoding($false)))
-    if (Test-Path -LiteralPath $taskPointer) { [IO.File]::Replace($taskCandidate, $taskPointer, $taskPointer + '.bak') }
+    if (Test-Path -LiteralPath $taskPointer) { [IO.File]::Replace($taskCandidate, $taskPointer, [NullString]::Value) }
     else { [IO.File]::Move($taskCandidate, $taskPointer) }
     [IO.File]::WriteAllText((Join-Path $taskRoot '.cache\desktop-build.stamp'), [DateTime]::UtcNow.ToString('O'))
 } finally { Pop-Location }

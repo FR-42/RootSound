@@ -8,6 +8,7 @@
     <AssemblyName>RootSound</AssemblyName>
     <RootNamespace>RootSound.Desktop</RootNamespace>
     <PlatformTarget>x64</PlatformTarget>
+    <ApplicationIcon>../assets/RootSound.ico</ApplicationIcon>
     <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
   </PropertyGroup>
   <ItemGroup>

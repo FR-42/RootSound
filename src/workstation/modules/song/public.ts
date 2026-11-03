@@ -1,5 +1,6 @@
 import type { ContentRecord, Draft, MaterialLibrary } from '../../contracts/content.ts';
 import type { PhrasePlaybackPort } from '../../contracts/phrase.ts';
+import { phraseDurationSeconds } from '../../contracts/phrase-time.ts';
 import type { SongBody, SongClip, SongEditorPort, SongPlaybackPort, SongTempoMode, SongTrack } from '../../contracts/song.ts';
 import type { SoundSequencePlan } from '../../contracts/sound.ts';
 import type { PostProductionPort, PostProductionSettings } from '../../contracts/post-production.ts';
@@ -88,7 +89,7 @@ export function createSongReferenceAdapter(): ReferenceAdapter {
 /** Unknown formats are preserved rather than reinterpreted as this first timeline model. */
 export function readSongBody(value: unknown): SongBody {
   const body = object(value, '歌曲');
-  fields(body, ['model', 'version', 'timeUnit', 'tempoBpm', 'tempoMode', 'gridTempoBpm', 'gridTempoChanges', 'gridOffsetSeconds', 'masterLevel', 'hiddenPhraseIds', 'phraseShelfOrder', 'timbreLibraryOrder', 'melodyTimbresSeeded', 'lengthBeats', 'tracks', 'postProduction'], '歌曲');
+  fields(body, ['model', 'version', 'timeUnit', 'tempoBpm', 'tempoMode', 'gridTempoBpm', 'gridTempoChanges', 'gridOffsetSeconds', 'masterLevel', 'hiddenPhraseIds', 'phraseShelfOrder', 'timbreLibraryOrder', 'melodyTimbresSeeded', 'timbreCatalogVersion', 'lengthBeats', 'tracks', 'postProduction'], '歌曲');
   if (body.model !== 'phrase-arrangement' || body.version !== 1 || body.timeUnit !== 'beat') throw new Error('暂不支持这份歌曲的格式或版本。原内容已保留。');
   const tempoBpm = finite(body.tempoBpm, '歌曲速度', 40, 240);
   const tempoMode = mode(body.tempoMode);
@@ -154,6 +155,7 @@ export function readSongBody(value: unknown): SongBody {
     ...(phraseShelfOrder === undefined ? {} : { phraseShelfOrder }),
     ...(timbreLibraryOrder === undefined ? {} : { timbreLibraryOrder }),
     ...(body.melodyTimbresSeeded === undefined ? {} : { melodyTimbresSeeded: boolean(body.melodyTimbresSeeded, '默认音色准备状态') }),
+    ...(body.timbreCatalogVersion === undefined ? {} : { timbreCatalogVersion: finite(body.timbreCatalogVersion, '音色目录版本', 1, 1000) }),
     ...(body.postProduction === undefined ? {} : { postProduction: readPostProduction(body.postProduction) }) };
 }
 
@@ -172,7 +174,7 @@ function snapshot(draft: Draft, body: SongBody): Snapshot { return { name: draft
 
 function phraseLength(body: SongBody, phraseId: string, phrases: PhrasePlaybackPort): number {
   const source = phrases.readSaved(phraseId).body;
-  return source.lengthBeats * (body.tempoMode === 'source' ? body.tempoBpm / source.tempoBpm : 1);
+  return phraseDurationSeconds(source) * (body.tempoMode === 'source' ? body.tempoBpm : source.tempoBpm) / 60;
 }
 function extent(body: SongBody, phrases: PhrasePlaybackPort): number {
   const lengths = new Map<string, number>();

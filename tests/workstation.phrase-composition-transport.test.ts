@@ -13,7 +13,7 @@ import { audio, fixture as simulatedDevice } from '../src/workstation/modules/so
 const sound = { kind: 'basic-synth' as const, version: 1 as const, sources: [{ waveform: 'sine' as const, frequencyRatio: 1, level: 1 }],
   envelope: { attackSeconds: .1, releaseSeconds: .2 }, note: { frequencyHz: 440, holdSeconds: 2, velocity: 1 }, level: .5 };
 function deferred() { let resolve!: () => void; const promise = new Promise<void>(done => { resolve = done; }); return { promise, resolve }; }
-function fixture() {
+function fixture(durationSeconds?: () => number) {
   let elapsed = 0; let tempo = 120; let length = 16; let session: PlaybackSession | undefined; let count = 0;
   let prepare = async () => {}; let waitDevice: Promise<void> | undefined;
   let input: SoundSequencePlan = { kind: 'sequence', version: 1, durationSeconds: 20, events: [{ atSeconds: 0, sound }] };
@@ -31,7 +31,7 @@ function fixture() {
     stopAll() { calls.push({ method: 'stopAll' }); if (session) emit('stopped'); },
     subscribe(listener: (event: SoundRuntimeEvent) => void) { listeners.add(listener); return () => listeners.delete(listener); },
   } as unknown as SoundRuntimePort;
-  const transport = createPhraseCompositionTransport({ runtime, tempoBpm: () => tempo, lengthBeats: () => length, prepare: () => prepare(), readPlan: () => input,
+  const transport = createPhraseCompositionTransport({ runtime, tempoBpm: () => tempo, lengthBeats: () => length, durationSeconds, prepare: () => prepare(), readPlan: () => input,
     onChange: state => states.push(state), onError: error => errors.push(error) });
   return { transport, calls, states, errors, emit, elapsed(value: number) { elapsed = value; }, tempo(value: number) { tempo = value; },
     plan(value: SoundSequencePlan) { input = value; }, length(value: number) { length = value; }, prepare(value: () => Promise<void>) { prepare = value; }, waitDevice(value: Promise<void>) { waitDevice = value; } };
@@ -51,6 +51,16 @@ test('phrase audition contains only the fixed four bars and leaves stored source
   assert.deepEqual(source, snapshot, 'four-bar audition never shortens the saved phrase');
   f.elapsed(8); assert.equal(f.transport.position(), 0); assert.equal(f.states.at(-1)!.playing, false);
   assert.equal(f.calls.at(-1)!.method, 'stop'); f.transport.dispose();
+});
+
+test('segmented clock plays beyond the old fixed-tempo ending and refreshes without seeking by a global BPM ratio',async()=>{
+  let duration=24;const f=fixture(()=>duration);
+  try{
+    await f.transport.toggle();assert.equal(f.calls.at(-1)!.plan!.durationSeconds,24);
+    f.elapsed(20);assert.equal(f.transport.position(),20);assert.equal(f.states.at(-1)!.playing,true);
+    f.tempo(180);f.transport.refresh();assert.equal(f.transport.position(),20,'global BPM cannot rescale a segmented head');
+    duration=16;f.transport.refresh();assert.equal(f.transport.position(),16);assert.equal(f.states.at(-1)!.playing,false);
+  }finally{f.transport.dispose();}
 });
 
 test('empty phrase audition has a four-bar clock, including background completion', async context => {

@@ -3,318 +3,1400 @@
     "category": "键盘",
     "key": "piano",
     "name": "钢琴",
-    "midi": 60
+    "midi": 60,
+    "program": 0,
+    "introduced": 1
   },
   {
     "category": "键盘",
     "key": "bright-piano",
     "name": "明亮钢琴",
-    "midi": 60
+    "midi": 60,
+    "program": 1,
+    "introduced": 1
+  },
+  {
+    "category": "键盘",
+    "key": "gm-2",
+    "name": "电大钢琴",
+    "midi": 60,
+    "program": 2,
+    "introduced": 2
+  },
+  {
+    "category": "键盘",
+    "key": "gm-3",
+    "name": "酒吧钢琴",
+    "midi": 60,
+    "program": 3,
+    "introduced": 2
   },
   {
     "category": "键盘",
     "key": "electric-piano",
     "name": "电钢琴",
-    "midi": 60
+    "midi": 60,
+    "program": 4,
+    "introduced": 1
   },
   {
     "category": "键盘",
     "key": "fm-piano",
     "name": "清脆电钢琴",
-    "midi": 60
+    "midi": 60,
+    "program": 5,
+    "introduced": 1
   },
   {
     "category": "键盘",
     "key": "harpsichord",
     "name": "羽管键琴",
-    "midi": 60
+    "midi": 60,
+    "program": 6,
+    "introduced": 1
   },
   {
     "category": "键盘",
-    "key": "organ",
-    "name": "管风琴",
-    "midi": 60
-  },
-  {
-    "category": "键盘",
-    "key": "accordion",
-    "name": "手风琴",
-    "midi": 60
-  },
-  {
-    "category": "拨弦",
-    "key": "nylon-guitar",
-    "name": "尼龙吉他",
-    "midi": 60
-  },
-  {
-    "category": "拨弦",
-    "key": "steel-guitar",
-    "name": "钢弦吉他",
-    "midi": 60
-  },
-  {
-    "category": "拨弦",
-    "key": "clean-guitar",
-    "name": "清音电吉他",
-    "midi": 60
-  },
-  {
-    "category": "拨弦",
-    "key": "distorted-guitar",
-    "name": "失真电吉他",
-    "midi": 60
-  },
-  {
-    "category": "拨弦",
-    "key": "harp",
-    "name": "竖琴",
-    "midi": 60
-  },
-  {
-    "category": "拨弦",
-    "key": "guzheng",
-    "name": "日本筝",
-    "midi": 60
-  },
-  {
-    "category": "弦乐",
-    "key": "violin",
-    "name": "小提琴",
-    "midi": 60
-  },
-  {
-    "category": "弦乐",
-    "key": "viola",
-    "name": "中提琴",
-    "midi": 60
-  },
-  {
-    "category": "弦乐",
-    "key": "cello",
-    "name": "大提琴",
-    "midi": 48
-  },
-  {
-    "category": "弦乐",
-    "key": "contrabass",
-    "name": "低音提琴",
-    "midi": 36
-  },
-  {
-    "category": "弦乐",
-    "key": "string-ensemble",
-    "name": "弦乐合奏",
-    "midi": 60
-  },
-  {
-    "category": "木管",
-    "key": "piccolo",
-    "name": "短笛",
-    "midi": 72
-  },
-  {
-    "category": "木管",
-    "key": "flute",
-    "name": "长笛",
-    "midi": 72
-  },
-  {
-    "category": "木管",
-    "key": "clarinet",
-    "name": "单簧管",
-    "midi": 60
-  },
-  {
-    "category": "木管",
-    "key": "oboe",
-    "name": "双簧管",
-    "midi": 60
-  },
-  {
-    "category": "木管",
-    "key": "bassoon",
-    "name": "巴松",
-    "midi": 48
-  },
-  {
-    "category": "木管",
-    "key": "saxophone",
-    "name": "萨克斯",
-    "midi": 60
-  },
-  {
-    "category": "铜管",
-    "key": "trumpet",
-    "name": "小号",
-    "midi": 60
-  },
-  {
-    "category": "铜管",
-    "key": "horn",
-    "name": "圆号",
-    "midi": 60
-  },
-  {
-    "category": "铜管",
-    "key": "trombone",
-    "name": "长号",
-    "midi": 48
-  },
-  {
-    "category": "铜管",
-    "key": "tuba",
-    "name": "大号",
-    "midi": 36
-  },
-  {
-    "category": "低音",
-    "key": "electric-bass",
-    "name": "电贝司",
-    "midi": 36
-  },
-  {
-    "category": "低音",
-    "key": "synth-bass",
-    "name": "合成贝司",
-    "midi": 36
-  },
-  {
-    "category": "低音",
-    "key": "sub-bass",
-    "name": "深沉低音",
-    "midi": 36
-  },
-  {
-    "category": "打击",
-    "key": "acoustic-kick",
-    "name": "原声底鼓",
-    "midi": 60
-  },
-  {
-    "category": "打击",
-    "key": "electronic-kick",
-    "name": "电子底鼓",
-    "midi": 60
-  },
-  {
-    "category": "打击",
-    "key": "snare",
-    "name": "军鼓",
-    "midi": 60
-  },
-  {
-    "category": "打击",
-    "key": "clap",
-    "name": "拍手",
-    "midi": 60
-  },
-  {
-    "category": "打击",
-    "key": "closed-hat",
-    "name": "闭镲",
-    "midi": 60
-  },
-  {
-    "category": "打击",
-    "key": "open-hat",
-    "name": "开镲",
-    "midi": 60
-  },
-  {
-    "category": "打击",
-    "key": "crash",
-    "name": "吊镲",
-    "midi": 60
-  },
-  {
-    "category": "打击",
-    "key": "tom",
-    "name": "嗵鼓",
-    "midi": 60
-  },
-  {
-    "category": "打击",
-    "key": "tambourine",
-    "name": "铃鼓",
-    "midi": 60
-  },
-  {
-    "category": "打击",
-    "key": "shaker",
-    "name": "沙锤",
-    "midi": 60
-  },
-  {
-    "category": "打击",
-    "key": "xylophone",
-    "name": "木琴",
-    "midi": 60
-  },
-  {
-    "category": "打击",
-    "key": "marimba",
-    "name": "马林巴",
-    "midi": 60
+    "key": "gm-7",
+    "name": "击弦古钢琴",
+    "midi": 60,
+    "program": 7,
+    "introduced": 2
   },
   {
     "category": "打击",
     "key": "celesta",
     "name": "钢片琴",
-    "midi": 72
+    "midi": 72,
+    "program": 8,
+    "introduced": 1
   },
   {
     "category": "打击",
-    "key": "tubular-bells",
-    "name": "管钟",
-    "midi": 60
-  },
-  {
-    "category": "电子",
-    "key": "saw-lead",
-    "name": "锯齿主奏",
-    "midi": 60
-  },
-  {
-    "category": "电子",
-    "key": "square-lead",
-    "name": "方波主奏",
-    "midi": 60
-  },
-  {
-    "category": "电子",
-    "key": "synth-pluck",
-    "name": "拨弦合成",
-    "midi": 60
-  },
-  {
-    "category": "电子",
-    "key": "warm-pad",
-    "name": "温暖铺底",
-    "midi": 60
-  },
-  {
-    "category": "电子",
-    "key": "airy-pad",
-    "name": "空灵铺底",
-    "midi": 60
+    "key": "gm-9",
+    "name": "钟琴",
+    "midi": 60,
+    "program": 9,
+    "introduced": 2
   },
   {
     "category": "电子",
     "key": "bell-pluck",
     "name": "水晶拨弦",
-    "midi": 60
+    "midi": 60,
+    "program": 10,
+    "introduced": 1
   },
   {
-    "category": "人声",
-    "key": "vocal-ah",
-    "name": "人声呜",
-    "midi": 60
+    "category": "打击",
+    "key": "gm-11",
+    "name": "颤音琴",
+    "midi": 60,
+    "program": 11,
+    "introduced": 2
+  },
+  {
+    "category": "打击",
+    "key": "marimba",
+    "name": "马林巴",
+    "midi": 60,
+    "program": 12,
+    "introduced": 1
+  },
+  {
+    "category": "打击",
+    "key": "xylophone",
+    "name": "木琴",
+    "midi": 60,
+    "program": 13,
+    "introduced": 1
+  },
+  {
+    "category": "打击",
+    "key": "tubular-bells",
+    "name": "管钟",
+    "midi": 60,
+    "program": 14,
+    "introduced": 1
+  },
+  {
+    "category": "打击",
+    "key": "gm-15",
+    "name": "扬琴",
+    "midi": 60,
+    "program": 15,
+    "introduced": 2
+  },
+  {
+    "category": "键盘",
+    "key": "gm-16",
+    "name": "拉杆风琴",
+    "midi": 60,
+    "program": 16,
+    "introduced": 2
+  },
+  {
+    "category": "键盘",
+    "key": "gm-17",
+    "name": "打击风琴",
+    "midi": 60,
+    "program": 17,
+    "introduced": 2
+  },
+  {
+    "category": "键盘",
+    "key": "gm-18",
+    "name": "摇滚风琴",
+    "midi": 60,
+    "program": 18,
+    "introduced": 2
+  },
+  {
+    "category": "键盘",
+    "key": "organ",
+    "name": "管风琴",
+    "midi": 60,
+    "program": 19,
+    "introduced": 1
+  },
+  {
+    "category": "键盘",
+    "key": "gm-20",
+    "name": "簧风琴",
+    "midi": 60,
+    "program": 20,
+    "introduced": 2
+  },
+  {
+    "category": "键盘",
+    "key": "accordion",
+    "name": "手风琴",
+    "midi": 60,
+    "program": 21,
+    "introduced": 1
+  },
+  {
+    "category": "键盘",
+    "key": "gm-22",
+    "name": "口琴",
+    "midi": 60,
+    "program": 22,
+    "introduced": 2
+  },
+  {
+    "category": "键盘",
+    "key": "gm-23",
+    "name": "探戈手风琴",
+    "midi": 60,
+    "program": 23,
+    "introduced": 2
+  },
+  {
+    "category": "拨弦",
+    "key": "nylon-guitar",
+    "name": "尼龙吉他",
+    "midi": 60,
+    "program": 24,
+    "introduced": 1
+  },
+  {
+    "category": "拨弦",
+    "key": "steel-guitar",
+    "name": "钢弦吉他",
+    "midi": 60,
+    "program": 25,
+    "introduced": 1
+  },
+  {
+    "category": "拨弦",
+    "key": "gm-26",
+    "name": "爵士吉他",
+    "midi": 60,
+    "program": 26,
+    "introduced": 2
+  },
+  {
+    "category": "拨弦",
+    "key": "clean-guitar",
+    "name": "清音电吉他",
+    "midi": 60,
+    "program": 27,
+    "introduced": 1
+  },
+  {
+    "category": "拨弦",
+    "key": "gm-28",
+    "name": "闷音吉他",
+    "midi": 60,
+    "program": 28,
+    "introduced": 2
+  },
+  {
+    "category": "拨弦",
+    "key": "gm-29",
+    "name": "过载吉他",
+    "midi": 60,
+    "program": 29,
+    "introduced": 2
+  },
+  {
+    "category": "拨弦",
+    "key": "distorted-guitar",
+    "name": "失真电吉他",
+    "midi": 60,
+    "program": 30,
+    "introduced": 1
+  },
+  {
+    "category": "拨弦",
+    "key": "gm-31",
+    "name": "吉他泛音",
+    "midi": 60,
+    "program": 31,
+    "introduced": 2
+  },
+  {
+    "category": "低音",
+    "key": "gm-32",
+    "name": "原声贝斯",
+    "midi": 36,
+    "program": 32,
+    "introduced": 2
+  },
+  {
+    "category": "低音",
+    "key": "electric-bass",
+    "name": "电贝司",
+    "midi": 36,
+    "program": 33,
+    "introduced": 1
+  },
+  {
+    "category": "低音",
+    "key": "gm-34",
+    "name": "拨片贝斯",
+    "midi": 36,
+    "program": 34,
+    "introduced": 2
+  },
+  {
+    "category": "低音",
+    "key": "gm-35",
+    "name": "无品贝斯",
+    "midi": 36,
+    "program": 35,
+    "introduced": 2
+  },
+  {
+    "category": "低音",
+    "key": "gm-36",
+    "name": "击弦贝斯一",
+    "midi": 36,
+    "program": 36,
+    "introduced": 2
+  },
+  {
+    "category": "低音",
+    "key": "gm-37",
+    "name": "击弦贝斯二",
+    "midi": 36,
+    "program": 37,
+    "introduced": 2
+  },
+  {
+    "category": "低音",
+    "key": "synth-bass",
+    "name": "合成贝司",
+    "midi": 36,
+    "program": 38,
+    "introduced": 1
+  },
+  {
+    "category": "低音",
+    "key": "sub-bass",
+    "name": "深沉低音",
+    "midi": 36,
+    "program": 39,
+    "introduced": 1
+  },
+  {
+    "category": "弦乐",
+    "key": "violin",
+    "name": "小提琴",
+    "midi": 60,
+    "program": 40,
+    "introduced": 1
+  },
+  {
+    "category": "弦乐",
+    "key": "viola",
+    "name": "中提琴",
+    "midi": 60,
+    "program": 41,
+    "introduced": 1
+  },
+  {
+    "category": "弦乐",
+    "key": "cello",
+    "name": "大提琴",
+    "midi": 48,
+    "program": 42,
+    "introduced": 1
+  },
+  {
+    "category": "弦乐",
+    "key": "contrabass",
+    "name": "低音提琴",
+    "midi": 36,
+    "program": 43,
+    "introduced": 1
+  },
+  {
+    "category": "弦乐",
+    "key": "gm-44",
+    "name": "颤弓弦乐",
+    "midi": 60,
+    "program": 44,
+    "introduced": 2
+  },
+  {
+    "category": "电子",
+    "key": "synth-pluck",
+    "name": "拨弦合成",
+    "midi": 60,
+    "program": 45,
+    "introduced": 1
+  },
+  {
+    "category": "拨弦",
+    "key": "harp",
+    "name": "竖琴",
+    "midi": 60,
+    "program": 46,
+    "introduced": 1
+  },
+  {
+    "category": "打击",
+    "key": "gm-47",
+    "name": "定音鼓",
+    "midi": 60,
+    "program": 47,
+    "introduced": 2
+  },
+  {
+    "category": "弦乐",
+    "key": "string-ensemble",
+    "name": "弦乐合奏",
+    "midi": 60,
+    "program": 48,
+    "introduced": 1
+  },
+  {
+    "category": "弦乐",
+    "key": "gm-49",
+    "name": "弦乐合奏二",
+    "midi": 60,
+    "program": 49,
+    "introduced": 2
+  },
+  {
+    "category": "弦乐",
+    "key": "gm-50",
+    "name": "合成弦乐一",
+    "midi": 60,
+    "program": 50,
+    "introduced": 2
+  },
+  {
+    "category": "弦乐",
+    "key": "gm-51",
+    "name": "合成弦乐二",
+    "midi": 60,
+    "program": 51,
+    "introduced": 2
   },
   {
     "category": "人声",
     "key": "choir",
     "name": "合唱团",
-    "midi": 60
+    "midi": 60,
+    "program": 52,
+    "introduced": 1
+  },
+  {
+    "category": "人声",
+    "key": "vocal-ah",
+    "name": "人声呜",
+    "midi": 60,
+    "program": 53,
+    "introduced": 1
+  },
+  {
+    "category": "人声",
+    "key": "gm-54",
+    "name": "合成人声",
+    "midi": 60,
+    "program": 54,
+    "introduced": 2
+  },
+  {
+    "category": "打击",
+    "key": "gm-55",
+    "name": "乐团齐奏",
+    "midi": 60,
+    "program": 55,
+    "introduced": 2
+  },
+  {
+    "category": "铜管",
+    "key": "trumpet",
+    "name": "小号",
+    "midi": 60,
+    "program": 56,
+    "introduced": 1
+  },
+  {
+    "category": "铜管",
+    "key": "trombone",
+    "name": "长号",
+    "midi": 48,
+    "program": 57,
+    "introduced": 1
+  },
+  {
+    "category": "铜管",
+    "key": "tuba",
+    "name": "大号",
+    "midi": 36,
+    "program": 58,
+    "introduced": 1
+  },
+  {
+    "category": "铜管",
+    "key": "gm-59",
+    "name": "弱音小号",
+    "midi": 60,
+    "program": 59,
+    "introduced": 2
+  },
+  {
+    "category": "铜管",
+    "key": "horn",
+    "name": "圆号",
+    "midi": 60,
+    "program": 60,
+    "introduced": 1
+  },
+  {
+    "category": "铜管",
+    "key": "gm-61",
+    "name": "铜管合奏",
+    "midi": 60,
+    "program": 61,
+    "introduced": 2
+  },
+  {
+    "category": "铜管",
+    "key": "gm-62",
+    "name": "合成铜管一",
+    "midi": 60,
+    "program": 62,
+    "introduced": 2
+  },
+  {
+    "category": "铜管",
+    "key": "gm-63",
+    "name": "合成铜管二",
+    "midi": 60,
+    "program": 63,
+    "introduced": 2
+  },
+  {
+    "category": "木管",
+    "key": "gm-64",
+    "name": "高音萨克斯",
+    "midi": 60,
+    "program": 64,
+    "introduced": 2
+  },
+  {
+    "category": "木管",
+    "key": "saxophone",
+    "name": "萨克斯",
+    "midi": 60,
+    "program": 65,
+    "introduced": 1
+  },
+  {
+    "category": "木管",
+    "key": "gm-66",
+    "name": "次中音萨克斯",
+    "midi": 60,
+    "program": 66,
+    "introduced": 2
+  },
+  {
+    "category": "木管",
+    "key": "gm-67",
+    "name": "上低音萨克斯",
+    "midi": 60,
+    "program": 67,
+    "introduced": 2
+  },
+  {
+    "category": "木管",
+    "key": "oboe",
+    "name": "双簧管",
+    "midi": 60,
+    "program": 68,
+    "introduced": 1
+  },
+  {
+    "category": "木管",
+    "key": "gm-69",
+    "name": "英国管",
+    "midi": 60,
+    "program": 69,
+    "introduced": 2
+  },
+  {
+    "category": "木管",
+    "key": "bassoon",
+    "name": "巴松",
+    "midi": 48,
+    "program": 70,
+    "introduced": 1
+  },
+  {
+    "category": "木管",
+    "key": "clarinet",
+    "name": "单簧管",
+    "midi": 60,
+    "program": 71,
+    "introduced": 1
+  },
+  {
+    "category": "木管",
+    "key": "piccolo",
+    "name": "短笛",
+    "midi": 72,
+    "program": 72,
+    "introduced": 1
+  },
+  {
+    "category": "木管",
+    "key": "flute",
+    "name": "长笛",
+    "midi": 72,
+    "program": 73,
+    "introduced": 1
+  },
+  {
+    "category": "木管",
+    "key": "gm-74",
+    "name": "竖笛",
+    "midi": 60,
+    "program": 74,
+    "introduced": 2
+  },
+  {
+    "category": "木管",
+    "key": "gm-75",
+    "name": "排箫",
+    "midi": 60,
+    "program": 75,
+    "introduced": 2
+  },
+  {
+    "category": "木管",
+    "key": "gm-76",
+    "name": "吹瓶声",
+    "midi": 60,
+    "program": 76,
+    "introduced": 2
+  },
+  {
+    "category": "木管",
+    "key": "gm-77",
+    "name": "尺八",
+    "midi": 60,
+    "program": 77,
+    "introduced": 2
+  },
+  {
+    "category": "木管",
+    "key": "gm-78",
+    "name": "哨音",
+    "midi": 60,
+    "program": 78,
+    "introduced": 2
+  },
+  {
+    "category": "木管",
+    "key": "gm-79",
+    "name": "陶笛",
+    "midi": 60,
+    "program": 79,
+    "introduced": 2
+  },
+  {
+    "category": "电子",
+    "key": "square-lead",
+    "name": "方波主奏",
+    "midi": 60,
+    "program": 80,
+    "introduced": 1
+  },
+  {
+    "category": "电子",
+    "key": "saw-lead",
+    "name": "锯齿主奏",
+    "midi": 60,
+    "program": 81,
+    "introduced": 1
+  },
+  {
+    "category": "电子",
+    "key": "gm-82",
+    "name": "汽笛主音",
+    "midi": 60,
+    "program": 82,
+    "introduced": 2
+  },
+  {
+    "category": "电子",
+    "key": "gm-83",
+    "name": "气音主音",
+    "midi": 60,
+    "program": 83,
+    "introduced": 2
+  },
+  {
+    "category": "电子",
+    "key": "gm-84",
+    "name": "拨弦主音",
+    "midi": 60,
+    "program": 84,
+    "introduced": 2
+  },
+  {
+    "category": "电子",
+    "key": "gm-85",
+    "name": "人声主音",
+    "midi": 60,
+    "program": 85,
+    "introduced": 2
+  },
+  {
+    "category": "电子",
+    "key": "gm-86",
+    "name": "五度主音",
+    "midi": 60,
+    "program": 86,
+    "introduced": 2
+  },
+  {
+    "category": "电子",
+    "key": "gm-87",
+    "name": "低音主音",
+    "midi": 60,
+    "program": 87,
+    "introduced": 2
+  },
+  {
+    "category": "电子",
+    "key": "gm-88",
+    "name": "新世纪铺底",
+    "midi": 60,
+    "program": 88,
+    "introduced": 2
+  },
+  {
+    "category": "电子",
+    "key": "warm-pad",
+    "name": "温暖铺底",
+    "midi": 60,
+    "program": 89,
+    "introduced": 1
+  },
+  {
+    "category": "电子",
+    "key": "gm-90",
+    "name": "合成铺底",
+    "midi": 60,
+    "program": 90,
+    "introduced": 2
+  },
+  {
+    "category": "电子",
+    "key": "airy-pad",
+    "name": "空灵铺底",
+    "midi": 60,
+    "program": 91,
+    "introduced": 1
+  },
+  {
+    "category": "电子",
+    "key": "gm-92",
+    "name": "弓弦铺底",
+    "midi": 60,
+    "program": 92,
+    "introduced": 2
+  },
+  {
+    "category": "电子",
+    "key": "gm-93",
+    "name": "金属铺底",
+    "midi": 60,
+    "program": 93,
+    "introduced": 2
+  },
+  {
+    "category": "电子",
+    "key": "gm-94",
+    "name": "光晕铺底",
+    "midi": 60,
+    "program": 94,
+    "introduced": 2
+  },
+  {
+    "category": "电子",
+    "key": "gm-95",
+    "name": "扫频铺底",
+    "midi": 60,
+    "program": 95,
+    "introduced": 2
+  },
+  {
+    "category": "电子",
+    "key": "gm-96",
+    "name": "雨声效果",
+    "midi": 60,
+    "program": 96,
+    "introduced": 2
+  },
+  {
+    "category": "电子",
+    "key": "gm-97",
+    "name": "配乐效果",
+    "midi": 60,
+    "program": 97,
+    "introduced": 2
+  },
+  {
+    "category": "电子",
+    "key": "gm-98",
+    "name": "水晶效果",
+    "midi": 60,
+    "program": 98,
+    "introduced": 2
+  },
+  {
+    "category": "电子",
+    "key": "gm-99",
+    "name": "氛围效果",
+    "midi": 60,
+    "program": 99,
+    "introduced": 2
+  },
+  {
+    "category": "电子",
+    "key": "gm-100",
+    "name": "明亮效果",
+    "midi": 60,
+    "program": 100,
+    "introduced": 2
+  },
+  {
+    "category": "电子",
+    "key": "gm-101",
+    "name": "奇幻效果",
+    "midi": 60,
+    "program": 101,
+    "introduced": 2
+  },
+  {
+    "category": "电子",
+    "key": "gm-102",
+    "name": "回声效果",
+    "midi": 60,
+    "program": 102,
+    "introduced": 2
+  },
+  {
+    "category": "电子",
+    "key": "gm-103",
+    "name": "科幻效果",
+    "midi": 60,
+    "program": 103,
+    "introduced": 2
+  },
+  {
+    "category": "拨弦",
+    "key": "gm-104",
+    "name": "西塔琴",
+    "midi": 60,
+    "program": 104,
+    "introduced": 2
+  },
+  {
+    "category": "拨弦",
+    "key": "gm-105",
+    "name": "班卓琴",
+    "midi": 60,
+    "program": 105,
+    "introduced": 2
+  },
+  {
+    "category": "拨弦",
+    "key": "gm-106",
+    "name": "三味线",
+    "midi": 60,
+    "program": 106,
+    "introduced": 2
+  },
+  {
+    "category": "拨弦",
+    "key": "guzheng",
+    "name": "日本筝",
+    "midi": 60,
+    "program": 107,
+    "introduced": 1
+  },
+  {
+    "category": "拨弦",
+    "key": "gm-108",
+    "name": "卡林巴",
+    "midi": 60,
+    "program": 108,
+    "introduced": 2
+  },
+  {
+    "category": "木管",
+    "key": "gm-109",
+    "name": "风笛",
+    "midi": 60,
+    "program": 109,
+    "introduced": 2
+  },
+  {
+    "category": "弦乐",
+    "key": "gm-110",
+    "name": "民间提琴",
+    "midi": 60,
+    "program": 110,
+    "introduced": 2
+  },
+  {
+    "category": "木管",
+    "key": "gm-111",
+    "name": "唢呐",
+    "midi": 60,
+    "program": 111,
+    "introduced": 2
+  },
+  {
+    "category": "打击",
+    "key": "gm-112",
+    "name": "小铃",
+    "midi": 60,
+    "program": 112,
+    "introduced": 2
+  },
+  {
+    "category": "打击",
+    "key": "gm-113",
+    "name": "阿果果铃",
+    "midi": 60,
+    "program": 113,
+    "introduced": 2
+  },
+  {
+    "category": "打击",
+    "key": "gm-114",
+    "name": "钢鼓",
+    "midi": 60,
+    "program": 114,
+    "introduced": 2
+  },
+  {
+    "category": "打击",
+    "key": "gm-115",
+    "name": "木块",
+    "midi": 60,
+    "program": 115,
+    "introduced": 2
+  },
+  {
+    "category": "打击",
+    "key": "gm-116",
+    "name": "太鼓",
+    "midi": 60,
+    "program": 116,
+    "introduced": 2
+  },
+  {
+    "category": "打击",
+    "key": "gm-117",
+    "name": "旋律通鼓",
+    "midi": 60,
+    "program": 117,
+    "introduced": 2
+  },
+  {
+    "category": "打击",
+    "key": "gm-118",
+    "name": "合成鼓",
+    "midi": 60,
+    "program": 118,
+    "introduced": 2
+  },
+  {
+    "category": "打击",
+    "key": "gm-119",
+    "name": "反向镲",
+    "midi": 60,
+    "program": 119,
+    "introduced": 2
+  },
+  {
+    "category": "电子",
+    "key": "gm-120",
+    "name": "吉他指板声",
+    "midi": 60,
+    "program": 120,
+    "introduced": 2
+  },
+  {
+    "category": "电子",
+    "key": "gm-121",
+    "name": "呼吸声",
+    "midi": 60,
+    "program": 121,
+    "introduced": 2
+  },
+  {
+    "category": "电子",
+    "key": "gm-122",
+    "name": "海浪",
+    "midi": 60,
+    "program": 122,
+    "introduced": 2
+  },
+  {
+    "category": "电子",
+    "key": "gm-123",
+    "name": "鸟鸣",
+    "midi": 60,
+    "program": 123,
+    "introduced": 2
+  },
+  {
+    "category": "电子",
+    "key": "gm-124",
+    "name": "电话铃",
+    "midi": 60,
+    "program": 124,
+    "introduced": 2
+  },
+  {
+    "category": "电子",
+    "key": "gm-125",
+    "name": "直升机",
+    "midi": 60,
+    "program": 125,
+    "introduced": 2
+  },
+  {
+    "category": "电子",
+    "key": "gm-126",
+    "name": "掌声",
+    "midi": 60,
+    "program": 126,
+    "introduced": 2
+  },
+  {
+    "category": "电子",
+    "key": "gm-127",
+    "name": "枪声",
+    "midi": 60,
+    "program": 127,
+    "introduced": 2
+  },
+  {
+    "category": "打击",
+    "key": "acoustic-kick",
+    "name": "原声底鼓",
+    "midi": 60,
+    "drum": 35,
+    "introduced": 1
+  },
+  {
+    "category": "打击",
+    "key": "electronic-kick",
+    "name": "电子底鼓",
+    "midi": 60,
+    "drum": 36,
+    "introduced": 1
+  },
+  {
+    "category": "打击",
+    "key": "gm-drum-37",
+    "name": "边击",
+    "midi": 60,
+    "drum": 37,
+    "introduced": 2
+  },
+  {
+    "category": "打击",
+    "key": "snare",
+    "name": "军鼓",
+    "midi": 60,
+    "drum": 38,
+    "introduced": 1
+  },
+  {
+    "category": "打击",
+    "key": "clap",
+    "name": "拍手",
+    "midi": 60,
+    "drum": 39,
+    "introduced": 1
+  },
+  {
+    "category": "打击",
+    "key": "gm-drum-40",
+    "name": "电子军鼓",
+    "midi": 60,
+    "drum": 40,
+    "introduced": 2
+  },
+  {
+    "category": "打击",
+    "key": "gm-drum-41",
+    "name": "低落地通鼓",
+    "midi": 60,
+    "drum": 41,
+    "introduced": 2
+  },
+  {
+    "category": "打击",
+    "key": "closed-hat",
+    "name": "闭镲",
+    "midi": 60,
+    "drum": 42,
+    "introduced": 1
+  },
+  {
+    "category": "打击",
+    "key": "gm-drum-43",
+    "name": "高落地通鼓",
+    "midi": 60,
+    "drum": 43,
+    "introduced": 2
+  },
+  {
+    "category": "打击",
+    "key": "gm-drum-44",
+    "name": "踏板踩镲",
+    "midi": 60,
+    "drum": 44,
+    "introduced": 2
+  },
+  {
+    "category": "打击",
+    "key": "tom",
+    "name": "嗵鼓",
+    "midi": 60,
+    "drum": 45,
+    "introduced": 1
+  },
+  {
+    "category": "打击",
+    "key": "open-hat",
+    "name": "开镲",
+    "midi": 60,
+    "drum": 46,
+    "introduced": 1
+  },
+  {
+    "category": "打击",
+    "key": "gm-drum-47",
+    "name": "中低通鼓",
+    "midi": 60,
+    "drum": 47,
+    "introduced": 2
+  },
+  {
+    "category": "打击",
+    "key": "gm-drum-48",
+    "name": "中高通鼓",
+    "midi": 60,
+    "drum": 48,
+    "introduced": 2
+  },
+  {
+    "category": "打击",
+    "key": "crash",
+    "name": "吊镲",
+    "midi": 60,
+    "drum": 49,
+    "introduced": 1
+  },
+  {
+    "category": "打击",
+    "key": "gm-drum-50",
+    "name": "高通鼓",
+    "midi": 60,
+    "drum": 50,
+    "introduced": 2
+  },
+  {
+    "category": "打击",
+    "key": "gm-drum-51",
+    "name": "叮叮镲",
+    "midi": 60,
+    "drum": 51,
+    "introduced": 2
+  },
+  {
+    "category": "打击",
+    "key": "gm-drum-52",
+    "name": "中国镲",
+    "midi": 60,
+    "drum": 52,
+    "introduced": 2
+  },
+  {
+    "category": "打击",
+    "key": "gm-drum-53",
+    "name": "镲帽",
+    "midi": 60,
+    "drum": 53,
+    "introduced": 2
+  },
+  {
+    "category": "打击",
+    "key": "tambourine",
+    "name": "铃鼓",
+    "midi": 60,
+    "drum": 54,
+    "introduced": 1
+  },
+  {
+    "category": "打击",
+    "key": "gm-drum-55",
+    "name": "水镲",
+    "midi": 60,
+    "drum": 55,
+    "introduced": 2
+  },
+  {
+    "category": "打击",
+    "key": "gm-drum-56",
+    "name": "牛铃",
+    "midi": 60,
+    "drum": 56,
+    "introduced": 2
+  },
+  {
+    "category": "打击",
+    "key": "gm-drum-57",
+    "name": "碎音镲二",
+    "midi": 60,
+    "drum": 57,
+    "introduced": 2
+  },
+  {
+    "category": "打击",
+    "key": "gm-drum-58",
+    "name": "颤击器",
+    "midi": 60,
+    "drum": 58,
+    "introduced": 2
+  },
+  {
+    "category": "打击",
+    "key": "gm-drum-59",
+    "name": "叮叮镲二",
+    "midi": 60,
+    "drum": 59,
+    "introduced": 2
+  },
+  {
+    "category": "打击",
+    "key": "gm-drum-60",
+    "name": "高邦戈",
+    "midi": 60,
+    "drum": 60,
+    "introduced": 2
+  },
+  {
+    "category": "打击",
+    "key": "gm-drum-61",
+    "name": "低邦戈",
+    "midi": 60,
+    "drum": 61,
+    "introduced": 2
+  },
+  {
+    "category": "打击",
+    "key": "gm-drum-62",
+    "name": "闷高康加",
+    "midi": 60,
+    "drum": 62,
+    "introduced": 2
+  },
+  {
+    "category": "打击",
+    "key": "gm-drum-63",
+    "name": "开放高康加",
+    "midi": 60,
+    "drum": 63,
+    "introduced": 2
+  },
+  {
+    "category": "打击",
+    "key": "gm-drum-64",
+    "name": "低康加",
+    "midi": 60,
+    "drum": 64,
+    "introduced": 2
+  },
+  {
+    "category": "打击",
+    "key": "gm-drum-65",
+    "name": "高廷巴雷",
+    "midi": 60,
+    "drum": 65,
+    "introduced": 2
+  },
+  {
+    "category": "打击",
+    "key": "gm-drum-66",
+    "name": "低廷巴雷",
+    "midi": 60,
+    "drum": 66,
+    "introduced": 2
+  },
+  {
+    "category": "打击",
+    "key": "gm-drum-67",
+    "name": "高阿果果铃",
+    "midi": 60,
+    "drum": 67,
+    "introduced": 2
+  },
+  {
+    "category": "打击",
+    "key": "gm-drum-68",
+    "name": "低阿果果铃",
+    "midi": 60,
+    "drum": 68,
+    "introduced": 2
+  },
+  {
+    "category": "打击",
+    "key": "gm-drum-69",
+    "name": "卡巴萨",
+    "midi": 60,
+    "drum": 69,
+    "introduced": 2
+  },
+  {
+    "category": "打击",
+    "key": "shaker",
+    "name": "沙锤",
+    "midi": 60,
+    "drum": 70,
+    "introduced": 1
+  },
+  {
+    "category": "打击",
+    "key": "gm-drum-71",
+    "name": "短哨",
+    "midi": 60,
+    "drum": 71,
+    "introduced": 2
+  },
+  {
+    "category": "打击",
+    "key": "gm-drum-72",
+    "name": "长哨",
+    "midi": 60,
+    "drum": 72,
+    "introduced": 2
+  },
+  {
+    "category": "打击",
+    "key": "gm-drum-73",
+    "name": "短刮瓜",
+    "midi": 60,
+    "drum": 73,
+    "introduced": 2
+  },
+  {
+    "category": "打击",
+    "key": "gm-drum-74",
+    "name": "长刮瓜",
+    "midi": 60,
+    "drum": 74,
+    "introduced": 2
+  },
+  {
+    "category": "打击",
+    "key": "gm-drum-75",
+    "name": "击木",
+    "midi": 60,
+    "drum": 75,
+    "introduced": 2
+  },
+  {
+    "category": "打击",
+    "key": "gm-drum-76",
+    "name": "高木块",
+    "midi": 60,
+    "drum": 76,
+    "introduced": 2
+  },
+  {
+    "category": "打击",
+    "key": "gm-drum-77",
+    "name": "低木块",
+    "midi": 60,
+    "drum": 77,
+    "introduced": 2
+  },
+  {
+    "category": "打击",
+    "key": "gm-drum-78",
+    "name": "闷库伊卡",
+    "midi": 60,
+    "drum": 78,
+    "introduced": 2
+  },
+  {
+    "category": "打击",
+    "key": "gm-drum-79",
+    "name": "开放库伊卡",
+    "midi": 60,
+    "drum": 79,
+    "introduced": 2
+  },
+  {
+    "category": "打击",
+    "key": "gm-drum-80",
+    "name": "闷三角铁",
+    "midi": 60,
+    "drum": 80,
+    "introduced": 2
+  },
+  {
+    "category": "打击",
+    "key": "gm-drum-81",
+    "name": "开放三角铁",
+    "midi": 60,
+    "drum": 81,
+    "introduced": 2
   }
 ]

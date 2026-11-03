@@ -1,5 +1,6 @@
 import type { ContentRecord, Draft, MaterialLibrary } from '../contracts/content.ts';
 import type { PhraseSection } from '../contracts/phrase.ts';
+import { instrumentCatalogVersion } from '../modules/timbre/instrument-catalog.ts';
 import { createTimbrePlayback, createTimbreReferenceAdapter, prepareMelodyTimbres, readEditableTimbreBody } from '../modules/timbre/public.ts';
 import { createPhraseReferenceAdapter, readPhraseBody } from '../modules/phrase/public.ts';
 import { createSongReferenceAdapter, readSongBody } from '../modules/song/public.ts';
@@ -34,7 +35,7 @@ function committed(result: ReturnType<MaterialLibrary['commitTransaction']>): vo
 /** Keep strict occurrence snapshots current for these non-musical metadata edits only. */
 function songLibraryMetadataChanges(library: MaterialLibrary, song: Draft, body: ReturnType<typeof readSongBody>, excludedDraftIds = new Set<string>()) {
   const previous = readSongBody(song.body);
-  const changed = (['timbreLibraryOrder', 'melodyTimbresSeeded'] as const)
+  const changed = (['timbreLibraryOrder', 'melodyTimbresSeeded', 'timbreCatalogVersion'] as const)
     .filter(key => JSON.stringify(previous[key]) !== JSON.stringify(body[key]));
   const object = (value: unknown): value is Record<string, unknown> => !!value && typeof value === 'object' && !Array.isArray(value);
   function rewrite(value: unknown): unknown {
@@ -90,13 +91,13 @@ export function listProjectTimbres(library: MaterialLibrary, songDraftId: string
 export function ensureProjectMelodyTimbres(library: MaterialLibrary, songDraftId: string): ContentRecord[] {
   const expectedToken = library.currentToken(); const { song, view, scope } = currentSong(library, songDraftId);
   const songBody = readSongBody(song.body);
-  if (songBody.melodyTimbresSeeded) return listProjectTimbres(library, songDraftId);
+  if (songBody.melodyTimbresSeeded && (songBody.timbreCatalogVersion ?? 1) >= instrumentCatalogVersion) return listProjectTimbres(library, songDraftId);
   const current = listProjectTimbres(library, songDraftId);
   const names = new Set([...library.listContentInfo(), ...library.listDrafts()]
     .filter(item => item.kind === 'rootsound.timbre' && library.projectScopeOf?.({ type: 'revision' in item ? 'content' : 'draft', id: item.id }) === scope)
     .map(item => nameKey(item.name)));
   const created: ContentRecord[] = [];
-  for (const preset of prepareMelodyTimbres()) {
+  for (const preset of prepareMelodyTimbres(songBody.melodyTimbresSeeded ? songBody.timbreCatalogVersion ?? 1 : 0)) {
     const id = `${preset.id}:${scope}`;
     if (current.some(record => record.id === id)) continue;
     // A renamed/edited preset is still the same saved identity after reopening.
@@ -107,6 +108,7 @@ export function ensureProjectMelodyTimbres(library: MaterialLibrary, songDraftId
     names.add(nameKey(name)); created.push({ ...preset, id, name });
   }
   songBody.melodyTimbresSeeded = true;
+  songBody.timbreCatalogVersion = instrumentCatalogVersion;
   songBody.timbreLibraryOrder = [...new Set([...(songBody.timbreLibraryOrder ?? []), ...current.map(record => record.id), ...created.map(record => record.id)])];
   committed(library.commitTransaction({ expectedToken, label: '准备本曲音色', createContents: created,
     replaceDrafts: songLibraryMetadataChanges(library, song, songBody),
@@ -203,7 +205,7 @@ export function removeProjectTimbre(library: MaterialLibrary, songDraftId: strin
 }
 
 function generatedEmptyPlaceholder(library: MaterialLibrary, part: ReturnType<typeof readPhraseBody>['parts'][number]): boolean {
-  if (part.notes.length || !/^音乐 [1-9]\d* 音色$/.test(part.name)) return false;
+  if (part.notes.length || part.hiddenNotes?.length || !/^音乐 [1-9]\d* 音色$/.test(part.name)) return false;
   const record = library.readContent(part.timbreId);
   if (!record || record.name !== part.name || record.dependencies.length) return false;
   if (library.listDrafts().some(draft => draft.sourceId === record.id && (draft.name !== record.name

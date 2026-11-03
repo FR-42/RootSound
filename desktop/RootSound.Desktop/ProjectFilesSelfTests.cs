@@ -6,12 +6,13 @@ namespace RootSound.Desktop;
 /// <summary>Project transfer boundary tests use disk files only, never dialogs or windows.</summary>
 internal static class ProjectFilesSelfTests
 {
-    public static int Run(string testDir)
+    public static int Run(string testDir, bool lightweight = false)
     {
         var root = Path.Combine(Path.GetFullPath(testDir), "project-files-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(root); int completed = 0;
         void Case(string name, Action<string> test)
         {
+            if (lightweight && name == "byte-limit-before-read-or-write") return;
             var directory = Path.Combine(root, name); Directory.CreateDirectory(directory); test(directory); completed++;
         }
         Case("utf8-bom-and-opaque-music", directory =>
@@ -29,8 +30,8 @@ internal static class ProjectFilesSelfTests
             var path = Path.Combine(directory, "清晨 🌤.rsproject"); var first = Project("第一版"); var second = Project("第二版");
             NativeProjectFiles.WriteAtomic(path, first); Check(NativeProjectFiles.ReadProject(path) == first, "新工程应完整落盘。");
             NativeProjectFiles.WriteAtomic(path, second); Check(NativeProjectFiles.ReadProject(path) == second, "替换应保存新工程。");
-            Check(File.ReadAllText(path + ".bak") == first, "备份应保留被替换版本。");
-            NativeProjectFiles.WriteAtomic(path, first); Check(File.ReadAllText(path + ".bak") == second, "连续保存应留下上一版。");
+            Check(!File.Exists(path + ".bak"), "替换不生成备份。");
+            NativeProjectFiles.WriteAtomic(path, first); Check(!File.Exists(path + ".bak"), "连续保存不生成备份。");
             Clean(directory);
         });
         Case("strict-envelope-preserves-old-file", directory =>
@@ -50,7 +51,7 @@ internal static class ProjectFilesSelfTests
             Check(NativeProjectFiles.ValidateText(text) == text, "平台必须接受版本 2，并把成员和音乐内容交由材料模块验证。");
             NativeProjectFiles.WriteAtomic(path, old); NativeProjectFiles.WriteAtomic(path, text);
             Check(NativeProjectFiles.ReadProject(path) == text, "版本 2 的显式成员工程必须原文读回。");
-            Check(File.ReadAllText(path + ".bak") == old, "版本 2 替换仍须保留版本 1 备份。");
+            Check(!File.Exists(path + ".bak"), "版本 2 替换不生成备份。");
             File.WriteAllText(path, text, new UTF8Encoding(true));
             Check(NativeProjectFiles.ReadProject(path) == text, "带 BOM 的版本 2 也必须原文读回。");
             Clean(directory);
@@ -60,13 +61,12 @@ internal static class ProjectFilesSelfTests
             var path = Path.Combine(directory, "安全成员工程.rsproject");
             var good = "{\"format\":\"RootSoundProject\",\"version\":2,\"rootId\":\"歌曲\",\"memberIds\":[],\"contents\":[]}";
             NativeProjectFiles.WriteAtomic(path, Project("原备份")); NativeProjectFiles.WriteAtomic(path, good);
-            var backup = File.ReadAllBytes(path + ".bak");
             foreach (var version in new[] { "0", "3", "1.5", "-1", "\"2\"", "null", "true" })
             {
                 var invalid = "{\"format\":\"RootSoundProject\",\"version\":" + version + "}";
                 ExpectFailure(() => NativeProjectFiles.WriteAtomic(path, invalid), "未知或非数字版本不能覆盖版本 2。");
                 Check(NativeProjectFiles.ReadProject(path) == good, "错误版本须保留现有版本 2 原件。");
-                Check(File.ReadAllBytes(path + ".bak").SequenceEqual(backup), "错误版本不能改写已有备份。");
+                Check(!File.Exists(path + ".bak"), "错误版本不生成备份。");
                 var input = Path.Combine(directory, "错误输入.rsproject"); File.WriteAllText(input, invalid, new UTF8Encoding(false, true));
                 var evidence = File.ReadAllBytes(input);
                 ExpectFailure(() => NativeProjectFiles.ReadProject(input), "读取也必须拒绝不支持的版本。");
@@ -100,7 +100,7 @@ internal static class ProjectFilesSelfTests
             using (var locked = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read))
                 ExpectFailure(() => NativeProjectFiles.WriteAtomic(path, Project("不能保存")), "占用中的工程应明确失败。");
             Check(NativeProjectFiles.ReadProject(path) == second, "失败必须保留当前版本。");
-            Check(File.ReadAllText(path + ".bak") == first, "失败必须保留已有备份。"); Clean(directory);
+            Check(!File.Exists(path + ".bak"), "失败不生成备份。"); Clean(directory);
         });
         Case("directories-are-not-output-files", directory =>
         {
@@ -109,8 +109,8 @@ internal static class ProjectFilesSelfTests
             Check(File.ReadAllText(Path.Combine(path, "keep.txt")) == "保留目录", "目标目录不能被删除。");
             var normal = Path.Combine(directory, "工程.rsproject"); var before = Project("原版"); NativeProjectFiles.WriteAtomic(normal, before);
             Directory.CreateDirectory(normal + ".bak"); File.WriteAllText(Path.Combine(normal + ".bak", "keep.txt"), "保留备份目录");
-            ExpectFailure(() => NativeProjectFiles.WriteAtomic(normal, Project("新版")), "备份路径是目录时必须明确失败。");
-            Check(NativeProjectFiles.ReadProject(normal) == before, "备份失败应保留原件。");
+            NativeProjectFiles.WriteAtomic(normal, Project("新版"));
+            Check(NativeProjectFiles.ReadProject(normal) == Project("新版"), "无关备份目录不应阻止保存。");
             Check(File.ReadAllText(Path.Combine(normal + ".bak", "keep.txt")) == "保留备份目录", "不能破坏备份目录。"); Clean(directory);
         });
         Case("extension-and-unknown-lock-preserved", directory =>
@@ -136,7 +136,7 @@ internal static class ProjectFilesSelfTests
             });
             Check(successful > 0, "至少一个并发工程保存应成功。");
             Check(candidates.Contains(NativeProjectFiles.ReadProject(path)), "并发不能混合不同版本。");
-            _ = NativeProjectFiles.ReadProject(path + ".bak"); Clean(directory);
+            Check(!File.Exists(path + ".bak"), "并发保存不生成备份。"); Clean(directory);
         });
         Case("reentry-rejected-without-opening-ui", _ =>
         {

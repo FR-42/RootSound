@@ -1,0 +1,68 @@
+:root {
+  color-scheme: light;
+  --surface-base: #fafbfd;
+  --surface: #ffffff;
+  --surface-raised: #edf1f6;
+  --surface-hover: #e4edf7;
+  --border: #bbc6d3;
+  --text: #2d4054;
+  --muted: #62748a;
+  --accent: #476f96;
+  --danger: #b7404c;
+  background: var(--surface-base);
+  color: var(--text);
+}
+body, .welcome, .studio { background: var(--surface-base); color: var(--text); }
+.wordmark, .invitation h1, .project-start-title, .project-start-label { color: var(--text); }
+.project-start-hint, .project-start-location { color: var(--muted); }
+.project-start-input, dialog, .settings-field select { background: var(--surface); color: var(--text); border-color: var(--border); }
+.quiet, .secondary, dialog p, dialog li, .settings-check, .settings-field { color: var(--muted); }
+.quiet:hover, .secondary:hover { color: var(--text); background: var(--surface-raised); }
+.primary { color: #fff; background: var(--accent); border-color: var(--accent); }
+.primary:hover { background: #365d81; border-color: #365d81; }
+.project-copy-dialog .primary, .project-delete-actions button:last-child { color: #fff; }
+.song-studio {
+  --song-bg: var(--surface-base); --song-panel: var(--surface);
+  --song-border: var(--border); --song-text: var(--text);
+  --song-muted: var(--muted); --song-accent: var(--accent);
+}
+.song-topbar { background: var(--surface); }
+.song-icon-button:hover, .song-settings:hover, .song-save:hover, .song-rate-choice:hover { background: var(--surface-hover); color: var(--text); }
+.song-play { color: var(--accent); }
+.song-exit, .song-exit:hover { color: var(--danger); }
+.song-exit:hover { background: #fbe9ec; }
+.song-popover-panel { background: var(--surface-raised); border-color: var(--border); box-shadow: 0 8px 24px #0005; }
+.song-tempo-panel input, .phrase-grid-select { background: var(--surface-base); color: var(--text); }
+.melody-workspace, .melody-scroll { background: var(--surface-base); color: var(--text); }
+.melody-pitch-row { border-color: #dbe2e8; }
+.melody-pitch-row.is-accidental { background: #536c8107; }
+.melody-grid-line { background: #55718d14; }
+.melody-grid-line.is-beat { background: #55718d35; }
+.melody-grid-line.is-bar { background: #55718d66; }
+.melody-key { background: #f7f9fc; color: #202938; border-color: #858f9e; }
+.is-vertical .melody-key.is-accidental, .melody-key.is-accidental { background: #647181; color: #fff; border-color: #4c596c; }
+.melody-key:hover, .is-vertical .melody-key:hover { background: #b9cfdf; color: #142033; }
+.melody-key.is-entry-range { box-shadow: inset 4px 0 var(--accent); }
+.is-vertical .melody-key.is-entry-range { box-shadow: inset 0 -4px var(--accent); }
+.melody-tone.is-selected { outline-color: var(--accent); background: var(--surface-hover); }
+.melody-note { color: #122334; box-shadow: inset 0 0 0 1px #0005; }
+.melody-note.is-dim { opacity: .22; }
+.melody-note.is-selected { box-shadow: inset 0 0 0 1px #101b2b, inset 0 0 0 2px #eef4ff; }
+.melody-family-remove:hover { background: #fbe9ec; color: var(--danger); }
+.melody-library-category:hover, .melody-library-category.is-active, .melody-library-tone.is-on-shelf,
+.project-library .project-library-tile:hover { background: var(--surface-hover); color: var(--text); }
+.melody-head-handle { will-change: transform; }
+.melody-playhead { left: 0; will-change: transform; }
+.project-library-overlay { background: #263b4d40; }
+dialog::backdrop, .melody-tone-library::backdrop, .workspace-settings-dialog::backdrop { background: #263b4d40; backdrop-filter: none; }
+/* No positional transitions on notes: direct manipulation must track the pointer. */
+@media (prefers-reduced-motion: reduce) { .melody-head-handle, .melody-playhead { will-change: auto; } }
+
+.phrase-composition-studio { color-scheme: light; }
+.secondary { background: var(--surface); border-color: var(--border); }
+.melody-tone-trash::before, .project-library-trash::before { background: radial-gradient(ellipse closest-side, #fffffff2 10%, #ffffffbf 36%, #ffffff5c 62%, #ffffff00 100%); }
+.workspace-settings-dialog { min-height: 180px; }
+.settings-dialog-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.settings-dialog-heading h2 { margin: 0; }
+.settings-close { border: 0; background: transparent; color: var(--muted); width: 30px; height: 30px; padding: 0; font-size: 24px; }
+.settings-close:hover { background: var(--surface-raised); }

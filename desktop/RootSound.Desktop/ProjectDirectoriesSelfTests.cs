@@ -178,9 +178,9 @@ internal static class ProjectDirectoriesSelfTests
             using var m = new ProjectDirectoryManager(root);
             var p = m.Create("原子写", m.DefaultLocation, Library("一"));
             m.WriteLibrary(Library("二")); m.Save();
-            byte[] before = File.ReadAllBytes(p.Path), backup = File.ReadAllBytes(p.Path + ".bak");
+            byte[] before = File.ReadAllBytes(p.Path);
             using (var blocker = new FileStream(p.Path, FileMode.Open, FileAccess.Read, FileShare.Read)) { m.WriteLibrary(Library("不能提交")); ExpectFailure(() => m.Save(), "锁定替换拒绝"); }
-            Check(File.ReadAllBytes(p.Path).SequenceEqual(before) && File.ReadAllBytes(p.Path + ".bak").SequenceEqual(backup), "失败保留原件及备份");
+            Check(File.ReadAllBytes(p.Path).SequenceEqual(before) && !File.Exists(p.Path + ".bak"), "失败保留原件且不生成备份");
             Check(!Directory.EnumerateFiles(m.DefaultLocation, "*.tmp").Any(), "写候选清理");
             m.WriteLibrary(Library("恢复")); m.Save();
             Check(DiskLibrary(p.Path) == Library("恢复"), "故障后可重试");
@@ -660,6 +660,7 @@ internal static class ProjectDirectoriesSelfTests
         {
             ProjectDirectoryInfo project;
             using (var maker = new ProjectDirectoryManager(root)) { project = maker.Create("中断删除", maker.DefaultLocation, Library("当前内容")); maker.WriteLibrary(Library("最新内容")); maker.Save(); }
+            File.WriteAllText(project.Path + ".bak", "模拟旧版本遗留备份");
             byte[] original = File.ReadAllBytes(project.Path), backup = File.ReadAllBytes(project.Path + ".bak"); int deletes = 0;
             using (var manager = new ProjectDirectoryManager(root, null, null, _ => { if (++deletes == 2) throw new IOException("模拟第二份文件删除失败"); }))
             {
@@ -880,6 +881,8 @@ internal static class ProjectDirectoriesSelfTests
             using (var manager = new ProjectDirectoryManager(root))
             {
                 project = manager.Create("仅手动保存", manager.DefaultLocation, Library("初稿")); manager.Save();
+                Check(!File.Exists(project.Path + ".bak"), "正常保存不生成备份");
+                File.WriteAllText(project.Path + ".bak", "模拟旧版本遗留备份");
                 bytes = File.ReadAllBytes(project.Path); backup = File.ReadAllBytes(project.Path + ".bak");
                 stamp = File.GetLastWriteTimeUtc(project.Path); backupStamp = File.GetLastWriteTimeUtc(project.Path + ".bak");
                 manager.Open(project.Path);

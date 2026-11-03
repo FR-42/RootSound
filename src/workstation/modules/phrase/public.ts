@@ -5,6 +5,8 @@ import type { TimbrePlaybackPort } from '../../contracts/timbre.ts';
 import type { ReferenceAdapter } from '../../contracts/references.ts';
 import { MAX_PHRASE_BEATS, MAX_PHRASE_NOTES, MIN_NOTE_BEATS, MIN_NOTE_SECONDS } from '../../contracts/phrase-limits.ts';
 import { phraseStepsPerBeat } from '../../contracts/phrase.ts';
+import { phraseBeatSeconds, phraseDurationSeconds, phraseHeldSeconds, phraseHeldBeats } from '../../contracts/phrase-time.ts';
+import { resizeTempoRoll } from './tempo-roll-resize.ts';
 
 export type { KeyboardPitch, PhraseBody, PhraseEditorPort, PhraseNote, PhrasePart, PhraseSection, PhraseView, PhrasePlaybackPort, PhraseNoteRef, PhraseNoteUpdate } from '../../contracts/phrase.ts';
 export { PHRASE_STEPS_PER_BEAT, phraseStepsPerBeat } from '../../contracts/phrase.ts';
@@ -13,6 +15,25 @@ const KIND = 'rootsound.phrase';
 const OWNER = 'phrase';
 /** First editor limits, not a restriction on future RootSound phrase formats. */
 const MAX_PARTS = 128;
+
+/** Tempo edits retain musical lengths, including old notes stored in seconds. */
+function retimeHeldNotes(body:PhraseBody, change:()=>void):void {
+  const before=structuredClone(body);
+  const held=new Map(body.parts.flatMap(part=>part.notes.map(note=>[note.id,phraseHeldBeats(before,note.startBeat,phraseHeldSeconds(before,note))] as const)));
+  change();
+  for(const part of body.parts) {
+    for(const note of part.notes) {
+      const beats=held.get(note.id)!;
+      note.durationBeats=Math.max(MIN_NOTE_BEATS,Math.min(body.lengthBeats-note.startBeat,beats));
+      note.durationSeconds=Math.max(MIN_NOTE_SECONDS,phraseBeatSeconds(body,note.startBeat+beats)-phraseBeatSeconds(body,note.startBeat));
+    }
+    for(const hidden of part.hiddenNotes??[]) {
+      const oldTempo=hidden.sectionId==='first'?before.tempoBpm:before.tempoSections!.find(section=>section.id===hidden.sectionId)!.tempoBpm;
+      const newTempo=hidden.sectionId==='first'?body.tempoBpm:body.tempoSections!.find(section=>section.id===hidden.sectionId)!.tempoBpm;
+      hidden.note.durationSeconds=hidden.note.durationSeconds!*oldTempo/newTempo;
+    }
+  }
+}
 
 export type PhraseSecondsInput = {
   name: string; timbreId: string; durationSeconds: number; tempoBpm?: number;
@@ -71,12 +92,25 @@ function partSection(value: unknown): PhraseSection {
 /** Strict reads reject unknown fields rather than silently truncating future content. */
 export function readPhraseBody(value: unknown): PhraseBody {
   const body = object(value, '音乐');
-  fields(body, ['model', 'version', 'timeUnit', 'tempoBpm', 'lengthBeats', 'stepsPerBeat', 'beatsPerBar', 'pickupBeats', 'masterLevel', 'parts'], '音乐');
+  fields(body, ['model', 'version', 'timeUnit', 'tempoBpm', 'tempoSections', 'lengthBeats', 'stepsPerBeat', 'beatsPerBar', 'pickupBeats', 'masterLevel', 'parts'], '音乐');
   if (body.model !== 'note-phrase' || body.version !== 1 || body.timeUnit !== 'beat') {
     throw new Error('暂不支持这份音乐的格式或版本。原内容已保留。');
   }
   const tempoBpm = number(body.tempoBpm, '速度', 40, 240);
   const lengthBeats = number(body.lengthBeats, '音乐长度', 0.25, MAX_PHRASE_BEATS);
+  let previousStart = 0;
+  const sectionIds = new Set<string>();
+  const tempoSections = body.tempoSections === undefined ? undefined : (() => {
+    if (!Array.isArray(body.tempoSections) || body.tempoSections.length > 127) throw new Error('BPM卷帘数量超出当前范围。');
+    return body.tempoSections.map(raw => {
+      const value = object(raw, 'BPM卷帘'); fields(value, ['id', 'startBeat', 'tempoBpm', 'stepsPerBeat'], 'BPM卷帘');
+      const id = text(value.id, 'BPM卷帘标识'), startBeat = number(value.startBeat, 'BPM卷帘起点', 0, lengthBeats);
+      if (id === 'first' || sectionIds.has(id) || startBeat <= previousStart || startBeat >= lengthBeats) throw new Error('BPM卷帘必须按时间连续排列。');
+      sectionIds.add(id); previousStart = startBeat;
+      return { id, startBeat, tempoBpm: number(value.tempoBpm, 'BPM卷帘速度', 40, 240),
+        ...(value.stepsPerBeat === undefined ? {} : { stepsPerBeat: phraseStepsPerBeat({ stepsPerBeat: value.stepsPerBeat as number }) }) };
+    });
+  })();
   const stepsPerBeat = body.stepsPerBeat === undefined ? undefined : phraseStepsPerBeat({ stepsPerBeat: body.stepsPerBeat as number });
   const beatsPerBar = body.beatsPerBar === undefined ? undefined : number(body.beatsPerBar, '每小节拍数', 1, 16);
   if (beatsPerBar !== undefined && !Number.isInteger(beatsPerBar)) throw new Error('每小节拍数必须是整数。');
@@ -96,22 +130,23 @@ export function readPhraseBody(value: unknown): PhraseBody {
   }
   const parts: PhrasePart[] = body.parts.map(raw => {
     const part = object(raw, '音乐中的声音');
-    fields(part, ['id', 'name', 'timbreId', 'section', 'unassigned', 'notes'], '音乐中的声音');
+    fields(part, ['id', 'name', 'timbreId', 'section', 'unassigned', 'notes', 'hiddenNotes'], '音乐中的声音');
     const id = unique(part.id, '声音标识');
     const name = text(part.name, '声音名称');
     const timbreId = text(part.timbreId, '引用声音标识');
     const section = part.section === undefined ? undefined : partSection(part.section);
     if (part.unassigned !== undefined && typeof part.unassigned !== 'boolean') throw new Error('音色状态必须为开或关。');
     if (!Array.isArray(part.notes)) throw new Error('音乐中的音符列表无效。');
-    noteCount += part.notes.length;
+    if (part.hiddenNotes !== undefined && !Array.isArray(part.hiddenNotes)) throw new Error('被隐藏的音符不是有效列表。');
+    noteCount += part.notes.length + ((part.hiddenNotes as unknown[] | undefined)?.length ?? 0);
     if (noteCount > MAX_PHRASE_NOTES) throw new Error(`当前音乐最多可编辑 ${MAX_PHRASE_NOTES} 个音符。`);
-    const notes: PhraseNote[] = part.notes.map(rawNote => {
+    function readNote(rawNote: unknown, hidden = false): PhraseNote {
       const note = object(rawNote, '音符');
       fields(note, ['id', 'startBeat', 'durationBeats', 'durationSeconds', 'frequencyHz', 'velocity', 'level', 'pan'], '音符');
       const noteId = unique(note.id, '音符标识');
-      const startBeat = number(note.startBeat, '音符开始位置', 0, lengthBeats);
-      const durationBeats = number(note.durationBeats, '音符长度', MIN_NOTE_BEATS, lengthBeats);
-      if (exceedsLength(startBeat, durationBeats, lengthBeats)) throw new Error('音符超出音乐结尾，请先延长音乐。');
+      const startBeat = number(note.startBeat, '音符开始位置', 0, hidden ? MAX_PHRASE_BEATS : lengthBeats);
+      const durationBeats = number(note.durationBeats, '音符长度', MIN_NOTE_BEATS, hidden ? MAX_PHRASE_BEATS : lengthBeats);
+      if (!hidden && exceedsLength(startBeat, durationBeats, lengthBeats)) throw new Error('音符超出音乐结尾，请先延长音乐。');
       return {
         id: noteId, startBeat, durationBeats,
         ...(note.durationSeconds === undefined ? {} : { durationSeconds: number(note.durationSeconds, '音符持续秒数', MIN_NOTE_SECONDS, 96) }),
@@ -120,11 +155,22 @@ export function readPhraseBody(value: unknown): PhraseBody {
         ...(note.level === undefined ? {} : { level: number(note.level, '音符音量', 0, 1) }),
         ...(note.pan === undefined ? {} : { pan: number(note.pan, '音符声像', -1, 1) }),
       };
+    }
+    const notes = part.notes.map(rawNote => readNote(rawNote));
+    const hiddenNotes = (part.hiddenNotes as unknown[] | undefined)?.map(raw => {
+      const item = object(raw, '被隐藏的音符'); fields(item, ['sectionId', 'note'], '被隐藏的音符');
+      const sectionId = text(item.sectionId, '音符所属卷帘');
+      if (sectionId !== 'first' && !sectionIds.has(sectionId)) throw new Error('被隐藏的音符缺少所属BPM卷帘。');
+      const note = readNote(item.note, true);
+      if (note.durationSeconds === undefined) throw new Error('被隐藏的音符缺少原始持续时值。');
+      return { sectionId, note };
     });
     return { id, name, timbreId, ...(section === undefined ? {} : { section }),
-      ...(part.unassigned === undefined ? {} : { unassigned: part.unassigned }), notes };
+      ...(part.unassigned === undefined ? {} : { unassigned: part.unassigned }), notes,
+      ...(hiddenNotes?.length ? { hiddenNotes } : {}) };
   });
   return { model: 'note-phrase', version: 1, timeUnit: 'beat', tempoBpm, lengthBeats,
+    ...(tempoSections === undefined ? {} : { tempoSections }),
     ...(stepsPerBeat === undefined ? {} : { stepsPerBeat }),
     ...(beatsPerBar === undefined ? {} : { beatsPerBar }),
     ...(pickupBeats === undefined ? {} : { pickupBeats }),
@@ -134,13 +180,13 @@ export function readPhraseBody(value: unknown): PhraseBody {
 type Snapshot = { name: string; dependencies: string[]; body: PhraseBody };
 function references(body: PhraseBody): string[] { return [...new Set(body.parts.map(part => part.timbreId))]; }
 async function preparePhraseSounds(body: PhraseBody, playback: TimbrePlaybackPort, tempoBpm = body.tempoBpm): Promise<void> {
-  const secondsPerBeat = 60 / number(tempoBpm, '速度', 40, 240);
+  const ratio = body.tempoBpm / number(tempoBpm, '速度', 40, 240);
   const sounds = new Map<string, Map<string, SoundPlan['note']>>();
   for (const part of body.parts) {
     if (part.unassigned) continue;
     for (const note of part.notes) {
       const input = { frequencyHz: note.frequencyHz,
-        holdSeconds: Math.max(MIN_NOTE_SECONDS, note.durationSeconds ?? note.durationBeats * secondsPerBeat), velocity: note.velocity };
+        holdSeconds: Math.max(MIN_NOTE_SECONDS, note.durationSeconds ?? phraseHeldSeconds(body, note) * ratio), velocity: note.velocity };
       const unique = sounds.get(part.timbreId) ?? new Map<string, SoundPlan['note']>();
       unique.set(JSON.stringify([input.frequencyHz, input.holdSeconds, input.velocity]), input); sounds.set(part.timbreId, unique);
     }
@@ -191,19 +237,19 @@ function validatePhrase(record: Draft | ContentRecord, playback: TimbrePlaybackP
 }
 function compilePhrase(body: PhraseBody, playback: TimbrePlaybackPort, tempoBpm = body.tempoBpm, allowSilence = false): SoundSequencePlan {
   number(tempoBpm, '速度', 40, 240);
-  const secondsPerBeat = 60 / tempoBpm;
+  const ratio = body.tempoBpm / tempoBpm;
   const events = body.parts.filter(part => !part.unassigned).flatMap(part => part.notes.map(note => {
       const sound = playback.planForSaved(part.timbreId, { frequencyHz: note.frequencyHz,
-        holdSeconds: Math.max(MIN_NOTE_SECONDS, note.durationSeconds ?? note.durationBeats * secondsPerBeat), velocity: note.velocity });
+        holdSeconds: Math.max(MIN_NOTE_SECONDS, note.durationSeconds ?? phraseHeldSeconds(body, note) * ratio), velocity: note.velocity });
       const level = (body.masterLevel ?? 1) * (note.level ?? 1);
-      return { atSeconds: note.startBeat * secondsPerBeat,
+      return { atSeconds: phraseBeatSeconds(body, note.startBeat) * ratio,
         sound: body.masterLevel === undefined && note.level === undefined ? sound : { ...sound, level: sound.level * level },
         ...(note.pan === undefined ? {} : { pan: note.pan }) };
   }));
-  if (!events.length && !allowSilence && !body.parts.some(part => part.unassigned && part.notes.length)) throw new Error('先添加几个音符，再试听这个音乐吧。');
+  if (!events.length && !allowSilence && !body.parts.some(part => part.unassigned && part.notes.length || part.hiddenNotes?.length)) throw new Error('先添加几个音符，再试听这个音乐吧。');
   events.sort((a, b) => a.atSeconds - b.atSeconds);
   const durationSeconds = events.reduce((end, event) => Math.max(end,
-    event.atSeconds + event.sound.note.holdSeconds + event.sound.envelope.releaseSeconds), body.lengthBeats * secondsPerBeat);
+    event.atSeconds + event.sound.note.holdSeconds + event.sound.envelope.releaseSeconds), phraseDurationSeconds(body) * ratio);
   return { kind: 'sequence', version: 1, durationSeconds, events };
 }
 
@@ -333,13 +379,58 @@ export function createPhraseEditor(library: MaterialLibrary, playback: TimbrePla
     setTempo(tempoBpm, options = {}) {
       const value = number(tempoBpm, '速度', 40, 240);
       modify(body => {
+        if(value===body.tempoBpm)return;
         if (options.preserveNoteDurations && value !== body.tempoBpm) {
           for (const part of body.parts) for (const note of part.notes) {
-            if (note.durationSeconds === undefined) note.durationSeconds = note.durationBeats * 60 / body.tempoBpm;
+            if (note.durationSeconds === undefined) note.durationSeconds = phraseHeldSeconds(body, note);
           }
         }
-        body.tempoBpm = value;
+        if(options.preserveNoteDurations)body.tempoBpm=value;
+        else retimeHeldNotes(body,()=>{body.tempoBpm=value;});
       });
+    },
+    addTempoSection() {
+      const id = crypto.randomUUID();
+      modify(body => {
+        const startBeat = body.lengthBeats, tempoBpm = body.tempoSections?.at(-1)?.tempoBpm ?? body.tempoBpm;
+        body.lengthBeats += (body.beatsPerBar ?? 4) * 4;
+        const stepsPerBeat = body.tempoSections?.at(-1)?.stepsPerBeat ?? phraseStepsPerBeat(body);
+        body.tempoSections = [...(body.tempoSections ?? []), { id, startBeat, tempoBpm, stepsPerBeat }];
+      });
+      return id;
+    },
+    setTempoSection(id, tempoBpm) {
+      const value = number(tempoBpm, 'BPM卷帘速度', 40, 240);
+      modify(body => {
+        const target = body.tempoSections?.find(section => section.id === id);
+        if (!target) throw new Error('这个BPM卷帘已不存在。');
+        if(value===target.tempoBpm)return;
+        retimeHeldNotes(body,()=>{target.tempoBpm=value;});
+      });
+    },
+    setTempoSectionSteps(id, stepsPerBeat) {
+      const value = phraseStepsPerBeat({ stepsPerBeat });
+      modify(body => {
+        if (id) {
+          const target = body.tempoSections?.find(section => section.id === id);
+          if (!target) throw new Error('这个BPM卷帘已不存在。');
+          target.stepsPerBeat = value;
+        } else {
+          const old = phraseStepsPerBeat(body);
+          for (const section of body.tempoSections ?? []) section.stepsPerBeat ??= old;
+          body.stepsPerBeat = value;
+        }
+      });
+    },
+    previewTempoSectionStart(id, startBeat) { return readPhraseBody(resizeTempoRoll(current().body, id, startBeat)); },
+    previewLastTempoRollLength(lengthBeats) { return readPhraseBody(resizeTempoRoll(current().body, undefined, lengthBeats)); },
+    setLastTempoRollLength(lengthBeats) {
+      const { draft, body } = current();
+      write({ name: draft.name, dependencies: draft.dependencies, body: resizeTempoRoll(body, undefined, lengthBeats) });
+    },
+    setTempoSectionStart(id, startBeat) {
+      const { draft, body } = current();
+      write({ name: draft.name, dependencies: draft.dependencies, body: resizeTempoRoll(body, id, startBeat) });
     },
     setMasterLevel(level) { const value = number(level, '音乐音量', 0, 1); modify(body => { body.masterLevel = value; }); },
     setStepsPerBeat(stepsPerBeat) {
@@ -481,6 +572,15 @@ export function createPhraseEditor(library: MaterialLibrary, playback: TimbrePla
       const sound = playback.planForSaved(target.timbreId, note);
       return after.body.masterLevel === undefined ? sound : { ...sound, level: sound.level * after.body.masterLevel };
     },
+    async previewPianoPlan(input) {
+      const before = current();
+      const note = { frequencyHz: number(input.frequencyHz, '音高', 20, 5000),
+        holdSeconds: number(input.holdSeconds, '试音长度', MIN_NOTE_SECONDS, 120), velocity: number(input.velocity, '音符力度', 0, 1) };
+      const plan = await playback.previewPianoPlan(note);
+      const after = current();
+      if (after.draft.id !== before.draft.id) throw new Error('试音期间歌曲发生变化，请重试。');
+      return after.body.masterLevel === undefined ? plan : { ...plan, level: plan.level * after.body.masterLevel };
+    },
     async previewTimbrePlan(timbreId, input) {
       const before = current();
       if (!availableSounds(before.draft).some(item => item.id === timbreId)) throw new Error('请选择当前歌曲音色库里的音色。');
@@ -500,7 +600,7 @@ export function createPhraseEditor(library: MaterialLibrary, playback: TimbrePla
     },
     save(mode, confirmation) {
       const { draft, body } = current();
-      if (!body.parts.some(part => part.notes.length)) throw new Error('先添加几个音符，再保存这个音乐吧。');
+      if (!body.parts.some(part => part.notes.length || part.hiddenNotes?.length)) throw new Error('先添加几个音符，再保存这个音乐吧。');
       return library.saveDraft(draft.id, mode, confirmation);
     },
   };
