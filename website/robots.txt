@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /RootSound/
+Sitemap: https://fr-42.github.io/RootSound/sitemap.xml
