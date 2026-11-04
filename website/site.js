@@ -129,7 +129,7 @@
   describeMotion();
   void (async () => {
     try {
-      const response = await fetch('guides/lessons.json?v=4');
+      const response = await fetch('guides/lessons.json?v=5');
       if (!response.ok) throw new Error('Guide unavailable');
       lessons = await response.json();
       for (const [index, lesson] of lessons.entries()) {

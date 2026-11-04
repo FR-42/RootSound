@@ -1,9 +1,11 @@
 import { createWebDemoModel, WEB_MAX_FILE_BYTES } from './web-demo-model.ts';
+import { createWebExampleModel } from './web-demo-example.ts';
+import starterExample from '../../../website/examples/starter.json';
 import { createMidiProjectLibrary } from './midi-project.ts';
 import { mountMelodyWorkspace } from '../modules/ui-rendering/melody-workspace.ts';
 import { createPhraseCompositionTransport } from '../modules/ui-rendering/phrase-composition-transport.ts';
 import { createBrowserSoundRuntime } from '../modules/sound-runtime/public.ts';
-import { phraseDurationSeconds } from '../contracts/phrase-time.ts';
+import { phraseDurationSeconds, phraseBeatSeconds, phraseHeldSeconds } from '../contracts/phrase-time.ts';
 import type { PhraseBody } from '../contracts/phrase.ts';
 import type { PlaylistTransportState } from '../modules/ui-rendering/playlist-transport.ts';
 import './web-demo.css';
@@ -33,13 +35,14 @@ app.innerHTML = `<section class="web-studio" aria-label="简乐在线编曲">
 const q = <T extends HTMLElement = HTMLElement>(selector: string) => app.querySelector<T>(selector)!;
 const name = q<HTMLInputElement>('.web-name'), play = q<HTMLButtonElement>('.web-play');
 const status = q('.web-status'), file = q<HTMLInputElement>('.web-file');
-let model = createWebDemoModel();
+let model = createWebExampleModel(starterExample);
 let runtime = webSound();
 let editor: ReturnType<typeof mountMelodyWorkspace> | undefined;
 let transport: ReturnType<typeof createPhraseCompositionTransport> | undefined;
 let state: PlaylistTransportState = { playing: false, preparing: false, position: 0, rate: 1 };
 let temporary: PhraseBody | undefined, family: string | undefined;
 let dirty = false, busy = false, frame = 0, disposed = false;
+let showStarter = true;
 
 function webSound() {
   const sound = createBrowserSoundRuntime();
@@ -83,6 +86,19 @@ function planBody() {
   return family ? { ...body, parts: body.parts.filter(part => part.id === family) } : body;
 }
 
+function starterViewport() {
+  if (!showStarter) return undefined;
+  const body = model.score.read().body!, notes = body.parts.flatMap(part => part.notes);
+  if (!notes.length) return undefined;
+  const keys = model.score.keyboard();
+  const indices = notes.map(note => keys.reduce((best, key, index) =>
+    Math.abs(key.frequencyHz - note.frequencyHz) < Math.abs(keys[best]!.frequencyHz - note.frequencyHz) ? index : best, 0));
+  const first = Math.max(0, Math.min(...indices) - 3), last = Math.min(keys.length, Math.max(...indices) + 4);
+  const rowHeight = Math.max(12, Math.min(32, (q('.web-workspace').clientWidth - 140) / (last - first)));
+  const end = Math.max(...notes.map(note => phraseBeatSeconds(body, note.startBeat) + phraseHeldSeconds(body, note)));
+  return { leftSeconds: 0, zoom: 8 / Math.max(2, end + .4), rowHeight, top: first * rowHeight };
+}
+
 function mount() {
   model.subscribeEdit(changed);
   name.value = model.score.read().draft!.name;
@@ -97,6 +113,7 @@ function mount() {
   });
   editor = mountMelodyWorkspace(q('.web-workspace'), {
     phrase: model.score, sound: runtime, orientation: 'vertical', includeAllSections: true,
+    initialViewport: starterViewport(),
     initialSelection: !model.score.read().body!.parts.some(part => part.notes.length) && model.score.read().body!.parts[0]
       ? { partId: model.score.read().body!.parts[0]!.id } : undefined,
     gridBpm: () => model.score.read().body!.tempoBpm,
@@ -116,7 +133,7 @@ async function replace(next: ReturnType<typeof createWebDemoModel>) {
   cancelAnimationFrame(frame);
   // Dispose the old view before switching model closures or the audio boundary.
   editor?.dispose(); transport?.dispose(); await runtime.dispose();
-  model = next; runtime = webSound(); editor = undefined; transport = undefined;
+  model = next; showStarter = false; runtime = webSound(); editor = undefined; transport = undefined;
   family = undefined; temporary = undefined; state = { playing: false, preparing: false, position: 0, rate: 1 };
   dirty = false; mount();
 }
@@ -217,7 +234,7 @@ name.addEventListener('blur', () => {
 name.addEventListener('keydown', event => { if (event.key === 'Enter') name.blur(); if (event.key === 'Escape') { name.value = model.score.read().draft!.name; name.blur(); } });
 q('.web-help').addEventListener('click', () => {
   const dialog = document.createElement('dialog'); dialog.className = 'web-dialog';
-  dialog.innerHTML = `<h2>在线编曲</h2><p>左侧 + 选择音色。选中音符组后，点击或拖动画布写音符；拖动音符移动位置，拖动尾端改变长度，右键删除。</p><p>滚轮上下移动，Shift 左右移动，Ctrl 缩放。悬停选中音符时，滚轮微调时长。选中音符组时只播放这一组；右键空白处取消选中，可听完整音乐。</p><p>左侧 BPM 数字可调整速度和敲击定速；下方 + 新建速度段，拖动段边界调整长度。网页版总长最多 64 拍。</p><p>草稿只在当前页面内存中。请使用“下载工程”保存；刷新或关闭会丢失尚未下载的内容。打开按钮支持 MIDI 和小型工程；超出音色范围时会使用网页版音色替代。</p><p>音色为 GeneralUser GS 2.0.3 的裁剪版本，保留原始录音及播放规则。<a href="instruments/generaluser-gs-2.0.3/LICENSE.txt" target="_blank" rel="noopener">音源许可与来源说明</a> · <a href="instruments/generaluser-gs-2.0.3/spessasynth_core-LICENSE.txt" target="_blank" rel="noopener">播放内核许可</a></p><form method="dialog"><button>知道了</button></form>`;
+  dialog.innerHTML = `<h2>在线编曲</h2><p>左侧 + 选择音色。选中音符组后，点击或拖动画布写音符；拖动音符移动位置，拖动尾端改变长度，右键删除。</p><p>滚轮上下移动，Shift 左右移动，Ctrl 缩放。悬停选中音符时，滚轮微调时长。选中音符组时只播放这一组；右键空白处取消选中，可听完整音乐。</p><p>左侧 BPM 数字可调整速度和敲击定速；下方 + 新建速度段，拖动段边界调整长度。网页版总长最多 64 拍。</p><p>每次打开先载入示例。请使用“下载工程”保存自己的修改；刷新后会回到示例。打开按钮支持 MIDI 和小型工程；超出音色范围时会使用网页版音色替代。</p><p>音色为 GeneralUser GS 2.0.3 的裁剪版本，保留原始录音及播放规则。<a href="instruments/generaluser-gs-2.0.3/LICENSE.txt" target="_blank" rel="noopener">音源许可与来源说明</a> · <a href="instruments/generaluser-gs-2.0.3/spessasynth_core-LICENSE.txt" target="_blank" rel="noopener">播放内核许可</a></p><form method="dialog"><button>知道了</button></form>`;
   dialog.addEventListener('close', () => dialog.remove(), { once: true }); app.append(dialog); dialog.showModal();
 });
 
@@ -240,4 +257,4 @@ window.addEventListener('message', event => {
 });
 window.addEventListener('pagehide', () => { disposed = true; cancelAnimationFrame(frame); editor?.dispose(); transport?.dispose(); void runtime.dispose(); });
 
-try { mount(); } catch (error) { report(error); }
+try { mount(); report('示例已载入，可以直接播放或编辑。'); } catch (error) { report(error); }

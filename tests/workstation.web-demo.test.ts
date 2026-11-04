@@ -3,6 +3,7 @@ import { test } from 'node:test';
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import path from 'node:path';
 import { createWebDemoModel, WEB_TONES } from '../src/workstation/app/web-demo-model.ts';
+import { createWebExampleModel, webExampleSnapshot } from '../src/workstation/app/web-demo-example.ts';
 import { createInitialProjectLibrary } from '../src/workstation/app/project-setup.ts';
 import { createMidiProjectLibrary } from '../src/workstation/app/midi-project.ts';
 import { loadSoundFont, SoundFontStream } from '../src/workstation/modules/sound-runtime/soundfont-engine.ts';
@@ -82,4 +83,19 @@ test('trimmed SF2 retains nonzero full-engine output for every offered voice', a
     assert(left.every(Number.isFinite));
     assert(left.some(sample => Math.abs(sample) > .001), JSON.stringify(voice));
   }
+});
+
+
+test('published starter retains the authored 40 notes and timing while each visit is independent', async () => {
+  const snapshot = JSON.parse(await readFile('website/examples/starter.json', 'utf8'));
+  const model = createWebExampleModel(snapshot, fetcher);
+  assert.deepEqual(webExampleSnapshot(model), snapshot);
+  assert.equal(model.score.read().body!.tempoBpm, 148);
+  assert.equal(model.score.read().body!.parts.flatMap(part => part.notes).length, 40);
+  const part = model.score.read().body!.parts[0]!;
+  model.score.removeNote(part.id, part.notes[0]!.id);
+  assert.equal(model.score.read().body!.parts.flatMap(part => part.notes).length, 39);
+  assert.deepEqual(webExampleSnapshot(createWebExampleModel(snapshot, fetcher)), snapshot);
+  const saved = createWebDemoModel(await model.save(), undefined, fetcher);
+  assert.equal(saved.score.read().body!.parts.flatMap(part => part.notes).length, 39);
 });

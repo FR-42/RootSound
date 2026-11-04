@@ -2,7 +2,7 @@
 from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
 import json, sys
-root=Path(sys.argv[1]) if len(sys.argv)>1 else Path(json.loads(Path('.test-output/rb134/latest.json').read_text())['root'])
+root=Path(sys.argv[1]) if len(sys.argv)>1 else Path(json.loads(Path('.test-output/rb135/latest.json').read_text())['root'])
 manifest=json.loads((root/'manifest.json').read_text(encoding='utf-8'))
 out=Path('website/guides');out.mkdir(parents=True,exist_ok=True)
 font=ImageFont.truetype('C:/Windows/Fonts/msyh.ttc',44)
@@ -59,7 +59,7 @@ def compose(raw,scene,previous,t):
                     d.text((x+ww/2,(a+b)/2),str(cell+1),font=small,fill='#4e739e' if active else '#b2bac5',anchor='mm')
                 d.text((x+ww/2,858),'1 拍',font=small,fill=color,anchor='mm')
             d.text((335,900),f"一拍分 {m['steps']} 格",font=small,fill='#506b8f',anchor='mm')
-            d.text((W/2,1005),'拍号：一小节几拍     格数：一拍几格',font=small,fill='#697686',anchor='mm')
+            d.text((W/2,1005),'每拍格数：把一拍分成几格',font=small,fill='#697686',anchor='mm')
         return frame
     c={k:mix(previous['camera'][k],scene['camera'][k],t) for k in ['cx','cy','w']}
     h=min(564,c['w']*PH/PW);left=max(0,min(1200-c['w'],c['cx']-c['w']/2));top=max(56,min(620-h,c['cy']-h/2))
@@ -74,7 +74,8 @@ cached={c['id']:c for c in json.loads((out/'lessons.json').read_text(encoding='u
 lessons=[];expected={'lessons.json'}
 for chapter in manifest['lessons']:
     identity=chapter['id'];expected.update(identity+suffix for suffix in ['.jpg','.webp'])
-    if selected and identity not in selected:lessons.append(cached[identity]);continue
+    if selected and identity not in selected:
+        lessons.append(cached[identity]|{k:chapter[k] for k in ['id','title','description','alt','version']});continue
     scenes=chapter['frames'];previous=scenes[0];clock=0;number=0;frames=[];durations=[]
     for scene in scenes:
         with Image.open(root/scene['file']) as source:raw=source.convert('RGB')
