@@ -4,8 +4,8 @@ import path from 'node:path';
 import {readFile,writeFile,mkdir,mkdtemp} from 'node:fs/promises';
 import {spawn} from 'node:child_process';
 import {build} from 'vite';
-await mkdir('.test-output/rb132',{recursive:true});
-const root=await mkdtemp(path.resolve('.test-output/rb132/render-'));
+await mkdir('.test-output/rb133',{recursive:true});
+const root=await mkdtemp(path.resolve('.test-output/rb133/render-'));
 // Only the teaching build exposes state for precise fixtures/assertions. The
 // public editor is unchanged and contains no tutorial control API.
 await build({configFile:path.resolve('vite.web.config.ts'),build:{outDir:path.resolve('.cache/guide-ui/play')},plugins:[{
@@ -34,5 +34,5 @@ console.log('Render directory: '+root);
 const env={...process.env};delete env.ELECTRON_RUN_AS_NODE;
 try{
  const code=await new Promise(resolve=>{const child=spawn(path.resolve('.cache/release-smoke-engine/electron.exe'),[path.resolve('scripts/operation-guides-renderer.cjs'),config],{env,windowsHide:true,stdio:['ignore','pipe','pipe']});child.stdout.on('data',d=>process.stdout.write(d));child.stderr.on('data',d=>process.stderr.write(d));child.on('error',()=>resolve(1));child.on('exit',resolve);});
- const report=await readFile(path.join(root,'report.json'),'utf8');console.log(report);if(code)process.exitCode=1;else await writeFile('.test-output/rb132/latest.json',JSON.stringify({root}));
+ const report=await readFile(path.join(root,'report.json'),'utf8');console.log(report);if(code)process.exitCode=1;else await writeFile('.test-output/rb133/latest.json',JSON.stringify({root}));
 }finally{server.close();}

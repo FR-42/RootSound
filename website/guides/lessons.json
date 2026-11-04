@@ -1,83 +1,42 @@
 [
   {
-    "id": "01-voices",
-    "title": "选声音",
-    "summary": "点＋加音色，分组写音符。",
-    "steps": [
-      "左边一个框是一组音符。",
-      "＋添加音色；小▶试听。",
-      "选中一组，再往画布写音符。"
-    ],
-    "version": 2,
-    "duration": 8.166666666666666,
-    "hasAudio": false
+    "id": "add-voice",
+    "title": "添加音色",
+    "description": "从＋选一个声音。",
+    "alt": "点击音色栏加号，选择长笛，左侧出现新的音符组。",
+    "version": 3,
+    "duration": 3.466666666666667
   },
   {
-    "id": "02-notes",
-    "title": "写音符",
-    "summary": "拖着写，拉长小节。",
-    "steps": [
-      "左右是音高，上下是时间。",
-      "按住拖动画音符，拖音符可移动。",
-      "拖下边界加小节；＋新增一段卷帘。"
-    ],
-    "version": 2,
-    "duration": 8.166666666666666,
-    "hasAudio": false
+    "id": "bpm",
+    "title": "BPM",
+    "description": "数字越大，节奏越快；也可以跟着节奏敲。",
+    "alt": "将BPM从120调到160，再调到90；跟着节奏敲击可以定速。",
+    "version": 3,
+    "duration": 7.7
   },
   {
-    "id": "03-tempo",
-    "title": "调节奏",
-    "summary": "BPM管快慢，格数管细分。",
-    "steps": [
-      "120＝每分钟120拍。",
-      "4格＝每拍分4份，不是拍号。",
-      "敲击定速：跟节奏点几下，再应用。"
-    ],
-    "version": 2,
-    "duration": 12.333333333333334,
-    "hasAudio": false
+    "id": "cells",
+    "title": "格数",
+    "description": "每拍分几份，由你决定。",
+    "alt": "将每拍4格改为8格、3格，观察横线的疏密变化。",
+    "version": 3,
+    "duration": 4.6
   },
   {
-    "id": "04-play",
-    "title": "播放",
-    "summary": "▶播放，Ⅱ暂停，■回到开头。",
-    "steps": [
-      "点击琴键可以试听。",
-      "▶播放，Ⅱ暂停，再点继续。",
-      "■停止并回到开头。"
-    ],
-    "version": 2,
-    "duration": 7.366666666666666,
-    "hasAudio": true
+    "id": "zoom-horizontal",
+    "title": "横向缩放",
+    "description": "Ctrl＋Shift＋滚轮，展开音高。",
+    "alt": "按Ctrl和Shift滚动鼠标滚轮，琴键与音符的横向宽度改变。",
+    "version": 3,
+    "duration": 4.8
   },
   {
-    "id": "05-navigation",
-    "title": "移动与缩放",
-    "summary": "拖动看位置，滚轮调视角。",
-    "steps": [
-      "右键空白取消选中，再拖动空白。",
-      "滚轮上下；Shift＋滚轮左右。",
-      "Ctrl＋滚轮缩放时间。",
-      "Ctrl＋Shift＋滚轮缩放音高。",
-      "Mac滚轮缩放也可用⌘。"
-    ],
-    "version": 2,
-    "duration": 7.866666666666666,
-    "hasAudio": false
-  },
-  {
-    "id": "06-files",
-    "title": "保存",
-    "summary": "工程留着改，音频拿去听。",
-    "steps": [
-      "新建：空白音乐；打开：继续已有工程或MIDI。",
-      "下载工程：保留可编辑音符。",
-      "导出音频：得到可播放的WAV。",
-      "草稿不自动保存，离开前下载工程。"
-    ],
-    "version": 2,
-    "duration": 7.033333333333333,
-    "hasAudio": false
+    "id": "zoom-vertical",
+    "title": "竖向缩放",
+    "description": "Ctrl＋滚轮，展开时间。",
+    "alt": "按Ctrl滚动鼠标滚轮，时间方向的格子与音符拉开或收拢。",
+    "version": 3,
+    "duration": 4.8
   }
 ]

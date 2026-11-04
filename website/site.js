@@ -36,56 +36,109 @@
   void refreshDownloads();
   const guide = document.querySelector('#guide');
   if (!guide) return;
-  const video = guide.querySelector('video');
-  let started = false;
-  async function loadGuide() {
-    if (started || !guide.open) return;
-    started = true;
-    try {
-      const response = await fetch('guides/lessons.json?v=2');
-      if (!response.ok) throw new Error('Guide unavailable');
-      const lessons = await response.json();
-      const tabs = guide.querySelector('.guide-tabs');
-      const buttons = lessons.map((lesson, index) => {
-        const button = document.createElement('button');
-        button.type = 'button'; button.className = 'guide-tab'; button.setAttribute('role', 'tab');
-        button.id = 'guide-tab-' + lesson.id; button.setAttribute('aria-controls', 'guide-panel');
-        button.textContent = `${index + 1}. ${lesson.title}`;
-        button.addEventListener('click', () => select(index));
-        button.addEventListener('keydown', event => {
-          if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
-          event.preventDefault();
-          const next = event.key === 'Home' ? 0 : event.key === 'End' ? lessons.length - 1
-            : (index + (event.key === 'ArrowRight' ? 1 : -1) + lessons.length) % lessons.length;
-          buttons[next].focus(); select(next);
-        });
-        tabs.append(button); return button;
-      });
-      function select(index) {
-        const lesson = lessons[index]; video.pause();
-        const version = lesson.version || 1;
-        video.src = `guides/${lesson.id}.mp4?v=${version}`; video.poster = `guides/${lesson.id}.jpg?v=${version}`; video.load();
-        guide.querySelector('#guide-summary').textContent = lesson.summary;
-        guide.querySelector('#guide-panel').setAttribute('aria-labelledby', buttons[index].id);
-        guide.querySelector('.guide-gif').href = `guides/${lesson.id}.gif?v=${version}`;
-        guide.querySelector('.guide-gif').download = `简乐-${lesson.title}.gif`;
-        const steps = guide.querySelector('.guide-transcript ol'); steps.replaceChildren();
-        for (const text of lesson.steps) { const li = document.createElement('li'); li.textContent = text; steps.append(li); }
-        buttons.forEach((button, i) => { button.setAttribute('aria-selected', String(i === index)); button.tabIndex = i === index ? 0 : -1; });
-      }
-      select(0);
-    } catch {
-      started = false; guide.querySelector('#guide-summary').textContent = '演示暂时无法加载，可以下载完整视频观看。';
-    }
+  const stage = guide.querySelector('.guide-stage');
+  const heading = guide.querySelector('#guide-title');
+  const summary = guide.querySelector('#guide-summary');
+  const count = guide.querySelector('.guide-count');
+  const motion = guide.querySelector('.guide-motion');
+  const reduced = matchMedia('(prefers-reduced-motion: reduce)');
+  let lessons = [], current = 0, requested = 0, generation = 0;
+  let stopped = reduced.matches, inView = true, drag = null;
+  const animations = new Set();
+  const source = (lesson, animate) => `guides/${lesson.id}.${animate ? 'webp' : 'jpg'}?v=${lesson.version}`;
+  const moving = () => !stopped && inView && !document.hidden;
+  const describeMotion = () => {
+    motion.setAttribute('aria-pressed', String(stopped));
+    motion.setAttribute('aria-label', stopped ? '播放动图' : '停止动图');
+    motion.title = stopped ? '播放动图' : '停止动图';
+    motion.querySelector('path').setAttribute('d', stopped ? 'm7 4 9 6-9 6Z' : 'M7 5v10M13 5v10');
+  };
+  const buttons = [];
+  function refreshMotion() {
+    if (!lessons.length) return;
+    const image = stage.querySelector('.guide-page:not(.guide-leaving) img') || stage.querySelector('img');
+    const next = source(lessons[current], moving());
+    if (image && image.getAttribute('src') !== next) image.src = next;
   }
-  guide.addEventListener('toggle', () => { if (guide.open) void loadGuide(); else video.pause(); });
-  const openFromLink = () => { if (location.hash === '#guide') { guide.open = true; void loadGuide(); } };
-  window.addEventListener('hashchange', openFromLink); openFromLink();
-  video.addEventListener('play', () => {
-    document.querySelector('.music-editor')?.contentWindow?.postMessage({ type: 'jianle:pause-for-guide' }, location.origin);
+  async function select(index, direction = index >= requested ? 1 : -1, initial = false) {
+    if (!lessons.length) return;
+    requested = (index + lessons.length) % lessons.length;
+    const target = requested, ticket = ++generation, lesson = lessons[target];
+    const image = new Image(1120, 500);
+    image.className = 'guide-image'; image.alt = lesson.alt;
+    image.src = source(lesson, moving());
+    try { await image.decode(); } catch {
+      image.src = source(lesson, false);
+      try { await image.decode(); } catch { return; }
+    }
+    if (ticket !== generation) return;
+    // Keep only the visible page and its outgoing sheet, even during rapid flips.
+    for (const animation of animations) animation.cancel();
+    animations.clear();
+    stage.querySelectorAll('.guide-leaving').forEach(page => page.remove());
+    let previous = stage.firstElementChild;
+    if (previous?.tagName === 'IMG') {
+      const wrapper = document.createElement('div'); wrapper.className = 'guide-page';
+      previous.replaceWith(wrapper); wrapper.append(previous); previous = wrapper;
+    }
+    const page = document.createElement('div'); page.className = 'guide-page'; page.append(image); stage.append(page);
+    current = target;
+    heading.textContent = lesson.title; summary.textContent = lesson.description;
+    count.textContent = `${target + 1} / ${lessons.length}`;
+    buttons.forEach((button, i) => button.setAttribute('aria-current', i === target ? 'true' : 'false'));
+    if (previous && !initial && !reduced.matches) {
+      previous.classList.add('guide-leaving'); previous.setAttribute('aria-hidden', 'true');
+      previous.style.transformOrigin = direction > 0 ? 'left center' : 'right center';
+      page.style.transformOrigin = direction > 0 ? 'right center' : 'left center';
+      const options = { duration: 420, easing: 'cubic-bezier(.22,.7,.2,1)', fill: 'both' };
+      const leave = previous.animate([{ transform: 'translateX(0) rotateY(0)', opacity: 1 }, { transform: `translateX(${-direction * 9}%) rotateY(${-direction * 16}deg)`, opacity: 0 }], options);
+      const enter = page.animate([{ transform: `translateX(${direction * 6}%) rotateY(${direction * 10}deg)`, opacity: 0 }, { transform: 'translateX(0) rotateY(0)', opacity: 1 }], options);
+      animations.add(leave); animations.add(enter);
+      await Promise.allSettled([leave.finished, enter.finished]);
+      animations.delete(leave); animations.delete(enter);
+      previous.remove();
+      if (ticket === generation) { leave.cancel(); enter.cancel(); }
+    } else previous?.remove();
+  }
+  guide.querySelector('.guide-back').addEventListener('click', () => void select(requested - 1, -1));
+  guide.querySelector('.guide-next').addEventListener('click', () => void select(requested + 1, 1));
+  document.addEventListener('keydown', event => {
+    if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey ||
+        event.target.closest('input, textarea, select, [contenteditable="true"]')) return;
+    if (!['ArrowLeft', 'ArrowRight'].includes(event.key)) return;
+    const rect = guide.getBoundingClientRect();
+    if (rect.bottom <= 0 || rect.top >= innerHeight) return;
+    event.preventDefault();
+    void select(requested + (event.key === 'ArrowRight' ? 1 : -1), event.key === 'ArrowRight' ? 1 : -1);
   });
-  window.addEventListener('message', event => {
-    if (event.origin === location.origin && event.source === document.querySelector('.music-editor')?.contentWindow
-        && event.data?.type === 'jianle:editor-playing') video.pause();
+  stage.addEventListener('pointerdown', event => {
+    if (event.button !== 0) return;
+    drag = { id: event.pointerId, x: event.clientX, y: event.clientY };
+    stage.setPointerCapture(event.pointerId);
   });
+  stage.addEventListener('pointerup', event => {
+    if (!drag || drag.id !== event.pointerId) return;
+    const dx = event.clientX - drag.x, dy = event.clientY - drag.y; drag = null;
+    if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy) * 1.3) void select(requested + (dx < 0 ? 1 : -1), dx < 0 ? 1 : -1);
+  });
+  stage.addEventListener('pointercancel', () => { drag = null; });
+  motion.addEventListener('click', () => { stopped = !stopped; describeMotion(); refreshMotion(); });
+  reduced.addEventListener('change', () => { stopped = reduced.matches; describeMotion(); refreshMotion(); });
+  document.addEventListener('visibilitychange', refreshMotion);
+  new IntersectionObserver(entries => { inView = entries[0].isIntersecting; refreshMotion(); }).observe(guide);
+  describeMotion();
+  void (async () => {
+    try {
+      const response = await fetch('guides/lessons.json?v=3');
+      if (!response.ok) throw new Error('Guide unavailable');
+      lessons = await response.json();
+      for (const [index, lesson] of lessons.entries()) {
+        const button = document.createElement('button');
+        button.type = 'button'; button.className = 'guide-dot'; button.setAttribute('aria-label', lesson.title);
+        button.addEventListener('click', () => void select(index));
+        guide.querySelector('.guide-dots').append(button); buttons.push(button);
+      }
+      await select(0, 1, true);
+    } catch { summary.textContent = '演示暂时无法加载，请刷新重试。'; }
+  })();
 })();

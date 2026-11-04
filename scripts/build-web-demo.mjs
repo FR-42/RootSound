@@ -1,5 +1,5 @@
 import { build } from 'vite';
-import { readFile, writeFile, mkdir, cp, copyFile } from 'node:fs/promises';
+import { readFile, writeFile, mkdir, cp, copyFile, rm } from 'node:fs/promises';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { SoundBankLoader, SpessaLog } from 'spessasynth_core';
@@ -8,7 +8,10 @@ import { SoundBankLoader, SpessaLog } from 'spessasynth_core';
 process.env.TZ='UTC';
 SpessaLog.setLogLevel(false,false,false);
 const root=path.resolve('.cache/website');
-await mkdir(root,{recursive:true});await cp('website',root,{recursive:true});
+await mkdir(root,{recursive:true});
+// Retire old generated tutorials as well as replacing current files.
+await rm(path.join(root,'guides'),{recursive:true,force:true});
+await cp('website',root,{recursive:true});
 await build({configFile:path.resolve('vite.web.config.ts')});
 const source='public/instruments/generaluser-gs-2.0.3',output=path.join(root,'play/instruments/generaluser-gs-2.0.3');
 await mkdir(output,{recursive:true});
