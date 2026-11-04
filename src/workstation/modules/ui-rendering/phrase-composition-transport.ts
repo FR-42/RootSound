@@ -1,3 +1,5 @@
+import type { PhraseBody } from '../../contracts/phrase.ts';
+import { phraseAuditionExtent } from './phrase-audition-extent.ts';
 import type { SoundRuntimePort, SoundSequencePlan } from '../../contracts/sound.ts';
 import { createPlaylistTransport, type PlaylistTransportState } from './playlist-transport.ts';
 
@@ -10,6 +12,7 @@ export function createPhraseCompositionTransport(options: {
   tempoBpm(): number;
   lengthBeats?(): number;
   durationSeconds?(): number;
+  readBody?(): PhraseBody | undefined;
   runtime: SoundRuntimePort;
   onChange(state: PlaylistTransportState): void;
   onError(error: unknown): void;
@@ -19,7 +22,14 @@ export function createPhraseCompositionTransport(options: {
   let state: PlaylistTransportState = { playing: false, preparing: false, rate: 1, position: 0 };
   let endTimer: ReturnType<typeof setTimeout> | undefined;
   let disposed = false;
-  const duration = () => options.durationSeconds?.() ?? (options.lengthBeats?.() ?? PHRASE_COMPOSITION_BEATS) * 60 / tempo;
+  let manualTail = false;
+  // Recompute on edits/transport actions, never scan thousands of notes per frame.
+  let bounds: ReturnType<typeof phraseAuditionExtent> | undefined;
+  const refreshExtent = () => { const body = options.readBody?.(); bounds = body ? phraseAuditionExtent(body) : undefined; };
+  const extent = () => bounds;
+  refreshExtent();
+  const fullDuration = () => options.durationSeconds?.() ?? (options.lengthBeats?.() ?? PHRASE_COMPOSITION_BEATS) * 60 / tempo;
+  const duration = () => { const bounds = extent(); return bounds ? manualTail ? bounds.fullEnd : bounds.barEnd : fullDuration(); };
 
   function clearEnd(): void {
     if (endTimer !== undefined) clearTimeout(endTimer);
@@ -38,6 +48,7 @@ export function createPhraseCompositionTransport(options: {
     }, Math.max(1, remaining * 1000 / state.rate));
   }
   function readPlan(): SoundSequencePlan {
+    refreshExtent();
     const source = options.readPlan();
     const limit = duration();
     const events: SoundSequencePlan['events'][number][] = [];
@@ -54,6 +65,7 @@ export function createPhraseCompositionTransport(options: {
     return { ...source, durationSeconds: limit, events };
   }
   const base = createPlaylistTransport({ ...options, readPlan, onChange(next) {
+    if (!next.playing && !next.preparing && next.position === 0) manualTail = false;
     state = { ...next, position: Math.min(duration(), next.position) };
     scheduleEnd();
     options.onChange(state);
@@ -61,23 +73,28 @@ export function createPhraseCompositionTransport(options: {
 
   function position(): number {
     const current = Math.min(duration(), base.position());
-    if (state.playing && current >= duration() - 1e-8) { base.stop(); return 0; }
+    if (state.playing && current >= duration() - 1e-8) { stop(); return 0; }
     return current;
   }
+  function stop(): void { manualTail = false; clearEnd(); base.stop(); }
   function seek(seconds: number): Promise<void> {
     if (disposed || !Number.isFinite(seconds)) return Promise.resolve();
-    const target = Math.max(0, Math.min(duration(), seconds));
+    refreshExtent();
+    const bounds = extent();
+    if (bounds) manualTail = seconds > bounds.noteEnd + 1e-8;
+    const target = Math.max(0, Math.min(bounds?.fullEnd ?? fullDuration(), seconds));
     if (target === duration()) base.pause();
     return base.seek(target);
   }
   return {
     async toggle() {
       if (disposed) return;
+      refreshExtent();
       if (!state.playing && !state.preparing && base.position() >= duration()) base.seek(0);
       await base.toggle();
     },
     pause: base.pause,
-    stop: base.stop,
+    stop,
     setRate(rate) {
       if (disposed) return;
       if (Number.isFinite(rate) && rate >= .25 && rate <= 4) requestedRate = rate;
@@ -88,12 +105,14 @@ export function createPhraseCompositionTransport(options: {
     position,
     refresh() {
       if (disposed) return;
+      refreshExtent();
+      if (bounds && state.playing && base.position() >= duration() - 1e-8) { stop(); return; }
       const nextTempo = options.tempoBpm();
       if (nextTempo !== tempo && !options.durationSeconds) {
         const beat = base.position() * tempo / 60;
         tempo = nextTempo;
-        seek(beat * 60 / tempo);
-      } else if (base.position() > duration()) void seek(duration());
+        void base.seek(beat * 60 / tempo);
+      } else if (base.position() > duration() && !manualTail) void base.seek(duration());
       else { base.refresh(); scheduleEnd(); }
     },
     dispose() { if (disposed) return; disposed = true; clearEnd(); base.dispose(); },

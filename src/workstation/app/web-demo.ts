@@ -105,7 +105,7 @@ function mount() {
   transport = createPhraseCompositionTransport({
     runtime, readPlan: () => model.score.previewPlan(planBody(), { allowSilence: true }),
     prepare: () => model.score.preparePreview(planBody()), tempoBpm: () => model.score.read().body!.tempoBpm,
-    durationSeconds: () => phraseDurationSeconds(model.score.read().body!),
+    durationSeconds: () => phraseDurationSeconds(model.score.read().body!), readBody: planBody,
     onChange(next) {
       if (next.playing && !state.playing && parent !== window) parent.postMessage({ type: 'jianle:editor-playing' }, location.origin);
       state = next; cancelAnimationFrame(frame); paintClock(); refreshButtons();

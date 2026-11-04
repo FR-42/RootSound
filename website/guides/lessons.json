@@ -2,10 +2,10 @@
   {
     "id": "add-voice",
     "title": "添加音色",
-    "description": "选音色 → 点卷帘写音符 → 向下拉长。",
-    "alt": "添加长笛，在卷帘中写下音符，再拖住音符下边缘向下延长。",
-    "version": 5,
-    "duration": 6.533333333333333,
+    "description": "选好声音，按住卷帘直接向下拖出长音符。",
+    "alt": "添加长笛后，在卷帘按下鼠标不松开，直接向下拖动写出长音符。",
+    "version": 6,
+    "duration": 5.666666666666667,
     "width": 1920,
     "height": 1080
   },
@@ -14,7 +14,7 @@
     "title": "BPM",
     "description": "数字越大，每拍越短。敲击定速：跟着节奏按空格。",
     "alt": "左侧调整BPM，右侧以相同缩放显示拍线间距变化；按空格敲击定速。",
-    "version": 5,
+    "version": 6,
     "duration": 10.533333333333333,
     "width": 1920,
     "height": 1080
@@ -24,7 +24,7 @@
     "title": "格数",
     "description": "一拍可以分成2格、3格、4格。",
     "alt": "同样一拍分别分成2格、3格、4格。",
-    "version": 5,
+    "version": 6,
     "duration": 5.833333333333333,
     "width": 1920,
     "height": 1080
@@ -34,7 +34,7 @@
     "title": "缩放视角",
     "description": "Ctrl＋滚轮竖向缩放；加Shift横向缩放。",
     "alt": "先按Ctrl和Shift滚轮横向缩放，再按Ctrl滚轮竖向缩放。",
-    "version": 5,
+    "version": 6,
     "duration": 9.5,
     "width": 1920,
     "height": 1080
@@ -44,8 +44,18 @@
     "title": "写音符与拖动画布",
     "description": "选中后写音符；右键空白取消选中，再拖动画布。",
     "alt": "点击音符选中，点击卷帘添加音符，右键空白取消选中后拖动画布。",
-    "version": 5,
+    "version": 6,
     "duration": 6.2,
+    "width": 1920,
+    "height": 1080
+  },
+  {
+    "id": "extend",
+    "title": "延长与新增卷帘",
+    "description": "下拉底边增加拍数；下方＋新建一段卷帘。",
+    "alt": "下拉卷帘底边增加拍数，再点击下方加号添加新卷帘。",
+    "version": 6,
+    "duration": 4.8,
     "width": 1920,
     "height": 1080
   }

@@ -105,7 +105,7 @@ export function mountPhraseComposition(root: HTMLElement, options: {
       // Prepare the newly selected recordings before compiling that plan.
     } while (!disposed && scope !== playbackFamilyId);
   }
-  const transport = createPhraseCompositionTransport({ runtime: sound, tempoBpm: tempo, lengthBeats: length, durationSeconds: duration,
+  const transport = createPhraseCompositionTransport({ runtime: sound, tempoBpm: tempo, lengthBeats: length, durationSeconds: duration, readBody: playbackBody,
     prepare: preparePlayback, readPlan: () => phrase.previewPlan(playbackBody(), { allowSilence: true }),
     onChange(next) { state = next; updatePlayback(); }, onError: error => report(error instanceof Error ? error.message : String(error), true) });
 

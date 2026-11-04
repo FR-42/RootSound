@@ -2,7 +2,7 @@
 from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
 import json, sys
-root=Path(sys.argv[1]) if len(sys.argv)>1 else Path(json.loads(Path('.test-output/rb135/latest.json').read_text())['root'])
+root=Path(sys.argv[1]) if len(sys.argv)>1 else Path(json.loads(Path('.test-output/rb136/latest.json').read_text())['root'])
 manifest=json.loads((root/'manifest.json').read_text(encoding='utf-8'))
 out=Path('website/guides');out.mkdir(parents=True,exist_ok=True)
 font=ImageFont.truetype('C:/Windows/Fonts/msyh.ttc',44)

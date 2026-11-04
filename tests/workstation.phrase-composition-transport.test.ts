@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import type { PlaybackSession, SoundRuntimeEvent, SoundRuntimePort, SoundSequencePlan } from '../src/workstation/contracts/sound.ts';
+import type { PhraseBody } from '../src/workstation/contracts/phrase.ts';
+import { phraseAuditionExtent } from '../src/workstation/modules/ui-rendering/phrase-audition-extent.ts';
 import { createPhraseCompositionTransport } from '../src/workstation/modules/ui-rendering/phrase-composition-transport.ts';
 import type { PlaylistTransportState } from '../src/workstation/modules/ui-rendering/playlist-transport.ts';
 import { createPhraseAudition } from '../src/workstation/modules/ui-rendering/phrase-audition.ts';
@@ -13,7 +15,7 @@ import { audio, fixture as simulatedDevice } from '../src/workstation/modules/so
 const sound = { kind: 'basic-synth' as const, version: 1 as const, sources: [{ waveform: 'sine' as const, frequencyRatio: 1, level: 1 }],
   envelope: { attackSeconds: .1, releaseSeconds: .2 }, note: { frequencyHz: 440, holdSeconds: 2, velocity: 1 }, level: .5 };
 function deferred() { let resolve!: () => void; const promise = new Promise<void>(done => { resolve = done; }); return { promise, resolve }; }
-function fixture(durationSeconds?: () => number) {
+function fixture(durationSeconds?: () => number, readBody?: () => PhraseBody) {
   let elapsed = 0; let tempo = 120; let length = 16; let session: PlaybackSession | undefined; let count = 0;
   let prepare = async () => {}; let waitDevice: Promise<void> | undefined;
   let input: SoundSequencePlan = { kind: 'sequence', version: 1, durationSeconds: 20, events: [{ atSeconds: 0, sound }] };
@@ -31,7 +33,7 @@ function fixture(durationSeconds?: () => number) {
     stopAll() { calls.push({ method: 'stopAll' }); if (session) emit('stopped'); },
     subscribe(listener: (event: SoundRuntimeEvent) => void) { listeners.add(listener); return () => listeners.delete(listener); },
   } as unknown as SoundRuntimePort;
-  const transport = createPhraseCompositionTransport({ runtime, tempoBpm: () => tempo, lengthBeats: () => length, durationSeconds, prepare: () => prepare(), readPlan: () => input,
+  const transport = createPhraseCompositionTransport({ runtime, tempoBpm: () => tempo, lengthBeats: () => length, durationSeconds, readBody, prepare: () => prepare(), readPlan: () => input,
     onChange: state => states.push(state), onError: error => errors.push(error) });
   return { transport, calls, states, errors, emit, elapsed(value: number) { elapsed = value; }, tempo(value: number) { tempo = value; },
     plan(value: SoundSequencePlan) { input = value; }, length(value: number) { length = value; }, prepare(value: () => Promise<void>) { prepare = value; }, waitDevice(value: Promise<void>) { waitDevice = value; } };
@@ -218,4 +220,49 @@ test('adding and undoing a bar updates the running and paused phrase boundary wi
     f.transport.pause(); f.length(16); f.transport.refresh(); await settle(); assert.equal(f.transport.position(), 8);
     await f.transport.toggle(); assert.equal(f.calls.at(-1)!.plan!.transport!.positionSeconds, 0, 'resuming at the new end restarts from zero');
   } finally { f.transport.dispose(); }
+});
+
+
+const endingBody = (): PhraseBody => ({ model:'note-phrase',version:1,timeUnit:'beat',tempoBpm:120,lengthBeats:32,
+  parts:[{id:'p',name:'p',timbreId:'t',notes:[{id:'n',startBeat:5,durationBeats:1,frequencyHz:440,velocity:.75}]}] });
+
+test('last held note finishes its bar and resets even with many empty bars after it', async context => {
+  context.mock.timers.enable({apis:['setTimeout']});const body=endingBody(),f=fixture(undefined,()=>body);
+  f.plan({kind:'sequence',version:1,durationSeconds:16,events:[{atSeconds:2.5,sound:{...sound,note:{...sound.note,holdSeconds:.5}}}]});
+  await f.transport.toggle();assert.equal(f.calls.at(-1)!.plan!.durationSeconds,4);
+  f.elapsed(3.9);assert.equal(f.transport.position(),3.9);f.elapsed(4);context.mock.timers.tick(4000);
+  assert.equal(f.transport.position(),0);assert.equal(f.states.at(-1)!.playing,false);f.transport.dispose();
+});
+
+test('bar ending follows held seconds, segmented BPM, pickup, and ignores hidden notes',()=>{
+  const body=endingBody();body.tempoSections=[{id:'b',startBeat:8,tempoBpm:60}];body.parts[0]!.notes[0]={...body.parts[0]!.notes[0]!,startBeat:9,durationSeconds:2.2};
+  body.parts[0]!.hiddenNotes=[{sectionId:'b',note:{...body.parts[0]!.notes[0]!,startBeat:20}}];
+  assert.deepEqual(phraseAuditionExtent(body),{noteEnd:7.2,barEnd:8,fullEnd:28});
+  body.tempoSections=[];body.parts[0]!.notes[0]={...body.parts[0]!.notes[0]!,startBeat:3,durationSeconds:.5};
+  assert.equal(phraseAuditionExtent(body).barEnd,2,'an exact boundary does not add another bar');
+  body.parts[0]!.notes=[];body.pickupBeats=1;assert.equal(phraseAuditionExtent(body).barEnd,.5);
+});
+
+test('manual seeking into trailing blank space permits the full extent until returning or stopping',async()=>{
+  const body=endingBody(),f=fixture(undefined,()=>body);try{
+    await f.transport.seek(3.5);await f.transport.toggle();assert.equal(f.calls.at(-1)!.plan!.durationSeconds,16);
+    f.elapsed(2);assert.equal(f.transport.position(),5.5);f.transport.pause();await f.transport.toggle();assert.equal(f.calls.at(-1)!.plan!.durationSeconds,16);
+    f.transport.stop();await f.transport.toggle();assert.equal(f.calls.at(-1)!.plan!.durationSeconds,4);
+    await f.transport.seek(6);assert.equal(f.calls.at(-1)!.plan!.durationSeconds,16);
+    await f.transport.seek(1);assert.equal(f.calls.at(-1)!.plan!.durationSeconds,4);
+  }finally{f.transport.dispose()}
+});
+
+test('live note edits extend the automatic end and removal can stop an already trailing head',async()=>{
+  const body=endingBody(),f=fixture(undefined,()=>body);try{
+    await f.transport.toggle();f.elapsed(1);body.parts[0]!.notes.push({id:'later',startBeat:13,durationBeats:1,frequencyHz:660,velocity:.75});
+    f.transport.refresh();await settle();assert.equal(f.calls.at(-1)!.plan!.durationSeconds,8);
+    f.elapsed(5);body.parts[0]!.notes.pop();f.transport.refresh();assert.equal(f.transport.position(),0);assert.equal(f.states.at(-1)!.playing,false);
+  }finally{f.transport.dispose()}
+});
+
+
+test('head animation reads cached bounds rather than rescanning the score',async()=>{
+ let reads=0;const body=endingBody(),f=fixture(undefined,()=>{reads++;return body});
+ try{await f.transport.toggle();const before=reads;for(let i=0;i<1000;i++)f.transport.position();assert.equal(reads,before);f.transport.refresh();assert(reads>before)}finally{f.transport.dispose()}
 });

@@ -60,11 +60,12 @@ let expression='starting',stage='setup';
 
  assert.equal(await parentJs("!!(document.querySelector('#guide').compareDocumentPosition(document.querySelector('.music-editor')) & Node.DOCUMENT_POSITION_FOLLOWING)"),true);
  assert.equal(await parentJs("document.querySelectorAll('video').length"),0);
+ assert.equal(await parentJs("document.querySelector('.site-thanks').textContent"),'特别鸣谢：frank。（b站：Frank讲明白）');
  const guideLayout=await parentJs("(()=>{const r=document.querySelector('.guide-stage').getBoundingClientRect();return {width:r.width,height:r.height}})()");assert(guideLayout.width>1100&&guideLayout.height>600);
 
- await wait(()=>parentJs("document.querySelectorAll('.guide-dot').length===5"));
- const titles=['添加音色','BPM','格数','缩放视角','写音符与拖动画布'];
- for(let i=0;i<5;i++){
+ await wait(()=>parentJs("document.querySelectorAll('.guide-dot').length===6"));
+ const titles=['添加音色','BPM','格数','缩放视角','写音符与拖动画布','延长与新增卷帘'];
+ for(let i=0;i<6;i++){
   await parentJs("document.querySelectorAll('.guide-dot')["+i+"].click()");
   await wait(()=>parentJs("document.querySelector('#guide-title').textContent==="+JSON.stringify(titles[i])));
   await wait(()=>parentJs("document.querySelectorAll('.guide-page').length===1"));
@@ -76,7 +77,7 @@ let expression='starting',stage='setup';
  await parentJs("document.querySelector('#guide').dispatchEvent(new KeyboardEvent('keydown',{bubbles:true,key:'ArrowRight'}))");
  await wait(()=>parentJs("document.querySelector('#guide-title').textContent==='添加音色'"));
  await parentJs("document.querySelector('#guide').dispatchEvent(new KeyboardEvent('keydown',{bubbles:true,key:'ArrowLeft'}))");
- await wait(()=>parentJs("document.querySelector('#guide-title').textContent==='写音符与拖动画布'"));
+ await wait(()=>parentJs("document.querySelector('#guide-title').textContent==='延长与新增卷帘'"));
  await parentJs("(()=>{const n=document.querySelector('.guide-next');n.click();n.click();n.click()})()");
  await wait(()=>parentJs("document.querySelector('#guide-title').textContent==='格数'"));
  await wait(()=>parentJs("document.querySelectorAll('.guide-page').length===1"));
@@ -111,6 +112,10 @@ let expression='starting',stage='setup';
  await js('__webTest.now=.2');await delay(60);
  await js("document.querySelector('.web-play').click()");assert.equal(await js("document.querySelector('.web-play').getAttribute('aria-pressed')"),'false');
  await js("document.querySelector('.web-play').click()");await wait(()=>js("document.querySelector('.web-play').getAttribute('aria-pressed')==='true'"));
+ await js('__webTest.now=3');await wait(()=>js("document.querySelector('.web-play').getAttribute('aria-pressed')==='false'"));assert.equal(await js("document.querySelector('.web-clock').textContent"),'00:00.000');
+ await js("document.querySelector('.melody-scroll').dispatchEvent(new WheelEvent('wheel',{bubbles:true,cancelable:true,deltaY:800,clientX:700,clientY:300}))");await delay(50);
+ await js("(()=>{const n=document.querySelector('.melody-ruler'),r=n.getBoundingClientRect();const p={bubbles:true,cancelable:true,button:0,buttons:1,pointerId:92,isPrimary:true,pointerType:'mouse',clientX:r.x+10,clientY:r.y+170};n.dispatchEvent(new PointerEvent('pointerdown',p));document.dispatchEvent(new PointerEvent('pointerup',{...p,buttons:0}))})()");
+ await js("document.querySelector('.web-play').click()");await wait(()=>js("document.querySelector('.web-play').getAttribute('aria-pressed')==='true'"));await js('__webTest.now=5.5');await delay(90);assert.equal(await js("document.querySelector('.web-play').getAttribute('aria-pressed')"),'true','manual tail placement can play after the automatic bar ending');
  await js("document.querySelector('.web-stop').click()");assert.equal(await js("document.querySelector('.web-clock').textContent"),'00:00.000');
  await js("document.querySelector('.web-export').click()");await wait(()=>js("__webTest.downloads.some(d=>d.name.endsWith('.wav'))"));
  const audio=await js("(async()=>{const item=__webTest.downloads.find(d=>d.name.endsWith('.wav')),bytes=new Uint8Array(await item.blob.arrayBuffer());let peak=0;for(let i=44;i<bytes.length-2;i+=3){let n=bytes[i]|bytes[i+1]<<8|bytes[i+2]<<16;if(n&0x800000)n-=0x1000000;peak=Math.max(peak,Math.abs(n))}return {name:item.name,bytes:bytes.length,peak}})()");assert(audio.peak>100,'export must contain sound');
@@ -129,7 +134,7 @@ let expression='starting',stage='setup';
  win.setContentSize(1280,950);await parentJs("document.querySelector('#guide').scrollIntoView()");await delay(100);fs.writeFileSync(root+'/guide-desktop.png',(await win.webContents.capturePage()).toPNG());
  win.setContentSize(390,950);await delay(100);assert.equal(await parentJs('document.documentElement.scrollWidth<=innerWidth'),true);fs.writeFileSync(root+'/guide-mobile.png',(await win.webContents.capturePage()).toPNG());
  const errors=await js('__webTest.errors');assert.deepEqual(errors,[]);assert.deepEqual(rendererErrors,[]);assert(!win.isVisible());
- fs.writeFileSync(root+'/report.json',JSON.stringify({passed:true,audio,layouts,voices:8,realProductionBuild:true,subpath:true,drawUndoRedo:true,pauseResume:true,nativeWorkspaceRoundtrip:true,starterNotes:40,starterReload:true,guidePages:5,guideKeysSwipeRapidFlip:true,guideReducedMotion:true,noVideo:true,visibleWindow:false,physicalAudio:false},null,2));win.destroy();app.exit(0);
+ fs.writeFileSync(root+'/report.json',JSON.stringify({passed:true,audio,layouts,voices:8,realProductionBuild:true,subpath:true,drawUndoRedo:true,pauseResume:true,lastNoteBarStop:true,manualTailPlayback:true,nativeWorkspaceRoundtrip:true,starterNotes:40,starterReload:true,guidePages:6,guideKeysSwipeRapidFlip:true,guideReducedMotion:true,noVideo:true,visibleWindow:false,physicalAudio:false},null,2));win.destroy();app.exit(0);
 }catch(error){fs.writeFileSync(root+'/report.json',JSON.stringify({error:String(error),stack:error?.stack,expression:expression.slice(0,350),stage}));app.exit(1)}})();
 `);
 const env={...process.env};delete env.ELECTRON_RUN_AS_NODE;
