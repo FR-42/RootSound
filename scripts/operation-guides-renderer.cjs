@@ -5,12 +5,12 @@ const config=JSON.parse(fs.readFileSync(process.argv[2],'utf8')),root=config.roo
 app.setPath('userData',path.join(root,'profile'));app.commandLine.appendSwitch('disable-gpu');app.commandLine.appendSwitch('force-device-scale-factor','1');
 const delay=ms=>new Promise(r=>setTimeout(r,ms));
 const lessons=[
- {id:'add-voice',title:'添加音色',description:'选好声音，按住卷帘直接向下拖出长音符。',alt:'添加长笛后，在卷帘按下鼠标不松开，直接向下拖动写出长音符。'},
- {id:'bpm',title:'BPM',description:'数字越大，每拍越短。敲击定速：跟着节奏按空格。',alt:'左侧调整BPM，右侧以相同缩放显示拍线间距变化；按空格敲击定速。'},
- {id:'cells',title:'格数',description:'一拍可以分成2格、3格、4格。',alt:'同样一拍分别分成2格、3格、4格。'},
- {id:'zoom',title:'缩放视角',description:'Ctrl＋滚轮竖向缩放；加Shift横向缩放。',alt:'先按Ctrl和Shift滚轮横向缩放，再按Ctrl滚轮竖向缩放。'},
- {id:'editing',title:'写音符与拖动画布',description:'选中后写音符；右键空白取消选中，再拖动画布。',alt:'点击音符选中，点击卷帘添加音符，右键空白取消选中后拖动画布。'},
- {id:'extend',title:'延长与新增卷帘',description:'下拉底边增加拍数；下方＋新建一段卷帘。',alt:'下拉卷帘底边增加拍数，再点击下方加号添加新卷帘。'},
+ {id:'add-voice',title:'添加音色',description:'',alt:'添加长笛后，在卷帘按下鼠标不松开，直接向下拖动写出长音符。'},
+ {id:'bpm',title:'BPM',description:'',alt:'左侧调整BPM，右侧以相同缩放显示拍线间距变化；按空格敲击定速。'},
+ {id:'cells',title:'格数',description:'',alt:'同样一拍分别分成2格、3格、4格。'},
+ {id:'zoom',title:'缩放视角',description:'',alt:'先按Ctrl和Shift滚轮横向缩放，再按Ctrl滚轮竖向缩放。'},
+ {id:'editing',title:'写音符与拖动画布',description:'',alt:'点击音符选中，点击卷帘添加音符，右键空白取消选中后拖动画布。'},
+ {id:'extend',title:'延长与新增卷帘',description:'',alt:'下拉卷帘底边增加拍数，再点击下方加号添加新卷帘。'},
 ];
 let win,lesson,frames=[],all=[],count=0,label='',keys='',camera={cx:600,cy:310,w:1200},cursor={x:70,y:70,down:false},last='',mode='normal';
 const js=code=>{last=code.slice(0,180);return win.webContents.executeJavaScript('(async()=>('+code+'))()');};
@@ -51,7 +51,7 @@ async function wheel(delta,flags={},steps=18){
  for(let i=0;i<steps;i++){await js(`document.querySelector('.melody-scroll').dispatchEvent(new WheelEvent('wheel',{bubbles:true,cancelable:true,deltaY:${delta/steps},clientX:${cursor.x},clientY:${cursor.y},...${JSON.stringify(flags)}}))`);await snap(34,0);}
  await snap(350,0);
 }
-async function end(){assert.deepEqual(await js('__guide.errors'),[]);assert(!win.isVisible());const duration=frames.reduce((n,f)=>n+f.duration,0);all.push({...lesson,version:6,frames,duration});console.log(JSON.stringify({id:lesson.id,frames:frames.length,seconds:duration/1000}));}
+async function end(){assert.deepEqual(await js('__guide.errors'),[]);assert(!win.isVisible());const duration=frames.reduce((n,f)=>n+f.duration,0);all.push({...lesson,version:7,frames,duration});console.log(JSON.stringify({id:lesson.id,frames:frames.length,seconds:duration/1000}));}
 app.whenReady().then(async()=>{try{
  session.defaultSession.webRequest.onBeforeRequest({urls:['https://*/*']},(_d,cb)=>cb({cancel:true}));
  win=new BrowserWindow({show:false,useContentSize:true,width:2400,height:1240,webPreferences:{offscreen:true,sandbox:true,contextIsolation:true,backgroundThrottling:false}});win.setMenu(null);win.setContentSize(2400,1240);
@@ -71,16 +71,16 @@ app.whenReady().then(async()=>{try{
  assert.equal(await js('__tutorial.model.score.read().body.parts.reduce((n,p)=>n+p.notes.length,0)'),1);
  assert((await js('__tutorial.model.score.read().body.parts.flatMap(p=>p.notes)[0].durationBeats'))>.5);await end();
 
- await fresh(1);await seed();mode='bpm';label='120 BPM：每分钟120拍';await click('.melody-tempo-button',850);
+ await fresh(1);await seed();mode='bpm';label='BPM';await click('.melody-tempo-button',850);
  const changeTempo=async(target,steps)=>{const before=await js('__tutorial.model.score.read().body.tempoBpm');const r=await rect('.melody-tempo-input');cursor={x:r.x+r.w*.55,y:r.y+r.h*.5,down:true};for(let i=1;i<=steps;i++){const bpm=Math.round(before+(target-before)*i/steps);await js(`(()=>{const n=document.querySelector('.melody-tempo-input');n.value='${bpm}';n.dispatchEvent(new Event('change',{bubbles:true}))})()`);await snap(34,0);}cursor.down=false;await snap(1400,0);assert.equal(await js('__tutorial.model.score.read().body.tempoBpm'),target);};
- label='BPM变大，拍线靠近';await changeTempo(180,20);label='BPM变小，拍线拉开';await changeTempo(60,26);
- mode='normal';keys='空格';label='敲击定速：跟着节奏按空格';await js("document.querySelector('.melody-tap-tempo').click()");await focus('.tap-tempo-dialog',1100);await snap(850,300);
+ label='加快';await changeTempo(180,20);label='放慢';await changeTempo(60,26);
+ mode='normal';keys='空格';label='空格定速';await js("document.querySelector('.melody-tap-tempo').click()");await focus('.tap-tempo-dialog',1100);await snap(850,300);
  await js("(()=>{__guide.realNow=performance.now.bind(performance);__guide.tapNow=0;Object.defineProperty(performance,'now',{configurable:true,value:()=>__guide.tapNow})})()");
  for(let i=0;i<5;i++){await js('__guide.tapNow='+i*500);await js("document.dispatchEvent(new KeyboardEvent('keydown',{bubbles:true,cancelable:true,key:' ',code:'Space'}))");keys='空格 ↓';await snap(150,0);keys='空格';await snap(350,0);}
  assert.equal(await js("document.querySelector('.tap-tempo-value').textContent"),'120');
- await js("Object.defineProperty(performance,'now',{configurable:true,value:__guide.realNow})");label='应用这个速度';await click('.tap-tempo-apply',150);mode='bpm';keys='';label='回到120 BPM，每拍0.5秒';await snap(1300,300);await end();
+ await js("Object.defineProperty(performance,'now',{configurable:true,value:__guide.realNow})");label='应用';await click('.tap-tempo-apply',150);mode='bpm';keys='';label='120 BPM';await snap(1300,300);await end();
 
- await fresh(2);await seed();mode='cells';label='同样一拍，分法不同';
+ await fresh(2);await seed();mode='cells';label='';
  for(const n of [2,3,4,3]){const r=await rect('.melody-grid-select');cursor={x:r.x+r.w*.5,y:r.y+r.h*.5,down:true};await js(`(()=>{const n=document.querySelector('.melody-grid-select');n.value='${n}';n.dispatchEvent(new Event('change',{bubbles:true}))})()`);await snap(160,0);cursor.down=false;await snap(1300,0);assert.equal(await js('__tutorial.model.score.read().body.stepsPerBeat'),n);}
  await end();
 
@@ -111,5 +111,5 @@ app.whenReady().then(async()=>{try{
  const lengthAfterEdge=await js('__tutorial.model.score.read().body.lengthBeats');assert(lengthAfterEdge>lengthBeforeEdge);label=`${lengthBeforeEdge}拍 → ${lengthAfterEdge}拍`;await snap(900,0);
  await js("document.querySelector('.melody-scroll').dispatchEvent(new WheelEvent('wheel',{bubbles:true,cancelable:true,deltaY:100000,clientX:900,clientY:300}))");await delay(80);label='下方＋，新建一段卷帘';await focus('.melody-extend',1100);await click('.melody-extend',300);
  assert.equal(await js('__tutorial.model.score.read().body.tempoSections.length'),1);assert((await js('__tutorial.model.score.read().body.lengthBeats'))>lengthAfterEdge);label='新的卷帘，接在后面';camera={cx:600,cy:310,w:1100};await snap(1400,300);await end();
- const result={width:1200,height:620,pixelRatio:2,lessons:all};fs.writeFileSync(path.join(root,'manifest.json'),JSON.stringify(result));fs.writeFileSync(path.join(root,'report.json'),JSON.stringify({passed:true,version:6,chapters:all.length,frames:count,seconds:all.reduce((n,l)=>n+l.duration,0)/1000,visibleWindow:false,physicalAudio:false,userProjectsRead:false}));win.destroy();app.exit(0);
+ const result={width:1200,height:620,pixelRatio:2,lessons:all};fs.writeFileSync(path.join(root,'manifest.json'),JSON.stringify(result));fs.writeFileSync(path.join(root,'report.json'),JSON.stringify({passed:true,version:7,chapters:all.length,frames:count,seconds:all.reduce((n,l)=>n+l.duration,0)/1000,visibleWindow:false,physicalAudio:false,userProjectsRead:false}));win.destroy();app.exit(0);
 }catch(error){fs.writeFileSync(path.join(root,'report.json'),JSON.stringify({error:String(error),stack:error.stack,last,chapter:lesson?.id}));app.exit(1);}});

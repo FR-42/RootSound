@@ -38,7 +38,6 @@
   if (!guide) return;
   const stage = guide.querySelector('.guide-stage');
   const heading = guide.querySelector('#guide-title');
-  const summary = guide.querySelector('#guide-summary');
   const count = guide.querySelector('.guide-count');
   const motion = guide.querySelector('.guide-motion');
   const reduced = matchMedia('(prefers-reduced-motion: reduce)');
@@ -83,7 +82,7 @@
     }
     const page = document.createElement('div'); page.className = 'guide-page'; page.append(image); stage.append(page);
     current = target;
-    heading.textContent = lesson.title; summary.textContent = lesson.description;
+    heading.textContent = lesson.title;
     count.textContent = `${target + 1} / ${lessons.length}`;
     buttons.forEach((button, i) => button.setAttribute('aria-current', i === target ? 'true' : 'false'));
     if (previous && !initial && !reduced.matches) {
@@ -129,7 +128,7 @@
   describeMotion();
   void (async () => {
     try {
-      const response = await fetch('guides/lessons.json?v=6');
+      const response = await fetch('guides/lessons.json?v=7');
       if (!response.ok) throw new Error('Guide unavailable');
       lessons = await response.json();
       for (const [index, lesson] of lessons.entries()) {
@@ -139,6 +138,6 @@
         guide.querySelector('.guide-dots').append(button); buttons.push(button);
       }
       await select(0, 1, true);
-    } catch { summary.textContent = '演示暂时无法加载，请刷新重试。'; }
+    } catch { heading.textContent = '演示暂时无法加载'; }
   })();
 })();
