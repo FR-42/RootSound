@@ -784,7 +784,7 @@ export function mountMelodyWorkspace(root: HTMLElement, options: {
         const bounds = block.getBoundingClientRect();
         const resizing = !!target.closest('.melody-note-resize') || (vertical ? event.clientY >= bounds.bottom - Math.min(7, bounds.height * .25) : event.clientX >= bounds.right - Math.min(7, bounds.width * .25));
         gesture = { ...base, kind: resizing ? 'resize' : 'note', partId: voice.id, note, changes: {}, rawY: 0, moved: false };
-        void audition.request(note.frequencyHz, phraseHeldSeconds(value, note), note.velocity);
+        void audition.request(note.frequencyHz, phraseHeldSeconds(value, note), note.velocity, undefined, note.level ?? 1);
       } else if (voice) {
         if (from.x < 0 || from.x >= (melodyDuration(value) - view.leftSeconds) * melodyScale(view, width(), melodyDuration(value))) return;
         const limit = value.lengthBeats; const lastStart = lastNoteStart(value);
@@ -892,7 +892,7 @@ export function mountMelodyWorkspace(root: HTMLElement, options: {
       }
     } catch (error) { failure = error instanceof Error ? error : new Error(String(error)); report(failure.message); }
     preview(); refresh(); if (changed) notify();
-    if (created && !failure) void audition.request(created.frequencyHz, phraseHeldSeconds(active.base, created), created.velocity);
+    if (created && !failure) void audition.request(created.frequencyHz, phraseHeldSeconds(active.base, created), created.velocity, undefined, created.level ?? 1);
     return failure;
   }
   function flush(persist = true): void { if (disposed) return; tempoRolls?.flush(); const failure = finish(true) ?? commitMix(); if (persist) persistWorkspace(true); if (failure) throw failure; }

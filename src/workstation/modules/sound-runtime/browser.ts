@@ -73,7 +73,7 @@ export function createBrowserSoundRuntime(): SoundRuntimePort {
   let auditionSequence = 0;
   let mainMix: GainNode | null = null;
   let outputMix: GainNode | null = null;
-  let outputLimiter: DynamicsCompressorNode | null = null;
+  let outputLimiter: ReturnType<typeof createOutputLimiter> | null = null;
   let outputLevel = 1;
   let sequence = 0;
   let requestSequence = 0;
@@ -148,7 +148,7 @@ export function createBrowserSoundRuntime(): SoundRuntimePort {
     if (!outputMix) {
       outputMix = audio.createGain(); outputMix.gain.setValueAtTime(1, audio.currentTime);
       outputLimiter = createOutputLimiter(audio, audio.destination);
-      outputMix.connect(outputLimiter);
+      outputMix.connect(outputLimiter.input);
       const redirect = (resources: GraphResources) => {
         for (const node of resources.outputBuses?.length ? resources.outputBuses : resources.panners) { node.disconnect(); node.connect(outputMix!); }
       };
@@ -672,7 +672,7 @@ export function createBrowserSoundRuntime(): SoundRuntimePort {
       if (active !== null) finish(active, 'stopped');
       const audio = context;
       mainMix?.disconnect(); mainMix = null;
-      outputMix?.disconnect(); outputMix = null; outputLimiter?.disconnect(); outputLimiter = null;
+      outputMix?.disconnect(); outputMix = null; outputLimiter?.dispose(); outputLimiter = null;
       if (audio !== null) audio.onstatechange = null;
       disposePromise = (async () => {
         try {

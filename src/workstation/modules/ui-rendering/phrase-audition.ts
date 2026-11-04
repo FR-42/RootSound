@@ -8,7 +8,7 @@ export function createPhraseAudition(
   sound: Pick<SoundRuntimePort, 'audition' | 'cancelAudition'>,
   currentPart: () => string | undefined,
   onError: (message: string) => void,
-): { request(frequencyHz: number, holdSeconds?: number, velocity?: number, ready?: void | Promise<void>): Promise<void>; requestKeyboard(frequencyHz: number): Promise<void>; requestTimbre(id: string): Promise<void>; sync(snapshot?: Pick<PhraseView, 'draft' | 'body'>): void; cancel(): void } {
+): { request(frequencyHz: number, holdSeconds?: number, velocity?: number, ready?: void | Promise<void>, level?: number): Promise<void>; requestKeyboard(frequencyHz: number): Promise<void>; requestTimbre(id: string): Promise<void>; sync(snapshot?: Pick<PhraseView, 'draft' | 'body'>): void; cancel(): void } {
   let generation = 0;
   let scope = '';
   function currentScope(view: Pick<PhraseView, 'draft' | 'body'> = phrase.read()): string {
@@ -31,7 +31,7 @@ export function createPhraseAudition(
           onError(`试音暂不可用：${error instanceof Error ? error.message : String(error)}`);
       }
     },
-    async request(frequencyHz, holdSeconds = 0.35, velocity = 0.75, ready) {
+    async request(frequencyHz, holdSeconds = 0.35, velocity = 0.75, ready, level = 1) {
       cancel(); scope = currentScope();
       const selected = currentPart(); if (!selected || !scope) return;
       const request = generation; const expected = scope;
@@ -42,7 +42,7 @@ export function createPhraseAudition(
         // not become unhandled while a sampled tone is still being prepared.
         const plan = ready === undefined ? await preparation : (await Promise.all([preparation, ready]))[0];
         if (generation !== request || currentScope() !== expected) return;
-        await sound.audition(plan);
+        await sound.audition(level === 1 ? plan : { ...plan, level: plan.level * level });
       } catch (error) {
         if (generation === request && currentScope() === expected) {
           onError(`试音暂不可用：${error instanceof Error ? error.message : String(error)}`);

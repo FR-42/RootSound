@@ -158,6 +158,18 @@ test('audition scope sync reuses its supplied view but async completion still ch
   assert.equal(heard.length, 1); assert.deepEqual(errors, []); audition.cancel();
 });
 
+test('an existing-note audition preserves its per-note gain including a silent note', async () => {
+  const phrase=auditionPhrase(),part=phrase.read().body!.parts[0]!.id;
+  phrase.setMasterLevel(.8);
+  const reference=await phrase.previewNotePlan(part,{frequencyHz:440,holdSeconds:.2,velocity:.7});
+  const levels:number[]=[],errors:string[]=[];
+  const audition=createPhraseAudition(phrase,{async audition(plan){levels.push(plan.level);},cancelAudition(){}},()=>part,error=>errors.push(error));
+  await audition.request(440,.2,.7,undefined,.25);
+  await audition.request(440,.2,.7,undefined,0);
+  await audition.request(440,.2,.7);
+  assert.deepEqual(levels,[reference.level*.25,0,reference.level]);assert.deepEqual(errors,[]);
+});
+
 test('a generated-note audition survives live head movement by waiting for the main player restart', async () => simulatedDevice(async () => {
   const phrase = auditionPhrase(); const part = phrase.read().body!.parts[0]!.id;
   phrase.addNote(part, { startBeat: 0, durationBeats: 4, frequencyHz: 440, velocity: .75 });

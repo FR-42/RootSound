@@ -18,6 +18,7 @@ class FakeNode {
 
 class FakeGain extends FakeNode { readonly gain = new FakeParam(); }
 class FakeCompressor extends FakeNode { threshold = new FakeParam(); knee = new FakeParam(); ratio = new FakeParam(); attack = new FakeParam(); release = new FakeParam(); }
+class FakeWaveShaper extends FakeNode { curve: Float32Array | null = null; oversample = 'none'; }
 class FakePanner extends FakeNode { readonly pan = new FakeParam(); }
 
 class FakeOscillator extends FakeNode {
@@ -66,6 +67,8 @@ export class FakeAudioContext {
   readonly oscillators: FakeOscillator[] = [];
   readonly gains: FakeGain[] = [];
   readonly compressors: FakeCompressor[] = [];
+  readonly shapers: FakeWaveShaper[] = [];
+  createWaveShaper(): FakeWaveShaper { const node = new FakeWaveShaper(); this.shapers.push(node); return node; }
   createDynamicsCompressor(): FakeCompressor { const node = new FakeCompressor(); this.compressors.push(node); return node; }
   readonly panners: FakePanner[] = [];
   readonly clocks: FakeConstantSource[] = [];

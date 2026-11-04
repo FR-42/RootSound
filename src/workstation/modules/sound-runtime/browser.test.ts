@@ -9,7 +9,7 @@ test('listening volume works before activation and live without changing transpo
   assert.equal(FakeAudioContext.instances.length,0);
   const session=await runtime.preview(plan());
   const mix=audio().gains[0]!;
-  assert.equal(audio().compressors.length,1);
+  assert.equal(audio().shapers.length,1); assert.equal(audio().compressors.length,0);
   assert.equal(mix.gain.changes.at(-1)!.value,2);
   const notes=audio().oscillators.length;
   runtime.setOutputLevel!(0); assert.equal(mix.gain.changes.at(-1)!.value,0);
@@ -18,7 +18,7 @@ test('listening volume works before activation and live without changing transpo
   await runtime.audition(plan());
   assert(audio().panners.at(-1)!.connections.includes(mix));
   assert.throws(()=>runtime.setOutputLevel!(4.1));
-  await runtime.dispose(); assert(mix.disconnected); assert(audio().compressors[0]!.disconnected);
+  await runtime.dispose(); assert(mix.disconnected); assert(audio().shapers[0]!.disconnected);
 }));
 
 test('changing volume reroutes an existing sequence and an active key through the same output', async () => fixture(async () => {

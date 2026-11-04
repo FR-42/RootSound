@@ -63,7 +63,7 @@ export async function renderOffline(plan: PlayableNotePlan | SoundSequencePlan, 
   const audio = new OfflineAudioContext(2, frames, sampleRate);
   const resources: GraphResources = { oscillators: [], samples: [], bufferReleases: [], gains: [], panners: [] };
   let windowed: WindowedGraph | undefined;
-  let limiter: DynamicsCompressorNode | undefined;
+  let limiter: ReturnType<typeof createOutputLimiter> | undefined;
   let rejectAborted: ((error: DOMException) => void) | undefined;
   const aborted = new Promise<never>((_resolve, reject) => { rejectAborted = reject; });
   const abort = (): void => {
@@ -80,7 +80,7 @@ export async function renderOffline(plan: PlayableNotePlan | SoundSequencePlan, 
     if(hasSoundFont(preview))await Promise.race([prepareSoundFont(audio,preview),aborted]);
     abortIfNeeded(options.signal);
     if (hasSoundFont(preview)) limiter = createOutputLimiter(audio, audio.destination);
-    const destination = limiter ?? audio.destination;
+    const destination = limiter?.input ?? audio.destination;
     if (preview.sequence && preview.events.length > WINDOWED_EVENT_THRESHOLD) windowed = new WindowedGraph(audio, preview, resources, destination);
     const graph = windowed?.graph ?? allocateGraph(audio, preview, resources, undefined, destination);
     scheduleGraph(graph, preview.normalization, 0);
@@ -120,6 +120,6 @@ export async function renderOffline(plan: PlayableNotePlan | SoundSequencePlan, 
     options.signal?.removeEventListener('abort', abort);
     windowed?.dispose();
     releaseGraph(resources);
-    limiter?.disconnect();
+    limiter?.dispose();
   }
 }
