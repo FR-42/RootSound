@@ -30,9 +30,8 @@ export function mountMelodyTempoRolls(options: {
     grid.addEventListener('pointerdown', event => event.stopPropagation());
     grid.addEventListener('keydown', event => event.stopPropagation());
     grid.addEventListener('change', () => {
-      const id = readId(); if (!options.flush()) return;
+      const id = readId(), steps = Number(grid.value); if (!options.flush()) return;
       try {
-        const steps = Number(grid.value);
         options.phrase.setTempoSectionSteps(id, steps);
         const bpm = phraseTempoSpans(options.readBody()!).find(span => span.id === id)?.tempoBpm ?? options.readBody()!.tempoBpm;
         options.gridChanged?.(steps, bpm); options.changed();
