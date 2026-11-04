@@ -25,7 +25,7 @@ main { width: min(1180px, calc(100% - 48px)); margin: 24px auto; }
 .guide-tabs { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 7px; margin: 4px 0 16px; }
 .guide-tab { padding: 10px 7px; border: 1px solid #dedede; border-radius: 5px; background: #fafbfd; color: #586576; font: inherit; font-size: 12px; cursor: pointer; line-height: 1.6; }
 .guide-tab[aria-selected="true"] { background: #edf2fa; border-color: #8da5ce; color: #234778; }
-.guide-video { display: block; width: 100%; aspect-ratio: 1280 / 900; background: #f4f5f7; border-radius: 6px; }
+.guide-video { display: block; width: 100%; aspect-ratio: 1280 / 800; background: #f4f5f7; border-radius: 6px; }
 .guide-summary { font-size: 13px; line-height: 1.9; color: #586576; margin: 14px 0 10px; }
 .guide-downloads { display: flex; flex-wrap: wrap; gap: 12px 24px; font-size: 12px; color: #2859a8; }
 .guide-downloads a:hover { text-decoration: underline; text-underline-offset: 3px; }

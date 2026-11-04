@@ -42,7 +42,7 @@
     if (started || !guide.open) return;
     started = true;
     try {
-      const response = await fetch('guides/lessons.json');
+      const response = await fetch('guides/lessons.json?v=2');
       if (!response.ok) throw new Error('Guide unavailable');
       const lessons = await response.json();
       const tabs = guide.querySelector('.guide-tabs');
@@ -63,10 +63,11 @@
       });
       function select(index) {
         const lesson = lessons[index]; video.pause();
-        video.src = `guides/${lesson.id}.mp4`; video.poster = `guides/${lesson.id}.jpg`; video.load();
+        const version = lesson.version || 1;
+        video.src = `guides/${lesson.id}.mp4?v=${version}`; video.poster = `guides/${lesson.id}.jpg?v=${version}`; video.load();
         guide.querySelector('#guide-summary').textContent = lesson.summary;
         guide.querySelector('#guide-panel').setAttribute('aria-labelledby', buttons[index].id);
-        guide.querySelector('.guide-gif').href = `guides/${lesson.id}.gif`;
+        guide.querySelector('.guide-gif').href = `guides/${lesson.id}.gif?v=${version}`;
         guide.querySelector('.guide-gif').download = `简乐-${lesson.title}.gif`;
         const steps = guide.querySelector('.guide-transcript ol'); steps.replaceChildren();
         for (const text of lesson.steps) { const li = document.createElement('li'); li.textContent = text; steps.append(li); }

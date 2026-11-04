@@ -48,14 +48,16 @@ let expression='starting',stage='setup';
  const parentJs=code=>win.webContents.executeJavaScript('(async()=>('+code+'))()');
  const js=code=>{expression=code;return frame.executeJavaScript('(async()=>('+code+'))()');};
  await wait(()=>js("!!document.querySelector('.melody-workspace')").catch(()=>false));
+ assert.equal(await js("'__tutorial' in globalThis"),false,'tutorial fixture API must not ship in the public editor');
  assert.equal(await parentJs("document.querySelector('#guide').open"),false);
  await parentJs("document.querySelector('#guide').open=true");
  await wait(()=>parentJs("document.querySelectorAll('.guide-tab').length===6"));
  for(let i=0;i<6;i++){
   await parentJs("document.querySelectorAll('.guide-tab')["+i+"].click()");
   assert.equal(await parentJs("document.querySelectorAll('.guide-tab[aria-selected=true]').length"),1);
-  assert.equal(await parentJs("document.querySelector('.guide-video').src.endsWith('.mp4')"),true);
-  assert.equal(await parentJs("document.querySelector('.guide-gif').href.endsWith('.gif')"),true);
+  assert.equal(await parentJs("new URL(document.querySelector('.guide-video').src).pathname.endsWith('.mp4')"),true);
+  assert.equal(await parentJs("new URL(document.querySelector('.guide-video').src).searchParams.get('v')"),'2');
+  assert.equal(await parentJs("new URL(document.querySelector('.guide-gif').href).pathname.endsWith('.gif')"),true);
  }
  await parentJs("(()=>{const video=document.querySelector('.guide-video'),pause=video.pause.bind(video);window.guidePauseCount=0;video.pause=()=>{window.guidePauseCount++;pause()}})()");
  assert.equal(await js('__webTest.audioCreated'),0,'startup cannot open an audio device');
