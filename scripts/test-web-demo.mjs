@@ -51,6 +51,8 @@ let expression='starting',stage='setup';
  assert.equal(await js("'__tutorial' in globalThis"),false,'tutorial fixture API must not ship in the public editor');
  assert.equal(await parentJs("!!(document.querySelector('#guide').compareDocumentPosition(document.querySelector('.music-editor')) & Node.DOCUMENT_POSITION_FOLLOWING)"),true);
  assert.equal(await parentJs("document.querySelectorAll('video').length"),0);
+ const guideLayout=await parentJs("(()=>{const r=document.querySelector('.guide-stage').getBoundingClientRect();return {width:r.width,height:r.height}})()");assert(guideLayout.width>1100&&guideLayout.height>600);
+
  await wait(()=>parentJs("document.querySelectorAll('.guide-dot').length===5"));
  const titles=['添加音色','BPM','格数','横向缩放','竖向缩放'];
  for(let i=0;i<5;i++){
@@ -58,7 +60,8 @@ let expression='starting',stage='setup';
   await wait(()=>parentJs("document.querySelector('#guide-title').textContent==="+JSON.stringify(titles[i])));
   await wait(()=>parentJs("document.querySelectorAll('.guide-page').length===1"));
   assert.equal(await parentJs("document.querySelectorAll('.guide-dot[aria-current=true]').length"),1);
-  assert.equal(await parentJs("document.querySelector('.guide-page img').naturalWidth"),1120);
+  assert.equal(await parentJs("document.querySelector('.guide-page img').naturalWidth"),1920);
+  assert.equal(await parentJs("document.querySelector('.guide-page img').naturalHeight"),1080);
   assert.equal(await parentJs("new URL(document.querySelector('.guide-page img').src).pathname.endsWith('.webp')"),true);
  }
  await parentJs("document.querySelector('#guide').dispatchEvent(new KeyboardEvent('keydown',{bubbles:true,key:'ArrowRight'}))");

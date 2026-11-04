@@ -2,41 +2,51 @@
   {
     "id": "add-voice",
     "title": "添加音色",
-    "description": "从＋选一个声音。",
-    "alt": "点击音色栏加号，选择长笛，左侧出现新的音符组。",
-    "version": 3,
-    "duration": 3.466666666666667
+    "description": "选音色 → 点卷帘写音符 → 向下拉长。",
+    "alt": "添加长笛，在卷帘中写下音符，再拖住音符下边缘向下延长。",
+    "version": 4,
+    "duration": 6.533333333333333,
+    "width": 1920,
+    "height": 1080
   },
   {
     "id": "bpm",
     "title": "BPM",
-    "description": "数字越大，节奏越快；也可以跟着节奏敲。",
-    "alt": "将BPM从120调到160，再调到90；跟着节奏敲击可以定速。",
-    "version": 3,
-    "duration": 7.7
+    "description": "数字越大，每拍越短。敲击定速：跟着节奏按空格。",
+    "alt": "左侧调整BPM，右侧以相同缩放显示拍线间距变化；按空格敲击定速。",
+    "version": 4,
+    "duration": 10.533333333333333,
+    "width": 1920,
+    "height": 1080
   },
   {
     "id": "cells",
     "title": "格数",
-    "description": "每拍分几份，由你决定。",
-    "alt": "将每拍4格改为8格、3格，观察横线的疏密变化。",
-    "version": 3,
-    "duration": 4.6
+    "description": "格数是每拍的细分，不是拍号；4/4也可以每拍分3格。",
+    "alt": "同样一拍分别分成2格、3格、4格；格数与一小节有几拍是两回事。",
+    "version": 4,
+    "duration": 5.833333333333333,
+    "width": 1920,
+    "height": 1080
   },
   {
     "id": "zoom-horizontal",
     "title": "横向缩放",
     "description": "Ctrl＋Shift＋滚轮，展开音高。",
     "alt": "按Ctrl和Shift滚动鼠标滚轮，琴键与音符的横向宽度改变。",
-    "version": 3,
-    "duration": 4.8
+    "version": 4,
+    "duration": 4.8,
+    "width": 1920,
+    "height": 1080
   },
   {
     "id": "zoom-vertical",
     "title": "竖向缩放",
     "description": "Ctrl＋滚轮，展开时间。",
     "alt": "按Ctrl滚动鼠标滚轮，时间方向的格子与音符拉开或收拢。",
-    "version": 3,
-    "duration": 4.8
+    "version": 4,
+    "duration": 4.8,
+    "width": 1920,
+    "height": 1080
   }
 ]

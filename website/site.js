@@ -64,7 +64,7 @@
     if (!lessons.length) return;
     requested = (index + lessons.length) % lessons.length;
     const target = requested, ticket = ++generation, lesson = lessons[target];
-    const image = new Image(1120, 500);
+    const image = new Image(1920, 1080);
     image.className = 'guide-image'; image.alt = lesson.alt;
     image.src = source(lesson, moving());
     try { await image.decode(); } catch {
@@ -129,7 +129,7 @@
   describeMotion();
   void (async () => {
     try {
-      const response = await fetch('guides/lessons.json?v=3');
+      const response = await fetch('guides/lessons.json?v=4');
       if (!response.ok) throw new Error('Guide unavailable');
       lessons = await response.json();
       for (const [index, lesson] of lessons.entries()) {

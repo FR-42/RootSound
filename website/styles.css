@@ -18,7 +18,7 @@ h1 { margin: 0; font-size: 24px; font-weight: 600; }
 main { width: min(1180px, calc(100% - 48px)); margin: 24px auto; }
 .music-editor { display: block; width: 100%; height: min(760px, calc(100svh - 160px)); min-height: 520px; border: 1px solid #d6d7d4; border-radius: 8px; background: #fafbfd; }
 .downloads { display: grid; gap: 12px; width: min(480px, 100%); margin: 32px auto; }
-.operation-guide { width: min(940px, 100%); margin: 10px auto 28px; outline: none; }
+.operation-guide { width: 100%; margin: 10px auto 28px; outline: none; }
 .guide-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 0 16px; margin-bottom: 4px; }
 .guide-heading h2 { margin: 0; font-size: 18px; font-weight: 550; }
 .guide-heading p { margin: 5px 0 0; font-size: 12px; color: #717780; line-height: 1.6; }
@@ -28,7 +28,7 @@ main { width: min(1180px, calc(100% - 48px)); margin: 24px auto; }
 .guide-deck { position: relative; isolation: isolate; margin-top: 8px; }
 .guide-deck::before, .guide-deck::after { content: ''; position: absolute; z-index: -1; inset: 6px 15px -6px; border-radius: 7px; background: #f0f2f5; transform: rotate(0.5deg); }
 .guide-deck::after { inset: 3px 7px -3px; background: #f7f8fa; transform: rotate(-0.35deg); }
-.guide-stage { position: relative; aspect-ratio: 1120 / 500; perspective: 1400px; overflow: hidden; border-radius: 6px; background: #fff; box-shadow: 0 5px 18px #22314d0a; touch-action: pan-y; cursor: grab; user-select: none; }
+.guide-stage { position: relative; aspect-ratio: 16 / 9; perspective: 1400px; overflow: hidden; border-radius: 6px; background: #fff; box-shadow: 0 5px 18px #22314d0a; touch-action: pan-y; cursor: grab; user-select: none; }
 .guide-stage:active { cursor: grabbing; }
 .guide-page { position: absolute; inset: 0; backface-visibility: hidden; will-change: transform, opacity; }
 .guide-leaving { z-index: 1; pointer-events: none; }
