@@ -14,6 +14,7 @@ import { renderOffline } from './offline.ts';
 import { readPcmAudio } from './pcm.ts';
 import { WindowedGraph, WINDOWED_EVENT_THRESHOLD } from './windowed.ts';
 import {prepareSoundFont,hasSoundFont,soundFontReady} from './soundfont-node.ts';
+import { createOutputLimiter } from './output-limiter.ts';
 
 const DEVICE_RESUME_TIMEOUT_MS = 3000;
 const LIVE_TRANSITION_SECONDS = 0.005;
@@ -141,15 +142,13 @@ export function createBrowserSoundRuntime(): SoundRuntimePort {
   }
 
   function listeningOutput(audio: AudioContext): AudioNode { return outputMix ?? audio.destination; }
-  function applyOutputLevel(): void {
-    if (!context || (outputLevel === 1 && !outputMix)) return;
+  function applyOutputLevel(force = false): void {
+    if (!context || (outputLevel === 1 && !outputMix && !force)) return;
     const audio = context;
     if (!outputMix) {
       outputMix = audio.createGain(); outputMix.gain.setValueAtTime(1, audio.currentTime);
-      outputLimiter = audio.createDynamicsCompressor();
-      for (const [parameter, value] of [[outputLimiter.threshold, -1], [outputLimiter.knee, 0], [outputLimiter.ratio, 20], [outputLimiter.attack, .003], [outputLimiter.release, .1]] as const)
-        parameter.setValueAtTime(value, audio.currentTime);
-      outputMix.connect(outputLimiter); outputLimiter.connect(audio.destination);
+      outputLimiter = createOutputLimiter(audio, audio.destination);
+      outputMix.connect(outputLimiter);
       const redirect = (resources: GraphResources) => {
         for (const node of resources.outputBuses?.length ? resources.outputBuses : resources.panners) { node.disconnect(); node.connect(outputMix!); }
       };
@@ -284,6 +283,7 @@ export function createBrowserSoundRuntime(): SoundRuntimePort {
     if(hasSoundFont(preview))await prepareSoundFont(audio,preview);
     if (disposed || request !== requestSequence) throw new Error('这次试听已取消。');
     validateFrequency(preview, audio.sampleRate);
+    if (hasSoundFont(preview)) applyOutputLevel(true);
     let session: PlaybackSession = Object.freeze({
       id: `preview-${runtimeId}-${++sequence}`,
       status: 'playing',
@@ -394,6 +394,7 @@ export function createBrowserSoundRuntime(): SoundRuntimePort {
     if(hasSoundFont(preview))await prepareSoundFont(audio,preview);
     if (disposed || request !== auditionSequence) throw new Error('这次试音已取消。');
     validateFrequency(preview, audio.sampleRate);
+    if (hasSoundFont(preview)) applyOutputLevel(true);
     const resources: GraphResources = { oscillators: [], samples: [], bufferReleases: [], gains: [], panners: [] };
     const voice: AuditionVoice = { resources, remaining: 0 };
     try {
@@ -432,6 +433,7 @@ export function createBrowserSoundRuntime(): SoundRuntimePort {
     }
     const preview = readPreview(input, { allowEmptySequence: true, previous: voice.preview, transportElapsed: elapsed(voice) });
     validateFrequency(preview, audio.sampleRate);
+    if (hasSoundFont(preview)) applyOutputLevel(true);
     const fontUpdate=++fontUpdateSequence;
     if(hasSoundFont(preview)&&!soundFontReady(audio)) {
       void prepareSoundFont(audio,preview).then(()=>{
@@ -580,6 +582,7 @@ export function createBrowserSoundRuntime(): SoundRuntimePort {
     if(hasSoundFont(preview))await prepareSoundFont(audio,preview);
     if (disposed || request !== requestSequence || active !== voice || voice.session.status !== 'paused') throw new Error('这次试听已取消。');
     validateFrequency(preview, audio.sampleRate);
+    if (hasSoundFont(preview)) applyOutputLevel(true);
     const resources: GraphResources = { oscillators: [], samples: [], bufferReleases: [], gains: [], panners: [] };
     let completion: ConstantSourceNode | null = null;
     let windowed: WindowedGraph | undefined;

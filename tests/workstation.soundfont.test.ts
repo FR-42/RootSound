@@ -121,3 +121,16 @@ test('full-bank plans stay thin and retain velocity, tuning, drum identity and g
   const drum={...body,instrument:'gm-drum-36',tuningSemitones:24};const pitch={...note,frequencyHz:440*2**((36-69)/12)};
   await full.prepare(drum,[pitch]);const hit=full.plan(drum,pitch);assert.equal(hit.soundFont?.key,36);assert.equal(hit.soundFont?.drums,true);assert(Math.abs(hit.soundFont!.cents)<1e-6);
 });
+
+test('SF2 polyphony does not attenuate a score using its placeholder sample as a peak estimate',async()=>{
+  const fetcher=(async()=>new Response(readFileSync('public/instruments/generaluser-gs-2.0.3/manifest.json'))) as typeof fetch;
+  const full=createSampleBankAudio(createMaterialLibrary(),undefined,fetcher,{soundFont:true});
+  const body={model:'sample-bank',version:1,bank:'generaluser-gs-2.0.3',instrument:'gm-0',attackSeconds:0,releaseSeconds:1,level:.7} as const;
+  const note={frequencyHz:440,holdSeconds:1,velocity:.75}; await full.prepare(body,[note]);
+  const sound=full.plan(body,note);
+  for(const count of [1,4,24]) {
+    const preview=readPreview({kind:'sequence',version:1,durationSeconds:2,events:Array.from({length:count},()=>({atSeconds:0,sound}))});
+    assert.equal(preview.normalization,1);assert.equal(preview.events.length,count);
+    assert.equal(preview.events[0]!.sound.level,.7);
+  }
+});

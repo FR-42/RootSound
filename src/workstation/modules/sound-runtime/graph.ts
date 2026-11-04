@@ -71,6 +71,11 @@ export function allocateGraph(audio: BaseAudioContext, preview: ScheduledPreview
   if (preview.output) {
     const node = audio.createGain(); resources.gains.push(node); (resources.outputBuses ??= []).push(node);
     node.connect(destination); destination = node; output = { node, preview };
+  } else if (preview.events.some(event => event.sound.kind === 'sample' && event.sound.soundFont)) {
+    // Keep SF2 and PCM outlets together when live listening gain or audition
+    // ducking reroutes an already-running graph.
+    const node = audio.createGain(); resources.gains.push(node); resources.outputBuses = [node];
+    node.connect(destination); destination = node;
   }
   const graph: SoundGraph = { envelopes: [], starts: [], pans: [], ...(output ? { output } : {}) };
   const fonts=preview.events.filter(event=>event.sound.kind==='sample'&&event.sound.soundFont);

@@ -4,6 +4,7 @@ import { allocateGraph, releaseGraph, scheduleGraph, startGraphSource, type Grap
 import { readPreview, validateFrequency } from './plan.ts';
 import { WindowedGraph, WINDOWED_EVENT_THRESHOLD } from './windowed.ts';
 import {prepareSoundFont,hasSoundFont} from './soundfont-node.ts';
+import { createOutputLimiter } from './output-limiter.ts';
 
 function cancelled(): DOMException { return new DOMException('音频导出已取消，尚未保存文件。', 'AbortError'); }
 function abortIfNeeded(signal?: AbortSignal): void { if (signal?.aborted) throw cancelled(); }
@@ -62,6 +63,7 @@ export async function renderOffline(plan: PlayableNotePlan | SoundSequencePlan, 
   const audio = new OfflineAudioContext(2, frames, sampleRate);
   const resources: GraphResources = { oscillators: [], samples: [], bufferReleases: [], gains: [], panners: [] };
   let windowed: WindowedGraph | undefined;
+  let limiter: DynamicsCompressorNode | undefined;
   let rejectAborted: ((error: DOMException) => void) | undefined;
   const aborted = new Promise<never>((_resolve, reject) => { rejectAborted = reject; });
   const abort = (): void => {
@@ -77,8 +79,10 @@ export async function renderOffline(plan: PlayableNotePlan | SoundSequencePlan, 
   try {
     if(hasSoundFont(preview))await Promise.race([prepareSoundFont(audio,preview),aborted]);
     abortIfNeeded(options.signal);
-    if (preview.sequence && preview.events.length > WINDOWED_EVENT_THRESHOLD) windowed = new WindowedGraph(audio, preview, resources, audio.destination);
-    const graph = windowed?.graph ?? allocateGraph(audio, preview, resources);
+    if (hasSoundFont(preview)) limiter = createOutputLimiter(audio, audio.destination);
+    const destination = limiter ?? audio.destination;
+    if (preview.sequence && preview.events.length > WINDOWED_EVENT_THRESHOLD) windowed = new WindowedGraph(audio, preview, resources, destination);
+    const graph = windowed?.graph ?? allocateGraph(audio, preview, resources, undefined, destination);
     scheduleGraph(graph, preview.normalization, 0);
     windowed?.prepare(0, 0);
     for (const scheduled of graph.starts) {
@@ -116,5 +120,6 @@ export async function renderOffline(plan: PlayableNotePlan | SoundSequencePlan, 
     options.signal?.removeEventListener('abort', abort);
     windowed?.dispose();
     releaseGraph(resources);
+    limiter?.disconnect();
   }
 }

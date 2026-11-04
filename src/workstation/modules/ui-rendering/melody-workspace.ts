@@ -143,9 +143,8 @@ export function mountMelodyWorkspace(root: HTMLElement, options: {
   const tempoRolls = vertical ? mountMelodyTempoRolls({ root: page, dock: tempoDock, ruler, bands: tempoBands, extend, end: endHandle, phrase,
     readBody: body, readView: () => view, scale: () => melodyScale(view, width(), melodyDuration(body()!)), height: width,
     flush: safeFlush, changed(committed = true) { refresh(); if (committed) notify(); }, report,
-    gridChanged(steps, bpm) {
+    gridChanged() {
       revealConfiguredGrid = true;
-      view = { ...view, zoom: Math.max(view.zoom, 20 * steps * bpm * 8 / (60 * width())) };
     },
     preview(value) { tempoPreview = value; if (value) { paintViewport(); previewEdit(); } else preview(); },
     navigate(seconds) { view = clampView({ ...view, leftSeconds: seconds }, melodyDuration(body()!)); manualNavigation(); paintViewport(); },
@@ -566,7 +565,7 @@ export function mountMelodyWorkspace(root: HTMLElement, options: {
     const canvasWidth = width(); headWidth = canvasWidth;
     const duration = melodyDuration(value); const scale = melodyScale(view, canvasWidth, duration);
     const seen = new Set<number>(); const ordered: HTMLElement[] = []; const order: number[] = [];
-    const detailPixels = revealConfiguredGrid ? 16 : 48;
+    const detailPixels = revealConfiguredGrid ? 0 : 48;
     for (const line of value.tempoSections?.length ? melodyScoreGrid(value, view, canvasWidth, detailPixels) : melodyDetailGrid(duration, options.gridBpm(), phraseStepsPerBeat(value), view, canvasWidth, value.beatsPerBar ?? 4, value.pickupBeats ?? 0, detailPixels)) {
       const x = (line.seconds - view.leftSeconds) * scale; if (x < -1 || x > canvasWidth + 1) continue;
       seen.add(line.seconds); let element = gridNodes.get(line.seconds);

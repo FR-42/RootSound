@@ -184,6 +184,10 @@ export function samePreviewSamples(left: ScheduledPreview | undefined, right: Sc
 
 function samplePeak(sound: Extract<ScheduledSound, { kind: 'sample' }>, pan = 0): number {
   if(sound.soundFont?.velocity===0)return 0;
+  // A full SF2 stream has its own velocity curves, envelopes and output peak
+  // protection. Its thin placeholder PCM is not a full-scale waveform estimate.
+  // Counting every held/releasing SF2 note as full scale attenuates entire scores.
+  if(sound.soundFont)return 0;
   const channels = sound.source.audio.channels.length;
   if (channels === 1) return sound.source.peak;
   if (channels === 2) {

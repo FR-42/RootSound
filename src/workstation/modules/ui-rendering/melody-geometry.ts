@@ -53,6 +53,7 @@ export function melodyScoreGrid(body: PhraseBody, view: MelodyView, width: numbe
 }
 /** Only reveal subdivisions when there is room, then subdivide further as zoom increases. */
 export function melodyDetailSteps(tempo: number, steps: number, scale: number, minimumCellPixels = 48): number {
+  if (minimumCellPixels === 0) return steps;
   const cellPixels = 60 / tempo / steps * scale;
   return cellPixels < minimumCellPixels ? 1 : steps * 2 ** Math.min(Math.floor(Math.log2(cellPixels / minimumCellPixels)), Math.floor(Math.log2(4096 / steps)));
 }

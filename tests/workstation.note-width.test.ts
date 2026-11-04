@@ -10,12 +10,24 @@ const close = (actual: number, expected: number) => assert(Math.abs(actual - exp
 test('explicit subdivision editing exposes configured cells on a fixed time ruler', () => {
   const view={leftSeconds:0,zoom:2.048,rowHeight:32};
   for (const steps of [2,3,4,9]) {
-    const lines=melodyDetailGrid(2,120,steps,view,1000,4,0,16);
+    const lines=melodyDetailGrid(2,120,steps,view,1000,4,0,0);
     assert.deepEqual(lines.filter(line=>line.beat).map(line=>line.seconds),[0,.5,1,1.5,2]);
-    if (steps <= 4) {
+    {
       const cells=lines.filter(line=>line.cell && line.seconds<.5);
       assert.equal(cells.length,steps);
       cells.forEach((line,index)=>close(line.seconds,index*.5/steps));
+    }
+  }
+});
+
+test('changing only subdivisions preserves every beat position and the full note rectangle at any zoom', () => {
+  const note:PhraseNote={id:'n',startBeat:.173,durationBeats:.713,durationSeconds:.413,frequencyHz:261.6255653005986,velocity:.75};
+  for (const zoom of [.25,1,4,32]) {
+    const view={leftSeconds:.13,zoom,rowHeight:24}, base=body(120);
+    const beats=(n:number)=>melodyDetailGrid(8,120,n,view,800,4,0,0).filter(line=>line.beat).map(line=>line.seconds);
+    for (const n of [2,3,4,5,9]) {
+      assert.deepEqual(beats(n),beats(4));
+      assert.deepEqual(melodyNoteRect(note,{...base,stepsPerBeat:n},keys,view,800),melodyNoteRect(note,base,keys,view,800));
     }
   }
 });
