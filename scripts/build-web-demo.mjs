@@ -4,6 +4,8 @@ import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { SoundBankLoader, SpessaLog } from 'spessasynth_core';
 
+// The source ICRD has no zone; keep its serialization stable across Windows/CI.
+process.env.TZ='UTC';
 SpessaLog.setLogLevel(false,false,false);
 const root=path.resolve('.cache/website');
 await mkdir(root,{recursive:true});await cp('website',root,{recursive:true});
