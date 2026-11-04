@@ -42,6 +42,7 @@ const TIMBRE_DRAG_TYPE = 'application/x-rootsound-timbre';
 export function mountMelodyWorkspace(root: HTMLElement, options: {
   phrase: PhraseEditorPort; sound: SoundRuntimePort; gridBpm(): number;
   initialView?: PhraseView;
+  initialSelection?: { partId: string; noteId?: string };
   initialViewport?: PhraseEditorViewport;
   workspaceState?: MusicWorkspaceStatePort;
   orientation?: 'horizontal' | 'vertical';
@@ -75,7 +76,7 @@ export function mountMelodyWorkspace(root: HTMLElement, options: {
     zoom: initialViewport?.zoom ?? 1, rowHeight: initialViewport?.rowHeight ?? (rhythm ? 72 : 32) };
   let gridSteps = phraseStepsPerBeat(current.body ?? {});
   let viewportReady = false; let lastViewport: PhraseEditorViewport | undefined;
-  let selection: Selection | undefined = restored?.selection; let gesture: Gesture | undefined; let mix: Mix | undefined;
+  let selection: Selection | undefined = options.initialSelection ?? restored?.selection; let gesture: Gesture | undefined; let mix: Mix | undefined;
   let playbackFamilyId: string | undefined;
   let playheadSeconds = restored?.playheadSeconds ?? 0; let library: HTMLDialogElement | undefined; let observer: ResizeObserver | undefined;
   let entryOctave = restored?.entryOctave ?? 4;

@@ -1,23 +1,56 @@
-# 简乐网站
+# 简乐网站与在线编曲
 
-公开地址：<https://fr-42.github.io/RootSound/>。
+公开地址：<https://fr-42.github.io/RootSound/>。保留简乐顶栏、GitHub 图标链接和
+Windows／Mac 下载卡片，下方内容按用户要求加入真正可操作的缩减版钢琴卷帘。
 
-2026-11-04 按用户要求精简：页面仅有中文名「简乐」、GitHub 仓库链接，以及
-Windows x64／Mac Apple Silicon 两个下载链接。移除介绍、宣传语、截图、试听、
-使用说明、问答和页脚。仓库地址和已有发布包文件名保持现有值。
+## 当前网页版
 
-同日按后续指示调整外观：「简乐」与灰色音符放在顶栏左侧，右侧是带 GitHub 图标的
-小块（文字仅 GitHub）；Windows／Mac 恢复为带平台图标、平台信息和下载箭头的
-卡片。仍只保留这三个链接，没有恢复其他宣传内容。
+- 与桌面版共用钢琴卷帘、音符领域和声音引擎，提供点击／拖动画音符、自由移动、
+  改时长、音量、声像、音色／音符组、键盘试听、播放／暂停／定位、自动跟随、
+  缩放平移、撤销重做、BPM 分段／敲击定速／格数。
+- 固定八种音色：钢琴、长笛、弦乐、贝斯、八音盒、底鼓、军鼓、闭镲。采样为
+  GeneralUser GS 2.0.3 原录音，SpessaSynth 4.4.4 执行完整 SF2 规则。发布时实际
+  裁剪为五个旋律预设加标准鼓组，原约32.3MB SF2缩减为约8.5MB；首次发声加载，
+  不只是隐藏选项。99个约8.3MB WAV仅按工程保存需要加载，完整许可随站点保留。
+- 总长最多64拍（默认4/4下16小节）、16个音符组、2048个音符（含隐藏音符）。
+  领域存储适配器在提交前验证，失败不改当前状态。编辑草稿只在页面内存，不自动
+  保存音乐；刷新／离开前提示未下载修改。
+- 打开 `.mid`／`.midi`、v2 `.rootsound`、便携 `.rsproject`，限16MiB；超长工程明确
+  拒绝，原文件不改。超出八种音色时告知替代，保留音符位置；复杂踏板／弯音等
+  MIDI 信息仍受桌面当前导入器的既有边界限制。
+- “下载工程”嵌入使用的原始采样，去除历史并生成原生 `RootSoundWorkspace` v2
+  `.rootsound`，可在桌面版继续编辑。“导出音频”离线生成24位立体声44.1kHz WAV，
+  使用完整音乐，独奏选择只影响试听。浏览器只能确认下载已发起。
+- 小屏做了排版适配，但首次完整交互验证基于隐藏桌面 Chromium；手机真机、Safari
+  延迟／兼容性及实际听感尚未验收。无账号、云保存、追踪脚本或后端服务。
 
-网站源码是 `website/`。推送 `main` 上的网站修改后，
-`.github/workflows/pages.yml` 自动将此目录发布到 GitHub Pages。
-初始下载链接指向 `preview261103`；页面会尝试从公开 Release 列表更新到最近
-同时具备 Windows／Mac ZIP 的版本。API 失败或 JavaScript 不可用时保留初始链接。
-新版本继续使用 `RootSound-Windows-x64-*.zip` 与
-`RootSound-macOS-arm64-*.zip` 命名，并适时更新 HTML 中的初始链接。
+## 源码与构建
 
-本地查看：在 `website/` 下运行 `python -m http.server 8080`，访问
-`http://localhost:8080`。网站不需要构建工具、账号或后端服务。
+- `website/`：宣传页、顶栏和下载链接；`web/index.html`：在线编辑器入口。
+- `src/workstation/app/web-demo*.ts`／CSS：网页适配和工具栏。音乐草稿使用独立内存
+  素材库；没有接入桌面本机目录、用户现有歌曲或旧的编排／共创界面。
+- `vite.web.config.ts`：输出 `.cache/website/play/`，相对资源路径可部署到
+  `/RootSound/play/`。共享音源路径默认仍是桌面根路径，网页使用构建基址。
+- `scripts/build-web-demo.mjs`：复制宣传页、编译在线编辑器、实际裁剪 SF2、复制
+  八种音色的便携采样与全部许可，生成 `.cache/website/` 发布目录。
 
-原宣传页的演示和素材生成流程已停用；历史内容可通过 Git 提交 f0ae5580 查看。
+```powershell
+npm run build:website
+npm run test:website
+node scripts/test-web-demo.mjs
+```
+
+最后一项需要本机发布缓存里的 Electron，始终隐藏且所有音频上下文为离线替身；
+不观察桌面、不输入到用户窗口、不打开物理声卡。验证真实构建在网站子路径下的
+绘制／撤销／播放暂停／音频导出／工程重开，并生成隔离的桌面和手机布局图片。
+
+## 发布
+
+`.github/workflows/pages.yml` 在 main 上网站／在线编辑器／共享音乐源码等相关输入
+更新时运行，也可在 GitHub Actions 手动启动。使用 Node24、`npm ci` 和
+`npm run build:website`，仅将 `.cache/website/` 上传 Pages。无用户歌曲／实验数据／
+本机缓存上传。首次构建只需仓库内已有依赖和源音色；不依赖本机编译产物。
+
+下载初始指向现有 preview261103 Release；页面可从公开 API 更新最近同时具有
+Windows／Mac ZIP 的版本，失败保留直链。原宣传页演示素材流程已停用，历史见
+提交 f0ae5580。

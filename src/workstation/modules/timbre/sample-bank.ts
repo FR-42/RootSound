@@ -9,7 +9,7 @@ import { defaultInstrumentInfo } from './instrument-catalog.ts';
 type AssetZone = Omit<SampleBankZone,'sampleId'> & { asset:string; byteLength:number; sampleRate:number; channels:number; frames:number };
 type Asset = { bytes:Uint8Array; audio?:PcmAudio };
 export type SampleBankAudio = ReturnType<typeof createSampleBankAudio>;
-const base='/instruments/generaluser-gs-2.0.3/';
+const base=(import.meta.env?.BASE_URL ?? '/')+'instruments/generaluser-gs-2.0.3/';
 const frequency=(body:SampleBankTimbreBody,note:SoundPlan['note'])=>note.frequencyHz*2**((body.tuningSemitones??0)/12);
 const referencePcm:PcmAudio={sampleRate:48000,channels:[new Float32Array([1])]};
 /** Installed recordings load only on demand; portable projects use the ordinary audio custody/cache. */

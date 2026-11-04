@@ -125,6 +125,8 @@ export type SoundRuntimeEvent =
   | { readonly type: 'device'; readonly status: SoundDeviceStatus; readonly error?: string };
 
 export interface SoundRuntimePort {
+  /** Resume from a direct browser gesture before asynchronous sample loading. */
+  activate?(): Promise<void>;
   /** A short key/note audition on the same device, independent of the main transport. */
   audition(plan: PlayableNotePlan): Promise<void>;
   cancelAudition(): void;

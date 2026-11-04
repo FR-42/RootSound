@@ -5,6 +5,13 @@ on:
     branches: [main]
     paths:
       - 'website/**'
+      - 'web/**'
+      - 'src/workstation/**'
+      - 'public/instruments/generaluser-gs-2.0.3/**'
+      - 'scripts/build-web-demo.mjs'
+      - 'vite.web.config.ts'
+      - 'package.json'
+      - 'package-lock.json'
       - '.github/workflows/pages.yml'
   workflow_dispatch:
 
@@ -25,10 +32,18 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - run: npm run check
+      - name: Build website and reduced music editor
+        run: npm run build:website
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: website
+          path: .cache/website
       - name: Publish
         id: deployment
         uses: actions/deploy-pages@v5

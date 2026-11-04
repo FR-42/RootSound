@@ -17,7 +17,7 @@ export async function prepareSoundFont(audio:BaseAudioContext,preview:ScheduledP
       if(!module){module=import('./soundfont-worklet.ts?worker&url').then(({default:url})=>audio.audioWorklet.addModule(url))
         .catch(error=>{modules.delete(audio);throw error;});modules.set(audio,module);}
       await module;
-      font??=fetch('/instruments/generaluser-gs-2.0.3/GeneralUser-GS.sf2').then(async response=>{
+      font??=fetch((import.meta.env?.BASE_URL ?? '/')+'instruments/generaluser-gs-2.0.3/GeneralUser-GS.sf2').then(async response=>{
         if(!response.ok)throw Error('完整音源读取失败，请重新安装新版 RootSound。');return response.arrayBuffer();
       }).catch(error=>{font=undefined;throw error;});
       const bytes=await font;

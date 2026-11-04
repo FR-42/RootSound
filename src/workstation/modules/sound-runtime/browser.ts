@@ -590,6 +590,7 @@ export function createBrowserSoundRuntime(): SoundRuntimePort {
   }
 
   return {
+    async activate() { await ready(); },
     preview,
     previewAudio,
     audition,
