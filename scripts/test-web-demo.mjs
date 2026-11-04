@@ -2,7 +2,7 @@
 // AudioContext is replaced before app scripts with an offline clock. No desktop
 // capture, OS input, file pickers, user projects, downloads or physical audio.
 import {readFile,writeFile,mkdir,mkdtemp} from 'node:fs/promises';
-import {spawn} from 'node:child_process';
+import {spawn,spawnSync} from 'node:child_process';
 import http from 'node:http';
 import path from 'node:path';
 
@@ -21,7 +21,7 @@ const nativeObjectURL=URL.createObjectURL.bind(URL);URL.createObjectURL=blob=>{c
 const click=HTMLAnchorElement.prototype.click;HTMLAnchorElement.prototype.click=function(){if(this.download){__webTest.downloads.push({name:this.download,blob:__webTest.blobs.get(this.href)});return;}return click.call(this)};
 Element.prototype.setPointerCapture=function(){};
 `;
-const types={'.html':'text/html; charset=utf-8','.js':'application/javascript','.css':'text/css','.json':'application/json','.svg':'image/svg+xml','.wav':'audio/wav','.sf2':'application/octet-stream','.txt':'text/plain'};
+const types={'.html':'text/html; charset=utf-8','.js':'application/javascript','.css':'text/css','.json':'application/json','.svg':'image/svg+xml','.wav':'audio/wav','.sf2':'application/octet-stream','.txt':'text/plain','.jpg':'image/jpeg','.gif':'image/gif','.webp':'image/webp','.mp4':'video/mp4','.vtt':'text/vtt'};
 const server=http.createServer(async(req,res)=>{try{
   const url=new URL(req.url,'http://localhost');requests.push(url.pathname);
   if(!url.pathname.startsWith('/RootSound/')){res.writeHead(404);res.end();return;}
@@ -45,8 +45,19 @@ let expression='starting',stage='setup';
  await win.loadURL(origin+'/RootSound/');
  await wait(()=>win.webContents.mainFrame.frames.some(f=>f.url.includes('/play/')));
  const frame=win.webContents.mainFrame.frames.find(f=>f.url.includes('/play/'));
+ const parentJs=code=>win.webContents.executeJavaScript('(async()=>('+code+'))()');
  const js=code=>{expression=code;return frame.executeJavaScript('(async()=>('+code+'))()');};
  await wait(()=>js("!!document.querySelector('.melody-workspace')").catch(()=>false));
+ assert.equal(await parentJs("document.querySelector('#guide').open"),false);
+ await parentJs("document.querySelector('#guide').open=true");
+ await wait(()=>parentJs("document.querySelectorAll('.guide-tab').length===6"));
+ for(let i=0;i<6;i++){
+  await parentJs("document.querySelectorAll('.guide-tab')["+i+"].click()");
+  assert.equal(await parentJs("document.querySelectorAll('.guide-tab[aria-selected=true]').length"),1);
+  assert.equal(await parentJs("document.querySelector('.guide-video').src.endsWith('.mp4')"),true);
+  assert.equal(await parentJs("document.querySelector('.guide-gif').href.endsWith('.gif')"),true);
+ }
+ await parentJs("(()=>{const video=document.querySelector('.guide-video'),pause=video.pause.bind(video);window.guidePauseCount=0;video.pause=()=>{window.guidePauseCount++;pause()}})()");
  assert.equal(await js('__webTest.audioCreated'),0,'startup cannot open an audio device');
  assert.equal(await js("document.querySelectorAll('.melody-tone').length"),1);
  await js("document.querySelector('.melody-add-tone').click()");
@@ -59,6 +70,10 @@ let expression='starting',stage='setup';
  await wait(()=>js('__webTest.audioCreated===1'));
  await js("document.querySelector('.web-undo').click()");assert.equal(await js("document.querySelectorAll('.melody-note').length"),0);
  await js("document.querySelector('.web-redo').click()");assert.equal(await js("document.querySelectorAll('.melody-note').length"),1);
+ await js("document.querySelector('.web-play').click()");await wait(()=>js("document.querySelector('.web-play').getAttribute('aria-pressed')==='true'"));
+ await wait(()=>parentJs('guidePauseCount>0'));
+ await parentJs("document.querySelector('.guide-video').dispatchEvent(new Event('play'))");
+ await wait(()=>js("document.querySelector('.web-play').getAttribute('aria-pressed')==='false'"));
  await js("document.querySelector('.web-play').click()");await wait(()=>js("document.querySelector('.web-play').getAttribute('aria-pressed')==='true'"));
  await js('__webTest.now=.2');await delay(60);
  await js("document.querySelector('.web-play').click()");assert.equal(await js("document.querySelector('.web-play').getAttribute('aria-pressed')"),'false');
@@ -78,12 +93,16 @@ let expression='starting',stage='setup';
   const layout=await js("({width:innerWidth,scroll:document.documentElement.scrollWidth,rollWidth:document.querySelector('.melody-roll').getBoundingClientRect().width,rollHeight:document.querySelector('.melody-roll').getBoundingClientRect().height,toolbar:document.querySelector('.web-toolbar').getBoundingClientRect().height})");assert(layout.scroll<=layout.width+1,JSON.stringify(layout));assert(layout.rollWidth>110&&layout.rollHeight>300);layouts.push(layout);
   fs.writeFileSync(root+'/web-'+width+'.png',(await win.webContents.capturePage()).toPNG());
  }
+ win.setContentSize(1280,950);await parentJs("document.querySelector('#guide').scrollIntoView()");await delay(100);fs.writeFileSync(root+'/guide-desktop.png',(await win.webContents.capturePage()).toPNG());
+ win.setContentSize(390,950);await delay(100);assert.equal(await parentJs('document.documentElement.scrollWidth<=innerWidth'),true);fs.writeFileSync(root+'/guide-mobile.png',(await win.webContents.capturePage()).toPNG());
  const errors=await js('__webTest.errors');assert.deepEqual(errors,[]);assert.deepEqual(rendererErrors,[]);assert(!win.isVisible());
- fs.writeFileSync(root+'/report.json',JSON.stringify({passed:true,audio,layouts,voices:8,realProductionBuild:true,subpath:true,drawUndoRedo:true,pauseResume:true,nativeWorkspaceRoundtrip:true,visibleWindow:false,physicalAudio:false},null,2));win.destroy();app.exit(0);
+ fs.writeFileSync(root+'/report.json',JSON.stringify({passed:true,audio,layouts,voices:8,realProductionBuild:true,subpath:true,drawUndoRedo:true,pauseResume:true,nativeWorkspaceRoundtrip:true,guideTabs:6,guideMusicMutualPause:true,visibleWindow:false,physicalAudio:false},null,2));win.destroy();app.exit(0);
 }catch(error){fs.writeFileSync(root+'/report.json',JSON.stringify({error:String(error),stack:error?.stack,expression:expression.slice(0,350),stage}));app.exit(1)}})();
 `);
 const env={...process.env};delete env.ELECTRON_RUN_AS_NODE;
 try{
+ const syntax=spawnSync(process.execPath,['--check',harness],{encoding:'utf8',windowsHide:true});
+ if(syntax.status)throw Error(syntax.stderr);
  const result=await new Promise(resolve=>{const child=spawn(path.resolve('.cache/release-smoke-engine/electron.exe'),[harness],{env,windowsHide:true,stdio:['ignore','pipe','pipe']});let output='';child.stdout.on('data',d=>output=(output+d).slice(-3000));child.stderr.on('data',d=>output=(output+d).slice(-3000));child.on('error',e=>resolve({code:1,output:String(e)}));child.on('exit',code=>resolve({code,output}));});
  const report=await readFile(path.join(root,'report.json'),'utf8').catch(()=>result.output);console.log(report);console.log('Evidence: '+root);
  await writeFile(path.join(root,'requests.json'),JSON.stringify(requests));

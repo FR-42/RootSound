@@ -45,6 +45,7 @@ function webSound() {
   const sound = createBrowserSoundRuntime();
   let request = 0;
   return { ...sound, async audition(plan: Parameters<typeof sound.audition>[0]) {
+    if (parent !== window) parent.postMessage({ type: 'jianle:editor-playing' }, location.origin);
     const id = ++request; report('正在准备声音，首次试听需要加载音色…');
     try { await sound.audition(plan); if (id === request) report('右键删除音符；选中音符后滚轮可调整时长。'); }
     catch (error) { if (id === request) report(error); throw error; }
@@ -89,7 +90,10 @@ function mount() {
     runtime, readPlan: () => model.score.previewPlan(planBody(), { allowSilence: true }),
     prepare: () => model.score.preparePreview(planBody()), tempoBpm: () => model.score.read().body!.tempoBpm,
     durationSeconds: () => phraseDurationSeconds(model.score.read().body!),
-    onChange(next) { state = next; cancelAnimationFrame(frame); paintClock(); refreshButtons(); }, onError: report,
+    onChange(next) {
+      if (next.playing && !state.playing && parent !== window) parent.postMessage({ type: 'jianle:editor-playing' }, location.origin);
+      state = next; cancelAnimationFrame(frame); paintClock(); refreshButtons();
+    }, onError: report,
   });
   editor = mountMelodyWorkspace(q('.web-workspace'), {
     phrase: model.score, sound: runtime, orientation: 'vertical', includeAllSections: true,
@@ -229,6 +233,11 @@ document.addEventListener('keydown', event => {
   if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') { event.preventDefault(); q<HTMLButtonElement>('.web-save').click(); }
 });
 window.addEventListener('beforeunload', event => { editor?.flush(); if (dirty) { event.preventDefault(); event.returnValue = ''; } });
+window.addEventListener('message', event => {
+  if (event.origin === location.origin && event.source === parent && event.data?.type === 'jianle:pause-for-guide') {
+    transport?.pause(); runtime.cancelAudition();
+  }
+});
 window.addEventListener('pagehide', () => { disposed = true; cancelAnimationFrame(frame); editor?.dispose(); transport?.dispose(); void runtime.dispose(); });
 
 try { mount(); } catch (error) { report(error); }

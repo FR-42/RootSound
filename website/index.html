@@ -25,6 +25,18 @@
   </header>
   <main>
     <iframe class="music-editor" src="play/" title="简乐在线编曲" allow="autoplay"></iframe>
+    <details class="operation-guide" id="guide">
+      <summary>操作指南 <span>6 段演示</span></summary>
+      <div class="guide-content">
+        <div class="guide-tabs" role="tablist" aria-label="选择操作演示"></div>
+        <div class="guide-panel" id="guide-panel" role="tabpanel">
+          <video class="guide-video" controls playsinline preload="none" aria-label="简乐操作演示" aria-describedby="guide-summary"></video>
+          <p id="guide-summary" class="guide-summary" role="status">正在准备演示…</p>
+          <div class="guide-downloads"><a class="guide-gif" href="guides/01-voices.gif" download="简乐-音色与音符组.gif">下载本段动图</a><a href="guides/jianle-quickstart.mp4" download="简乐-操作指南.mp4">下载完整视频</a></div>
+          <details class="guide-transcript"><summary>文字步骤</summary><ol></ol></details>
+        </div>
+      </div>
+    </details>
     <nav class="downloads" aria-label="下载简乐">
       <a class="platform-download" data-platform="windows" href="https://github.com/FR-42/RootSound/releases/download/preview261103/RootSound-Windows-x64-0.1.0-preview.3.zip" aria-label="下载 Windows 64 位版">
         <svg class="platform-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m2 4 9-1v8H2zm11-1.3L23 1v10H13zM2 13h9v8l-9-1zm11 0h10v10l-10-1.7z"/></svg>
