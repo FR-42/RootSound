@@ -15,6 +15,7 @@ export interface WorkspacePreferencesPort {
 
 /** Local editing context, deliberately separate from saved musical content. */
 export interface MusicWorkspaceState {
+  showGridCells?: boolean;
   orientation?: 'vertical';
   viewport: { leftSeconds: number; zoom: number; top: number; rowHeight: number };
   selection?: { partId: string; noteId?: string };

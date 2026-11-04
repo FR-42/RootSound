@@ -74,7 +74,7 @@ export function mountMelodyWorkspace(root: HTMLElement, options: {
   let workspaceTimer = 0;
   let view: MelodyView = { leftSeconds: initialViewport?.leftSeconds ?? 0,
     zoom: initialViewport?.zoom ?? 1, rowHeight: initialViewport?.rowHeight ?? (rhythm ? 72 : 32) };
-  let gridSteps = phraseStepsPerBeat(current.body ?? {});
+  let revealConfiguredGrid = restored?.showGridCells ?? false;
   let viewportReady = false; let lastViewport: PhraseEditorViewport | undefined;
   let selection: Selection | undefined = options.initialSelection ?? restored?.selection; let gesture: Gesture | undefined; let mix: Mix | undefined;
   let playbackFamilyId: string | undefined;
@@ -143,6 +143,10 @@ export function mountMelodyWorkspace(root: HTMLElement, options: {
   const tempoRolls = vertical ? mountMelodyTempoRolls({ root: page, dock: tempoDock, ruler, bands: tempoBands, extend, end: endHandle, phrase,
     readBody: body, readView: () => view, scale: () => melodyScale(view, width(), melodyDuration(body()!)), height: width,
     flush: safeFlush, changed(committed = true) { refresh(); if (committed) notify(); }, report,
+    gridChanged(steps, bpm) {
+      revealConfiguredGrid = true;
+      view = { ...view, zoom: Math.max(view.zoom, 20 * steps * bpm * 8 / (60 * width())) };
+    },
     preview(value) { tempoPreview = value; if (value) { paintViewport(); previewEdit(); } else preview(); },
     navigate(seconds) { view = clampView({ ...view, leftSeconds: seconds }, melodyDuration(body()!)); manualNavigation(); paintViewport(); },
   }) : undefined;
@@ -175,7 +179,7 @@ export function mountMelodyWorkspace(root: HTMLElement, options: {
     if (!options.workspaceState || !viewportReady || disposed) return;
     if (immediate) {
       window.clearTimeout(workspaceTimer); workspaceTimer = 0;
-      options.workspaceState.write({ ...(vertical ? { orientation: 'vertical' as const } : {}), viewport: readViewport(), selection: selection ? { ...selection } : undefined,
+      options.workspaceState.write({ ...(revealConfiguredGrid ? { showGridCells: true } : {}), ...(vertical ? { orientation: 'vertical' as const } : {}), viewport: readViewport(), selection: selection ? { ...selection } : undefined,
         playheadSeconds: Math.max(0, Math.min(melodyDuration(body()!), playheadSeconds)), entryOctave, entryToneId,
         noteLengths: Object.fromEntries([...noteLengths].filter(([id]) => !!part(id))) });
     } else if (!workspaceTimer) workspaceTimer = window.setTimeout(() => { workspaceTimer = 0; persistWorkspace(true); }, 200);
@@ -562,11 +566,12 @@ export function mountMelodyWorkspace(root: HTMLElement, options: {
     const canvasWidth = width(); headWidth = canvasWidth;
     const duration = melodyDuration(value); const scale = melodyScale(view, canvasWidth, duration);
     const seen = new Set<number>(); const ordered: HTMLElement[] = []; const order: number[] = [];
-    for (const line of value.tempoSections?.length ? melodyScoreGrid(value, view, canvasWidth) : melodyDetailGrid(duration, options.gridBpm(), phraseStepsPerBeat(value), view, canvasWidth, value.beatsPerBar ?? 4, value.pickupBeats ?? 0)) {
+    const detailPixels = revealConfiguredGrid ? 16 : 48;
+    for (const line of value.tempoSections?.length ? melodyScoreGrid(value, view, canvasWidth, detailPixels) : melodyDetailGrid(duration, options.gridBpm(), phraseStepsPerBeat(value), view, canvasWidth, value.beatsPerBar ?? 4, value.pickupBeats ?? 0, detailPixels)) {
       const x = (line.seconds - view.leftSeconds) * scale; if (x < -1 || x > canvasWidth + 1) continue;
       seen.add(line.seconds); let element = gridNodes.get(line.seconds);
       if (!element) { element = node('i', 'melody-grid-line'); gridNodes.set(line.seconds, element); }
-      element.classList.toggle('is-bar', line.bar); element.classList.toggle('is-beat', line.beat); if (vertical) element.style.top = `${x}px`; else element.style.left = `${x}px`;
+      element.classList.toggle('is-beat', line.beat); element.classList.toggle('is-cell', line.cell); if (vertical) element.style.top = `${x}px`; else element.style.left = `${x}px`;
       order.push(line.seconds); ordered.push(element);
     }
     for (const [seconds, element] of gridNodes) if (!seen.has(seconds)) { element.remove(); gridNodes.delete(seconds); }
@@ -703,11 +708,6 @@ export function mountMelodyWorkspace(root: HTMLElement, options: {
   }
   function refresh(snapshot?: PhraseView): void {
     if (disposed) return; const previous = part(); current = snapshot ?? phrase.read(); const next = body();
-    if (next) {
-      const steps = phraseStepsAtBeat(next, melodyBeats(view.leftSeconds, next));
-      if (steps !== gridSteps) view = { ...view, zoom: view.zoom * steps / gridSteps };
-      gridSteps = steps;
-    }
     if (toneDeleteDialog && current.draft?.id !== toneDeleteDraftId) toneDeleteDialog.close();
     // The view already contains project-scoped sound names. Re-listing the
     // complete project here re-read/validated the same records on every edit.

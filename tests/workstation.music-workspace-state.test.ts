@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import { createMusicWorkspaceState } from '../src/workstation/app/platform/music-workspace-state.ts';
 import type { MusicWorkspaceState } from '../src/workstation/contracts/workspace.ts';
 
-const state: MusicWorkspaceState = { viewport: { leftSeconds: 2.5, zoom: 6, top: 720, rowHeight: 38 },
+const state: MusicWorkspaceState = { showGridCells: true, viewport: { leftSeconds: 2.5, zoom: 6, top: 720, rowHeight: 38 },
   selection: { partId: 'p', noteId: 'n' }, playheadSeconds: 4.5, entryOctave: 5, entryToneId: 'p', noteLengths: { p: .173 } };
 
 test('project-local context survives reopening, isolates projects and returns owned snapshots', () => {

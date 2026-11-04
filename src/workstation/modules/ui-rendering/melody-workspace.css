@@ -36,8 +36,8 @@
 .melody-pitch-row.is-accidental { background: #536c8107; }
 .melody-pitch-row, .melody-key { box-sizing: border-box; }
 .melody-grid-line { position: absolute; top: 0; bottom: 0; width: 1px; background: #55718d14; pointer-events: none; }
-.melody-grid-line.is-beat { background: #55718d35; }
-.melody-grid-line.is-bar { background: #55718d66; }
+.melody-grid-line.is-cell { background: #71869f55; }
+.melody-grid-line.is-beat { background: #71869fb3; }
 .melody-after-end { position: absolute; top: 0; bottom: 0; right: 0; background: var(--surface-raised); border-left: 2px solid var(--border); pointer-events: none; z-index: 4; }
 .melody-note { position: absolute; box-sizing: border-box; padding: 0; min-width: 0; border: 0; box-shadow: inset 0 0 0 1px #35536d55; border-radius: 2px; background: var(--tone-color); color: var(--text); cursor: grab; touch-action: none; user-select: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; font-size: 10px; z-index: 2; }
 .melody-note { z-index: 1; }

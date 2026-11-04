@@ -12,6 +12,7 @@ import type { PhraseEditorViewport } from './phrase-editor-viewport.ts';
 import { centerTop, mountPhraseOverviewNotes } from './phrase-overview-notes.ts';
 import { clampPhraseSplit, defaultPhraseSplit, phraseSplitBounds } from './phrase-section-split.ts';
 import { showTapTempo } from './tap-tempo.ts';
+import { mountOutputVolume } from './output-volume.ts';
 import './song.css';
 import './phrase-composition.css';
 
@@ -327,6 +328,7 @@ export function mountPhraseComposition(root: HTMLElement, options: {
   subdivisionLabel.append(subdivisionSelect); subdivisionPanel.append(subdivisionLabel); subdivision.append(subdivisionButton, subdivisionPanel);
   const volumeCommit = () => { if (disposed || busy) return; try { commitMaster(); } catch (error) { masterPreview = undefined; report(error instanceof Error ? error.message : String(error), true); sync(); } };
   controls.append(stopButton, playButton, clock, ...(options.directMusic ? [] : [bpm, subdivision]));
+  mountOutputVolume(controls, () => sound);
   const files = node('div', 'song-file-actions');
   if (options.onExport) files.append(action('导出音频', 'song-save', () => { void execute(options.onExport); }));
   const save = action('保存', 'song-save', () => { void execute(options.onSave, true, true); }); files.append(save); fileButtons.push(save);

@@ -11,6 +11,7 @@ export function mountMelodyTempoRolls(options: {
   root: HTMLElement; dock: HTMLElement; ruler: HTMLElement; bands: HTMLElement; extend: HTMLButtonElement; end: HTMLButtonElement;
   phrase: PhraseEditorPort; readBody(): PhraseBody | undefined; readView(): MelodyView; scale(): number; height(): number;
   flush(): boolean; changed(committed?: boolean): void; preview(body?: PhraseBody): void; navigate(seconds: number): void; report(message: string): void;
+  gridChanged?(steps: number, bpm: number): void;
 }) {
   let active: string | undefined, opened = false, disposed = false;
   let tap: ReturnType<typeof showTapTempo> | undefined;
@@ -30,7 +31,12 @@ export function mountMelodyTempoRolls(options: {
     grid.addEventListener('keydown', event => event.stopPropagation());
     grid.addEventListener('change', () => {
       const id = readId(); if (!options.flush()) return;
-      try { options.phrase.setTempoSectionSteps(id, Number(grid.value)); options.changed(); }
+      try {
+        const steps = Number(grid.value);
+        options.phrase.setTempoSectionSteps(id, steps);
+        const bpm = phraseTempoSpans(options.readBody()!).find(span => span.id === id)?.tempoBpm ?? options.readBody()!.tempoBpm;
+        options.gridChanged?.(steps, bpm); options.changed();
+      }
       catch (error) { options.report(error instanceof Error ? error.message : String(error)); paint(); }
     });
     return grid;

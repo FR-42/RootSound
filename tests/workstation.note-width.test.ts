@@ -7,6 +7,19 @@ import { melodyGrid, melodyNoteRect, melodyScale, initialMelodyView, melodyDetai
 const keys = [{ label: 'C4', frequencyHz: 261.6255653005986, accidental: false }];
 const close = (actual: number, expected: number) => assert(Math.abs(actual - expected) < 1e-8);
 
+test('explicit subdivision editing exposes configured cells on a fixed time ruler', () => {
+  const view={leftSeconds:0,zoom:2.048,rowHeight:32};
+  for (const steps of [2,3,4,9]) {
+    const lines=melodyDetailGrid(2,120,steps,view,1000,4,0,16);
+    assert.deepEqual(lines.filter(line=>line.beat).map(line=>line.seconds),[0,.5,1,1.5,2]);
+    if (steps <= 4) {
+      const cells=lines.filter(line=>line.cell && line.seconds<.5);
+      assert.equal(cells.length,steps);
+      cells.forEach((line,index)=>close(line.seconds,index*.5/steps));
+    }
+  }
+});
+
 test('six-beat bars with a three-beat pickup preserve notes and mark the real downbeats',()=>{
   const score=readPhraseBody({...body(120),beatsPerBar:6,pickupBeats:3});
   assert.equal(score.beatsPerBar,6);assert.equal(score.pickupBeats,3);

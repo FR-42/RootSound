@@ -1,0 +1,5 @@
+.output-volume { display: inline-flex; align-items: center; gap: 5px; margin-inline: 6px; flex: none; color: var(--muted); }
+.output-volume svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.output-volume input { width: 76px; height: 18px; margin: 0; accent-color: #6688aa; cursor: pointer; }
+.output-volume output { width: 33px; font: 10px ui-monospace, monospace; text-align: right; }
+@media (max-width: 600px) { .output-volume { gap: 3px; margin-inline: 2px; } .output-volume input { width: 48px; } }

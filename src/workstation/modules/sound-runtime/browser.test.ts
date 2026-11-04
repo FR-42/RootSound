@@ -4,6 +4,34 @@ import type { SoundPlan, SoundRuntimeEvent, SoundSequencePlan } from '../../cont
 import { createBrowserSoundRuntime } from './browser.ts';
 import { FakeAudioContext, acquired, audio, close, fixture, longSample, phrase, plan } from './testing.ts';
 
+test('listening volume works before activation and live without changing transport or note gains', async () => fixture(async () => {
+  const runtime=createBrowserSoundRuntime(); runtime.setOutputLevel!(2);
+  assert.equal(FakeAudioContext.instances.length,0);
+  const session=await runtime.preview(plan());
+  const mix=audio().gains[0]!;
+  assert.equal(audio().compressors.length,1);
+  assert.equal(mix.gain.changes.at(-1)!.value,2);
+  const notes=audio().oscillators.length;
+  runtime.setOutputLevel!(0); assert.equal(mix.gain.changes.at(-1)!.value,0);
+  assert.equal(runtime.position(session.id),0); assert.equal(audio().oscillators.length,notes);
+  runtime.setOutputLevel!(4); assert.equal(runtime.readOutputLevel!(),4);
+  await runtime.audition(plan());
+  assert(audio().panners.at(-1)!.connections.includes(mix));
+  assert.throws(()=>runtime.setOutputLevel!(4.1));
+  await runtime.dispose(); assert(mix.disconnected); assert(audio().compressors[0]!.disconnected);
+}));
+
+test('changing volume reroutes an existing sequence and an active key through the same output', async () => fixture(async () => {
+  const runtime=createBrowserSoundRuntime(); const session=await runtime.preview(phrase([{atSeconds:0,sound:plan()}],5));
+  await runtime.audition(plan());
+  const before=audio().gains.length; runtime.setOutputLevel!(1.5);
+  const output=audio().gains[before]!;
+  assert(audio().panners.at(-1)!.connections.includes(output));
+  assert(audio().gains[before-1]!.connections.includes(output));
+  assert.equal(runtime.readOutputLevel!(),1.5); assert(runtime.position(session.id)!>=0);
+  await runtime.dispose();
+}));
+
 test('head speed retimes triggers while samples, note holds and releases keep real seconds', async () => fixture(async () => {
   const runtime = createBrowserSoundRuntime(); const sample = longSample();
   const input = { ...phrase([{ atSeconds: 0, sound: sample }, { atSeconds: 2, sound: sample }], 5), transport: { positionSeconds: 0, rate: .75 } };

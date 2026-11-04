@@ -3,6 +3,7 @@ import { createWebExampleModel } from './web-demo-example.ts';
 import starterExample from '../../../website/examples/starter.json';
 import { createMidiProjectLibrary } from './midi-project.ts';
 import { mountMelodyWorkspace } from '../modules/ui-rendering/melody-workspace.ts';
+import { mountOutputVolume } from '../modules/ui-rendering/output-volume.ts';
 import { createPhraseCompositionTransport } from '../modules/ui-rendering/phrase-composition-transport.ts';
 import { createBrowserSoundRuntime } from '../modules/sound-runtime/public.ts';
 import { phraseDurationSeconds, phraseBeatSeconds, phraseHeldSeconds } from '../contracts/phrase-time.ts';
@@ -37,6 +38,7 @@ const name = q<HTMLInputElement>('.web-name'), play = q<HTMLButtonElement>('.web
 const status = q('.web-status'), file = q<HTMLInputElement>('.web-file');
 let model = createWebExampleModel(starterExample);
 let runtime = webSound();
+const volume = mountOutputVolume(q('.web-transport'), () => runtime);
 let editor: ReturnType<typeof mountMelodyWorkspace> | undefined;
 let transport: ReturnType<typeof createPhraseCompositionTransport> | undefined;
 let state: PlaylistTransportState = { playing: false, preparing: false, position: 0, rate: 1 };
@@ -132,8 +134,9 @@ function mount() {
 async function replace(next: ReturnType<typeof createWebDemoModel>) {
   cancelAnimationFrame(frame);
   // Dispose the old view before switching model closures or the audio boundary.
+  const outputLevel = runtime.readOutputLevel?.() ?? 1;
   editor?.dispose(); transport?.dispose(); await runtime.dispose();
-  model = next; showStarter = false; runtime = webSound(); editor = undefined; transport = undefined;
+  model = next; showStarter = false; runtime = webSound(); runtime.setOutputLevel?.(outputLevel); volume.refresh(); editor = undefined; transport = undefined;
   family = undefined; temporary = undefined; state = { playing: false, preparing: false, position: 0, rate: 1 };
   dirty = false; mount();
 }

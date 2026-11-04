@@ -39,12 +39,12 @@ export function melodyNoteRect(note: PhraseNote, body: PhraseBody, keys: readonl
     y: melodyPitchTop(keys, row, view.rowHeight) + 1,
     width: Math.max(0, phraseHeldSeconds(body, note) * scale), height: melodyPitchHeight(keys, row, view.rowHeight) - 2 };
 }
-export function melodyScoreGrid(body: PhraseBody, view: MelodyView, width: number) {
+export function melodyScoreGrid(body: PhraseBody, view: MelodyView, width: number, cellPixels = 48) {
   const result: ReturnType<typeof melodyDetailGrid> = [], end = view.leftSeconds + 8 / view.zoom;
   for (const span of phraseTempoSpans(body)) {
     if (span.endSeconds < view.leftSeconds || span.startSeconds > end) continue;
     const local = { ...view, leftSeconds: view.leftSeconds - span.startSeconds };
-    for (const line of melodyDetailGrid(span.endSeconds - span.startSeconds, span.tempoBpm, phraseStepsAtBeat(body, span.startBeat), local, width, body.beatsPerBar ?? 4, span.startBeat === 0 ? body.pickupBeats ?? 0 : 0)) {
+    for (const line of melodyDetailGrid(span.endSeconds - span.startSeconds, span.tempoBpm, phraseStepsAtBeat(body, span.startBeat), local, width, body.beatsPerBar ?? 4, span.startBeat === 0 ? body.pickupBeats ?? 0 : 0, cellPixels)) {
       if (line.seconds >= span.endSeconds - span.startSeconds - 1e-8 && span.endBeat < body.lengthBeats) continue;
       result.push({ ...line, seconds: line.seconds + span.startSeconds });
     }
@@ -52,19 +52,19 @@ export function melodyScoreGrid(body: PhraseBody, view: MelodyView, width: numbe
   return result;
 }
 /** Only reveal subdivisions when there is room, then subdivide further as zoom increases. */
-export function melodyDetailSteps(tempo: number, steps: number, scale: number): number {
+export function melodyDetailSteps(tempo: number, steps: number, scale: number, minimumCellPixels = 48): number {
   const cellPixels = 60 / tempo / steps * scale;
-  return cellPixels < 48 ? 1 : steps * 2 ** Math.min(Math.floor(Math.log2(cellPixels / 48)), Math.floor(Math.log2(4096 / steps)));
+  return cellPixels < minimumCellPixels ? 1 : steps * 2 ** Math.min(Math.floor(Math.log2(cellPixels / minimumCellPixels)), Math.floor(Math.log2(4096 / steps)));
 }
-export function melodyDetailGrid(duration: number, tempo: number, steps: number, view: MelodyView, width: number, beatsPerBar = 4, pickupBeats = 0) {
-  const scale = melodyScale(view, width, duration), divisions = melodyDetailSteps(tempo, steps, scale);
+export function melodyDetailGrid(duration: number, tempo: number, steps: number, view: MelodyView, width: number, beatsPerBar = 4, pickupBeats = 0, minimumCellPixels = 48) {
+  const scale = melodyScale(view, width, duration), divisions = melodyDetailSteps(tempo, steps, scale, minimumCellPixels);
   const cell = 60 / tempo / divisions;
   const first = Math.max(0, Math.ceil((view.leftSeconds - 1 / scale) / cell));
   const last = Math.floor((Math.min(duration, view.leftSeconds + (width + 1) / scale) + 1e-8) / cell);
   return Array.from({ length: Math.max(0, last - first + 1) }, (_, offset) => {
     const index = first + offset;
     const measure = (index / divisions - pickupBeats) / beatsPerBar;
-    return { seconds: index * cell, beat: index % divisions === 0, bar: measure >= 0 && Math.abs(measure - Math.round(measure)) < 1e-8 };
+    return { seconds: index * cell, beat: index % divisions === 0, cell: divisions >= steps && index % (divisions / steps) === 0, bar: measure >= 0 && Math.abs(measure - Math.round(measure)) < 1e-8 };
   });
 }
 /** The grid tempo is a visual ruler; note positions always use the phrase's own clock. */

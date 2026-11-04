@@ -14,7 +14,7 @@ export function createMusicWorkspaceState(storage: PreferenceStorage, projectId:
       const selection = typeof value.selection?.partId === 'string' ? { partId: value.selection.partId,
         ...(typeof value.selection.noteId === 'string' ? { noteId: value.selection.noteId } : {}) } : undefined;
       const noteLengths = Object.fromEntries(Object.entries(value.noteLengths ?? {}).filter(([id, seconds]) => id && typeof seconds === 'number' && Number.isFinite(seconds) && seconds >= .0001 && seconds <= 96));
-      current = { ...(value.orientation === 'vertical' ? { orientation: 'vertical' as const } : {}), viewport: { leftSeconds: Math.max(0, view.leftSeconds), zoom: view.zoom, top: Math.max(0, view.top), rowHeight: view.rowHeight },
+      current = { ...(value.showGridCells === true ? { showGridCells: true } : {}), ...(value.orientation === 'vertical' ? { orientation: 'vertical' as const } : {}), viewport: { leftSeconds: Math.max(0, view.leftSeconds), zoom: view.zoom, top: Math.max(0, view.top), rowHeight: view.rowHeight },
         selection, playheadSeconds: Math.max(0, value.playheadSeconds), entryOctave: Math.max(0, Math.min(8, Math.round(value.entryOctave))),
         entryToneId: typeof value.entryToneId === 'string' ? value.entryToneId : undefined, noteLengths: noteLengths as Record<string, number> };
     }

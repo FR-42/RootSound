@@ -125,6 +125,9 @@ export type SoundRuntimeEvent =
   | { readonly type: 'device'; readonly status: SoundDeviceStatus; readonly error?: string };
 
 export interface SoundRuntimePort {
+  /** Listening gain only; affects playback and key auditions, never export or saved notes. */
+  setOutputLevel?(level: number): void;
+  readOutputLevel?(): number;
   /** Resume from a direct browser gesture before asynchronous sample loading. */
   activate?(): Promise<void>;
   /** A short key/note audition on the same device, independent of the main transport. */
