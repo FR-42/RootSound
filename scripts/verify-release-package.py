@@ -31,6 +31,16 @@ for platform in ['windows','mac']:
         assert package.read(prefix+'icon.png')==(ROOT/'desktop/assets/RootSound.png').read_bytes()
         for required in ['main.cjs','preload.cjs','rpc.cjs','package.json','host/RootSound.Host.dll','ui/index.html','ui/instruments/generaluser-gs-2.0.3/LICENSE.txt','runtime/LICENSE.txt']:
             assert prefix+required in names,required
+        bank=prefix+'ui/instruments/generaluser-gs-2.0.3/'
+        for required in ['GeneralUser-GS.sf2','CREDITS.txt','THIRD-PARTY.txt','PROVENANCE.json','spessasynth_core-LICENSE.txt','fflate-LICENSE.txt','stb-vorbis-LICENSE.txt']:
+            assert bank+required in names,required
+        provenance=json.loads(package.read(bank+'PROVENANCE.json'))
+        with package.open(bank+'GeneralUser-GS.sf2') as stream:
+            assert hashlib.file_digest(stream,'sha256').hexdigest()==provenance['sourceSha256']
+        assert any(name.startswith(prefix+'ui/assets/soundfont-worklet-') and package.getinfo(name).file_size>100000 for name in names),'Full SoundFont engine missing'
+        for source in ['main.cjs','preload.cjs','rpc.cjs','bundled-projects.cjs']:
+            assert package.read(prefix+source)==(ROOT/'desktop/electron'/source).read_bytes(),source
+        assert b"script-src 'self' 'wasm-unsafe-eval'" in package.read(prefix+'main.cjs')
         runtime='runtime/dotnet.exe' if platform=='windows' else 'runtime/dotnet'
         assert prefix+runtime in names
         voices=[name for name in names if name.startswith(prefix+'ui/instruments/') and name.endswith('.wav')]

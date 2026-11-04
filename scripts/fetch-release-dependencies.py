@@ -1,9 +1,19 @@
 """Fetch pinned desktop runtimes into build cache; never copy user projects."""
-import concurrent.futures, hashlib, json, pathlib, urllib.request
+import concurrent.futures, hashlib, json, pathlib, urllib.request, sys
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 OUT = ROOT / '.cache' / 'release-dependencies'
 OUT.mkdir(parents=True, exist_ok=True)
+
+if '--offline' in sys.argv:
+    manifest = json.loads((OUT / 'manifest.json').read_text('utf-8'))
+    for item in manifest['downloads']:
+        algorithm = 'sha256' if 'sha256' in item else 'sha512'
+        with (OUT / item['file']).open('rb') as source:
+            actual = hashlib.file_digest(source, algorithm).hexdigest()
+        if actual != item[algorithm]: raise ValueError('Cached runtime checksum mismatch: ' + item['file'])
+    print(json.dumps({'cachedRuntimesVerified':len(manifest['downloads']),'electronVersion':manifest['electronVersion'],'dotnetVersion':manifest['dotnetVersion']}))
+    sys.exit(0)
 
 def request(url):
     return urllib.request.urlopen(urllib.request.Request(url, headers={'User-Agent': 'RootSound-release-builder'}), timeout=60)

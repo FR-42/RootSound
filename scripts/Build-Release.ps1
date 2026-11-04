@@ -1,4 +1,4 @@
-param([string]$Version = '0.1.0-preview.2', [switch]$IncludeCurrentProjects)
+param([string]$Version = '0.1.0-preview.2', [switch]$IncludeCurrentProjects, [switch]$UseCachedRuntimes)
 $ErrorActionPreference = 'Stop'
 if ($Version -notmatch '^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$') { throw 'Invalid release version.' }
 $releaseTaskRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..')).Path
@@ -17,7 +17,9 @@ try {
     & dotnet build desktop/RootSound.Host/RootSound.Host.csproj -c Release --configfile desktop/NuGet.Config -o .cache/release-host
     if ($LASTEXITCODE -ne 0) { throw 'Portable file service build failed.' }
     & node --test tests/release-host.test.mjs; if ($LASTEXITCODE -ne 0) { throw 'Portable file service checks failed.' }
-    & python scripts/fetch-release-dependencies.py; if ($LASTEXITCODE -ne 0) { throw 'Runtime downloads failed.' }
+    if ($UseCachedRuntimes) { & python scripts/fetch-release-dependencies.py --offline }
+    else { & python scripts/fetch-release-dependencies.py }
+    if ($LASTEXITCODE -ne 0) { throw 'Runtime preparation failed.' }
     & python scripts/package-desktop-release.py prepare; if ($LASTEXITCODE -ne 0) { throw 'Package preparation failed.' }
     & python scripts/package-desktop-release.py sign-mac; if ($LASTEXITCODE -ne 0) { throw 'Local Mac signing failed.' }
     & python scripts/package-desktop-release.py archive; if ($LASTEXITCODE -ne 0) { throw 'ZIP creation failed.' }

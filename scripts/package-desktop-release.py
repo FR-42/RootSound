@@ -130,7 +130,8 @@ def archive():
         readme='RootSound '+VERSION+'\n\n'
         readme+=('解压整个文件夹，双击 RootSound.exe。无需安装 Node.js 或 .NET。\n项目默认保存在程序旁的 project 文件夹。\n' if key=='windows' else
                  '适用于 Apple 芯片 Mac，macOS 13 或以上。解压后将 RootSound.app 拖入“应用程序”，再打开。\n项目默认保存在“音乐/RootSound/project”，不写入应用程序包。\n本预览包为本地签名，尚无苹果开发者签名／公证；首次打开可能需要在“系统设置→隐私与安全性”中确认。\n尚未在真实 Mac 上完成运行与听音验收。\n')
-        readme+='\n包含：乐曲库、竖向钢琴卷帘、默认采样音色、音色导入、键盘演奏、MIDI导入、工程保存和WAV导出。\n不包含：旧歌曲编排界面、乐句库、灵感共创、独立采样／蓝牙实验工具。\n'
+        readme+='\n包含：乐曲库、竖向钢琴卷帘、128种GM乐器及47种鼓音、音色导入、琴键试听、MIDI导入、BPM卷帘、工程保存和WAV导出。\n不包含：旧歌曲编排界面、乐句库、灵感共创、独立采样／蓝牙实验工具。\n'
+        readme+='\n内置音源采用GeneralUser GS 2.0.3，完整SoundFont播放采用SpessaSynth core 4.4.4。许可和来源说明位于应用资源的ui/instruments/generaluser-gs-2.0.3目录。音源作者说明部分历史采样无法完全追溯原始来源；允许商用和软件打包不代表全部底层采样权属已核清。\n'
         if plan.get('projects'):
             readme+=f'\n随包附带作者当前的{len(plan["projects"])}个工程，不含备份和历史缓存。\n'
             readme+='首次打开会加入乐曲库；已有同名工程不会被覆盖，删除后的随包工程不会在下次启动时重新出现。\n'

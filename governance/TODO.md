@@ -1,5 +1,272 @@
 # RootSound TODO
 
+## RB137 Less explanatory text in guides — PUBLISHED 2026-11-04
+
+- Remove all six page-summary sentences. Recompose BPM/cells images without
+  explanations about dividing a beat or holding an equal beat length; retain
+  numeric diagrams and short actions such as faster/slower/Space tap.
+- Reuse verified RB136 captures; no new editor interaction or user file access.
+  Six1920x1080animations retain timing;13media files total5,410,880bytes. Website
+  build/media checks and hidden production UI navigation/edit/export tests pass
+  (rb137-*,rb137/,rb130/ui-3Qm7hq). Source3b9c23b9pushed; Pages41783483271
+  succeeded and20public resources match the verified build.
+
+## RB136 Direct drawing, roll extension and playback boundaries — PUBLISHED 2026-11-04
+
+- First guide draws a long note with one continuous press-and-pull gesture.
+  Sixth guide drags the actual roll bottom from16 to20beats and clicks bottom+
+  to append another BPM roll.302isolated retina UI states;6animated WebP pages,
+  13media/metadata files,5,649,782bytes. Grey operation-demo region and separately
+  headed editable playground distinguish watching from doing. Requested Frank
+  acknowledgement added. README preserves user's prose with headings and links.
+- Desktop and web share last-held-note/bar-end calculation, including segmented
+  tempo, pickups and explicit held seconds. Normal playback resets to zero and
+  pauses at that bar end; manual seeking beyond the last note permits trailing
+  blank bars. Stop or seeking back resets the exception. Live edits refresh the
+  boundary, cached outside animation frames. Score/export lengths stay unchanged.
+-40relevant tests, typecheck, website build, animation media verification and
+  hidden production UI pass. UI verifies both automatic stop and manual-tail
+  continuation,6page navigation and prior edit/export/reopen/layout flows. Local
+  Windows build0warnings/errors; root launcher and975UI/instrument assets match
+  selected build20261104-054848-721-7c44b7. No user desktop, physical sound device
+  or existing user projects touched. Evidence rb136-* and rb136/, UI rb130/ui-fMxgUy.
+- Source commit b0d56fea pushed; Pages41782248856succeeded.20public resources
+  match the verified local build. RootSound.exe updated locally; binary and
+  unrelated earlier release/governance edits excluded from the source commit.
+
+## RB135 Editing guide and authored website starter — PUBLISHED 2026-11-04
+
+- User removes meter explanations, merges horizontal/vertical zoom into one
+  animation, adds selecting/adding/deselecting/panning. Keep5pages with new
+  zoom/editing chapters.266isolated retina UI states; tests assert one selection,
+ 4→5notes, right-click clears selection, drag changes viewport without adding.
+  No user composition is used by guide fixtures; New resets the public starter.
+- User's Chrome tab is not available through the connected browser. At our text
+  request user downloads current score and supplies its exact path. Read/copy
+  only that3,173,865byte file, original SHA256unchanged (proof rb135/example-report).
+  Its40piano notes at148BPM become website/examples/starter.json (7610bytes),
+  storing exact score and voice keys without local paths/history/duplicated PCM.
+  Snapshot roundtrip, timing and all audible event parameters/normalization match.
+- Web boot creates an independent editable project from this static example on
+  every load. Initial pitch/time framing shows all40notes on desktop; New stays
+  blank. Visitor drafts are still memory-only/manual-download and never change
+  the shared example. Initial example does not open an audio device.
+- User clarifies volume complaint occurs within one playback. All40notes have
+  velocity.75/SF2velocity95 and gain.7, no output fade. Equal-note repeat RMS
+  varies<0.6%; actual score quarter-second window peak is~2.4dB above first
+  window, consistent with pitch/sample/overlap/tail variation. No automatic
+  gain rise reproduced; no DSP/score dynamics changed. Actual Chrome/audio-device
+  listening is not verified; explanation is based on offline analysis.
+- Typecheck/build,5web model/audio tests (one new starter/isolation/save test),
+  HD animation duration/size checks and hidden production UI pass:40initial
+  visible notes, reload restores40, blank New,5pages/keys/swipe/reduced motion,
+  prior edit/play/export/reopen and3widths. Separate double-capture starter image
+  inspected. No desktop/OS input/physical audio. Evidence rb135-* and rb135/;
+  UI rb130/ui-WoACcU and ui-LGIn2i. Only requested files committed d69bc5d9;
+  earlier README/release/governance changes excluded. Pages run41779614813 succeeded;18public site/image/example/editor resources
+  match checked files. https://fr-42.github.io/RootSound/ verified.
+
+## RB134 Sharp, larger tempo/subdivision teaching — PUBLISHED 2026-11-04
+
+- User requests clearer/larger images, simultaneous BPM controls/grid spacing,
+  explicit Space tapping, and adding/drawing/lengthening a note. Gallery now
+  matches editor width,16:9,1920x1080lossless WebP from2400x1240native offscreen
+  pixels. Zoom factor2with first-load reinitialization preserves logical1200x620
+  layout;230self-made UI states, no user desktop/device/projects used.
+- BPM split view keeps actual roll scale256CSSpx/sec while changing120→180→60,
+  highlights adjacent beat lines and seconds per beat. Then real Space key events
+  at500ms produce120BPM. Cells shows equal-length beats divided2/3/4ways alongside
+  the real control. User suggests equating counts with meter; assistant explains
+  existing cells-per-beat semantics and keeps subdivisions distinct from meter,
+  including4/4with3cells. This is not a user-confirmed redefinition of the control.
+- Add-voice chapter now creates one visible note and drags its lower resize edge;
+  note count/visible coordinates/over2x held duration asserted. Inspect corrected
+  clip after fixing first-load pitch offset. Other two zoom lessons retained atHD.
+-11public image/metadata files4,897,672bytes; redundant GIFs retired, no videos.
+  Frame durations/dimensions/native2x source/fixed BPM scale verified. Build and
+  hidden production browser verify HD images, gallery>1100x600,5pages, key/swipe/
+  rapid flips/reduced motion, prior play/edit/export/reopen and3widths. Physical
+  listening/mobile/Safari hardware not claimed. Evidence rb134-* and rb134/;
+  UI rb130/ui-w7QXAI. docs/WEBSITE.md updated.
+- Commit2cbfa450 pushed, earlier unrelated edits excluded. Pages run41776569212 succeeded (including typecheck);14public site/image
+  resources match tested files. https://fr-42.github.io/RootSound/#guide verified.
+
+## RB133 Animated page deck above the editor — PUBLISHED 2026-11-04
+
+- User requests images instead of video, above the piano roll, focusing on BPM,
+  cells, both zoom axes and adding voices. Replace6videos with5image pages:
+  add voice, BPM/tap, cells, horizontal zoom, vertical zoom. Short heading/cue,
+  discreet chevrons/dots/count and420ms paper-like turn; keys/swipe/direct dots,
+  manual paging only. Remove movie player/downloads/transcripts/old movie assets.
+-30fps looping WebP plus GIF/poster,1120x500;166isolated real UI states,16public
+  assets5,376,551bytes. Animated durations3.47–7.7s verified; generator no longer
+  uses FFmpeg or creates movies. Build clears stale guide cache before copying.
+- Decode incoming page before turning; cancel superseded transitions and retain
+  at most2sheets. Stop control switches to still cover; offscreen/background also
+  use stills. Reduced-motion preference starts still and turns without animation.
+- Hidden production browser checks placement/no video,5pages, keyboard wrap,
+  rapid flips/swipe, stop/restart/reduced motion, and prior editing/play/pause/
+  export/reopen plus1280/390/320layouts. Images inspected, build passed; no user
+  desktop/OS input/projects or physical audio. Mobile/Safari hardware unverified.
+  Evidence .test-output/rb133-* and rb133/; UI rb130/ui-kwXmhN. docs/WEBSITE.md.
+- Commit2efbb231 pushed, earlier unrelated local files excluded. Pages run41774860620 succeeded;19public site/image resources match checked files.
+  Public https://fr-42.github.io/RootSound/#guide verified.
+
+## RB132 Concise, focused operation demos — PUBLISHED 2026-11-04
+
+- User finds RB131 too elaborate. Replace126.4s with50.96s, six7–12s clips.
+  Close-up actual controls, one short action label, smooth30fps camera/cursor,
+  continuous gestures and modest click feedback; detailed steps stay collapsed.
+  Preserve six topics and true offline piano in the pause/resume example.
+-328 real UI states from a permanently hidden offscreen editor; fixture API
+  exists only in isolated teaching build, explicitly absent from public bundle.
+  Lower-edge gesture really adds bars; tap cadence500ms yields120BPM. Pan cursor
+  corrected to visible viewport. No user desktop/input/device/files used.
+-1280x800 H264/AAC video,1024x640 animated GIF/WebP,32assets14,581,627bytes.
+  GIFs optimize holds into25–59frames without changing duration. All7MP4 decode,
+  dimensions/frame rate/animation durations and nonzero unclipped audio checked.
+  Full typecheck/build pass. Hidden production UI verifies6tabs/versioned links,
+  no fixture API, mutual pause, editing/export/roundtrip and desktop/mobile layout.
+  Evidence .test-output/rb132/ and rb132-*.log; UI rb130/ui-firHHk.
+- Only tutorial/site/maintenance files committed460bbb35 and pushed. Earlier
+  README/release/governance changes remain local. Pages run41771766318 succeeded;35public site/media resources match checked files.
+  Public https://fr-42.github.io/RootSound/#guide and full-video link verified.
+
+## RB131 Six animated operation guides — PUBLISHED 2026-11-04
+
+- User requests motion guidance covering six named topics. Produce six16–25s
+  chapters as GIF/animated WebP/MP4, plus126.4s complete subtitled H264/AAC video.
+  Topics: sound families/+; vertical pitch/time and drawing/extending rolls;
+  BPM/cells/tap tempo; audition/play/pause/stop; pan/wheel/both zoom axes; document
+  new/open/native download/WAV export. Clarify subdivision vs meter and bottom+
+  vs extending a roll's lower edge. Chinese titles/subtitles, cursor and click
+  highlights, actual shared UI. The playback chapter includes original four-note
+  offline-rendered piano; others silent, no narration. No reference/user music.
+-401frames generated in a permanently hidden production renderer with self-made
+  data/offline audio; no user desktop/screen/OS input, picker or music files.
+  Bitmap typography normalized in video composition;1280x820 animations and
+  1280x900 videos/posters keep subtitles clear of browser controls. Six GIFs have
+  38–75optimized frames; durations/probes/decoding/audio nonzero verified. Final
+  full video1,228,421bytes, all32media/metadata files about9.3MB.
+- Site's collapsed 操作指南 supports6topic tabs, video controls, GIF/full-video
+  downloads with Chinese filenames, written steps, keyboard tab navigation and
+  #guide link. Lazy media/no autoplay. Origin/source-checked messages prevent
+  tutorial and music playback overlapping; own-renderer UI checks all6tabs,
+  links, mutual pause, desktop/mobile layouts and existing editor flow pass.
+  Full typecheck/build pass; actual listening/mobile hardware not claimed.
+- Commit eef7f4f5 pushed, only tutorial sources/assets/docs and narrow web bridge;
+  prior local README/release/governance excluded. Pages run41766889076 succeeded;
+  41public media/editor/site resources match the checked files. Public guide
+  https://fr-42.github.io/RootSound/#guide and guides/jianle-quickstart.mp4 verified.
+  Maintenance docs/WEBSITE.md; evidence .test-output/rb131-* and rb131/; hidden
+  browser evidence rb130/ui-PAr6lu. Authored source generators in scripts/.
+
+## RB130 Reduced browser music editor — PUBLISHED 2026-11-04
+
+- User authorizes adding the reduced core to the existing 简乐 site. Keep header,
+  GitHub and platform downloads; embed the genuine shared vertical roll in /play/.
+  Reuse note editing, gestures, tempo rolls, tap tempo, groups, audition, transport,
+  follow/scroll/zoom, undo/redo and full SF2 rendering. Add browser-native file
+  import/download and explicit save, with a memory-only document and unload warning.
+- Eight offered voices (piano, flute, strings, bass, music box, kick, snare, closed
+  hat). Actually trim GeneralUser GS32,319,396bytes to8,464,944bytes, preserving
+  five melodic presets plus standard drums and full engine rules.99portable WAV
+  files8,278,134bytes load on demand for embedded saves; manifest207,205bytes.
+  Original licensing/provenance files retained, accessible from in-app help.
+- Domain-store quota is atomic:64beats or16bars (whichever smaller by meter),
+  16families/2048notes including hidden notes; oversized changes/imports fail
+  without changing the current document. MIDI and small native-v2/portable
+  imports supported; unsupported voices map to available voices with a notice.
+  16MiB import limit. Export WAV uses all families, ignoring audition solo.
+- Native .rootsound v2 export embeds used recordings and strips history. A real
+  isolated portable desktop host opens the generated two-note file without
+  changing it. Filename governs website import name. Drafts are not autosaved.
+-4new model/roundtrip/MIDI/SF2 tests,72directed shared audio/sample/tempo tests
+  (including those4), full typecheck and production build pass. Hidden production
+  renderer under /RootSound/ checks actual drawing/undo/redo/pause/resume/nonzero
+  WAV download/engineering download/reopen and1280/390/320 layouts; screenshots
+  inspected. All clocks offline, no user desktop/window/input, physical device,
+  user songs or heavy user-file validation. Safari/mobile hardware/listening
+  remain unverified. Existing fake-DOM melody suite fails55times on missing
+  cancelAnimationFrame; replay against HEAD source reproduces identical55failures.
+  This unrelated harness issue is recorded, not claimed passing or repaired.
+- Commits75708a16/2f42edc1 pushed; CI now installs pinned dependencies, typechecks, builds
+  website/editor and uploads only .cache/website. Existing README/release/governance
+  changes excluded. Pages runs41761886573/41762315231 succeeded;12public HTML,
+  CSS/JS/worklet/manifest/license resources match the tested build; live SF2
+  header/size8464944 verified. Build timezone fixed to UTC so ambiguous source
+  creation-date metadata no longer changes the bank hash between Windows/CI.
+  Final SF2 SHA256 def75ca8a46be5d73a59d8771d9780cd38757e3d4513d5f8e6fe81b793b790d5.
+  Public https://fr-42.github.io/RootSound/ includes /play/. Evidence
+  .test-output/rb130-*.log and rb130/; maintenance docs/WEBSITE.md.
+
+## RB129 Header and icon links — PUBLISHED 2026-11-04
+
+- User requests 简乐 in the header, a compact GitHub icon block with only GitHub
+  text, and the former Windows/Mac icon download cards. Restore just these
+  requested visuals, retaining exactly3links. Include platform/archive sizes;
+  the existing optional release query also refreshes sizes.
+- Hidden isolated rendering checks1280/390/320 widths, title, header geometry,
+  loaded brand icon and no overflow; mobile preview visually inspected.
+  No user desktop capture or physical audio. Syntax/diff checks pass.
+  Website-only commit16905efb pushed; Pages run41758468390 succeeded. Live
+  HTML/CSS/JS match local files. docs/WEBSITE.md updated.
+
+## RB128 Minimal 简乐 website — PUBLISHED 2026-11-04
+
+- User confirms Chinese name 简乐 and requests only the name, GitHub and download
+  links. Remove all copy/sections/media and obsolete public demo assets; title and
+  Open Graph title use 简乐. Preserve Windows/Mac direct links and optional API
+  refresh. No application/URL/archive rename or unrelated local commits.
+- HTML parser verifies exactly the name and3links; JavaScript syntax/diff checks
+  pass. Commit370ba65c pushed to main; Pages run41757867310 succeeded, and live
+  HTML/CSS/JS match local files with200responses.
+  Supersedes RB127's rich promotional layout. Maintenance docs/WEBSITE.md updated.
+
+## RB127 Promotional website and GitHub Pages — PUBLISHED 2026-11-04
+
+- User asks to build a promotional site for FR-42/RootSound. Static source in
+  website/, with actual current UI from an isolated original demonstration,
+  piano/music-box listening, downloadable three-track/66-note MIDI, basic usage,
+  Windows/Mac downloads and factual preview/platform/sample-license boundaries.
+- No user songs or desktop captured. Assets total about596KB, without external
+  fonts, accounts or tracking. Existing Release preview261103 remains the
+  download source; public API refresh is optional with static fallback.
+- Hidden renderer checks1440/768/390/320 widths, no overflow, loaded imagery,
+  MP3 offline decoding, playback/seek/tone-switch controls using a media stub,
+  API outage fallback and future release update. The real app imports66notes
+  across3tracks. No visible window or physical audio device, no listening claim.
+- Website-only commit f0ae5580 pushed to main; Pages configured for Actions and
+  repository homepage set. Actions run41677675350 succeeded; public address
+  https://fr-42.github.io/RootSound/ returns200. User README
+  and prior release changes were excluded from this commit. Maintenance details
+  docs/WEBSITE.md; local evidence .test-output/rb127/.
+
+## RB126 Refresh Windows/Mac release ZIPs — IMPLEMENTED 2026-11-04
+
+- User requests regenerating the two archives. Produce0.1.0-preview.3 Windows
+  x64 and macOS Apple Silicon/ARM64, with the previously requested current saved
+  projects:9 files, copied as immutable snapshots without editing originals.
+- Build current public-only entry and portable host. Preserve white/gray note
+  icon; exclude old arrangement/co-creation/experiments, source/development files,
+  backups and histories. Include full SF2,958 WAVs, SpessaSynth worker, all audio
+  bank/dependency licenses and provenance uncertainty in the package instructions.
+- Add an explicit cached-runtime mode: verify five pinned runtime/signing archive
+  hashes without network refresh or dependency upgrades. Packaging verifier checks
+  current bridge code, SF2 source digest, complete worklet and licenses. Existing
+  native host3flows pass; type/build0warnings/errors. Hidden actual packaged
+  renderer/host verifies9seed projects,175voices, manual save/reopen and original
+  SF2 nonzero PCM under production protocol/CSP, using only an offline clock.
+- Windows ZIP284,846,473bytes; Mac ZIP243,457,223bytes. Mac retains14Unix links,
+  executable modes,1183sealed-resource digests and5local signature checks; no
+  Developer ID, notarization or physical Mac execution. SHA256SUMS rechecked.
+  This is packaging authorization, not clearance of the bank's third-party
+  sample provenance or permission to publish on GitHub. No upload performed.
+- Outputs release/RootSound-{Windows-x64,macOS-arm64}-0.1.0-preview.3.zip,
+  SHA256SUMS.txt and Chinese release notes. Evidence .test-output/rb126-
+  {release,shell}.log, rb126-package-verification.json and rb126-checksums.json.
+  User project files remain unchanged; no user-window/screen/physical audio use.
+
 ## RB125 Full SoundFont playback and tempo-scaled held notes — IMPLEMENTED 2026-11-03
 
 - Replace the current desktop's PCM-only bank execution with Apache-2.0

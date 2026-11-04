@@ -1,5 +1,42 @@
 # RootSound DECISIONS
 
+## D-2026-11-04-playback-end · Stop after the last occupied bar — USER CONFIRMED
+
+- Desktop and website should pause and return to the beginning at the end of
+  the bar containing the final audible note. Do not keep running indefinitely.
+  Explicitly moving the playhead into the blank tail is the user's exception.
+- RB136 uses the final held-note end, accounts for segmented BPM/pickups, keeps
+  the explicit-tail mode through pause/resume, and clears it on Stop or seeking
+  back into musical content. These details are implementation choices serving
+  the requested behavior; stored score and export extents are unchanged.
+
+## D-2026-11-04-web-example · Load the author's current score as the public example — USER CONFIRMED
+
+- User asks preserving current website edits and loading them at every visit as
+  a demonstration. Their supplied Chrome download contains40piano notes/148BPM.
+  Publish that score as the fixed starting example; each visit is a fresh local
+  editable copy. This is not authorization to autosave all visitors' edits into
+  the public example. Existing explicit-download and unsaved-draft rules remain.
+- Latest tutorial request removes meter explanations, combines both zoom axes,
+  and demonstrates selection/addition/right-click deselection/blank-canvas pan.
+
+## D-2026-11-04-guide-deck · Image-first guidance above the editor — USER CONFIRMED
+
+- Replace tutorial videos with animated image pages above the piano roll. Focus
+  on BPM, cells, horizontal/vertical zoom and adding voices. Keep the presentation
+  simple, intuitive and fluid, with few words; turn using left/right keys and a
+  page-like transition rather than large framed previous/next controls.
+- RB133 chooses5pages, small chevrons/dots and horizontal swipe, with no automatic
+  page rotation. This replaces RB131–132 video/tutorial presentation, not editing.
+
+## D-2026-11-04-chinese-name · 简乐 — USER CONFIRMED
+
+- User names the project 简乐 (simple + music). Current requested scope is the
+  public website: show 简乐 and only GitHub/Windows/Mac download links, removing
+  all other visible content. Repository URLs and published archive filenames
+  retain their existing identifiers; application-wide renaming is not performed
+  by this website batch.
+
 ## D-2026-11-03-full-sf2 · Execute the original SoundFont rules — ACTIVE
 
 - User asks what omitted SoundFont modulation means, how it affects timbre and
