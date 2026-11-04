@@ -24,6 +24,7 @@
         if (url.protocol === 'https:' && url.hostname === 'github.com' &&
             url.pathname.startsWith('/FR-42/RootSound/releases/')) {
           document.querySelector(`[data-platform="${platform}"]`).href = url.href;
+          document.querySelector(`[data-size="${platform}"]`).textContent = `约 ${Math.round(asset.size / 1e6)} MB`;
         }
       }
     } catch {

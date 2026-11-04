@@ -6,6 +6,10 @@
 Windows x64／Mac Apple Silicon 两个下载链接。移除介绍、宣传语、截图、试听、
 使用说明、问答和页脚。仓库地址和已有发布包文件名保持现有值。
 
+同日按后续指示调整外观：「简乐」与灰色音符放在顶栏左侧，右侧是带 GitHub 图标的
+小块（文字仅 GitHub）；Windows／Mac 恢复为带平台图标、平台信息和下载箭头的
+卡片。仍只保留这三个链接，没有恢复其他宣传内容。
+
 网站源码是 `website/`。推送 `main` 上的网站修改后，
 `.github/workflows/pages.yml` 自动将此目录发布到 GitHub Pages。
 初始下载链接指向 `preview261103`；页面会尝试从公开 Release 列表更新到最近
