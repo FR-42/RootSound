@@ -69,6 +69,7 @@ a:focus-visible { outline: 2px solid #2859a8; outline-offset: 5px; }
 }
 @media (prefers-reduced-motion: reduce) { .platform-download, .guide-turn, .guide-dot::after { transition: none; } }
 
+.project-description { margin: 0 0 28px; color: #626a76; font-size: 16px; line-height: 1.8; }
 .section-kicker { display: block; font-size: 11px; letter-spacing: .08em; color: #7b8492; margin-bottom: 9px; }
 .playground { margin-top: 34px; }
 .playground-heading { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; padding-inline: 4px; }
