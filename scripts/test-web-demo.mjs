@@ -85,6 +85,9 @@ let expression='starting',stage='setup';
  assert.deepEqual(await js("[...document.querySelectorAll('.song-file-actions button')].map(n=>n.textContent)"),['设置']);
  assert.equal(await js("document.querySelector('.melody-tempo-button').textContent"),'148');
  assert.equal(await js("document.querySelectorAll('.melody-key').length"),128);
+ assert(await js("(()=>{const note=document.querySelector('.melody-note');if(!note)return false;const style=getComputedStyle(note),canvas=document.createElement('canvas').getContext('2d');canvas.fillStyle=style.getPropertyValue('--tone-color').trim();canvas.fillRect(0,0,1,1);const original=[...canvas.getImageData(0,0,1,1).data];canvas.fillStyle=style.backgroundColor;canvas.fillRect(0,0,1,1);const lighter=[...canvas.getImageData(0,0,1,1).data];return lighter.slice(0,3).every((value,index)=>value>=original[index])&&lighter.slice(0,3).some((value,index)=>value>original[index])})()"));
+ assert(await parentJs("[...document.querySelectorAll('.platform-download')].every(link=>link.hidden&&!link.hasAttribute('href'))"));
+ assert.equal(await parentJs("document.querySelector('.release-history').href"),'https://github.com/FR-42/RootSound/releases');
  assert.equal(await js('__webTest.audioCreated'),0);
 
  stage='starter playback';

@@ -18,6 +18,9 @@ h1 { margin: 0; font-size: 24px; font-weight: 600; }
 main { width: min(1180px, calc(100% - 48px)); margin: 24px auto; }
 .music-editor { display: block; width: 100%; height: min(760px, calc(100svh - 160px)); min-height: 520px; border: 1px solid #d6d7d4; border-radius: 8px; background: #fafbfd; }
 .downloads { display: grid; gap: 12px; width: min(480px, 100%); margin: 32px auto; }
+.platform-download[hidden] { display: none; }
+.release-history { justify-self: center; color: #345c7b; font-size: 14px; }
+.release-history:hover { text-decoration: underline; }
 .platform-download { display: flex; align-items: center; gap: 20px; padding: 23px 22px; border: 1px solid #d6d7d4; border-radius: 8px; background: #fff; transition: transform .2s, border-color .2s, box-shadow .2s; }
 .platform-download:hover { transform: translateY(-2px); border-color: #afb5cf; box-shadow: 0 7px 20px #313a4f09; }
 .platform-icon { width: 25px; height: 25px; }

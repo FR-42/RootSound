@@ -1,4 +1,3 @@
-// Keep the existing direct links when the public release API is unavailable.
 (() => {
   'use strict';
   async function refreshDownloads() {
@@ -23,13 +22,13 @@
         const url = new URL(asset.browser_download_url);
         if (url.protocol === 'https:' && url.hostname === 'github.com' &&
             url.pathname.startsWith('/FR-42/RootSound/releases/')) {
-          document.querySelector(`[data-platform="${platform}"]`).href = url.href;
+          const link = document.querySelector(`[data-platform="${platform}"]`);
+          link.href = url.href;
+          link.hidden = false;
           document.querySelector(`[data-size="${platform}"]`).textContent = `约 ${Math.round(asset.size / 1e6)} MB`;
         }
       }
-    } catch {
-      // The links in HTML work without JavaScript or a successful API request.
-    } finally {
+    } catch {} finally {
       clearTimeout(timeout);
     }
   }

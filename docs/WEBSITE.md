@@ -29,5 +29,5 @@ scripts/test-web-demo.mjs 在隔离隐藏 Electron 中测试真实构建；需�
 手机真机／Safari／实际音频设备和听感不能由隐藏 Chromium 结果代替。
 
 .github/workflows/pages.yml 仍是仓库的 Pages 构建／部署流程，使用 Node 24。
-运行本地 build 不等于已执行该远端工作流。下载链接来自页面配置与公开发布信息，
-首页的下载入口使用 Windows EXE 和 Mac PKG 安装包。
+首页从 GitHub 的公开发布中读取配对的 Windows EXE 和 Mac PKG 安装包。
+暂时没有可用安装包时，首页提供发布记录入口。

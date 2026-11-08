@@ -40,7 +40,7 @@
 .melody-grid-line.is-beat { background: #71869fb3; }
 .melody-after-end { position: absolute; top: 0; bottom: 0; right: 0; background: var(--surface-raised); border-left: 2px solid var(--border); pointer-events: none; z-index: 4; }
 .melody-note { position: absolute; box-sizing: border-box; padding: 0; min-width: 0; border: 0; box-shadow: inset 0 0 0 1px #35536d55; border-radius: 2px; background: var(--tone-color); color: var(--text); cursor: grab; touch-action: none; user-select: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; font-size: 10px; z-index: 2; }
-.melody-note { z-index: 1; }
+.melody-note { background-color: color-mix(in srgb, var(--tone-color) 62%, white); z-index: 1; }
 .melody-note.is-dim { opacity: .16; z-index: 0; cursor: default; }
 .melody-note.is-selected { box-shadow: inset 0 0 0 1px #355f82, inset 0 0 0 2px #fff; z-index: 3; }
 .melody-note.is-dragging { cursor: grabbing; will-change: left, top, width; }
