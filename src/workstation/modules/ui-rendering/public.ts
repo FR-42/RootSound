@@ -28,7 +28,7 @@ import './studio.css';
 import './theme.css';
 export { confirmFormatSave } from './format-save-warning.ts';
 export type { MusicGuideDocument } from './music-guide.ts';
-export { showLearningSettings, showFeatureGate, needsTempoRolls };
+export { showLearningSettings, showFeatureGate, needsTempoRolls, mountMusicGuide };
 
 export interface StudioOptions {
   timbre?: TimbreEditorPort;

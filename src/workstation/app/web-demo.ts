@@ -3,7 +3,7 @@ import { createWebExampleModel } from './web-demo-example.ts';
 import starterExample from '../../../website/examples/starter.json';
 import { musicFileFormat } from './music-interchange-model.ts';
 import { commitMusicDocument } from './music-document.ts';
-import { confirmFormatSave, showFeatureGate, showLearningSettings, needsTempoRolls } from '../modules/ui-rendering/public.ts';
+import { confirmFormatSave, showFeatureGate, showLearningSettings, needsTempoRolls, mountMusicGuide } from '../modules/ui-rendering/public.ts';
 import { mountMelodyWorkspace } from '../modules/ui-rendering/melody-workspace.ts';
 import { mountOutputVolume } from '../modules/ui-rendering/output-volume.ts';
 import { createPhraseCompositionTransport } from '../modules/ui-rendering/phrase-composition-transport.ts';
@@ -13,7 +13,6 @@ import type { PhraseBody } from '../contracts/phrase.ts';
 import type { PlaylistTransportState } from '../modules/ui-rendering/playlist-transport.ts';
 import { createLearningSettings } from './platform/learning-settings.ts';
 import { createMusicGuideDocument } from './music-guide-document.ts';
-import { mountMusicGuide } from '../modules/ui-rendering/music-guide.ts';
 import './web-demo.css';
 
 const app = document.querySelector<HTMLElement>('#app')!;
