@@ -68,6 +68,8 @@ export interface StudioOptions {
   preferences?: WorkspacePreferencesPort;
   learning?: LearningSettingsPort;
   musicGuide?: MusicGuideFactory;
+  demo?: boolean;
+  startWithGuide?: boolean;
   workspaceState?: MusicWorkspaceStatePort;
   references?: ReferenceEditingPort;
   previewContent?(contentId: string, signal?: AbortSignal): Promise<PlaybackSession>;
@@ -83,6 +85,7 @@ function element<K extends keyof HTMLElementTagNameMap>(tag: K, className = '', 
 /** A project opens directly into its sole editable music score. */
 export function mountStudio(root: HTMLElement, options: StudioOptions): { dispose(): void; openGuide(): Promise<void>; prepareClose(options?: { allowProjectDialog?: boolean }): Promise<void> } {
   let disposed = false, guideOpen = false;
+  let frameNotes = options.demo === true;
   let editor: ReturnType<typeof mountPhraseComposition> | undefined;
   let page: { dispose(): void } | undefined;
   function leave(): void { editor?.dispose(); editor = undefined; page?.dispose(); page = undefined; options.sound.stopAll(); }
@@ -91,6 +94,7 @@ export function mountStudio(root: HTMLElement, options: StudioOptions): { dispos
     showLearningSettings(root, options.learning, {
       requiresTempoRolls: inMusic && needsTempoRolls(options.phrase?.read().body),
       onChange: () => editor?.refresh(),
+      onReplayGuide: options.demo ? () => { void openGuide(); } : undefined,
     });
   }
   function showWelcome(): void {
@@ -127,7 +131,7 @@ export function mountStudio(root: HTMLElement, options: StudioOptions): { dispos
     }
     const phrase = options.phrase!;
     editor = mountPhraseComposition(root, { phrase, initialView, sound: options.sound, directMusic: true,
-      workspaceState: options.workspaceState,
+      workspaceState: options.workspaceState, frameNotesOnMount: frameNotes,
       readMultipleTempoRolls: options.learning ? () => options.learning!.read().multipleTempoRolls : undefined,
       onSettings: options.learning ? () => settings(true) : undefined,
       // Retired mode cannot reactivate from a previously saved preference.
@@ -138,12 +142,18 @@ export function mountStudio(root: HTMLElement, options: StudioOptions): { dispos
       onRemoveTimbre: options.onRemovePhraseTimbre, onReorderTimbres: options.onReorderTimbres,
       onRename(name) { options.onRenameProject?.(name); phrase.rename(name); },
       readUnsavedChanges: options.projectSetup?.hasUnsavedChanges ? () => options.projectSetup!.hasUnsavedChanges!() : undefined,
-      async onSave() { if (options.projectSetup?.save) await options.projectSetup.save(); },
+      onSave: options.projectSetup?.save ? () => options.projectSetup!.save!() : undefined,
       onSaveAs: options.projectSetup?.saveAs ? () => showProjectSaveAs(root, options.projectSetup!, phrase.read().draft!.name) : undefined,
-      onExit: options.projectSetup ? () => showProjectExit(root, options.projectSetup!) : showWelcome,
+      onExit: options.demo ? undefined : options.projectSetup ? () => showProjectExit(root, options.projectSetup!) : showWelcome,
       onExport: options.audioFiles ? () => showAudioExport(root, { name: phrase.read().draft!.name,
         sound: options.sound, files: options.audioFiles!, prepare: () => phrase.preparePreview(), plan: () => phrase.previewPlan() }) : undefined,
     });
+    frameNotes = false;
+  }
+  function showGuide(resume: () => void) {
+    leave();
+    guideOpen = true;
+    page = mountMusicGuide(root, options.musicGuide!, () => { guideOpen = false; resume(); });
   }
   async function openGuide() {
     if (disposed || guideOpen || !options.musicGuide || root.querySelector('dialog[open]')) return;
@@ -152,15 +162,15 @@ export function mountStudio(root: HTMLElement, options: StudioOptions): { dispos
     try {
       await editor?.flush();
       if (disposed) return;
-      leave();
-      page = mountMusicGuide(root, options.musicGuide, () => { guideOpen = false; resume(); });
+      showGuide(resume);
     } catch (error) {
       guideOpen = false;
       editor?.notify(error instanceof Error ? error.message : String(error), true);
     }
   }
-  if (options.initialEntry && options.initialEntry !== 'welcome') showMusic();
-  else showWelcome();
+  const initialView = options.initialEntry && options.initialEntry !== 'welcome' ? showMusic : showWelcome;
+  if (options.startWithGuide && options.musicGuide) showGuide(initialView);
+  else initialView();
   return { openGuide, async prepareClose(closeOptions = {}) {
     if (disposed) throw new Error('当前页面已关闭。');
     // Toolbar actions have already flushed their edits before invoking the project service.

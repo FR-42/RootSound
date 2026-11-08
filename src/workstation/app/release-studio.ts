@@ -26,17 +26,19 @@ import { stageMaterialStorage } from './material-library-session.ts';
 
 export interface ReleasePlatform {
   storage: MaterialStorage;
-  projectDirectories: ProjectDirectoriesPort;
-  audioFiles: AudioFilesPort;
+  projectDirectories?: ProjectDirectoriesPort;
+  audioFiles?: AudioFilesPort;
+  demoProject?: { id: string; name: string; format?: never; startWithGuide?: boolean };
   timbreFiles: TimbreFilesPort;
   samplePayloads?: SamplePayloadPort;
 }
 
-export async function mountReleaseStudio(root: HTMLElement, platform: ReleasePlatform, navigate: () => void) {
+export async function mountReleaseStudio(root: HTMLElement, platform: ReleasePlatform, navigate?: () => void) {
   const runtime = createBrowserSoundRuntime(), directories = platform.projectDirectories;
   try {
-    const state = await directories.read();
-    const staged = state.current ? stageMaterialStorage(platform.storage) : undefined;
+    const state = await directories?.read();
+    const current = state?.current ?? platform.demoProject;
+    const staged = current ? stageMaterialStorage(platform.storage) : undefined;
     const library = createMaterialLibrary(staged?.storage, { project: { rootKind: 'rootsound.song',
       adapters: [createTimbreReferenceAdapter(), createPhraseReferenceAdapter(), createSongReferenceAdapter(), createSampleReferenceAdapter()] } });
     const sampleAudio = createSampleAudio(library, createBrowserSampleDecoder(), platform.samplePayloads);
@@ -46,15 +48,15 @@ export async function mountReleaseStudio(root: HTMLElement, platform: ReleasePla
     // The song adapter is retained solely as the .rootsound compatibility boundary.
     // The former arrangement UI and its workspace are not mounted or imported.
     const song = createSongEditor(library, createPhrasePlayback(library, tones), { defaultTempoMode: 'source', initialTrackCount: 1 });
-    const songId = state.current && openMusicDocument(library, song, phrase, state.current.name);
-    if (state.current) {
+    const songId = current && openMusicDocument(library, song, phrase, current.name);
+    if (current) {
       if (!songId) throw new Error('工程缺少可编辑的歌曲。');
       prepareProjectMelodyTimbres(library, songId);
-      if (state.current.format) commitMusicDocument(library, song, phrase);
+      if (current.format) commitMusicDocument(library, song, phrase);
       staged!.publish();
-      await directories.finishLoading?.();
+      await directories?.finishLoading?.();
     }
-    const sourceFormat = state.current?.format;
+    const sourceFormat = current?.format;
     let fileSession: ReturnType<typeof import('./music-file.ts')['createMusicFileSession']> | undefined;
     async function prepareFile(target: 'source' | 'rootsound' = 'source') {
       if (!songId) return;
@@ -80,14 +82,15 @@ export async function mountReleaseStudio(root: HTMLElement, platform: ReleasePla
     const preferences = createWorkspacePreferences(localStorage);
     const learning = createLearningSettings(localStorage);
     const projectId = () => { if (!songId) throw new Error('先打开一个音乐项目。'); return songId; };
-    const studio = mountStudio(root, { phrase, song, sound: runtime, hasPrevious: !!state.current,
-      projectName: state.current?.name, doubleClickIntervalMs: state.doubleClickIntervalMs, preferences, learning,
-      workspaceState: state.current ? createMusicWorkspaceState(localStorage, state.current.id) : undefined,
+    const studio = mountStudio(root, { phrase, song, sound: runtime, hasPrevious: !!current,
+      projectName: current?.name, doubleClickIntervalMs: state?.doubleClickIntervalMs, preferences, learning,
+      workspaceState: current ? createMusicWorkspaceState(localStorage, current.id) : undefined,
       musicGuide: { createDocument: createMusicGuideDocument, createSound: createBrowserSoundRuntime },
-      initialEntry: state.current ? 'song' : 'welcome', audioFiles: platform.audioFiles,
-      projectSetup: createProjectSetup(directories, () => {
+      initialEntry: current ? 'song' : 'welcome', audioFiles: platform.audioFiles, demo: !!platform.demoProject,
+      startWithGuide: platform.demoProject?.startWithGuide,
+      projectSetup: directories && createProjectSetup(directories, () => {
         runtime.stopAll();
-        navigate();
+        navigate?.();
       }, {
         read() { const value = platform.storage.read(); if (value === null) throw new Error('当前没有项目。'); return value; },
         songDraftId: projectId, name: () => song.readDraft()!.name,

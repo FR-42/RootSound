@@ -9,18 +9,23 @@ declare class AudioWorkletProcessor {
   constructor(options?:unknown);
 }
 let bank:ReturnType<typeof loadSoundFont>|undefined;
+let starterBank:ReturnType<typeof loadSoundFont>|undefined;
 class FontProcessor extends AudioWorkletProcessor {
   #stream:SoundFontStream|undefined;
   #start=Infinity;
   #stop=Infinity;
   #ended=false;
-  constructor(options:{processorOptions:{bank?:ArrayBuffer;events?:FontEvent[];midiExpression?:TimedMidiExpressionLane[]}}) {
+  constructor(options:{processorOptions:{bank?:ArrayBuffer;starter?:boolean;events?:FontEvent[];midiExpression?:TimedMidiExpressionLane[]}}) {
     super();
     try {
-      if(options.processorOptions.bank){bank=loadSoundFont(options.processorOptions.bank);this.port.postMessage({type:'ready'});}
-      else {
-        if(!bank)throw Error('完整 SoundFont 音源尚未加载。');
-        this.#stream=new SoundFontStream(bank,sampleRate,options.processorOptions.events!,options.processorOptions.midiExpression);
+      if(options.processorOptions.bank) {
+        const loaded = loadSoundFont(options.processorOptions.bank);
+        if (options.processorOptions.starter) starterBank = loaded; else bank = loaded;
+        this.port.postMessage({type:'ready'});
+      } else {
+        const available = bank ?? starterBank;
+        if(!available)throw Error('SoundFont 音源尚未加载。');
+        this.#stream=new SoundFontStream(available,sampleRate,options.processorOptions.events!,options.processorOptions.midiExpression);
       }
       this.port.onmessage=event=>{
         const value=event.data;

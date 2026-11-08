@@ -381,7 +381,10 @@ export function mountPhraseComposition(root: HTMLElement, options: {
   const files = node('div', 'song-file-actions');
   if (options.onExport) files.append(action('导出音频', 'song-save song-export-audio', () => { void execute(options.onExport); }));
   if (options.onSettings) files.append(action('设置', 'song-save song-settings', () => { void execute(options.onSettings); }));
-  const save = action('保存', 'song-save song-save-project', () => { void execute(options.onSave, true); }); files.append(save); fileButtons.push(save);
+  if (options.onSave) {
+    const save = action('保存', 'song-save song-save-project', () => { void execute(options.onSave, true); });
+    files.append(save); fileButtons.push(save);
+  }
   if (options.onExit) { const exit = action('退出', 'song-exit', () => { void execute(options.onExit); }); files.append(exit); fileButtons.push(exit); }
   const identity = node('div', 'phrase-composition-identity');
   const back = action('‹', 'song-icon-button phrase-melody-back', () => { void execute(showOverview); });

@@ -73,6 +73,10 @@ test('website serves the same complete SF2 as the desktop build', async () => {
   const bytes = await readFile('.cache/website/play/instruments/generaluser-gs-2.0.3/GeneralUser-GS.sf2');
   assert.deepEqual(bytes, await readFile('public/instruments/generaluser-gs-2.0.3/GeneralUser-GS.sf2'));
   const bank = loadSoundFont(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength));
+  const starterBytes = await readFile('.cache/website/play/instruments/generaluser-gs-2.0.3/GeneralUser-GS-starter.sf2');
+  assert(starterBytes.byteLength < bytes.byteLength / 5);
+  const starter = loadSoundFont(starterBytes.buffer.slice(starterBytes.byteOffset, starterBytes.byteOffset + starterBytes.byteLength));
+  assert.deepEqual(starter.presets.map(preset => preset.program).sort((a,b) => a-b), [0,48,73]);
   const voices = [{program:0,key:60},{program:73,key:72},{program:48,key:60},{program:33,key:48},{program:10,key:72},
     {program:0,key:35,drums:true},{program:0,key:38,drums:true},{program:0,key:42,drums:true}];
   for (const voice of voices) {
@@ -82,6 +86,14 @@ test('website serves the same complete SF2 as the desktop build', async () => {
     stream.process(left, right); stream.dispose();
     assert(left.every(Number.isFinite));
     assert(left.some(sample => Math.abs(sample) > .001), JSON.stringify(voice));
+    if (!voice.drums && [0,48,73].includes(voice.program)) {
+      const compact = new SoundFontStream(starter, 44100, [{atSeconds:0,holdSeconds:.2,releaseSeconds:.2,level:.5,pan:0,
+        font:{bank:'generaluser-gs-2.0.3',program:voice.program,key:voice.key,velocity:95,cents:0,drums:false}}]);
+      await compact.ready();
+      const output = new Float32Array(left.length);
+      compact.process(output, new Float32Array(right.length)); compact.dispose();
+      assert.deepEqual(output, left);
+    }
   }
 });
 

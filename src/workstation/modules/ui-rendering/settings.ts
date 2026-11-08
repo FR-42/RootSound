@@ -3,7 +3,7 @@ import './workspace.css';
 import './settings.css';
 
 export function showLearningSettings(root: HTMLElement, preferences: LearningSettingsPort, options: {
-  requiresTempoRolls?: boolean; onChange?(): void;
+  requiresTempoRolls?: boolean; onChange?(): void; onReplayGuide?(): void;
 }): void {
   if (root.querySelector('.learning-settings')) return;
   const dialog = document.createElement('dialog'); dialog.className = 'settings-dialog learning-settings';
@@ -25,6 +25,12 @@ export function showLearningSettings(root: HTMLElement, preferences: LearningSet
     } catch (error) { input.checked = preferences.read().multipleTempoRolls; problem.textContent = String(error instanceof Error ? error.message : error); problem.hidden = false; }
   });
   dialog.append(header, label, hint, problem);
+  if (options.onReplayGuide) {
+    const replay = document.createElement('button'); replay.type = 'button'; replay.className = 'secondary learning-replay-guide';
+    replay.textContent = '再次观看引导';
+    replay.addEventListener('click', () => { dialog.close(); options.onReplayGuide!(); });
+    dialog.append(replay);
+  }
   dialog.addEventListener('close', () => dialog.remove(), { once: true }); root.append(dialog); dialog.showModal();
 }
 

@@ -5,6 +5,7 @@ import type { SampleBankTimbreBody, SampleBankZone } from '../../contracts/timbr
 import { decodePcmWav, encodeBase64 } from '../sampling/audio.ts';
 import { bankSampleIds, readSampleBankBody, selectBankZones } from './sample-bank-model.ts';
 import { defaultInstrumentInfo } from './instrument-catalog.ts';
+import { WEB_STARTER_TONES } from '../../contracts/web-audio.ts';
 
 type AssetZone = Omit<SampleBankZone,'sampleId'> & { asset:string; byteLength:number; sampleRate:number; channels:number; frames:number };
 type Asset = { bytes:Uint8Array; audio?:PcmAudio };
@@ -16,18 +17,24 @@ const referencePcm:PcmAudio={sampleRate:48000,channels:[new Float32Array([1])]};
 export function createSampleBankAudio(library:MaterialLibrary, samples?:SampleAudioPort, fetcher:typeof fetch=globalThis.fetch,
   options:{soundFont?:boolean}={}) {
   const full=options.soundFont ?? typeof globalThis.AudioWorkletNode==='function';
-  let manifest:Promise<Record<string,AssetZone[]>> | undefined;
+  const manifests = new Map<string, Promise<Record<string,AssetZone[]>>>();
   const assets=new Map<string,Promise<Asset>>(); let bytes=0;
   async function regions(body:SampleBankTimbreBody):Promise<AssetZone[]> {
-    manifest ??= (async()=>{
-      const response=await fetcher(base+'manifest.json'); if(!response.ok)throw new Error('内置采样库尚未安装完整，请重新安装新版 RootSound。');
-      const value=await response.json() as {bank:string;instruments:Record<string,AssetZone[]>};
-      if(value.bank!=='generaluser-gs-2.0.3')throw new Error('采样库版本不匹配。');
-      for(const zones of Object.values(value.instruments)) for(const zone of zones) {
-        if(!/^[a-f0-9]{64}\.wav$/u.test(zone.asset) || !Number.isInteger(zone.byteLength) || zone.byteLength<44 || zone.byteLength>16*1024*1024)throw new Error('采样库目录损坏。');
-      }
-      return value.instruments;
-    })().catch(error=>{manifest=undefined;throw error;});
+    const filename = import.meta.env?.MODE === 'website' && Object.hasOwn(WEB_STARTER_TONES, body.instrument)
+      ? 'manifest.starter.json' : 'manifest.json';
+    let manifest = manifests.get(filename);
+    if (!manifest) {
+      manifest = (async()=>{
+        const response=await fetcher(base+filename); if(!response.ok)throw new Error('内置采样库尚未安装完整，请重新安装新版 RootSound。');
+        const value=await response.json() as {bank:string;instruments:Record<string,AssetZone[]>};
+        if(value.bank!=='generaluser-gs-2.0.3')throw new Error('采样库版本不匹配。');
+        for(const zones of Object.values(value.instruments)) for(const zone of zones) {
+          if(!/^[a-f0-9]{64}\.wav$/u.test(zone.asset) || !Number.isInteger(zone.byteLength) || zone.byteLength<44 || zone.byteLength>16*1024*1024)throw new Error('采样库目录损坏。');
+        }
+        return value.instruments;
+      })().catch(error=>{manifests.delete(filename);throw error;});
+      manifests.set(filename, manifest);
+    }
     const found=(await manifest)[body.instrument]; if(!found?.length)throw new Error('找不到这个乐器的原始录音。');
     readSampleBankBody({...body,zones:found.map(zone=>{ const {asset,byteLength: _bytes,sampleRate: _rate,channels: _channels,frames: _frames,...fields}=zone;return {...fields,sampleId:asset}; })});
     return found;

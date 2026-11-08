@@ -13,7 +13,7 @@ import { allocateGraph, releaseGraph, scheduleGraph, startGraphSource, watchSour
 import { renderOffline } from './offline.ts';
 import { readPcmAudio } from './pcm.ts';
 import { WindowedGraph, WINDOWED_EVENT_THRESHOLD } from './windowed.ts';
-import {prepareSoundFont,hasSoundFont,soundFontReady} from './soundfont-node.ts';
+import {prepareSoundFont,hasSoundFont,soundFontReady,supportsStarterSoundFont} from './soundfont-node.ts';
 import { createOutputLimiter } from './output-limiter.ts';
 
 const DEVICE_RESUME_TIMEOUT_MS = 3000;
@@ -414,13 +414,13 @@ export function createBrowserSoundRuntime(): SoundRuntimePort {
     const preview = readPreview(input, { allowEmptySequence: true, previous: voice.preview, transportElapsed: options?.elapsedSeconds ?? elapsed(voice) });
     validateFrequency(preview, audio.sampleRate);
     const fontUpdate=++fontUpdateSequence;
-    if(hasSoundFont(preview)&&!soundFontReady(audio)) {
+    if(hasSoundFont(preview)&&!soundFontReady(audio,preview)) {
       void prepareSoundFont(audio,preview).then(()=>{
         if(fontUpdate===fontUpdateSequence&&active===voice&&voice.session.status==='playing')update(sessionId,input,options);
       }).catch(error=>{if(fontUpdate===fontUpdateSequence&&active===voice)finish(voice,'failed',message(error));});
       return voice.session;
     }
-    if (options?.preserveSounding && voice.preview && voice.soundFont && voice.completion && preview.sequence && !preview.output && !voice.preview.output
+    if (options?.preserveSounding && voice.preview && voice.soundFont && (!voice.soundFont.source.starterOnly || supportsStarterSoundFont(preview)) && voice.completion && preview.sequence && !preview.output && !voice.preview.output
       && preview.events.every(event => event.sound.kind === 'sample' && event.sound.soundFont)
       && voice.preview.events.every(event => event.sound.kind === 'sample' && event.sound.soundFont)) {
       if (audio.state !== 'running') throw new Error('声音设备当前不可用，请重新点击试听。');
