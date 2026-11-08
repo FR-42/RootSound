@@ -69,9 +69,9 @@ test('short MIDI remaps unsupported instruments without moving notes; oversized 
   assert.equal(model.library.currentToken(), before);
 });
 
-test('trimmed SF2 retains nonzero full-engine output for every offered voice', async () => {
+test('website serves the same complete SF2 as the desktop build', async () => {
   const bytes = await readFile('.cache/website/play/instruments/generaluser-gs-2.0.3/GeneralUser-GS.sf2');
-  assert(bytes.byteLength < 9 * 1024 * 1024);
+  assert.deepEqual(bytes, await readFile('public/instruments/generaluser-gs-2.0.3/GeneralUser-GS.sf2'));
   const bank = loadSoundFont(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength));
   const voices = [{program:0,key:60},{program:73,key:72},{program:48,key:60},{program:33,key:48},{program:10,key:72},
     {program:0,key:35,drums:true},{program:0,key:38,drums:true},{program:0,key:42,drums:true}];

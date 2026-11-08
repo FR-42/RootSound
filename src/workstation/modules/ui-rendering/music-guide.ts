@@ -90,7 +90,12 @@ export function mountMusicGuide(root: HTMLElement, factory: MusicGuideFactory, o
   words.hidden = true; words.setAttribute('aria-live', 'polite'); words.setAttribute('aria-atomic', 'true');
   const enterCue = button('music-guide-enter', 'Enter', () => { if (!enterCue.hidden) advance(); });
   enterCue.hidden = true;
-  shell.append(host, words, enterCue); root.replaceChildren(shell);
+  const touchControls = element('div', 'music-guide-touch');
+  const touchPlay = button('music-guide-touch-play', '播放 / 暂停', () => host.querySelector<HTMLButtonElement>('.song-play')?.click());
+  touchControls.append(touchPlay,
+    button('', '下一步', () => { if (shown && !host.querySelector('dialog[open]')) advance(); }),
+    button('', '退出引导', () => finish()));
+  shell.append(host, words, enterCue, touchControls); root.replaceChildren(shell);
   const suppressTitles = (node: Element) => {
     if (node.hasAttribute('title')) node.removeAttribute('title');
     node.querySelectorAll('[title]').forEach(child => child.removeAttribute('title'));
@@ -315,7 +320,8 @@ export function mountMusicGuide(root: HTMLElement, factory: MusicGuideFactory, o
     if (event.defaultPrevented || event.isComposing || event.keyCode === 229 || event.altKey || event.ctrlKey || event.metaKey
       || host.querySelector('dialog[open]')) { lastEnterAt = -Infinity; return; }
     const target = event.target;
-    if (target instanceof HTMLElement && (target.isContentEditable || target.closest('input, select, textarea') || !shell.contains(target) && target.closest('button'))) { lastEnterAt = -Infinity; return; }
+    if (target instanceof HTMLElement && (target.isContentEditable || target.closest('input, select, textarea')
+      || target.closest('.music-guide-touch') && (event.key === 'Enter' || event.code === 'Space'))) { lastEnterAt = -Infinity; return; }
     if (event.key !== 'Enter' && !event.repeat) lastEnterAt = -Infinity;
     if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); finish(); return; }
     if (!shown) return;
@@ -351,5 +357,5 @@ export function mountMusicGuide(root: HTMLElement, factory: MusicGuideFactory, o
       }
     }, 320);
   });
-  return { dispose, next() { if (!disposed && shown && !host.querySelector('dialog[open]')) advance(); } };
+  return { dispose };
 }

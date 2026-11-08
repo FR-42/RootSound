@@ -1,35 +1,11 @@
 import { build } from 'vite';
-import { readFile, writeFile, mkdir, cp, copyFile, rm } from 'node:fs/promises';
+import { mkdir, cp, rm } from 'node:fs/promises';
 import path from 'node:path';
-import { createHash } from 'node:crypto';
-import { SoundBankLoader, SpessaLog } from 'spessasynth_core';
-
-// The source ICRD has no zone; keep its serialization stable across Windows/CI.
-process.env.TZ='UTC';
-SpessaLog.setLogLevel(false,false,false);
 const root=path.resolve('.cache/website');
 await mkdir(root,{recursive:true});
 // Retire old generated tutorials as well as replacing current files.
 await rm(path.join(root,'guides'),{recursive:true,force:true});
 await cp('website',root,{recursive:true});
 await build({configFile:path.resolve('vite.web.config.ts')});
-const source='public/instruments/generaluser-gs-2.0.3',output=path.join(root,'play/instruments/generaluser-gs-2.0.3');
-await mkdir(output,{recursive:true});
-const keys=['piano','flute','string-ensemble','electric-bass','bell-pluck','acoustic-kick','snare','closed-hat'];
-const original=await readFile(path.join(source,'GeneralUser-GS.sf2'));
-const bank=SoundBankLoader.fromArrayBuffer(original.buffer.slice(original.byteOffset,original.byteOffset+original.byteLength));
-const programs=new Set([0,73,48,33,10]);
-for(const preset of [...bank.presets])if(!(preset.isGMGSDrum?preset.program===0&&preset.bankMSB===0:programs.has(preset.program)&&preset.bankMSB===0&&preset.bankLSB===0))bank.deletePreset(preset);
-bank.removeUnusedElements();
-const bytes=Buffer.from(bank.writeSF2());
-if(bytes.length>=original.length||bank.presets.length!==6)throw Error('Reduced bank is not the expected five melodic presets plus standard drums');
-await writeFile(path.join(output,'GeneralUser-GS.sf2'),bytes);
-const manifest=JSON.parse(await readFile(path.join(source,'manifest.json'),'utf8'));
-manifest.instruments=Object.fromEntries(keys.map(key=>[key,manifest.instruments[key]]));
-await writeFile(path.join(output,'manifest.json'),JSON.stringify(manifest));
-const assets=new Set(Object.values(manifest.instruments).flatMap(zones=>zones.map(zone=>zone.asset)));
-for(const asset of assets)await copyFile(path.join(source,asset),path.join(output,asset));
-for(const name of ['LICENSE.txt','THIRD-PARTY.txt','PROVENANCE.json','spessasynth_core-LICENSE.txt','stb-vorbis-LICENSE.txt'])await copyFile(path.join(source,name),path.join(output,name));
-const report={source:'GeneralUser GS 2.0.3',modified:'Subset of five melodic GM presets and standard drum kit; original sample data and generators retained.',sourceBytes:original.length,soundFontBytes:bytes.length,soundFontSha256:createHash('sha256').update(bytes).digest('hex'),voices:keys,presets:bank.presets.map(p=>({program:p.program,drums:p.isGMGSDrum})),portableWavFiles:assets.size};
-await writeFile(path.join(output,'WEB-SUBSET.json'),JSON.stringify(report,null,2));
-console.log(JSON.stringify(report));
+await cp('public/instruments/generaluser-gs-2.0.3', path.join(root, 'play/instruments/generaluser-gs-2.0.3'), { recursive: true });
+await cp('public/licenses', path.join(root, 'play/licenses'), { recursive: true });

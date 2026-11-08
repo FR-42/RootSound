@@ -60,3 +60,8 @@
   .phrase-composition-studio .song-topbar { grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); }
   .phrase-composition-studio .song-project-name { display: block; }
 }
+
+@media (max-width: 520px) {
+  .phrase-composition-studio .song-topbar { flex-basis: auto; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 8px; padding: 5px 8px; }
+  .phrase-composition-studio .song-file-actions { grid-column: 1 / -1; }
+}

@@ -81,8 +81,8 @@ function element<K extends keyof HTMLElementTagNameMap>(tag: K, className = '', 
   const node = document.createElement(tag); node.className = className; node.textContent = text; return node;
 }
 /** A project opens directly into its sole editable music score. */
-export function mountStudio(root: HTMLElement, options: StudioOptions): { dispose(): void; prepareClose(options?: { allowProjectDialog?: boolean }): Promise<void> } {
-  let disposed = false;
+export function mountStudio(root: HTMLElement, options: StudioOptions): { dispose(): void; openGuide(): Promise<void>; prepareClose(options?: { allowProjectDialog?: boolean }): Promise<void> } {
+  let disposed = false, guideOpen = false;
   let editor: ReturnType<typeof mountPhraseComposition> | undefined;
   let page: { dispose(): void } | undefined;
   function leave(): void { editor?.dispose(); editor = undefined; page?.dispose(); page = undefined; options.sound.stopAll(); }
@@ -98,10 +98,7 @@ export function mountStudio(root: HTMLElement, options: StudioOptions): { dispos
     const { page: welcome, start } = createProjectWelcome(); root.replaceChildren(welcome);
     if (options.musicGuide) {
       const guide = element('button', 'music-guide-launch', '操作引导'); guide.type = 'button';
-      guide.addEventListener('click', () => {
-        leave();
-        page = mountMusicGuide(root, options.musicGuide!, showWelcome);
-      });
+      guide.addEventListener('click', () => { void openGuide(); });
       welcome.append(guide);
     }
     if (options.learning) {
@@ -148,9 +145,23 @@ export function mountStudio(root: HTMLElement, options: StudioOptions): { dispos
         sound: options.sound, files: options.audioFiles!, prepare: () => phrase.preparePreview(), plan: () => phrase.previewPlan() }) : undefined,
     });
   }
+  async function openGuide() {
+    if (disposed || guideOpen || !options.musicGuide || root.querySelector('dialog[open]')) return;
+    guideOpen = true;
+    const resume = editor ? showMusic : showWelcome;
+    try {
+      await editor?.flush();
+      if (disposed) return;
+      leave();
+      page = mountMusicGuide(root, options.musicGuide, () => { guideOpen = false; resume(); });
+    } catch (error) {
+      guideOpen = false;
+      editor?.notify(error instanceof Error ? error.message : String(error), true);
+    }
+  }
   if (options.initialEntry && options.initialEntry !== 'welcome') showMusic();
   else showWelcome();
-  return { async prepareClose(closeOptions = {}) {
+  return { openGuide, async prepareClose(closeOptions = {}) {
     if (disposed) throw new Error('当前页面已关闭。');
     // Toolbar actions have already flushed their edits before invoking the project service.
     if (!closeOptions.allowProjectDialog) {

@@ -131,3 +131,10 @@
   .music-guide .phrase-composition-studio .song-project-name { display: block; }
   .music-guide .song-file-actions { grid-column: 1 / -1; }
 }
+
+.music-guide-touch { display: none; }
+@media (max-width: 760px), (pointer: coarse) {
+  .music-guide-touch { position: absolute; right: 10px; bottom: 8px; z-index: 31; display: flex; gap: 5px; }
+  .music-guide-touch button { padding: 4px 7px; border: 1px solid var(--border); border-radius: 4px; background: var(--surface); color: var(--text); font-size: 12px; }
+  .music-guide:not([data-step="3"]) .music-guide-touch-play { display: none; }
+}

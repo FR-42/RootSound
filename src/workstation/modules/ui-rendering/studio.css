@@ -1,6 +1,6 @@
 :root { font-family: 'Segoe UI', 'Microsoft YaHei UI', 'Microsoft YaHei', sans-serif; color: #e9e7e2; background: #141715; font-synthesis: none; color-scheme: dark; --accent: #ddc88f; --muted: #8e9890; }
 * { box-sizing: border-box; }
-body { margin: 0; min-width: 360px; }
+body { margin: 0; }
 button, input { font: inherit; }
 button, a, input[type=range], .envelope-handle { -webkit-tap-highlight-color: transparent; }
 button { cursor: pointer; }
