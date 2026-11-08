@@ -1294,7 +1294,7 @@ export function mountMelodyWorkspace(root: HTMLElement, options: {
     return true;
   }
   function keydown(event: KeyboardEvent): void {
-    if (options.readLessonInput && options.readLessonInput() !== 'edit') return;
+    if (root.closest('[inert]') || options.readLessonInput && options.readLessonInput() !== 'edit') return;
     const rangeUndo = event.key === 'Backspace' && event.target instanceof HTMLInputElement && event.target.type === 'range';
     if (disposed || library || event.isComposing || event.keyCode === 229 || isEditable(event.target) && !rangeUndo || root.querySelector('dialog[open]') || document.querySelector('dialog[open]')) return;
     const key = event.key.toLowerCase();

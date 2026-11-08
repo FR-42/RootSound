@@ -6,7 +6,9 @@ button { cursor:pointer; }
 button:disabled { cursor:default; opacity:.45; }
 button:focus-visible, input:focus-visible { outline:2px solid #497eae; outline-offset:2px; }
 [hidden] { display:none!important; }
+#app { position: relative; }
 .web-studio { height:100%; display:flex; flex-direction:column; min-width:0; }
+.web-studio[inert] { visibility: hidden; }
 .web-toolbar { display:flex; flex-wrap:wrap; align-items:center; gap:12px; min-height:52px; padding:8px 10px; border-bottom:1px solid var(--border); background:#fff; }
 .web-toolbar button { border:1px solid var(--border); border-radius:4px; padding:5px 9px; background:#fff; min-height:30px; font-size:12px; }
 .web-toolbar button:hover:enabled { background:#edf1f7; }
@@ -22,6 +24,15 @@ button:focus-visible, input:focus-visible { outline:2px solid #497eae; outline-o
 .web-footer { flex:none; display:flex; align-items:center; gap:12px; min-height:30px; padding:4px 10px; border-top:1px solid var(--border); font-size:11px; color:var(--muted); }
 .web-status { margin:0; flex:1; min-width:0; line-height:1.6; }
 .web-limit { white-space:nowrap; }
+.web-guide-start, .web-guide-controls button { flex: none; padding: 4px 8px; border: 1px solid var(--border); border-radius: 4px; background: #fff; color: var(--text); }
+.web-guide { position: absolute; inset: 0; display: flex; flex-direction: column; background: #fff; }
+.web-guide-stage { position: relative; flex: 1; min-height: 0; outline: none; }
+.web-guide-stage > .music-guide { position: absolute; }
+.web-guide-controls { flex: none; display: flex; justify-content: flex-end; gap: 8px; padding: 5px 10px; border-top: 1px solid var(--border); font-size: 12px; }
+.web-guide-next, .web-guide-play { display: none; }
+@media (max-width: 760px), (pointer: coarse) {
+  .web-guide-next, .web-guide:has(.music-guide[data-step="3"]) .web-guide-play { display: block; }
+}
 .web-help { background:#fff; border:1px solid var(--border); border-radius:50%; width:22px; height:22px; padding:0; flex:none; }
 .loading { padding:30px; font-size:14px; }
 .web-dialog { max-width:min(520px,calc(100% - 32px)); max-height:85%; overflow:auto; border:1px solid var(--border); border-radius:8px; padding:22px; color:var(--text); background:#fff; box-shadow:0 14px 45px #263b4d26; }

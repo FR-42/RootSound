@@ -12,12 +12,15 @@ import { phraseDurationSeconds, phraseBeatSeconds, phraseHeldSeconds } from '../
 import type { PhraseBody } from '../contracts/phrase.ts';
 import type { PlaylistTransportState } from '../modules/ui-rendering/playlist-transport.ts';
 import { createLearningSettings } from './platform/learning-settings.ts';
+import { createMusicGuideDocument } from './music-guide-document.ts';
+import { mountMusicGuide } from '../modules/ui-rendering/music-guide.ts';
 import './web-demo.css';
 
 const app = document.querySelector<HTMLElement>('#app')!;
 app.innerHTML = `<section class="web-studio" aria-label="简乐在线编曲">
   <header class="web-toolbar">
     <input class="web-name" aria-label="音乐名称" value="我的音乐" readonly title="双击修改名称">
+    <button class="web-guide-start" type="button">操作引导</button>
     <div class="web-transport">
       <button class="web-stop" title="停止并回到开头" aria-label="停止并回到开头">■</button>
       <button class="web-play" title="播放 / 暂停（空格）" aria-label="播放" aria-pressed="false">▶</button>
@@ -36,6 +39,14 @@ app.innerHTML = `<section class="web-studio" aria-label="简乐在线编曲">
   <div class="web-workspace"></div>
   <footer class="web-footer"><p class="web-status" role="status" aria-live="polite">选一个音符组，在空白处点按或拖动，即可写音符。</p><span class="web-limit">8 音色 · 最多 16 小节</span><button class="web-help" aria-label="使用帮助">?</button></footer>
   <input class="web-file" type="file" accept=".mid,.midi,.smf,.kar,.rmi,.musicxml,.xml,.mxl,.rootsound,.rsproject" hidden>
+</section>
+<section class="web-guide" aria-label="操作引导" hidden>
+  <div class="web-guide-stage" tabindex="-1"></div>
+  <footer class="web-guide-controls">
+    <button class="web-guide-play" type="button">播放 / 暂停</button>
+    <button class="web-guide-next" type="button">下一步</button>
+    <button class="web-guide-exit" type="button">退出引导</button>
+  </footer>
 </section>`;
 const q = <T extends HTMLElement = HTMLElement>(selector: string) => app.querySelector<T>(selector)!;
 const name = q<HTMLInputElement>('.web-name'), play = q<HTMLButtonElement>('.web-play');
@@ -52,6 +63,31 @@ let temporary: PhraseBody | undefined, family: string | undefined;
 let dirty = false, busy = false, frame = 0, disposed = false;
 let showStarter = true;
 const learning = createLearningSettings(localStorage);
+const studio = q('.web-studio'), guideView = q('.web-guide'), guideStage = q('.web-guide-stage');
+const guideStart = q<HTMLButtonElement>('.web-guide-start');
+let guide: ReturnType<typeof mountMusicGuide> | undefined;
+
+function closeGuide() {
+  guide?.dispose();
+  guide = undefined;
+  guideView.hidden = true;
+  studio.inert = false;
+  guideStart.focus({ preventScroll: true });
+}
+
+guideStart.addEventListener('click', () => {
+  if (busy || guide) return;
+  editor?.flush();
+  transport?.pause();
+  runtime.cancelAudition();
+  studio.inert = true;
+  guideView.hidden = false;
+  guide = mountMusicGuide(guideStage, { createDocument: createMusicGuideDocument, createSound: createBrowserSoundRuntime }, closeGuide);
+  guideStage.focus({ preventScroll: true });
+});
+q('.web-guide-exit').addEventListener('click', closeGuide);
+q('.web-guide-next').addEventListener('click', () => guide?.next());
+q('.web-guide-play').addEventListener('click', () => guideStage.querySelector<HTMLButtonElement>('.song-play')?.click());
 
 q('.web-settings').addEventListener('click', () => {
   if (busy) return;
@@ -63,7 +99,6 @@ function webSound() {
   const sound = createBrowserSoundRuntime();
   let request = 0;
   return { ...sound, async audition(plan: Parameters<typeof sound.audition>[0]) {
-    if (parent !== window) parent.postMessage({ type: 'jianle:editor-playing' }, location.origin);
     const id = ++request; report('正在准备声音，首次试听需要加载音色…');
     try { await sound.audition(plan); if (id === request) report('右键删除音符，按住右键拖动可连续擦除。悬停音符时按 Alt 并滚动可微调时长。'); }
     catch (error) { if (id === request) report(error); throw error; }
@@ -122,7 +157,6 @@ function mount() {
     prepare: () => model.score.preparePreview(planBody()), tempoBpm: () => model.score.read().body!.tempoBpm,
     durationSeconds: () => phraseDurationSeconds(model.score.read().body!), readBody: planBody,
     onChange(next) {
-      if (next.playing && !state.playing && parent !== window) parent.postMessage({ type: 'jianle:editor-playing' }, location.origin);
       state = next; cancelAnimationFrame(frame); paintClock(); refreshButtons();
     }, onError: report,
   });
@@ -282,7 +316,7 @@ document.addEventListener('keydown', event => {
 }, { capture: true });
 document.addEventListener('keydown', event => {
   const target = event.target as HTMLElement;
-  if (event.defaultPrevented || busy || target.closest('input,textarea,select,dialog,[contenteditable="true"]')) return;
+  if (event.defaultPrevented || busy || guide || target.closest('input,textarea,select,dialog,[contenteditable="true"]')) return;
   if (event.code === 'Space' && !target.closest('button')) {
     event.preventDefault(); void runtime.activate?.().then(() => transport?.toggle()).catch(report);
   }
@@ -293,12 +327,7 @@ document.addEventListener('keydown', event => {
   }
 });
 window.addEventListener('beforeunload', event => { editor?.flush(); if (dirty) { event.preventDefault(); event.returnValue = ''; } });
-window.addEventListener('message', event => {
-  if (event.origin === location.origin && event.source === parent && event.data?.type === 'jianle:pause-for-guide') {
-    transport?.pause(); runtime.cancelAudition();
-  }
-});
-window.addEventListener('pagehide', () => { disposed = true; cancelAnimationFrame(frame); editor?.dispose(); transport?.dispose(); void runtime.dispose(); });
+window.addEventListener('pagehide', () => { disposed = true; guide?.dispose(); cancelAnimationFrame(frame); editor?.dispose(); transport?.dispose(); void runtime.dispose(); });
 
 try {
   mount(); report('示例已载入，可以直接播放或编辑。');

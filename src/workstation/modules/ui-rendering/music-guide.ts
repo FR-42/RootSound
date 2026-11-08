@@ -315,7 +315,7 @@ export function mountMusicGuide(root: HTMLElement, factory: MusicGuideFactory, o
     if (event.defaultPrevented || event.isComposing || event.keyCode === 229 || event.altKey || event.ctrlKey || event.metaKey
       || host.querySelector('dialog[open]')) { lastEnterAt = -Infinity; return; }
     const target = event.target;
-    if (target instanceof HTMLElement && (target.isContentEditable || target.closest('input, select, textarea'))) { lastEnterAt = -Infinity; return; }
+    if (target instanceof HTMLElement && (target.isContentEditable || target.closest('input, select, textarea') || !shell.contains(target) && target.closest('button'))) { lastEnterAt = -Infinity; return; }
     if (event.key !== 'Enter' && !event.repeat) lastEnterAt = -Infinity;
     if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); finish(); return; }
     if (!shown) return;
@@ -351,5 +351,5 @@ export function mountMusicGuide(root: HTMLElement, factory: MusicGuideFactory, o
       }
     }, 320);
   });
-  return { dispose };
+  return { dispose, next() { if (!disposed && shown && !host.querySelector('dialog[open]')) advance(); } };
 }

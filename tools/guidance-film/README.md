@@ -9,7 +9,7 @@
 
 ## 内容与运行
 
-真实操作素材来自仓库已有的 `website/guides/*.webp`，与 Remotion 的抽象声波、音符、颜色、
+真实操作素材来自仓库已有的 `history/2026-11-08-website-guide/guides/*.webp`，与 Remotion 的抽象声波、音符、颜色、
 镜头入场和交叉溶解交替剪辑。配乐由 `prepare.py` 的原创音序离线合成，是短片配乐，不是
 录制用户音乐，也不是音源音质对照。章节定义与应用共享 `guidance-scenes.json`。
 

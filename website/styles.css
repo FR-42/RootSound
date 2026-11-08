@@ -18,32 +18,6 @@ h1 { margin: 0; font-size: 24px; font-weight: 600; }
 main { width: min(1180px, calc(100% - 48px)); margin: 24px auto; }
 .music-editor { display: block; width: 100%; height: min(760px, calc(100svh - 160px)); min-height: 520px; border: 1px solid #d6d7d4; border-radius: 8px; background: #fafbfd; }
 .downloads { display: grid; gap: 12px; width: min(480px, 100%); margin: 32px auto; }
-.operation-guide { width: 100%; margin: 10px auto 40px; padding: 22px; background: #f4f6f9; border-radius: 14px; outline: none; }
-.guide-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 0 16px; margin-bottom: 4px; }
-.guide-heading h2 { margin: 0; font-size: 18px; font-weight: 550; }
-.guide-motion { border: 0; background: transparent; color: #858b94; padding: 8px; border-radius: 50%; cursor: pointer; }
-.guide-motion:hover { color: #313e50; background: #f1f3f6; }
-.guide-motion svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linejoin: round; }
-.guide-deck { position: relative; isolation: isolate; margin-top: 8px; }
-.guide-deck::before, .guide-deck::after { content: ''; position: absolute; z-index: -1; inset: 6px 15px -6px; border-radius: 7px; background: #f0f2f5; transform: rotate(0.5deg); }
-.guide-deck::after { inset: 3px 7px -3px; background: #f7f8fa; transform: rotate(-0.35deg); }
-.guide-stage { position: relative; aspect-ratio: 16 / 9; perspective: 1400px; overflow: hidden; border-radius: 6px; background: #fff; box-shadow: 0 5px 18px #22314d0a; touch-action: pan-y; cursor: grab; user-select: none; }
-.guide-stage:active { cursor: grabbing; }
-.guide-page { position: absolute; inset: 0; backface-visibility: hidden; will-change: transform, opacity; }
-.guide-leaving { z-index: 1; pointer-events: none; }
-.guide-image { display: block; width: 100%; height: 100%; object-fit: contain; pointer-events: none; -webkit-user-drag: none; }
-.guide-turn { position: absolute; z-index: 3; top: 50%; transform: translateY(-50%); display: grid; place-items: center; width: 28px; height: 42px; border: 0; border-radius: 16px; color: #8b94a2; background: #ffffffd9; cursor: pointer; transition: color .2s, background .2s; }
-.guide-turn:hover { color: #2d527e; background: #eef2f9; }
-.guide-turn svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.4; stroke-linecap: round; stroke-linejoin: round; }
-.guide-back { left: -12px; }
-.guide-next { right: -12px; }
-.guide-footer { position: relative; display: flex; align-items: center; justify-content: center; margin-top: 18px; min-height: 24px; }
-.guide-dots { display: flex; gap: 2px; }
-.guide-dot { display: grid; place-items: center; padding: 0; width: 24px; height: 24px; border: 0; background: transparent; cursor: pointer; }
-.guide-dot::after { content: ''; width: 5px; height: 5px; background: #d0d4da; border-radius: 10px; transition: width .25s, background .25s; }
-.guide-dot[aria-current="true"]::after { width: 17px; background: #617691; }
-.guide-count { position: absolute; right: 16px; color: #9298a1; font-size: 11px; font-variant-numeric: tabular-nums; }
-.operation-guide:focus-visible, .operation-guide button:focus-visible { outline: 2px solid #9aaac0; outline-offset: 3px; }
 .platform-download { display: flex; align-items: center; gap: 20px; padding: 23px 22px; border: 1px solid #d6d7d4; border-radius: 8px; background: #fff; transition: transform .2s, border-color .2s, box-shadow .2s; }
 .platform-download:hover { transform: translateY(-2px); border-color: #afb5cf; box-shadow: 0 7px 20px #313a4f09; }
 .platform-icon { width: 25px; height: 25px; }
@@ -58,21 +32,14 @@ a:focus-visible { outline: 2px solid #2859a8; outline-offset: 5px; }
   .brand img { width: 32px; height: 32px; }
   main { width: calc(100% - 24px); margin-block: 16px; }
   .music-editor { height: calc(100svh - 112px); min-height: 500px; }
-  .operation-guide { margin-top: 6px; margin-bottom: 24px; }
-  .guide-heading { padding-inline: 4px; }
-  .guide-heading h2 { font-size: 16px; }
-  .guide-back { left: -8px; }
-  .guide-next { right: -8px; }
-  .guide-count { right: 4px; }
   .platform-download { gap: 16px; padding: 20px; }
 }
-@media (prefers-reduced-motion: reduce) { .platform-download, .guide-turn, .guide-dot::after { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .platform-download { transition: none; } }
 
 .project-description { margin: 0 0 28px; color: #626a76; font-size: 16px; line-height: 1.8; }
-.section-kicker { display: block; font-size: 11px; letter-spacing: .08em; color: #7b8492; margin-bottom: 9px; }
 .playground { margin-top: 34px; }
 .playground-heading { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; padding-inline: 4px; }
 .playground-heading h2 { margin: 0; font-size: 22px; font-weight: 550; }
 .playground-heading span { padding: 5px 10px; border-radius: 5px; color: #47708d; background: #edf5f8; font-size: 12px; }
 .site-thanks { border-top: 1px solid #eeeeef; padding: 24px 20px 32px; text-align: center; color: #8a8e96; font-size: 12px; line-height: 1.8; }
-@media (max-width: 600px) { .operation-guide { padding: 14px 10px; } .playground-heading h2 { font-size: 19px; } }
+@media (max-width: 600px) { .playground-heading h2 { font-size: 19px; } }

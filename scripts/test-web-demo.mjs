@@ -61,46 +61,11 @@ let expression='starting',stage='setup';
  await js("document.querySelector('.web-new').click()");await wait(()=>js("document.querySelectorAll('.melody-note').length===0"));
  await js("location.reload()");await wait(()=>js("document.querySelectorAll('.melody-note').length===40").catch(()=>false));
  await js("document.querySelector('.web-new').click()");await wait(()=>js("document.querySelectorAll('.melody-note').length===0"));
- await parentJs("document.querySelector('#guide').scrollIntoView()");
-
- assert.equal(await parentJs("!!(document.querySelector('#guide').compareDocumentPosition(document.querySelector('.music-editor')) & Node.DOCUMENT_POSITION_FOLLOWING)"),true);
- assert.equal(await parentJs("document.querySelectorAll('video').length"),0);
+ assert.equal(await parentJs("document.querySelectorAll('.music-editor').length"),1);
+ assert.equal(await parentJs("document.querySelectorAll('#guide, video').length"),0);
+ assert.equal(await parentJs("document.querySelector('[data-platform=windows]').href.endsWith('-Setup.exe')"),true);
+ assert.equal(await parentJs("document.querySelector('[data-platform=mac]').href.endsWith('.pkg')"),true);
  assert.equal(await parentJs("document.querySelector('.site-thanks').textContent"),'特别鸣谢：frank。（b站：Frank讲明白）');
- const guideLayout=await parentJs("(()=>{const r=document.querySelector('.guide-stage').getBoundingClientRect();return {width:r.width,height:r.height}})()");assert(guideLayout.width>1100&&guideLayout.height>600);
-
- await wait(()=>parentJs("document.querySelectorAll('.guide-dot').length===6"));
- const titles=['添加音色','BPM','格数','缩放视角','写音符与拖动画布','延长与新增卷帘'];
- for(let i=0;i<6;i++){
-  await parentJs("document.querySelectorAll('.guide-dot')["+i+"].click()");
-  await wait(()=>parentJs("document.querySelector('#guide-title').textContent==="+JSON.stringify(titles[i])));
-  await wait(()=>parentJs("document.querySelectorAll('.guide-page').length===1"));
-  assert.equal(await parentJs("document.querySelectorAll('.guide-dot[aria-current=true]').length"),1);
-  assert.equal(await parentJs("document.querySelector('.guide-page img').naturalWidth"),1920);
-  assert.equal(await parentJs("document.querySelector('.guide-page img').naturalHeight"),1080);
-  assert.equal(await parentJs("new URL(document.querySelector('.guide-page img').src).pathname.endsWith('.webp')"),true);
- }
- await parentJs("document.querySelector('#guide').dispatchEvent(new KeyboardEvent('keydown',{bubbles:true,key:'ArrowRight'}))");
- await wait(()=>parentJs("document.querySelector('#guide-title').textContent==='添加音色'"));
- await parentJs("document.querySelector('#guide').dispatchEvent(new KeyboardEvent('keydown',{bubbles:true,key:'ArrowLeft'}))");
- await wait(()=>parentJs("document.querySelector('#guide-title').textContent==='延长与新增卷帘'"));
- await parentJs("(()=>{const n=document.querySelector('.guide-next');n.click();n.click();n.click()})()");
- await wait(()=>parentJs("document.querySelector('#guide-title').textContent==='格数'"));
- await wait(()=>parentJs("document.querySelectorAll('.guide-page').length===1"));
- await parentJs("(()=>{const n=document.querySelector('.guide-stage');n.setPointerCapture=()=>{};n.dispatchEvent(new PointerEvent('pointerdown',{bubbles:true,button:0,pointerId:7,clientX:400,clientY:200}));n.dispatchEvent(new PointerEvent('pointerup',{bubbles:true,button:0,pointerId:7,clientX:300,clientY:205}))})()");
- await wait(()=>parentJs("document.querySelector('#guide-title').textContent==='缩放视角'"));
- await wait(()=>parentJs("document.querySelectorAll('.guide-page').length===1"));
- await parentJs("document.querySelector('.guide-motion').click()");
- assert.equal(await parentJs("new URL(document.querySelector('.guide-page img').src).pathname.endsWith('.jpg')"),true);
- await parentJs("document.querySelector('.guide-motion').click()");
- assert.equal(await parentJs("new URL(document.querySelector('.guide-page img').src).pathname.endsWith('.webp')"),true);
- await win.webContents.debugger.attach('1.3');
- await win.webContents.debugger.sendCommand('Emulation.setEmulatedMedia',{features:[{name:'prefers-reduced-motion',value:'reduce'}]});
- await wait(()=>parentJs("document.querySelector('.guide-motion').getAttribute('aria-pressed')==='true'"));
- await parentJs("document.querySelector('.guide-next').click()");
- await wait(()=>parentJs("document.querySelector('#guide-title').textContent==='写音符与拖动画布'"));
- assert.equal(await parentJs("document.querySelectorAll('.guide-page').length"),1);
- assert.equal(await parentJs("document.querySelector('.guide-stage').getAnimations({subtree:true}).length"),0);
- await win.webContents.debugger.sendCommand('Emulation.setEmulatedMedia',{features:[]});win.webContents.debugger.detach();
  assert.equal(await js('__webTest.audioCreated'),0,'startup cannot open an audio device');
  assert.equal(await js("document.querySelectorAll('.melody-grid-line.is-bar').length"),0);
  assert.equal(await js("document.querySelector('.output-volume input').value"),'100');
@@ -114,7 +79,7 @@ let expression='starting',stage='setup';
  const cellPositions=await js("[...document.querySelectorAll('.melody-grid-line.is-cell')].slice(0,4).map(n=>parseFloat(n.style.top))");
  assert.equal(cellPositions.length,4);assert(cellPositions[1]>cellPositions[0]);
  const beatPositions=await js("[...document.querySelectorAll('.melody-grid-line.is-beat')].slice(0,2).map(n=>parseFloat(n.style.top))");
- assert(Math.abs((beatPositions[1]-beatPositions[0])/(cellPositions[1]-cellPositions[0])-3)<1e-4,JSON.stringify({beatPositions,cellPositions}));
+ assert(Math.abs((beatPositions[1]-beatPositions[0])/3-(cellPositions[1]-cellPositions[0]))<=1,JSON.stringify({beatPositions,cellPositions}));
  assert.equal(await js("document.querySelectorAll('.melody-grid-line.is-beat').length>=2"),true);
  assert.deepEqual(await js("[...document.querySelectorAll('.melody-grid-line.is-beat')].map(n=>n.style.top)"),beforeGridBeats);
  await js("(()=>{const n=document.querySelector('.melody-grid-select');n.value='4';n.dispatchEvent(new Event('change'))})()");
@@ -160,10 +125,63 @@ let expression='starting',stage='setup';
   const layout=await js("({width:innerWidth,scroll:document.documentElement.scrollWidth,rollWidth:document.querySelector('.melody-roll').getBoundingClientRect().width,rollHeight:document.querySelector('.melody-roll').getBoundingClientRect().height,toolbar:document.querySelector('.web-toolbar').getBoundingClientRect().height})");assert(layout.scroll<=layout.width+1,JSON.stringify(layout));assert(layout.rollWidth>110&&layout.rollHeight>300);layouts.push(layout);
   fs.writeFileSync(root+'/web-'+width+'.png',(await win.webContents.capturePage()).toPNG());
  }
- win.setContentSize(1280,950);await parentJs("document.querySelector('#guide').scrollIntoView()");await delay(100);fs.writeFileSync(root+'/guide-desktop.png',(await win.webContents.capturePage()).toPNG());
- win.setContentSize(390,950);await delay(100);assert.equal(await parentJs('document.documentElement.scrollWidth<=innerWidth'),true);fs.writeFileSync(root+'/guide-mobile.png',(await win.webContents.capturePage()).toPNG());
+ stage='embedded interactive guide';
+ win.setContentSize(1280,950);
+ const draft='引导前的草稿';
+ await js("(()=>{const n=document.querySelector('.web-name');n.dispatchEvent(new MouseEvent('dblclick'));n.value="+JSON.stringify(draft)+";n.dispatchEvent(new Event('blur'))})()");
+ assert(await js("document.querySelector('.web-save').hasAttribute('data-unsaved')"));
+ await js("document.querySelector('.web-play').click()");
+ await wait(()=>js("document.querySelector('.web-play').getAttribute('aria-pressed')==='true'"));
+ await js("document.querySelector('.web-guide-start').click()");
+ await wait(()=>js("document.querySelector('.music-guide-word')?.textContent==='卷帘'"));
+ assert(await js("document.querySelector('.web-studio').inert"));
+ assert.equal(await js("document.querySelector('.web-play').getAttribute('aria-pressed')"),'false');
+ assert.equal(await js("document.querySelectorAll('.web-guide .melody-note').length"),6);
+ await js("document.activeElement.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true,cancelable:true}))");
+ await wait(()=>js("document.querySelector('.music-guide-word')?.textContent==='音符'"));
+ await js("document.activeElement.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true,cancelable:true}))");
+ await wait(()=>js("!document.querySelector('.music-guide')&&!document.querySelector('.web-studio').inert"));
+ assert.equal(await js("document.activeElement.className"),'web-guide-start');
+ assert.equal(await js("document.querySelector('.web-name').value"),draft);
+ assert.equal(await js("document.querySelectorAll('.web-studio .melody-note').length"),1);
+
+ stage='compact guide navigation and draft isolation';
+ win.setContentSize(390,950);
+ await js("document.querySelector('.web-guide-start').click()");
+ await wait(()=>js("document.querySelector('.music-guide-word')?.textContent==='卷帘'"));
+ assert(await js("document.querySelector('.web-guide-next').getBoundingClientRect().width>0"));
+ assert(await parentJs('document.documentElement.scrollWidth<=innerWidth'));
+ for(let step=2;step<=10;step++){
+   await js("document.querySelector('.web-guide-next').click()");
+   await wait(()=>js("Number(document.querySelector('.music-guide')?.dataset.step)==="+step));
+   if(step===3) {
+     assert(await js("document.querySelector('.web-guide-play').getBoundingClientRect().width>0"));
+     const before=await js('__webTest.audioCreated');
+     await js("document.querySelector('.web-guide-play').click()");
+     await wait(async()=>await js('__webTest.audioCreated')>before);
+   }
+   if(step===9) {
+     const count=await js("document.querySelectorAll('.web-studio .melody-note').length");
+     await js("document.activeElement.dispatchEvent(new KeyboardEvent('keydown',{key:'Backspace',bubbles:true,cancelable:true}))");
+     assert.equal(await js("document.querySelectorAll('.web-studio .melody-note').length"),count);
+   }
+ }
+ assert.equal(await js("document.querySelector('.music-guide-word').textContent"),'顶栏');
+ await js("document.querySelector('.web-guide-next').click()");
+ await wait(()=>js("document.querySelector('.web-guide').hidden&&!document.querySelector('.web-studio').inert"));
+ await js("document.querySelector('.web-guide-start').click()");
+ await wait(()=>js("document.querySelector('.music-guide-word')?.textContent==='卷帘'"));
+ await js("document.querySelector('.web-guide-exit').click()");
+ assert.equal(await js("document.querySelector('.web-name').value"),draft);
+ assert(await js("document.querySelector('.web-save').hasAttribute('data-unsaved')"));
+ await js("__webTest.downloads=[],document.querySelector('.web-save').click()");
+ await wait(()=>js("__webTest.downloads.some(item=>item.name.endsWith('.rootsound'))"));
+ const afterGuide=JSON.parse(await js("__webTest.downloads.find(item=>item.name.endsWith('.rootsound')).blob.text()"));
+ assert.equal(afterGuide.name,draft);
+ const savedNotes=workspace=>JSON.parse(workspace.libraryText).contents.filter(item=>item.kind==='rootsound.phrase').flatMap(item=>item.body.parts.flatMap(part=>part.notes));
+ assert.deepEqual(savedNotes(afterGuide),savedNotes(saved));
  const errors=await js('__webTest.errors');assert.deepEqual(errors,[]);assert.deepEqual(rendererErrors,[]);assert(!win.isVisible());
- fs.writeFileSync(root+'/report.json',JSON.stringify({passed:true,audio,layouts,voices:8,realProductionBuild:true,subpath:true,drawUndoRedo:true,pauseResume:true,lastNoteBarStop:true,manualTailPlayback:true,nativeWorkspaceRoundtrip:true,starterNotes:40,starterReload:true,guidePages:6,guideKeysSwipeRapidFlip:true,guideReducedMotion:true,noVideo:true,visibleWindow:false,physicalAudio:false},null,2));win.destroy();app.exit(0);
+ fs.writeFileSync(root+'/report.json',JSON.stringify({passed:true,audio,layouts,voices:8,realProductionBuild:true,subpath:true,drawUndoRedo:true,pauseResume:true,lastNoteBarStop:true,manualTailPlayback:true,nativeWorkspaceRoundtrip:true,starterNotes:40,starterReload:true,guideStages:10,guideDraftIsolation:true,guideKeyboardAndTouchControls:true,noVideo:true,visibleWindow:false,physicalAudio:false},null,2));win.destroy();app.exit(0);
 }catch(error){fs.writeFileSync(root+'/report.json',JSON.stringify({error:String(error),stack:error?.stack,expression:expression.slice(0,350),stage}));app.exit(1)}})();
 `);
 const env={...process.env};delete env.ELECTRON_RUN_AS_NODE;

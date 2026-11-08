@@ -9,7 +9,7 @@ root = Path(__file__).resolve().parents[2]
 target = root / '.cache' / 'guidance-film' / 'input'
 target.mkdir(parents=True, exist_ok=True)
 for name in ['add-voice', 'editing', 'zoom', 'bpm', 'cells', 'extend']:
-    source = Image.open(root / 'website' / 'guides' / (name + '.webp'))
+    source = Image.open(root / 'history' / '2026-11-08-website-guide' / 'guides' / (name + '.webp'))
     frames = target / (name + '-frames')
     frames.mkdir(exist_ok=True)
     lines = ['ffconcat version 1.0']
