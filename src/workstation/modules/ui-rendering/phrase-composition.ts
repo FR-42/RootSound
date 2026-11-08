@@ -44,7 +44,8 @@ export function mountPhraseComposition(root: HTMLElement, options: {
   readMultipleTempoRolls?(): boolean;
   onLearningAction?(action: LearningAction): void;
   readLessonInput?: Parameters<typeof mountMelodyWorkspace>[1]['readLessonInput'];
-  touchGuide?: Parameters<typeof mountMelodyWorkspace>[1]['touchGuide'];
+  mobileTouch?: Parameters<typeof mountMelodyWorkspace>[1]['mobileTouch'];
+  mobileWeb?: boolean;
   readLessonToolbar?(): boolean;
   onPlaybackAdvance?(): void;
   frameNotesOnMount?: boolean;
@@ -380,8 +381,19 @@ export function mountPhraseComposition(root: HTMLElement, options: {
   if (clock) controls.append(clock, bpm, subdivision);
   mountOutputVolume(controls, () => sound);
   const files = node('div', 'song-file-actions');
+  let mobileTouch = options.mobileTouch;
   if (options.onExport) files.append(action('导出音频', 'song-save song-export-audio', () => { void execute(options.onExport); }));
   if (options.onSettings) files.append(action('设置', 'song-save song-settings', () => { void execute(options.onSettings); }));
+  if (options.mobileWeb) {
+    let rightMode = false;
+    const right = action('右键', 'song-save song-touch-right', () => {
+      rightMode = !rightMode;
+      right.setAttribute('aria-pressed', String(rightMode));
+    });
+    right.setAttribute('aria-pressed', 'false');
+    files.append(right);
+    mobileTouch = { readRightButton: () => rightMode };
+  }
   if (options.onSave) {
     const save = action('保存', 'song-save song-save-project', () => { void execute(options.onSave, true); });
     files.append(save); fileButtons.push(save);
@@ -537,7 +549,7 @@ export function mountPhraseComposition(root: HTMLElement, options: {
     activeSection = 'melody';
     try { sectionEditor = mountMelodyWorkspace(melodyRegion, { phrase, sound, initialView: current, gridBpm: gridTempo, readPerformanceMode: options.readPerformanceMode, includeAllSections: true,
       readMultipleTempoRolls: options.readMultipleTempoRolls, onLearningAction: options.onLearningAction, readLessonInput: options.readLessonInput,
-      touchGuide: options.touchGuide,
+      mobileTouch,
       orientation: options.directMusic ? 'vertical' : 'horizontal',
       showPlayheadTime: options.directMusic,
       workspaceState: options.workspaceState,

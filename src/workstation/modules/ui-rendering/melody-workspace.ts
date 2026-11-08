@@ -34,8 +34,8 @@ type Selection = { partId: string; noteId?: string };
 type LibraryIntent = { kind: 'create' } | { kind: 'replace'; partId: string };
 type Gesture = { id: number; capture: HTMLElement; base: PhraseBody; draftId: string; from: Point; last: Point; clientFrom: Point } & (
   { kind: 'head'; seconds: number } | { kind: 'pan'; lastClient: Point } |
-  { kind: 'erase'; refs: Map<string, { partId: string; noteId: string }>; moved: boolean; sampleTime?: number } |
-  { kind: 'note' | 'create' | 'resize'; partId: string; targetPartId?: string; note: PhraseNote; changes: NoteChanges; rawY: number; moved: boolean; auditionOnClick?: boolean });
+  { kind: 'erase'; refs: Map<string, { partId: string; noteId: string }>; moved: boolean; sampleTime?: number; touchRight?: boolean } |
+  { kind: 'note' | 'create' | 'resize'; partId: string; targetPartId?: string; note: PhraseNote; changes: NoteChanges; rawY: number; moved: boolean; auditionOnClick?: boolean; touchDrag?: boolean });
 type Mix = { partId: string; note: PhraseNote; base: PhraseBody; changes: NoteChanges; pointerId?: number };
 const RHYTHM_PITCH = 261.6255653005986;
 const GROUP_DRAG_TYPE = 'application/x-rootsound-note-group';
@@ -69,7 +69,7 @@ export function mountMelodyWorkspace(root: HTMLElement, options: {
   readMultipleTempoRolls?(): boolean;
   onLearningAction?(action: LearningAction): void;
   readLessonInput?(): 'locked' | 'pan' | 'draw' | 'zoom' | 'edit';
-  touchGuide?: { readRightButton(): boolean };
+  mobileTouch?: { readRightButton(): boolean };
 }): { refresh(view?: PhraseView): void; dispose(): void; flush(): void; setPlayhead(seconds: number, playing?: boolean): void; isStepInputActive(): boolean; readViewport(): PhraseEditorViewport; frameNotes(reserveEndSpace?: boolean): void; previewTempoRate(value?: number, sectionId?: string): void } {
   const { phrase, sound } = options; let current = options.initialView ?? phrase.read(); let disposed = false;
   const rhythm = options.section === 'rhythm';
@@ -124,7 +124,7 @@ export function mountMelodyWorkspace(root: HTMLElement, options: {
   let tempoRatePreview: PhraseBody | undefined;
   let tempoPreviewBoundaryOnly = false;
   let panMoved = false;
-  const touches = vertical && options.touchGuide ? new Map<number, Point>() : undefined;
+  const touches = vertical && options.mobileTouch && options.readLessonInput ? new Map<number, Point>() : undefined;
   let pinch: { x: number; y: number; axis?: 'x' | 'y' | 'both' } | undefined;
   let pinchFrame = 0;
   const sounding = new Set<string>();
@@ -757,9 +757,14 @@ export function mountMelodyWorkspace(root: HTMLElement, options: {
       }
       const rect = noteRect(note, voice, value!, canvasWidth, rhythmRows);
       let top = rect.y;
-      if (active && active.kind === 'note' && active.note.id === note.id) top = rhythm
-        ? originalDragRow! * view.rowHeight + 7 + active.rawY
-        : melodyPitchTop(keys, phrasePitchRow(active.note.frequencyHz, keys), view.rowHeight) + 1 + active.rawY;
+      if (active?.kind === 'note' && active.note.id === note.id) {
+        top = rhythm ? originalDragRow! * view.rowHeight + 7 + active.rawY
+          : melodyPitchTop(keys, phrasePitchRow(active.note.frequencyHz, keys), view.rowHeight) + 1 + active.rawY;
+        if (active.touchDrag && active.moved) {
+          const leftOfFinger = active.last.y - rect.height - 16;
+          top = Math.max(pitchOffset(), Math.min(top, leftOfFinger));
+        }
+      }
       const left = `${vertical ? top : rect.x}px`, y = `${vertical ? rect.x : top}px`;
       const width = `${vertical ? rect.height : rect.width}px`, height = `${vertical ? rect.width : rect.height}px`;
       if (block.style.left !== left) block.style.left = left;
@@ -928,12 +933,13 @@ export function mountMelodyWorkspace(root: HTMLElement, options: {
   }
   function begin(event: PointerEvent, headGesture = false): void {
     const target = event.target as HTMLElement;
-    const button = event.pointerType === 'touch' && event.button === 0 && !headGesture && canvas.contains(target)
-      && options.touchGuide?.readRightButton() ? 2 : event.button;
+    const touchRight = event.pointerType === 'touch' && event.button === 0 && !headGesture && canvas.contains(target)
+      && !!options.mobileTouch?.readRightButton();
+    const button = touchRight ? 2 : event.button;
     if (disposed || library || (button !== 0 && button !== 1 && button !== 2)) return;
     const mode = options.readLessonInput?.() ?? 'edit';
     const block = target.closest<HTMLElement>('.melody-note');
-    if (mode === 'locked' || (mode !== 'edit' && block) || (mode === 'pan' && button !== 0)) return;
+    if (mode === 'locked' || (!touchRight && ((mode !== 'edit' && block) || (mode === 'pan' && button !== 0)))) return;
     if (!headGesture && block?.classList.contains('is-dim') && (!vertical || button !== 2)) { event.preventDefault(); event.stopPropagation(); return; }
     const key = target.closest<HTMLElement>('.melody-key');
     if (key && !headGesture) {
@@ -956,8 +962,8 @@ export function mountMelodyWorkspace(root: HTMLElement, options: {
         const refs = new Map<string, { partId: string; noteId: string }>();
         const noteId = block?.dataset.noteId, partId = block?.dataset.partId;
         if (noteId && partId) refs.set(noteId, { partId, noteId });
-        gesture = { ...base, kind: 'erase', refs, moved: false };
-        if (mode === 'edit') document.addEventListener('pointerrawupdate', eraseRaw);
+        gesture = { ...base, kind: 'erase', refs, moved: false, touchRight };
+        if (mode === 'edit' && !touchRight) document.addEventListener('pointerrawupdate', eraseRaw);
       } else {
         gesture = { ...base, kind: 'erase', refs: new Map(), moved: false };
         if (block) erase(from, from);
@@ -978,7 +984,8 @@ export function mountMelodyWorkspace(root: HTMLElement, options: {
         const bounds = block.getBoundingClientRect();
         const resizing = !!target.closest('.melody-note-resize') || (vertical ? event.clientY >= bounds.bottom - Math.min(7, bounds.height * .25) : event.clientX >= bounds.right - Math.min(7, bounds.width * .25));
         const auditionOnClick = options.readIsPlaying?.() === true;
-        gesture = { ...base, kind: resizing ? 'resize' : 'note', partId: voice.id, note, changes: {}, rawY: 0, moved: false, auditionOnClick };
+        gesture = { ...base, kind: resizing ? 'resize' : 'note', partId: voice.id, note, changes: {}, rawY: 0, moved: false, auditionOnClick,
+          touchDrag: vertical && !!options.mobileTouch && event.pointerType === 'touch' };
         if (!auditionOnClick) void audition.request(note.frequencyHz, phraseHeldSeconds(value, note), note.velocity, undefined, note.level ?? 1, voice.id);
       } else if (voice) {
         if (from.x < 0 || from.x >= (melodyDuration(value) - view.leftSeconds) * melodyScale(view, width(), melodyDuration(value))) return;
@@ -1100,7 +1107,7 @@ export function mountMelodyWorkspace(root: HTMLElement, options: {
     }
     pinch.x = span.x; pinch.y = span.y;
     if (view.zoom === previous.zoom && view.rowHeight === previous.rowHeight) return;
-    manualNavigation(); scheduleViewport();
+    manualNavigation(); paintViewport();
     if (view.zoom !== previous.zoom) options.onLearningAction?.('zoom-y');
     if (view.rowHeight !== previous.rowHeight) options.onLearningAction?.('zoom-x');
   }
@@ -1123,12 +1130,12 @@ export function mountMelodyWorkspace(root: HTMLElement, options: {
     const active = gesture; if (disposed || !active || active.id !== event.pointerId) return; event.preventDefault();
     if (active.kind === 'head') { moveHead(active, event); return; }
     if (vertical && active.kind === 'erase') {
-      if (options.readLessonInput && options.readLessonInput() !== 'edit') {
+      if (!active.touchRight && options.readLessonInput && options.readLessonInput() !== 'edit') {
         active.moved ||= Math.hypot(event.clientX - active.clientFrom.x, event.clientY - active.clientFrom.y) > 4;
         return;
       }
       erasePath(active, event);
-      if (event.pointerType !== 'touch' && typeof event.buttons === 'number' && !(event.buttons & 2)) finish(true);
+      if (!active.touchRight && typeof event.buttons === 'number' && !(event.buttons & 2)) finish(true);
       return;
     }
     const now = point(event);
@@ -1150,7 +1157,7 @@ export function mountMelodyWorkspace(root: HTMLElement, options: {
       panMoved ||= beforeSeconds !== view.leftSeconds || beforeOffset !== pitchOffset();
       manualNavigation(); scheduleViewport();
     }
-    else if (active.kind === 'erase') erase(active.last, now);
+    else if (active.kind === 'erase') { erase(active.last, now); active.last = now; }
     else {
       const scale = melodyScale(view, width(), melodyDuration(active.base)); const delta = (now.x - active.from.x) / scale; const limit = active.base.lengthBeats;
       active.moved = active.moved || Math.abs(now.x - active.from.x) > 1 || Math.abs(now.y - active.from.y) > 1;
@@ -1173,10 +1180,10 @@ export function mountMelodyWorkspace(root: HTMLElement, options: {
         const seconds = phraseHeldSeconds(active.base, active.note);
         active.changes = { startBeat, durationSeconds: seconds, durationBeats: melodyClamp(phraseHeldBeats(active.base, startBeat, seconds), MIN_BEATS, limit - startBeat), ...(!rhythm && offset && pitch ? { frequencyHz: pitch.frequencyHz } : {}) };
       }
+      active.last = now;
       if (!options.readIsPlaying) previewEdit();
       paintNotes(active.note.id);
     }
-    if (active.kind !== 'pan') active.last = now;
   }
   function finish(commit: boolean): Error | undefined {
     const active = gesture; gesture = undefined; if (!active) return;
@@ -1429,8 +1436,8 @@ export function mountMelodyWorkspace(root: HTMLElement, options: {
     if (keyPan?.id === event.pointerId) finishKeyPan();
     if (quickDrag?.id === event.pointerId) finishQuickScroll();
     if (gesture?.id === event.pointerId) {
-      if (vertical && gesture.kind === 'erase' && (event.button === 2 || event.pointerType === 'touch')) {
-        if (!options.readLessonInput || options.readLessonInput() === 'edit') erase(gesture.last, point(event));
+      if (vertical && gesture.kind === 'erase' && (event.button === 2 || gesture.touchRight)) {
+        if (gesture.touchRight || !options.readLessonInput || options.readLessonInput() === 'edit') erase(gesture.last, point(event));
         else gesture.moved ||= Math.hypot(event.clientX - gesture.clientFrom.x, event.clientY - gesture.clientFrom.y) > 4;
       }
       finish(true);

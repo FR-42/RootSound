@@ -96,13 +96,13 @@ export function mountMusicGuide(root: HTMLElement, factory: MusicGuideFactory, o
   enterCue.hidden = true;
   const touchControls = element('div', 'music-guide-touch');
   const touchPlay = button('music-guide-touch-play', '播放 / 暂停', () => host.querySelector<HTMLButtonElement>('.song-play')?.click());
+  touchPlay.hidden = !!factory.mobileWeb;
   let rightMode = false;
   const touchRight = factory.mobileWeb ? button('music-guide-touch-right', '右键', () => setRightMode(!rightMode)) : undefined;
   touchControls.append(touchPlay,
     button('', '下一步', () => { if (shown && !host.querySelector('dialog[open]')) advance(); }),
     button('', '退出引导', () => finish()));
   if (touchRight) {
-    touchRight.hidden = true;
     touchRight.setAttribute('aria-pressed', 'false');
     touchControls.append(touchRight);
   }
@@ -122,11 +122,6 @@ export function mountMusicGuide(root: HTMLElement, factory: MusicGuideFactory, o
   function setRightMode(enabled: boolean) {
     rightMode = enabled;
     touchRight?.setAttribute('aria-pressed', String(enabled));
-  }
-  function updateRightButton() {
-    if (!touchRight) return;
-    touchRight.hidden = shell.dataset.timbrePhase !== 'deselect' && !words.querySelector('[data-guide-action="delete-note"]');
-    if (touchRight.hidden) setRightMode(false);
   }
   function cueAfter(delay = enterDelayMs) {
     advanceTimer = window.setTimeout(() => { enterCue.hidden = false; }, delay);
@@ -313,15 +308,16 @@ export function mountMusicGuide(root: HTMLElement, factory: MusicGuideFactory, o
       workspaceState: { read: () => workspace, write: next => { workspace = next; } },
       readMultipleTempoRolls: () => false,
       readLessonInput: () => step === 1 ? 'locked' : step < 6 ? 'pan' : step === 6 ? 'draw' : step < editStep ? 'zoom' : 'edit',
-      touchGuide: factory.mobileWeb ? { readRightButton: () => rightMode } : undefined,
+      mobileTouch: factory.mobileWeb ? { readRightButton: () => rightMode } : undefined,
       readLessonToolbar: () => step >= finalStep,
       listTimbres: document.listTimbres, onCreateNoteGroup: document.addGroup, onChangeNoteGroupTimbre: document.changeTone,
       onRename: document.rename, onSave: savePractice, readUnsavedChanges: hasUnsavedChanges,
       onExit: exitPractice,
       onLearningAction(action) {
+        if (rightMode && (action === 'deselect' && shell.dataset.timbrePhase === 'deselect'
+          || action === 'delete-note' && words.querySelector('[data-guide-action="delete-note"]'))) setRightMode(false);
         timbreScene?.action(action);
         noteEditAction?.(action);
-        updateRightButton();
       },
       onPlaybackAdvance() {
         if (step === 3 && !advanceTimer) {
@@ -343,6 +339,10 @@ export function mountMusicGuide(root: HTMLElement, factory: MusicGuideFactory, o
     step = next;
     const scene = scenes[step - 1]!;
     shell.dataset.step = String(step);
+    if (factory.mobileWeb) {
+      touchPlay.hidden = step < 3;
+      setRightMode(false);
+    }
     if (step === 3 || step === 4 || step === editStep) editor?.frameNotes(step !== 3);
     host.querySelector<HTMLElement>('.song-topbar')?.toggleAttribute('inert', step < finalStep);
     host.querySelector<HTMLElement>('.melody-tempo-dock')?.toggleAttribute('inert', step < 5);
@@ -360,7 +360,6 @@ export function mountMusicGuide(root: HTMLElement, factory: MusicGuideFactory, o
     if (step === 6) timbreScene = introduceTimbres(shell, host, heading, copy, cueAfter);
     if (subdivisionTip) leaveSubdivisionScene = introduceSubdivisions(copy, subdivisionTip);
     if (step === editStep) noteEditAction = introduceNoteEdits(copy);
-    updateRightButton();
     if (scene.wait) cueAfter(scene.wait);
     shown = true;
   }

@@ -32,7 +32,10 @@ window.AudioWorkletNode=class extends WorkletNode{
    });
  }
 };
-Element.prototype.setPointerCapture=function(){};
+const capturePointer=Element.prototype.setPointerCapture;
+Element.prototype.setPointerCapture=function(id){
+ try{capturePointer.call(this,id)}catch(error){if(error.name!=='NotFoundError')throw error}
+};
 `;
 const types={'.html':'text/html; charset=utf-8','.js':'application/javascript','.css':'text/css','.json':'application/json','.svg':'image/svg+xml','.wav':'audio/wav','.sf2':'application/octet-stream','.txt':'text/plain','.jpg':'image/jpeg','.gif':'image/gif','.webp':'image/webp','.mp4':'video/mp4','.vtt':'text/vtt'};
 const server=http.createServer(async(req,res)=>{try{
@@ -144,11 +147,9 @@ let expression='starting',stage='setup';
  assert.equal(await js("document.querySelector('.music-guide-word').textContent"),'卷帘');
  await ready('.music-guide.is-mobile-web');
  const playVisible=()=>js("document.querySelector('.music-guide-touch-play').getBoundingClientRect().width>0");
- assert(await playVisible());
- await click('.music-guide-touch-play');
- await wait(()=>js("document.querySelector('.song-play').getAttribute('aria-label')==='暂停'"));
- await click('.music-guide-touch-play');
- await wait(()=>js("document.querySelector('.song-play').getAttribute('aria-label')==='播放'"));
+ const rightVisible=()=>js("document.querySelector('.music-guide-touch-right').getBoundingClientRect().width>0");
+ assert.equal(await playVisible(),false);
+ assert(await rightVisible());
  const dragTouch = (selector, dx, dy, at) => inFrame((selector, dx, dy, at) => {
    const target=document.querySelector(selector);
    const rect=(selector==='.melody-canvas' ? document.querySelector('.melody-scroll') : target).getBoundingClientRect();
@@ -158,22 +159,55 @@ let expression='starting',stage='setup';
    if(dx||dy) document.dispatchEvent(new PointerEvent('pointermove',{...opts,button:-1,clientX:x+dx,clientY:y+dy}));
    document.dispatchEvent(new PointerEvent('pointerup',{...opts,buttons:0,clientX:x+dx,clientY:y+dy}));
  }, selector,dx,dy,at);
+ const frameOrigin=()=>parentJs("(()=>{const frame=document.querySelector('.music-editor'),r=frame.getBoundingClientRect();return {x:r.left+frame.clientLeft,y:r.top+frame.clientTop}})()");
+ const sendTouch=(type,touchPoints)=>win.webContents.debugger.sendCommand('Input.dispatchTouchEvent',{type,touchPoints});
+ const visibleNote=(swipe,minInset=4)=>inFrame((swipe,minInset)=>{
+     const viewport=document.querySelector('.melody-scroll').getBoundingClientRect();
+     for(const item of document.querySelectorAll('.melody-note')){
+       const box=item.getBoundingClientRect(),x=box.left+box.width/2,y=box.top+box.height/2;
+       if(x<=viewport.left+minInset||x>=viewport.right-12||y<=viewport.top+16||y>=viewport.bottom-72)continue;
+       if(document.elementFromPoint(x,y)?.closest('.melody-note')!==item)continue;
+       const start=swipe?box.top-8:y;
+       if(swipe&&(start<=viewport.top||document.elementFromPoint(x,start)?.closest('.melody-note')))continue;
+       return {id:item.dataset.noteId,x,y,start,left:item.style.left,top:parseFloat(item.style.top)};
+     }
+   },swipe,minInset);
+ const eraseWithTouch=async swipe=>{
+   await parentJs("document.querySelector('.music-editor').scrollIntoView({block:'start'})");
+   const origin=await frameOrigin();
+   const note=await visibleNote(swipe);
+   assert(note,'a visible note with a clear touch path');
+   await sendTouch('touchStart',[{id:61,x:origin.x+note.x,y:origin.y+note.start}]);
+   if(swipe)await sendTouch('touchMove',[{id:61,x:origin.x+note.x,y:origin.y+note.y}]);
+   await sendTouch('touchEnd',[]);
+   await wait(()=>inFrame(id=>!document.querySelector('.melody-note[data-note-id="'+id+'"]'),note.id));
+ };
  const pinch = async (dx,dy) => {
-   const frameOrigin=await parentJs("(()=>{const r=document.querySelector('.music-editor').getBoundingClientRect();return {x:r.left,y:r.top}})()");
+   const origin=await frameOrigin();
    const center=await js("(()=>{const r=document.querySelector('.melody-scroll').getBoundingClientRect();return {x:r.left+r.width/2,y:r.top+180}})()");
-   const x=frameOrigin.x+center.x, y=frameOrigin.y+center.y;
+   const x=origin.x+center.x, y=origin.y+center.y;
    const fingers=(extraX,extraY)=>[{id:51,x:x-26-extraX,y:y-34-extraY},{id:52,x:x+26+extraX,y:y+34+extraY}];
-   const send=(type,touchPoints)=>win.webContents.debugger.sendCommand('Input.dispatchTouchEvent',{type,touchPoints});
-   await send('touchStart',fingers(0,0));
-   await send('touchMove',fingers(dx,dy));
+   await sendTouch('touchStart',fingers(0,0));
+   await sendTouch('touchMove',fingers(dx,dy));
    await js("new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))");
-   await send('touchEnd',[]);
+   await sendTouch('touchEnd',[]);
  };
  const scales=()=>js("(()=>{const beats=document.querySelectorAll('.melody-grid-line.is-beat');return {pitch:parseFloat(document.querySelector('.melody-key').style.width),time:parseFloat(beats[1].style.top)-parseFloat(beats[0].style.top)}})()");
  for(let step=2;step<=10;step++){
    await click('.music-guide-touch button:nth-child(2)');
    await wait(()=>js("Number(document.querySelector('.music-guide')?.dataset.step)==="+step));
-   assert(await playVisible());
+   assert.equal(await playVisible(),step>=3);
+   assert(await rightVisible());
+   if(step===2){
+     await click('.music-guide-touch-right');
+     await eraseWithTouch(false);
+   }
+   if(step===3){
+     await click('.music-guide-touch-play');
+     await wait(()=>js("document.querySelector('.song-play').getAttribute('aria-label')==='暂停'"));
+     await click('.music-guide-touch-play');
+     await wait(()=>js("document.querySelector('.song-play').getAttribute('aria-label')==='播放'"));
+   }
    if(step===6) {
      await ready('.music-guide[data-timbre-phase=select]');
      await click('.melody-note-family');
@@ -185,17 +219,46 @@ let expression='starting',stage='setup';
      await ready('.music-guide-touch-right:not([hidden])');
      await click('.music-guide-touch-right');
      assert.equal(await js("document.querySelector('.music-guide-touch-right').getAttribute('aria-pressed')"),'true');
-     await dragTouch('.melody-canvas',0,0,[.04,.5]);
+     await parentJs("document.querySelector('.music-editor').scrollIntoView({block:'start'})");
+     const origin=await frameOrigin();
+     const blank=await inFrame(()=>{
+       const viewport=document.querySelector('.melody-scroll').getBoundingClientRect();
+       for(const fraction of [.04,.12,.24,.38,.54]){
+         const x=viewport.left+viewport.width*fraction,y=viewport.top+viewport.height*.5;
+         const target=document.elementFromPoint(x,y);
+         if(target?.closest('.melody-canvas')&&!target.closest('.melody-note,.melody-playhead,.melody-roll-end'))return {x,y};
+       }
+     });
+     assert(blank,'visible blank canvas for touch deselection');
+     await sendTouch('touchStart',[{id:63,x:origin.x+blank.x,y:origin.y+blank.y}]);
+     await sendTouch('touchEnd',[]);
      assert.equal(await js("!!document.querySelector('.melody-note-family.is-selected')"),false);
-     assert.equal(await js("document.querySelector('.music-guide-touch-right').hidden"),true);
+     assert(await rightVisible());
+     assert.equal(await js("document.querySelector('.music-guide-touch-right').getAttribute('aria-pressed')"),'false');
    }
    if(step===7) {
      assert.equal(await js("document.querySelector('.music-guide-copy p:last-child').textContent"),'手机端可以双指缩放');
      await parentJs("document.querySelector('.music-editor').scrollIntoView({block:'start'})");
      const before=await scales();
+     await inFrame(()=>{
+       const world=document.querySelector('.melody-world'),initialWidth=world.style.width;
+       const observer=new MutationObserver(()=>{
+         if(world.style.width===initialWidth)return;
+         observer.disconnect();
+         const notes=[...world.querySelectorAll('.melody-note')],keys=[...world.querySelectorAll('.melody-key')];
+         window.__pinchAligned=notes.length>0&&notes.every(note=>{
+           const pitch=note.getAttribute('aria-label').split(' ').at(-1);
+           const key=keys.find(key=>key.dataset.pitchLabel===pitch);
+           return !!key&&Math.abs(parseFloat(note.style.left)-parseFloat(key.style.left)-1)<.01
+             &&Math.abs(parseFloat(note.style.width)-parseFloat(key.style.width)+2)<.01;
+         });
+       });
+       observer.observe(world,{attributes:true,attributeFilter:['style']});
+     });
      await pinch(14,0);
      const horizontal=await scales();
      assert(horizontal.pitch>before.pitch && horizontal.time===before.time, JSON.stringify({before,horizontal}));
+     assert.equal(await js('window.__pinchAligned'),true,'notes align with the new pitch columns in the zoom frame');
      await pinch(0,21);
      const vertical=await scales();
      assert(vertical.time>horizontal.time && vertical.pitch===horizontal.pitch, JSON.stringify({horizontal,vertical}));
@@ -205,14 +268,33 @@ let expression='starting',stage='setup';
      await ready('[data-guide-action="delete-note"]');
      await ready('.music-guide-touch-right:not([hidden])');
      await click('.music-guide-touch-right');
-     const before=await js("document.querySelectorAll('.melody-note').length");
-     await dragTouch('.melody-note',0,20,[.5,.45]);
-     assert(await js("document.querySelectorAll('.melody-note').length")<before);
+     await eraseWithTouch(true);
      await ready('[data-guide-action="resize-note"]');
      assert.equal(await js("document.querySelector('.music-guide-touch-right').getAttribute('aria-pressed')"),'false');
    }
  }
  await click('.music-guide-touch button:nth-child(2)');await ready('.melody-workspace');
+ await ready('.song-touch-right');
+ assert.equal(await js("!!document.querySelector('.music-guide')"),false);
+ assert(await js("document.querySelector('.song-touch-right').getBoundingClientRect().width>0"));
+ await click('.song-touch-right');
+ assert.equal(await js("document.querySelector('.song-touch-right').getAttribute('aria-pressed')"),'true');
+ await eraseWithTouch(false);
+ await click('.song-touch-right');
+ const note=await visibleNote(false,65);
+ assert(note,'visible note with space to the left of the finger');
+ const frameOffset=await frameOrigin();
+ await sendTouch('touchStart',[{id:62,x:frameOffset.x+note.x,y:frameOffset.y+note.y}]);
+ await sendTouch('touchMove',[{id:62,x:frameOffset.x+note.x,y:frameOffset.y+note.y+24}]);
+ const noteBounds=id=>inFrame(id=>{
+   const item=document.querySelector('.melody-note[data-note-id="'+id+'"]');
+   return {right:item.getBoundingClientRect().right,left:item.style.left,top:parseFloat(item.style.top)};
+ },id);
+ assert((await noteBounds(note.id)).right<=note.x-12,'touch drag preview stays left of the finger');
+ await sendTouch('touchEnd',[]);
+ const landed=await noteBounds(note.id);
+ assert.equal(landed.left,note.left,'a vertical drag preserves pitch');
+ assert(landed.top>note.top,'a vertical drag commits the new time');
  assert(await js('document.documentElement.scrollWidth<=innerWidth'));
 
  stage='homepage guide and direct link';

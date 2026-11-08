@@ -134,6 +134,7 @@ export function mountStudio(root: HTMLElement, options: StudioOptions): { dispos
     const phrase = options.phrase!;
     editor = mountPhraseComposition(root, { phrase, initialView, sound: options.sound, directMusic: true,
       workspaceState: options.workspaceState, frameNotesOnMount: frameNotes,
+      mobileWeb: options.demo && options.musicGuide?.mobileWeb,
       readMultipleTempoRolls: options.learning ? () => options.learning!.read().multipleTempoRolls : undefined,
       onSettings: options.learning ? () => settings(true) : undefined,
       // Retired mode cannot reactivate from a previously saved preference.

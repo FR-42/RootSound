@@ -2,6 +2,8 @@
 .phrase-composition-studio .song-topbar { grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); }
 .phrase-composition-studio .song-transport { justify-self: center; }
 .phrase-composition-studio .song-file-actions { min-width: 0; overflow-x: auto; scrollbar-width: none; }
+.phrase-composition-studio .song-touch-right { min-height: 38px; }
+.phrase-composition-studio .song-touch-right[aria-pressed="true"] { border-color: var(--accent); background: var(--accent); color: #fff; }
 .phrase-composition-identity { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .phrase-composition-title { display: flex; align-items: center; min-width: 0; }
 .phrase-composition-identity .song-project-name { min-width: 0; }
