@@ -40,6 +40,7 @@ a:focus-visible { outline: 2px solid #2859a8; outline-offset: 5px; }
 .playground { margin-top: 34px; }
 .playground-heading { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; padding-inline: 4px; }
 .playground-heading h2 { margin: 0; font-size: 22px; font-weight: 550; }
-.playground-heading span { padding: 5px 10px; border-radius: 5px; color: #47708d; background: #edf5f8; font-size: 12px; }
+.guide-entry { padding: 7px 12px; border: 1px solid #b9c8dc; border-radius: 5px; color: #345c7b; background: #edf5f8; font-size: 14px; white-space: nowrap; }
+.guide-entry:hover { background: #e3eef5; }
 .site-thanks { border-top: 1px solid #eeeeef; padding: 24px 20px 32px; text-align: center; color: #8a8e96; font-size: 12px; line-height: 1.8; }
 @media (max-width: 600px) { .playground-heading h2 { font-size: 19px; } }

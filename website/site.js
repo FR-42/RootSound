@@ -34,4 +34,13 @@
     }
   }
   void refreshDownloads();
+  const guideEntry = document.querySelector('.guide-entry');
+  const editor = document.querySelector('.music-editor');
+  guideEntry.addEventListener('click', event => {
+    if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey ||
+        editor.contentDocument?.URL !== editor.src || editor.contentDocument.readyState !== 'complete') return;
+    event.preventDefault();
+    editor.scrollIntoView({ block: 'nearest' });
+    editor.contentWindow.postMessage({ type: 'jianle:start-guide' }, location.origin);
+  });
 })();

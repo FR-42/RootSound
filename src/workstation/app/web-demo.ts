@@ -74,7 +74,7 @@ function closeGuide() {
   guideStart.focus({ preventScroll: true });
 }
 
-guideStart.addEventListener('click', () => {
+function openGuide() {
   if (busy || guide) return;
   editor?.flush();
   transport?.pause();
@@ -83,6 +83,11 @@ guideStart.addEventListener('click', () => {
   guideView.hidden = false;
   guide = mountMusicGuide(guideStage, { createDocument: createMusicGuideDocument, createSound: createBrowserSoundRuntime }, closeGuide);
   guideStage.focus({ preventScroll: true });
+}
+
+guideStart.addEventListener('click', openGuide);
+window.addEventListener('message', event => {
+  if (event.origin === location.origin && event.source === parent && event.data?.type === 'jianle:start-guide') openGuide();
 });
 q('.web-guide-exit').addEventListener('click', closeGuide);
 q('.web-guide-next').addEventListener('click', () => guide?.next());
@@ -330,4 +335,5 @@ window.addEventListener('pagehide', () => { disposed = true; guide?.dispose(); c
 
 try {
   mount(); report('示例已载入，可以直接播放或编辑。');
+  if (new URLSearchParams(location.search).get('guide') === '1') openGuide();
 } catch (error) { report(error); }
