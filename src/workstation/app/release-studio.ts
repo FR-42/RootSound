@@ -28,7 +28,7 @@ export interface ReleasePlatform {
   storage: MaterialStorage;
   projectDirectories?: ProjectDirectoriesPort;
   audioFiles?: AudioFilesPort;
-  demoProject?: { id: string; name: string; format?: never; startWithGuide?: boolean };
+  demoProject?: { id: string; name: string; format?: never; startWithGuide?: boolean; mobileGuide?: boolean };
   timbreFiles: TimbreFilesPort;
   samplePayloads?: SamplePayloadPort;
 }
@@ -98,7 +98,7 @@ export async function mountReleaseStudio(root: HTMLElement, platform: ReleasePla
     const studio = mountStudio(root, { phrase, song, sound: runtime, hasPrevious: !!current,
       projectName: current?.name, doubleClickIntervalMs: state?.doubleClickIntervalMs, preferences, learning,
       workspaceState: current ? createMusicWorkspaceState(localStorage, current.id) : undefined,
-      musicGuide: { createDocument: createMusicGuideDocument, createSound: createBrowserSoundRuntime },
+      musicGuide: { createDocument: createMusicGuideDocument, createSound: createBrowserSoundRuntime, mobileWeb: platform.demoProject?.mobileGuide },
       initialEntry: current ? 'song' : 'welcome', audioFiles: platform.audioFiles, demo: !!platform.demoProject,
       startWithGuide: platform.demoProject?.startWithGuide,
       onFirstGuideChoice: directories && firstDesktopGuideChoice(localStorage, learning.read().guides.basics.status),

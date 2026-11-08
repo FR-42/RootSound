@@ -24,7 +24,8 @@ function start(watchGuide: boolean) {
       commitMusicDocument(example.library, example.song, example.score);
       let text = example.readLibrary();
       studio = await mountReleaseStudio(root, {
-        demoProject: { id: 'website-starter', name: starterExample.name, startWithGuide: watchGuide },
+        demoProject: { id: 'website-starter', name: starterExample.name, startWithGuide: watchGuide,
+          mobileGuide: matchMedia('(pointer: coarse) and (hover: none)').matches && Math.min(screen.width, screen.height) < 600 },
         storage: { read: () => text, write: value => { text = value; } },
         timbreFiles: createBrowserTimbreFiles(),
       });

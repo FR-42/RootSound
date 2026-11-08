@@ -44,6 +44,7 @@ export function mountPhraseComposition(root: HTMLElement, options: {
   readMultipleTempoRolls?(): boolean;
   onLearningAction?(action: LearningAction): void;
   readLessonInput?: Parameters<typeof mountMelodyWorkspace>[1]['readLessonInput'];
+  touchGuide?: Parameters<typeof mountMelodyWorkspace>[1]['touchGuide'];
   readLessonToolbar?(): boolean;
   onPlaybackAdvance?(): void;
   frameNotesOnMount?: boolean;
@@ -536,6 +537,7 @@ export function mountPhraseComposition(root: HTMLElement, options: {
     activeSection = 'melody';
     try { sectionEditor = mountMelodyWorkspace(melodyRegion, { phrase, sound, initialView: current, gridBpm: gridTempo, readPerformanceMode: options.readPerformanceMode, includeAllSections: true,
       readMultipleTempoRolls: options.readMultipleTempoRolls, onLearningAction: options.onLearningAction, readLessonInput: options.readLessonInput,
+      touchGuide: options.touchGuide,
       orientation: options.directMusic ? 'vertical' : 'horizontal',
       showPlayheadTime: options.directMusic,
       workspaceState: options.workspaceState,

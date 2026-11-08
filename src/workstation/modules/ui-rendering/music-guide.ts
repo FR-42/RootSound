@@ -20,6 +20,7 @@ export interface MusicGuideDocument {
 export interface MusicGuideFactory {
   createDocument(name: string): MusicGuideDocument;
   createSound(): SoundRuntimePort;
+  mobileWeb?: boolean;
 }
 
 const enterDelayMs = 1500;
@@ -87,6 +88,7 @@ export function mountMusicGuide(root: HTMLElement, factory: MusicGuideFactory, o
   let sound: SoundRuntimePort | undefined;
   let editor: ReturnType<typeof mountPhraseComposition> | undefined;
   const shell = element('main', 'music-guide');
+  shell.classList.toggle('is-mobile-web', !!factory.mobileWeb);
   const host = element('div', 'music-guide-host');
   const words = element('section', 'music-guide-words');
   words.hidden = true; words.setAttribute('aria-live', 'polite'); words.setAttribute('aria-atomic', 'true');
@@ -94,9 +96,16 @@ export function mountMusicGuide(root: HTMLElement, factory: MusicGuideFactory, o
   enterCue.hidden = true;
   const touchControls = element('div', 'music-guide-touch');
   const touchPlay = button('music-guide-touch-play', '播放 / 暂停', () => host.querySelector<HTMLButtonElement>('.song-play')?.click());
+  let rightMode = false;
+  const touchRight = factory.mobileWeb ? button('music-guide-touch-right', '右键', () => setRightMode(!rightMode)) : undefined;
   touchControls.append(touchPlay,
     button('', '下一步', () => { if (shown && !host.querySelector('dialog[open]')) advance(); }),
     button('', '退出引导', () => finish()));
+  if (touchRight) {
+    touchRight.hidden = true;
+    touchRight.setAttribute('aria-pressed', 'false');
+    touchControls.append(touchRight);
+  }
   shell.append(host, words, enterCue, touchControls); root.replaceChildren(shell);
   const suppressTitles = (node: Element) => {
     if (node.hasAttribute('title')) node.removeAttribute('title');
@@ -110,12 +119,26 @@ export function mountMusicGuide(root: HTMLElement, factory: MusicGuideFactory, o
   });
   tooltips.observe(host, { subtree: true, childList: true, attributes: true, attributeFilter: ['title'] });
 
+  function setRightMode(enabled: boolean) {
+    rightMode = enabled;
+    touchRight?.setAttribute('aria-pressed', String(enabled));
+  }
+  function updateRightButton() {
+    if (!touchRight) return;
+    touchRight.hidden = shell.dataset.timbrePhase !== 'deselect' && !words.querySelector('[data-guide-action="delete-note"]');
+    if (touchRight.hidden) setRightMode(false);
+  }
   function cueAfter(delay = enterDelayMs) {
     advanceTimer = window.setTimeout(() => { enterCue.hidden = false; }, delay);
   }
   function introduceNoteEdits(copy: HTMLElement) {
     let index = 0;
-    const showPrompt = () => copy.replaceChildren(element('p', 'music-guide-prompt', noteEditPrompts[index]![1]));
+    const showPrompt = () => {
+      const [action, text] = noteEditPrompts[index]!;
+      const prompt = element('p', 'music-guide-prompt', text);
+      prompt.dataset.guideAction = action;
+      copy.replaceChildren(prompt);
+    };
     showPrompt();
     return (action: LearningAction) => {
       if (noteEditPrompts[index]?.[0] !== action) return;
@@ -290,6 +313,7 @@ export function mountMusicGuide(root: HTMLElement, factory: MusicGuideFactory, o
       workspaceState: { read: () => workspace, write: next => { workspace = next; } },
       readMultipleTempoRolls: () => false,
       readLessonInput: () => step === 1 ? 'locked' : step < 6 ? 'pan' : step === 6 ? 'draw' : step < editStep ? 'zoom' : 'edit',
+      touchGuide: factory.mobileWeb ? { readRightButton: () => rightMode } : undefined,
       readLessonToolbar: () => step >= finalStep,
       listTimbres: document.listTimbres, onCreateNoteGroup: document.addGroup, onChangeNoteGroupTimbre: document.changeTone,
       onRename: document.rename, onSave: savePractice, readUnsavedChanges: hasUnsavedChanges,
@@ -297,6 +321,7 @@ export function mountMusicGuide(root: HTMLElement, factory: MusicGuideFactory, o
       onLearningAction(action) {
         timbreScene?.action(action);
         noteEditAction?.(action);
+        updateRightButton();
       },
       onPlaybackAdvance() {
         if (step === 3 && !advanceTimer) {
@@ -325,6 +350,7 @@ export function mountMusicGuide(root: HTMLElement, factory: MusicGuideFactory, o
     const heading = element('h2', 'music-guide-word', scene.title);
     const copy = element('div', 'music-guide-copy');
     copy.append(...scene.lines.map(line => element('p', '', line)));
+    if (factory.mobileWeb && step === 7) copy.append(element('p', '', '手机端可以双指缩放'));
     const subdivisionTip = step === subdivisionStep ? copy.lastElementChild : null;
     subdivisionTip?.remove();
     if (step === 3) copy.lastElementChild?.classList.add('music-guide-prompt');
@@ -334,6 +360,7 @@ export function mountMusicGuide(root: HTMLElement, factory: MusicGuideFactory, o
     if (step === 6) timbreScene = introduceTimbres(shell, host, heading, copy, cueAfter);
     if (subdivisionTip) leaveSubdivisionScene = introduceSubdivisions(copy, subdivisionTip);
     if (step === editStep) noteEditAction = introduceNoteEdits(copy);
+    updateRightButton();
     if (scene.wait) cueAfter(scene.wait);
     shown = true;
   }

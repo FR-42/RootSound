@@ -60,6 +60,7 @@ let expression='starting',stage='setup';
  let frame=win.webContents.mainFrame.frames.find(f=>f.url.includes('/play/'));
  const parentJs=code=>win.webContents.executeJavaScript('(async()=>('+code+'))()');
  const js=code=>{expression=code;return frame.executeJavaScript('(async()=>('+code+'))()');};
+ const inFrame=(fn,...args)=>js('('+fn.toString()+')(...'+JSON.stringify(args)+')');
  const click=selector=>js("document.querySelector("+JSON.stringify(selector)+").click()");
  const ready=selector=>wait(()=>js("!!document.querySelector("+JSON.stringify(selector)+")"));
  const key=name=>js("document.body.dispatchEvent(new KeyboardEvent('keydown',{key:"+JSON.stringify(name)+",bubbles:true,cancelable:true}))");
@@ -112,6 +113,7 @@ let expression='starting',stage='setup';
  await click('.song-settings');await ready('.learning-settings[open]');
  await click('.learning-replay-guide');await ready('.music-guide-word');
  assert.equal(await js("document.querySelector('.music-guide-word').textContent"),'卷帘');
+ assert.equal(await js("!!document.querySelector('.music-guide.is-mobile-web, .music-guide-touch-right')"),false);
  await key('Enter');await wait(()=>js("document.querySelector('.music-guide-word')?.textContent==='音符'"));
  await key('Escape');await ready('.song-topbar');
  assert.equal(await js("document.querySelector('.song-project-name').textContent"),name);
@@ -134,13 +136,44 @@ let expression='starting',stage='setup';
  stage='first visit choosing yes and compact guide';
  await js("localStorage.removeItem("+JSON.stringify(answerKey)+")");
  win.setContentSize(390,950);
+ win.webContents.debugger.attach('1.3');
+ await win.webContents.debugger.sendCommand('Emulation.setDeviceMetricsOverride',{width:390,height:950,screenWidth:390,screenHeight:950,deviceScaleFactor:1,mobile:true});
+ await win.webContents.debugger.sendCommand('Emulation.setTouchEmulationEnabled',{enabled:true,maxTouchPoints:5});
  await loadHome();await ready(heading);
  await click('.website-guide-choice .primary');await ready('.music-guide-word');
  assert.equal(await js("document.querySelector('.music-guide-word').textContent"),'卷帘');
- assert(await js("document.querySelector('.music-guide-touch').getBoundingClientRect().width>0"));
+ await ready('.music-guide.is-mobile-web');
+ const playVisible=()=>js("document.querySelector('.music-guide-touch-play').getBoundingClientRect().width>0");
+ assert(await playVisible());
+ await click('.music-guide-touch-play');
+ await wait(()=>js("document.querySelector('.song-play').getAttribute('aria-label')==='暂停'"));
+ await click('.music-guide-touch-play');
+ await wait(()=>js("document.querySelector('.song-play').getAttribute('aria-label')==='播放'"));
+ const dragTouch = (selector, dx, dy, at) => inFrame((selector, dx, dy, at) => {
+   const target=document.querySelector(selector);
+   const rect=(selector==='.melody-canvas' ? document.querySelector('.melody-scroll') : target).getBoundingClientRect();
+   const x=rect.left+rect.width*at[0], y=rect.top+rect.height*at[1];
+   const opts={bubbles:true,cancelable:true,pointerId:41,isPrimary:true,pointerType:'touch',button:0,buttons:1,clientX:x,clientY:y};
+   target.dispatchEvent(new PointerEvent('pointerdown',opts));
+   if(dx||dy) document.dispatchEvent(new PointerEvent('pointermove',{...opts,button:-1,clientX:x+dx,clientY:y+dy}));
+   document.dispatchEvent(new PointerEvent('pointerup',{...opts,buttons:0,clientX:x+dx,clientY:y+dy}));
+ }, selector,dx,dy,at);
+ const pinch = async (dx,dy) => {
+   const frameOrigin=await parentJs("(()=>{const r=document.querySelector('.music-editor').getBoundingClientRect();return {x:r.left,y:r.top}})()");
+   const center=await js("(()=>{const r=document.querySelector('.melody-scroll').getBoundingClientRect();return {x:r.left+r.width/2,y:r.top+180}})()");
+   const x=frameOrigin.x+center.x, y=frameOrigin.y+center.y;
+   const fingers=(extraX,extraY)=>[{id:51,x:x-26-extraX,y:y-34-extraY},{id:52,x:x+26+extraX,y:y+34+extraY}];
+   const send=(type,touchPoints)=>win.webContents.debugger.sendCommand('Input.dispatchTouchEvent',{type,touchPoints});
+   await send('touchStart',fingers(0,0));
+   await send('touchMove',fingers(dx,dy));
+   await js("new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))");
+   await send('touchEnd',[]);
+ };
+ const scales=()=>js("(()=>{const beats=document.querySelectorAll('.melody-grid-line.is-beat');return {pitch:parseFloat(document.querySelector('.melody-key').style.width),time:parseFloat(beats[1].style.top)-parseFloat(beats[0].style.top)}})()");
  for(let step=2;step<=10;step++){
    await click('.music-guide-touch button:nth-child(2)');
    await wait(()=>js("Number(document.querySelector('.music-guide')?.dataset.step)==="+step));
+   assert(await playVisible());
    if(step===6) {
      await ready('.music-guide[data-timbre-phase=select]');
      await click('.melody-note-family');
@@ -149,6 +182,34 @@ let expression='starting',stage='setup';
      assert(drawn.down>drawn.initial&&drawn.up<drawn.down,JSON.stringify(drawn));
      assert.equal(drawn.added,1,JSON.stringify(drawn));
      assert(drawn.finished);
+     await ready('.music-guide-touch-right:not([hidden])');
+     await click('.music-guide-touch-right');
+     assert.equal(await js("document.querySelector('.music-guide-touch-right').getAttribute('aria-pressed')"),'true');
+     await dragTouch('.melody-canvas',0,0,[.04,.5]);
+     assert.equal(await js("!!document.querySelector('.melody-note-family.is-selected')"),false);
+     assert.equal(await js("document.querySelector('.music-guide-touch-right').hidden"),true);
+   }
+   if(step===7) {
+     assert.equal(await js("document.querySelector('.music-guide-copy p:last-child').textContent"),'手机端可以双指缩放');
+     await parentJs("document.querySelector('.music-editor').scrollIntoView({block:'start'})");
+     const before=await scales();
+     await pinch(14,0);
+     const horizontal=await scales();
+     assert(horizontal.pitch>before.pitch && horizontal.time===before.time, JSON.stringify({before,horizontal}));
+     await pinch(0,21);
+     const vertical=await scales();
+     assert(vertical.time>horizontal.time && vertical.pitch===horizontal.pitch, JSON.stringify({horizontal,vertical}));
+   }
+   if(step===9) {
+     await dragTouch('.melody-note',30,12,[.5,.45]);
+     await ready('[data-guide-action="delete-note"]');
+     await ready('.music-guide-touch-right:not([hidden])');
+     await click('.music-guide-touch-right');
+     const before=await js("document.querySelectorAll('.melody-note').length");
+     await dragTouch('.melody-note',0,20,[.5,.45]);
+     assert(await js("document.querySelectorAll('.melody-note').length")<before);
+     await ready('[data-guide-action="resize-note"]');
+     assert.equal(await js("document.querySelector('.music-guide-touch-right').getAttribute('aria-pressed')"),'false');
    }
  }
  await click('.music-guide-touch button:nth-child(2)');await ready('.melody-workspace');
@@ -162,14 +223,14 @@ let expression='starting',stage='setup';
  await wait(()=>parentJs("document.querySelector('.music-guide-word')?.textContent==='卷帘'"));
  assert.deepEqual(rendererErrors,[]);assert(!win.isVisible());
  fs.writeFileSync(root+'/report.json',JSON.stringify({passed:true,firstVisitYes:true,firstVisitNo:true,returningVisit:true,replayFromSettings:true,
-   guideStages:10,timbreDragLength:true,draftPreserved:true,voices:175,starterPlayback:true,firstPlaybackMs,fullBankOnDemand:true,visibleWindow:false,physicalAudio:false},null,2));win.destroy();app.exit(0);
+   guideStages:10,timbreDragLength:true,mobileGuideControls:true,mobilePinchAxes:true,draftPreserved:true,voices:175,starterPlayback:true,firstPlaybackMs,fullBankOnDemand:true,visibleWindow:false,physicalAudio:false},null,2));win.destroy();app.exit(0);
 }catch(error){fs.writeFileSync(root+'/report.json',JSON.stringify({error:String(error),stack:error?.stack,expression:expression.slice(0,350),stage}));app.exit(1)}})();
 `);
 const env={...process.env};delete env.ELECTRON_RUN_AS_NODE;
 try{
  const syntax=spawnSync(process.execPath,['--check',harness],{encoding:'utf8',windowsHide:true});
  if(syntax.status)throw Error(syntax.stderr);
- const result=await new Promise(resolve=>{const child=spawn(path.resolve('.cache/release-smoke-engine/electron.exe'),[harness],{env,windowsHide:true,stdio:['ignore','pipe','pipe']});let output='';child.stdout.on('data',d=>output=(output+d).slice(-3000));child.stderr.on('data',d=>output=(output+d).slice(-3000));child.on('error',e=>resolve({code:1,output:String(e)}));child.on('exit',code=>resolve({code,output}));});
+ const result=await new Promise(resolve=>{const child=spawn(path.resolve(process.env.ROOTSOUND_TEST_ELECTRON||'.cache/release-smoke-engine/electron.exe'),[harness],{env,windowsHide:true,stdio:['ignore','pipe','pipe']});let output='';child.stdout.on('data',d=>output=(output+d).slice(-3000));child.stderr.on('data',d=>output=(output+d).slice(-3000));child.on('error',e=>resolve({code:1,output:String(e)}));child.on('exit',code=>resolve({code,output}));});
  const report=await readFile(path.join(root,'report.json'),'utf8').catch(()=>result.output);console.log(report);console.log('Evidence: '+root);
  await writeFile(path.join(root,'requests.json'),JSON.stringify(requests));
  if(result.code)process.exitCode=1;

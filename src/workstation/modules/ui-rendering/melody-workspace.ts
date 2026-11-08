@@ -69,6 +69,7 @@ export function mountMelodyWorkspace(root: HTMLElement, options: {
   readMultipleTempoRolls?(): boolean;
   onLearningAction?(action: LearningAction): void;
   readLessonInput?(): 'locked' | 'pan' | 'draw' | 'zoom' | 'edit';
+  touchGuide?: { readRightButton(): boolean };
 }): { refresh(view?: PhraseView): void; dispose(): void; flush(): void; setPlayhead(seconds: number, playing?: boolean): void; isStepInputActive(): boolean; readViewport(): PhraseEditorViewport; frameNotes(reserveEndSpace?: boolean): void; previewTempoRate(value?: number, sectionId?: string): void } {
   const { phrase, sound } = options; let current = options.initialView ?? phrase.read(); let disposed = false;
   const rhythm = options.section === 'rhythm';
@@ -123,6 +124,9 @@ export function mountMelodyWorkspace(root: HTMLElement, options: {
   let tempoRatePreview: PhraseBody | undefined;
   let tempoPreviewBoundaryOnly = false;
   let panMoved = false;
+  const touches = vertical && options.touchGuide ? new Map<number, Point>() : undefined;
+  let pinch: { x: number; y: number; axis?: 'x' | 'y' | 'both' } | undefined;
+  let pinchFrame = 0;
   const sounding = new Set<string>();
   const keyNodes: HTMLButtonElement[] = [];
   let soundingKeys = new Map<number, string>();
@@ -923,15 +927,17 @@ export function mountMelodyWorkspace(root: HTMLElement, options: {
     positionHead();
   }
   function begin(event: PointerEvent, headGesture = false): void {
-    if (disposed || library || (event.button !== 0 && event.button !== 1 && event.button !== 2)) return;
-    const mode = options.readLessonInput?.() ?? 'edit';
     const target = event.target as HTMLElement;
+    const button = event.pointerType === 'touch' && event.button === 0 && !headGesture && canvas.contains(target)
+      && options.touchGuide?.readRightButton() ? 2 : event.button;
+    if (disposed || library || (button !== 0 && button !== 1 && button !== 2)) return;
+    const mode = options.readLessonInput?.() ?? 'edit';
     const block = target.closest<HTMLElement>('.melody-note');
-    if (mode === 'locked' || (mode !== 'edit' && block) || (mode === 'pan' && event.button !== 0)) return;
-    if (!headGesture && block?.classList.contains('is-dim') && (!vertical || event.button !== 2)) { event.preventDefault(); event.stopPropagation(); return; }
+    if (mode === 'locked' || (mode !== 'edit' && block) || (mode === 'pan' && button !== 0)) return;
+    if (!headGesture && block?.classList.contains('is-dim') && (!vertical || button !== 2)) { event.preventDefault(); event.stopPropagation(); return; }
     const key = target.closest<HTMLElement>('.melody-key');
     if (key && !headGesture) {
-      if (vertical && event.button === 0 && safeFlush()) {
+      if (vertical && button === 0 && safeFlush()) {
         event.preventDefault(); keyPan = { id: event.pointerId, capture: key, fromX: event.clientX, offset: pitchOffset(), moved: false };
         key.setPointerCapture?.(event.pointerId);
       }
@@ -945,7 +951,7 @@ export function mountMelodyWorkspace(root: HTMLElement, options: {
       moveHead(gesture, event);
       return;
     }
-    else if (event.button === 2) {
+    else if (button === 2) {
       if (vertical) {
         const refs = new Map<string, { partId: string; noteId: string }>();
         const noteId = block?.dataset.noteId, partId = block?.dataset.partId;
@@ -964,7 +970,7 @@ export function mountMelodyWorkspace(root: HTMLElement, options: {
         }
       }
     }
-    else if (event.button === 1 || event.altKey || (!block && !editingFamilyId())) gesture = { ...base, kind: 'pan', lastClient: { x: event.clientX, y: event.clientY } };
+    else if (button === 1 || event.altKey || (!block && !editingFamilyId())) gesture = { ...base, kind: 'pan', lastClient: { x: event.clientX, y: event.clientY } };
     else {
       const voice = block ? part(block.dataset.partId) : rhythm ? visibleParts(value)[Math.floor(from.y / view.rowHeight)] : part(); const note = voice?.notes.find(item => item.id === block?.dataset.noteId);
       if (block && voice && note) {
@@ -1046,7 +1052,67 @@ export function mountMelodyWorkspace(root: HTMLElement, options: {
     if (active?.kind !== 'erase' || active.id !== pointer.pointerId) return;
     erasePath(active, pointer);
   }
+  function touchSpan() {
+    const [first, second] = [...touches!.values()];
+    if (!first || !second) return;
+    return { x: Math.abs(first.x - second.x), y: Math.abs(first.y - second.y),
+      clientX: (first.x + second.x) / 2, clientY: (first.y + second.y) / 2 };
+  }
+  function startTouch(event: PointerEvent): boolean {
+    if (!touches || event.pointerType !== 'touch' || disposed || library) return false;
+    touches.set(event.pointerId, { x: event.clientX, y: event.clientY });
+    if (touches.size === 1) return false;
+    event.preventDefault();
+    if (touches.size === 2) {
+      finish(false);
+      finishKeyPan(true);
+      for (const id of touches.keys()) scroll.setPointerCapture?.(id);
+      pinch = touchSpan();
+    }
+    return true;
+  }
+  function endTouch(event: PointerEvent): void {
+    if (!touches?.has(event.pointerId)) return;
+    if (pinchFrame) {
+      cancelAnimationFrame(pinchFrame); pinchFrame = 0;
+      if (event.type === 'pointerup') paintPinch();
+    }
+    touches.delete(event.pointerId);
+    if (pinch) pinch = touchSpan();
+  }
+  function paintPinch(): void {
+    pinchFrame = 0;
+    const mode = options.readLessonInput?.();
+    if (!pinch || disposed || (mode !== 'zoom' && mode !== 'edit')) return;
+    const span = touchSpan(), value = body();
+    if (!span || !value) return;
+    if (!pinch.axis) {
+      const dx = Math.abs(span.x - pinch.x), dy = Math.abs(span.y - pinch.y);
+      if (Math.max(dx, dy) < 8) return;
+      pinch.axis = dx > 1.6 * dy ? 'x' : dy > 1.6 * dx ? 'y' : 'both';
+    }
+    const previous = view;
+    if (pinch.axis !== 'x' && span.y !== pinch.y) {
+      view = zoomMelody(view, width(), melodyDuration(value), point(span).x, Math.max(24, span.y) / Math.max(24, pinch.y));
+    }
+    if (pinch.axis !== 'y' && span.x !== pinch.x) {
+      zoomPitchAt(span.clientX, Math.max(24, span.x) / Math.max(24, pinch.x));
+    }
+    pinch.x = span.x; pinch.y = span.y;
+    if (view.zoom === previous.zoom && view.rowHeight === previous.rowHeight) return;
+    manualNavigation(); scheduleViewport();
+    if (view.zoom !== previous.zoom) options.onLearningAction?.('zoom-y');
+    if (view.rowHeight !== previous.rowHeight) options.onLearningAction?.('zoom-x');
+  }
   function move(event: PointerEvent): void {
+    if (touches?.has(event.pointerId)) {
+      touches.set(event.pointerId, { x: event.clientX, y: event.clientY });
+      if (touches.size >= 2) {
+        event.preventDefault();
+        if (!pinchFrame) pinchFrame = requestAnimationFrame(paintPinch);
+        return;
+      }
+    }
     if (keyPan?.id === event.pointerId) {
       event.preventDefault(); const delta = event.clientX - keyPan.fromX;
       if (Math.abs(delta) > 3) keyPan.moved = true;
@@ -1062,7 +1128,7 @@ export function mountMelodyWorkspace(root: HTMLElement, options: {
         return;
       }
       erasePath(active, event);
-      if (typeof event.buttons === 'number' && !(event.buttons & 2)) finish(true);
+      if (event.pointerType !== 'touch' && typeof event.buttons === 'number' && !(event.buttons & 2)) finish(true);
       return;
     }
     const now = point(event);
@@ -1192,6 +1258,15 @@ export function mountMelodyWorkspace(root: HTMLElement, options: {
   }
   function flush(persist = true): void { if (disposed) return; tempoRolls?.flush(); const failure = finish(true) ?? commitMix(); if (persist) persistWorkspace(true); if (failure) throw failure; }
   function safeFlush(): boolean { try { flush(false); return true; } catch { return false; } }
+  function zoomPitchAt(client: number, factor: number): void {
+    const bounds = scroll.getBoundingClientRect();
+    const y = client - (vertical ? bounds.left : bounds.top);
+    const row = (pitchOffset() + y) / view.rowHeight;
+    const rowHeight = melodyClamp(view.rowHeight * factor, rhythm ? 48 : 12, rhythm ? 120 : 44);
+    if (rowHeight === view.rowHeight) return;
+    view = { ...view, rowHeight };
+    paintRows(); setTop(row * rowHeight - y);
+  }
   function wheel(event: WheelEvent): void {
     if (disposed || !body() || library || root.querySelector('dialog[open]') || document.querySelector('dialog[open]')) return;
     event.preventDefault();
@@ -1226,11 +1301,8 @@ export function mountMelodyWorkspace(root: HTMLElement, options: {
     const control = event.ctrlKey || event.metaKey;
     const pitchZoom = control && (vertical ? event.shiftKey : !event.shiftKey);
     const timeZoom = control && (vertical ? !event.shiftKey : event.shiftKey);
-    if (pitchZoom) {
-      const y = vertical ? event.clientX - scroll.getBoundingClientRect().left : event.clientY - scroll.getBoundingClientRect().top;
-      const row = (pitchOffset() + y) / view.rowHeight;
-      view = { ...view, rowHeight: melodyClamp(view.rowHeight * Math.exp(-event.deltaY * .002), rhythm ? 48 : 12, rhythm ? 120 : 44) }; paintRows(); setTop(row * view.rowHeight - y);
-    } else if (timeZoom) { const rowHeight = view.rowHeight; view = zoomMelody(view, width(), melodyDuration(value), point(event).x, Math.exp(-event.deltaY * .002)); if (rhythm) view.rowHeight = rowHeight; }
+    if (pitchZoom) zoomPitchAt(vertical ? event.clientX : event.clientY, Math.exp(-event.deltaY * .002));
+    else if (timeZoom) { const rowHeight = view.rowHeight; view = zoomMelody(view, width(), melodyDuration(value), point(event).x, Math.exp(-event.deltaY * .002)); if (rhythm) view.rowHeight = rowHeight; }
     else if (vertical) {
       setTop(pitchOffset() + (event.shiftKey ? event.deltaX || event.deltaY : event.deltaX || 0));
       if (!event.shiftKey) view = clampView({ ...view, leftSeconds: view.leftSeconds + event.deltaY / melodyScale(view, width(), melodyDuration(value)) }, melodyDuration(value));
@@ -1353,10 +1425,11 @@ export function mountMelodyWorkspace(root: HTMLElement, options: {
     reportViewport();
   }
   const up = (event: PointerEvent) => {
+    endTouch(event);
     if (keyPan?.id === event.pointerId) finishKeyPan();
     if (quickDrag?.id === event.pointerId) finishQuickScroll();
     if (gesture?.id === event.pointerId) {
-      if (vertical && gesture.kind === 'erase' && event.button === 2) {
+      if (vertical && gesture.kind === 'erase' && (event.button === 2 || event.pointerType === 'touch')) {
         if (!options.readLessonInput || options.readLessonInput() === 'edit') erase(gesture.last, point(event));
         else gesture.moved ||= Math.hypot(event.clientX - gesture.clientFrom.x, event.clientY - gesture.clientFrom.y) > 4;
       }
@@ -1364,9 +1437,9 @@ export function mountMelodyWorkspace(root: HTMLElement, options: {
     }
     if (mix?.pointerId === event.pointerId) commitMix();
   };
-  const cancel = (event: PointerEvent) => { if (keyPan?.id === event.pointerId) finishKeyPan(true); if (quickDrag?.id === event.pointerId) finishQuickScroll(); if (gesture?.id === event.pointerId) finish(false); if (mix?.pointerId === event.pointerId) { mix = undefined; preview(); refresh(); } };
+  const cancel = (event: PointerEvent) => { endTouch(event); if (keyPan?.id === event.pointerId) finishKeyPan(true); if (quickDrag?.id === event.pointerId) finishQuickScroll(); if (gesture?.id === event.pointerId) finish(false); if (mix?.pointerId === event.pointerId) { mix = undefined; preview(); refresh(); } };
   const resize = () => { if (!disposed) { setTop(pitchOffset()); scheduleViewport(); } };
-  scroll.addEventListener('pointerdown', event => begin(event, event.target === head && event.button === 0));
+  scroll.addEventListener('pointerdown', event => { if (!startTouch(event)) begin(event, event.target === head && event.button === 0); });
   ruler.addEventListener('pointerdown', event => { if (event.button === 0) begin(event, true); });
   scroll.addEventListener('contextmenu', event => event.preventDefault()); scroll.addEventListener('wheel', wheel, { passive: false }); ruler.addEventListener('wheel', wheel, { passive: false });
   if (rhythm) shelf.addEventListener('wheel', wheel, { passive: false });
@@ -1466,6 +1539,7 @@ export function mountMelodyWorkspace(root: HTMLElement, options: {
     if (disposed) return; endGroupDrag(); finishKeyPan(true); finish(false); mix = undefined; persistWorkspace(true); preview(); audition.cancel(); tempoRolls?.dispose(); disposed = true; library?.close(); observer?.disconnect(); removeConsoleWheel(); window.clearTimeout(noticeTimer); window.clearTimeout(workspaceTimer);
     window.clearTimeout(quickHideTimer); quickDrag = undefined;
     cancelAnimationFrame(viewportFrame); viewportFrame = 0;
+    cancelAnimationFrame(pinchFrame); pinchFrame = 0; touches?.clear(); pinch = undefined;
     scroll.removeEventListener('scroll', scrolled);
     document.removeEventListener('pointermove', move); document.removeEventListener('pointerup', up); document.removeEventListener('pointercancel', cancel); document.removeEventListener('keydown', keydown); window.removeEventListener('resize', resize);
   } };
