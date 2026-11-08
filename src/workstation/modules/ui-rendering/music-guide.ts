@@ -23,6 +23,7 @@ export interface MusicGuideFactory {
 }
 
 const enterDelayMs = 1500;
+const subdivisionStep = 8;
 const editStep = 9;
 const noteEditPrompts: ReadonlyArray<readonly [action: LearningAction, text: string]> = [
   ['move-note', '左键按住并拖动音符可以改变位置'],
@@ -39,8 +40,8 @@ const scenes = [
   { title: '音色', lines: [], wait: 0 },
   { title: '缩放', lines: ['Control + 滚轮竖直缩放，Shift + Control + 滚轮水平缩放'], wait: 5000 },
   { title: '拍内细分', lines: [
-    '点击左下角的 BPM 设置每拍细分。',
-    '每拍会有更细的横线划分',
+    '上下拉宽，会出现更细、更密集的横线',
+    '点击bpm可调节均分份数',
   ], wait: 5000 },
   { title: '编辑音符', lines: [], wait: 0 },
   { title: '顶栏', lines: [
@@ -80,6 +81,7 @@ export function mountMusicGuide(root: HTMLElement, factory: MusicGuideFactory, o
   let lastEnterAt = -Infinity;
   let sceneTimer = 0, advanceTimer = 0, firstFrame = 0;
   let leaveTempoScene: (() => void) | undefined;
+  let leaveSubdivisionScene: (() => void) | undefined;
   let timbreScene: ReturnType<typeof introduceTimbres> | undefined;
   let noteEditAction: ((action: LearningAction) => void) | undefined;
   let sound: SoundRuntimePort | undefined;
@@ -121,6 +123,40 @@ export function mountMusicGuide(root: HTMLElement, factory: MusicGuideFactory, o
       if (index < noteEditPrompts.length) showPrompt();
       else { copy.replaceChildren(); cueAfter(); }
     };
+  }
+  function introduceSubdivisions(copy: HTMLElement, nextLine: Element) {
+    const scroll = host.querySelector<HTMLElement>('.melody-scroll');
+    const grid = scroll?.querySelector<HTMLElement>('.melody-grid');
+    if (!scroll || !grid || matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      copy.append(nextLine);
+      return;
+    }
+
+    let frame = 0;
+    const paint = (progress: number) => {
+      const edge = scroll.scrollLeft + scroll.clientWidth * progress;
+      grid.style.setProperty('--music-guide-subdivision-edge', `${edge}px`);
+    };
+    const stop = () => {
+      cancelAnimationFrame(frame);
+      grid.classList.remove('is-drawing-subdivisions');
+      grid.style.removeProperty('--music-guide-subdivision-edge');
+    };
+    paint(0);
+    grid.classList.add('is-drawing-subdivisions');
+    const start = performance.now();
+    function draw(now: number) {
+      const progress = Math.max(0, (now - start) / 1000);
+      if (progress >= 1) {
+        stop();
+        copy.append(nextLine);
+        return;
+      }
+      paint(progress ** 2);
+      frame = requestAnimationFrame(draw);
+    }
+    frame = requestAnimationFrame(draw);
+    return stop;
   }
   function introduceTempo(heading: HTMLElement, copy: HTMLElement) {
     const tempoButton = host.querySelector<HTMLButtonElement>('.melody-tempo-button');
@@ -273,6 +309,7 @@ export function mountMusicGuide(root: HTMLElement, factory: MusicGuideFactory, o
   function showScene(next: number) {
     if (disposed) return;
     leaveTempoScene?.(); leaveTempoScene = undefined;
+    leaveSubdivisionScene?.(); leaveSubdivisionScene = undefined;
     timbreScene?.dispose(); timbreScene = undefined;
     noteEditAction = undefined;
     window.clearTimeout(advanceTimer); advanceTimer = 0;
@@ -288,11 +325,14 @@ export function mountMusicGuide(root: HTMLElement, factory: MusicGuideFactory, o
     const heading = element('h2', 'music-guide-word', scene.title);
     const copy = element('div', 'music-guide-copy');
     copy.append(...scene.lines.map(line => element('p', '', line)));
+    const subdivisionTip = step === subdivisionStep ? copy.lastElementChild : null;
+    subdivisionTip?.remove();
     if (step === 3) copy.lastElementChild?.classList.add('music-guide-prompt');
     words.replaceChildren(heading, copy);
     words.hidden = false;
     if (step === 5) introduceTempo(heading, copy);
     if (step === 6) timbreScene = introduceTimbres(shell, host, heading, copy, cueAfter);
+    if (subdivisionTip) leaveSubdivisionScene = introduceSubdivisions(copy, subdivisionTip);
     if (step === editStep) noteEditAction = introduceNoteEdits(copy);
     if (scene.wait) cueAfter(scene.wait);
     shown = true;
@@ -301,6 +341,7 @@ export function mountMusicGuide(root: HTMLElement, factory: MusicGuideFactory, o
     if (disposed) return;
     disposed = true;
     leaveTempoScene?.();
+    leaveSubdivisionScene?.();
     timbreScene?.dispose();
     cancelAnimationFrame(firstFrame);
     window.clearTimeout(sceneTimer);

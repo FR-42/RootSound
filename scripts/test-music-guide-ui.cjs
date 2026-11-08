@@ -546,7 +546,13 @@ async function runTest() {
   await next();
   await step(8);
   assert.equal(await js('document.querySelector(".music-guide-word").textContent'), '拍内细分');
-  assert.deepEqual(await copyLines(), ['点击左下角的 BPM 设置每拍细分。', '每拍会有更细的横线划分']);
+  assert.deepEqual(await copyLines(), ['上下拉宽，会出现更细、更密集的横线']);
+  const fineGridLine = '.melody-grid-line:not(.is-beat)';
+  assert.notEqual(await style(fineGridLine, 'clipPath'), 'none');
+  assert.equal(await style('.melody-grid-line.is-beat', 'clipPath'), 'none');
+  await ready('.music-guide-copy p:nth-child(2)');
+  assert.deepEqual(await copyLines(), ['上下拉宽，会出现更细、更密集的横线', '点击bpm可调节均分份数']);
+  assert.equal(await style(fineGridLine, 'clipPath'), 'none');
   await click('.melody-tempo-button');
   const subdivision = 'select[aria-label="每拍细分"]';
   await ready(subdivision);

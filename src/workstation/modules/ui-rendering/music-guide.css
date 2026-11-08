@@ -124,6 +124,9 @@
 .music-guide:is([data-step="2"], [data-step="3"], [data-step="4"], [data-step="5"], [data-step="6"], [data-step="7"], [data-step="8"]) .melody-note { cursor: default; }
 .music-guide:is([data-step="1"], [data-step="2"], [data-step="3"], [data-step="4"]) .melody-grid { visibility: hidden; }
 .music-guide:is([data-step="5"], [data-step="6"], [data-step="7"]) .melody-grid-line:not(.is-beat) { visibility: hidden; }
+.music-guide .is-drawing-subdivisions .melody-grid-line:not(.is-beat) {
+  clip-path: polygon(0 0, var(--music-guide-subdivision-edge) 0, var(--music-guide-subdivision-edge) 100%, 0 100%);
+}
 .music-guide:is([data-step="5"], [data-step="6"], [data-step="7"]) .melody-tempo-grid-field { display: none; }
 .music-guide :is(.melody-quick-hint, .melody-tempo-resize-hint) { display: none; }
 @media (max-width: 680px) {
