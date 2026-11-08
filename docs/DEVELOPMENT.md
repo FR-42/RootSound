@@ -23,15 +23,16 @@ npm run dev／npm run build 使用 index.html 的开发工作站入口；正式�
 网页用 build:website。跨平台打包需要独立运行时缓存与打包依赖。
 
 ```powershell
-powershell -File scripts/Build-Release.ps1 -Version 0.1.0-preview.4
+powershell -File scripts/Build-Release.ps1 -Version 0.1.0-preview.5
 ```
 
-发布文件在 release 目录。Windows x64 使用单文件安装程序，默认安装至
+发布文件在 release/版本号 目录。Windows x64 使用单文件安装程序，默认安装至
 D:\Apps\RootSound，并创建桌面快捷方式。D 盘缺失时选择其他非 C 盘的固定磁盘。
 安装版工程目录为安装根目录的 project，更新程序版本时继续使用此目录。
 Mac 使用安装到 /Applications 的 Apple 芯片版 PKG，最低 macOS 13。
 预览包中的 Mac 应用使用临时签名，PKG 未经 Apple 公证。
-默认安装包不含本地工程。显式使用 IncludeCurrentProjects 仅打包演示目录的原生工程。
+安装包从 Git HEAD 读取 project/演示项目 中已提交的 .rootsound 工程。首次启动时把
+示例复制到安装版乐曲库的「演示项目」子目录，保留同名文件和主动删除的记录。
 
 ## 原生 Git worktree
 

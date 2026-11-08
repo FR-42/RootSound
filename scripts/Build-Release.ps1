@@ -1,14 +1,13 @@
-param([string]$Version = '0.1.0-preview.4', [switch]$IncludeCurrentProjects, [switch]$UseCachedRuntimes)
+param([string]$Version = '0.1.0-preview.5', [switch]$UseCachedRuntimes)
 $ErrorActionPreference = 'Stop'
 if ($Version -notmatch '^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$') { throw 'Invalid release version.' }
 $releaseTaskRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..')).Path
 Push-Location -LiteralPath $releaseTaskRoot
 try {
     foreach ($releaseName in @("RootSound-Windows-x64-$Version-Setup.exe", "RootSound-macOS-arm64-$Version.pkg")) {
-        if (Test-Path -LiteralPath "release/$releaseName") { throw 'Release files already exist. Choose a new version to preserve them.' }
+        if (Test-Path -LiteralPath "release/$Version/$releaseName") { throw 'Release files already exist. Choose a new version to preserve them.' }
     }
     $env:ROOTSOUND_RELEASE_VERSION = $Version
-    $env:ROOTSOUND_INCLUDE_PROJECTS = if ($IncludeCurrentProjects) { '1' } else { '0' }
     $env:ROOTSOUND_RELEASE_OUTPUT = Join-Path $releaseTaskRoot ('.cache/release-zip-check/' + $Version + '-' + [Guid]::NewGuid().ToString('N'))
     $env:DOTNET_CLI_HOME = Join-Path $releaseTaskRoot '.cache/dotnet-home'
     $env:DOTNET_CLI_TELEMETRY_OPTOUT = '1'

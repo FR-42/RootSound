@@ -7,7 +7,7 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 CACHE = ROOT / '.cache'
 DEPS = CACHE / 'release-dependencies'
 PLAN = CACHE / 'release-package-plan.json'
-VERSION = os.environ.get('ROOTSOUND_RELEASE_VERSION', '0.1.0-preview.2')
+VERSION = os.environ.get('ROOTSOUND_RELEASE_VERSION', '0.1.0-preview.5')
 
 def safe_path(root, name):
     target = (root / name).resolve()
@@ -75,20 +75,31 @@ def prepare():
     if not icon_name.endswith('.icns'):icon_name+='.icns'
     shutil.copyfile(ROOT/'desktop/assets/RootSound.icns',app/'Contents/Resources'/icon_name)
 
-    # Personal projects are opt-in per build, never part of the default recipe.
-    projects=[]
-    if os.environ.get('ROOTSOUND_INCLUDE_PROJECTS')=='1':
-        snapshot=stage/'bundled-projects';snapshot.mkdir()
-        for source in sorted((ROOT/'project'/'演示项目').glob('*.rootsound')):
-            if source.is_symlink() or not source.is_file():continue
-            checksum=hashlib.sha256();target=snapshot/source.name
-            with source.open('rb') as input,target.open('xb') as output:
-                while chunk:=input.read(1024*1024):checksum.update(chunk);output.write(chunk)
-            projects.append({'name':source.name,'bytes':target.stat().st_size,'sha256':checksum.hexdigest()})
-        if projects:
-            for destination in [win_app/'seed-projects',mac_app/'seed-projects']:
-                shutil.copytree(snapshot,destination)
-                (destination/'manifest.json').write_text(json.dumps({'version':1,'projects':projects},ensure_ascii=False,indent=2),encoding='utf-8')
+    demo_dir = 'project/演示项目/'
+    tree = subprocess.check_output(['git', 'ls-tree', '-r', '-z', 'HEAD', '--', demo_dir], cwd=ROOT)
+    snapshot = stage/'bundled-projects'
+    snapshot.mkdir()
+    projects = []
+    for entry in tree.decode('utf-8').split('\0'):
+        if not entry:
+            continue
+        metadata, relative = entry.split('\t', 1)
+        mode, kind, oid = metadata.split()
+        if mode not in ('100644', '100755') or kind != 'blob' or not relative.endswith('.rootsound'):
+            continue
+        name = relative.removeprefix(demo_dir)
+        if name == relative or '\\' in name or any(part in ('', '.', '..') for part in name.split('/')):
+            raise ValueError('Invalid demo project path')
+        target = safe_path(snapshot, name)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        with target.open('xb') as output:
+            subprocess.run(['git', 'cat-file', 'blob', oid], cwd=ROOT, stdout=output, check=True)
+        with target.open('rb') as input:
+            checksum = hashlib.file_digest(input, 'sha256').hexdigest()
+        projects.append({'name': name, 'bytes': target.stat().st_size, 'sha256': checksum})
+    for destination in [win_app/'seed-projects', mac_app/'seed-projects']:
+        shutil.copytree(snapshot, destination)
+        (destination/'manifest.json').write_text(json.dumps({'version': 2, 'projects': projects}, ensure_ascii=False, indent=2), encoding='utf-8')
 
     # Windows cannot create Unix symlinks without a system privilege. Provide
     # local-only aliases so the shallow signer can read vendor framework bundles;
@@ -133,7 +144,7 @@ def archive():
         readme+='\n包含：乐曲库、竖向钢琴卷帘、128种GM乐器及47种鼓音、音色导入、琴键试听、MIDI导入、BPM卷帘、工程保存和WAV导出。\n不包含：旧歌曲编排界面、乐句库、灵感共创、独立采样／蓝牙实验工具。\n'
         readme+='\n内置音源采用GeneralUser GS 2.0.3，完整SoundFont播放采用SpessaSynth core 4.4.4。许可和来源说明位于应用资源的ui/instruments/generaluser-gs-2.0.3目录。音源作者说明部分历史采样无法完全追溯原始来源；允许商用和软件打包不代表全部底层采样权属已核清。\n'
         if plan.get('projects'):
-            readme+=f'\n随包附带作者当前的{len(plan["projects"])}个工程，不含备份和历史缓存。\n'
+            readme+=f'\n随包附带演示项目目录中已提交的 {len(plan["projects"])} 个工程。\n'
             readme+='首次打开会加入乐曲库；已有同名工程不会被覆盖，删除后的随包工程不会在下次启动时重新出现。\n'
             readme+='\n'.join('- '+item['name'] for item in plan['projects'])+'\n'
         readme+='\n退出时可选择保存、放弃或取消，普通编辑不会自动保存工程。\n'
@@ -162,7 +173,7 @@ def archive():
         with output.open('rb') as input: checksum=hashlib.file_digest(input,'sha256').hexdigest()
         checksums.append(checksum+'  '+output.name)
     (release/'SHA256SUMS.txt').write_text('\n'.join(checksums)+'\n',encoding='utf-8')
-    project_note=f'本版按作者要求附带当前{len(plan.get("projects",[]))}个工程（不含.bak）；白底灰色音符图标。' if plan.get('projects') else '本版不附带个人工程。'
+    project_note=f'本版附带演示项目目录中已提交的 {len(plan.get("projects",[]))} 个工程。' if plan.get('projects') else '本版不附带个人工程。'
     (release/'发布说明.txt').write_text('RootSound '+VERSION+'\n\n两个ZIP是上传GitHub Release的下载文件。Windows版本已做隔离文件功能检查；Mac ARM64包已完成结构与签名检查，仍需真实Mac验收，且未做Apple Developer ID签名／公证。请作为预览版本发布。\n\n'+project_note+'\n运行环境已随包附带，不含项目源码目录、实验、历史版本或开发依赖。\nMac的ZIP保留Unix可执行权限和框架内部链接，请在Mac上直接解压ZIP；不要在Windows解压后重新压缩。\n',encoding='utf-8')
     print('\n'.join(checksums))
 

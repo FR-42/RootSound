@@ -135,6 +135,15 @@ let expression='starting',stage='setup';
  for(let step=2;step<=10;step++){
    await click('.music-guide-touch button:nth-child(2)');
    await wait(()=>js("Number(document.querySelector('.music-guide')?.dataset.step)==="+step));
+   if(step===6) {
+     await ready('.music-guide[data-timbre-phase=select]');
+     await click('.melody-note-family');
+     assert.match(await js("document.querySelector('.music-guide-copy').textContent"),/按住不松手，上下拖动可改变时长/);
+     const drawn=await js("(()=>{const canvas=document.querySelector('.melody-canvas'),r=document.querySelector('.melody-scroll').getBoundingClientRect(),x=r.x+r.width*.58,y=r.y+180;const opts={bubbles:true,cancelable:true,pointerId:31,isPrimary:true,pointerType:'mouse',button:0,buttons:1,clientX:x,clientY:y};const note=()=>document.querySelector('.melody-note.is-drawing');const length=()=>parseFloat(note().style.height);const count=()=>document.querySelectorAll('.melody-note').length;const before=count();canvas.dispatchEvent(new PointerEvent('pointerdown',opts));const initial=length();document.dispatchEvent(new PointerEvent('pointermove',{...opts,clientY:y+100}));const down=length();document.dispatchEvent(new PointerEvent('pointermove',{...opts,clientY:y+55}));const up=length();document.dispatchEvent(new PointerEvent('pointerup',{...opts,clientY:y+55,buttons:0}));return {initial,down,up,added:count()-before,finished:!note(),notice:document.querySelector('.melody-notice')?.textContent}})()");
+     assert(drawn.down>drawn.initial&&drawn.up<drawn.down,JSON.stringify(drawn));
+     assert.equal(drawn.added,1,JSON.stringify(drawn));
+     assert(drawn.finished);
+   }
  }
  await click('.music-guide-touch button:nth-child(2)');await ready('.melody-workspace');
  assert(await js('document.documentElement.scrollWidth<=innerWidth'));
@@ -147,7 +156,7 @@ let expression='starting',stage='setup';
  await wait(()=>parentJs("document.querySelector('.music-guide-word')?.textContent==='卷帘'"));
  assert.deepEqual(rendererErrors,[]);assert(!win.isVisible());
  fs.writeFileSync(root+'/report.json',JSON.stringify({passed:true,firstVisitYes:true,firstVisitNo:true,returningVisit:true,replayFromSettings:true,
-   guideStages:10,draftPreserved:true,voices:175,starterPlayback:true,firstPlaybackMs,fullBankOnDemand:true,visibleWindow:false,physicalAudio:false},null,2));win.destroy();app.exit(0);
+   guideStages:10,timbreDragLength:true,draftPreserved:true,voices:175,starterPlayback:true,firstPlaybackMs,fullBankOnDemand:true,visibleWindow:false,physicalAudio:false},null,2));win.destroy();app.exit(0);
 }catch(error){fs.writeFileSync(root+'/report.json',JSON.stringify({error:String(error),stack:error?.stack,expression:expression.slice(0,350),stage}));app.exit(1)}})();
 `);
 const env={...process.env};delete env.ELECTRON_RUN_AS_NODE;

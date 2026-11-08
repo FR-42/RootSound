@@ -15,7 +15,7 @@ import { writeXar } from '../node_modules/@electron/osx-sign/dist/pkg-utils/xar.
 const plan = JSON.parse(await readFile('.cache/release-package-plan.json', 'utf8'));
 assert.match(plan.version, /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/u);
 assert(plan.macAdhocSignatureVerified?.length > 0);
-const output = path.resolve('release');
+const output = path.resolve('release', plan.version);
 await mkdir(output, { recursive: true });
 const windowsInstaller = path.join(output, `RootSound-Windows-x64-${plan.version}-Setup.exe`);
 const macInstaller = path.join(output, `RootSound-macOS-arm64-${plan.version}.pkg`);

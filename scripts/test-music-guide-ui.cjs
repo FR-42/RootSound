@@ -442,7 +442,7 @@ async function runTest() {
   const actionPrompt = '.music-guide-copy p:nth-child(2)';
   const selectText = '点击左上角音色卡可以进入选中状态';
   const mutedText = '选中音色时，其他音色的音符将变暗且静默';
-  const drawText = '左键卷帘以添加音符';
+  const drawText = '左键卷帘添加音符，按住不松手，上下拖动可改变时长';
   const deselectText = '右键卷帘空白处以取消选中';
   const copyLines = () => call(() => Array.from(document.querySelectorAll('.music-guide-copy p'), line => line.textContent));
   const cardNames = selector => call(selector => Array.from(document.querySelectorAll(selector), card => card.textContent), selector);
@@ -495,7 +495,17 @@ async function runTest() {
   assert.equal(await style('.music-guide-copy p:first-child', 'color'), 'rgb(65, 87, 109)');
   assert.equal(await style(actionPrompt, 'animationName'), breathe);
   const drawPoint = [canvas.x + 210, canvas.y + 440];
-  await gesture([drawPoint]);
+  await send('mousePressed', ...drawPoint, { button: 'left', buttons: 1, clickCount: 1 });
+  await ready('.melody-note.is-drawing');
+  const initialLength = (await geometry('.melody-note.is-drawing')).h;
+  await send('mouseMoved', drawPoint[0], drawPoint[1] + 112, { button: 'left', buttons: 1 });
+  const extendedLength = (await geometry('.melody-note.is-drawing')).h;
+  assert(extendedLength > initialLength);
+  await send('mouseMoved', drawPoint[0], drawPoint[1] + 62, { button: 'left', buttons: 1 });
+  const shortenedLength = (await geometry('.melody-note.is-drawing')).h;
+  assert(shortenedLength < extendedLength);
+  await send('mouseReleased', drawPoint[0], drawPoint[1] + 62, { button: 'left', buttons: 0, clickCount: 1 });
+  assert.equal(await visible('.melody-note.is-drawing'), false);
   assert.equal(await notes(), 7);
   assert.deepEqual(await copyLines(), [mutedText, deselectText]);
   assert.equal(await style(actionPrompt, 'animationName'), breathe);

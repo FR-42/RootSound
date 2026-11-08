@@ -22,3 +22,25 @@ test('bundled projects import once without overwriting existing songs or restori
   await writeFile(path.join(source,'manifest.json'),JSON.stringify({version:1,projects:[{name:'../escape.rootsound'}]}));
   await assert.rejects(seedBundledProjects(source,data),/名称无效/);
 });
+
+test('current demo manifest preserves the folder, nested files, existing work and deletions', async () => {
+  await mkdir('.test-output/release-seeds', { recursive: true });
+  const root = await mkdtemp(path.resolve('.test-output/release-seeds/demo-'));
+  const source = path.join(root, 'seed'), data = path.join(root, 'data');
+  const demo = path.join(data, 'project', '演示项目');
+  await mkdir(path.join(source, '子目录'), { recursive: true });
+  await mkdir(demo, { recursive: true });
+  await writeFile(path.join(source, '子目录/示例.rootsound'), 'demo');
+  await writeFile(path.join(source, '已有.rootsound'), 'bundled');
+  await writeFile(path.join(demo, '已有.rootsound'), 'user edit');
+  const manifest = path.join(source, 'manifest.json');
+  await writeFile(manifest, JSON.stringify({ version: 2, projects: [{ name: '子目录/示例.rootsound' }, { name: '已有.rootsound' }] }));
+  assert.deepEqual(await seedBundledProjects(source, data), { copied: 1, skipped: 1 });
+  assert.equal(await readFile(path.join(demo, '子目录/示例.rootsound'), 'utf8'), 'demo');
+  assert.equal(await readFile(path.join(demo, '已有.rootsound'), 'utf8'), 'user edit');
+  await unlink(path.join(demo, '子目录/示例.rootsound'));
+  assert.deepEqual(await seedBundledProjects(source, data), { copied: 0, skipped: 2 });
+  await assert.rejects(readFile(path.join(demo, '子目录/示例.rootsound')), { code: 'ENOENT' });
+  await writeFile(manifest, JSON.stringify({ version: 2, projects: [{ name: '子目录/../逃逸.rootsound' }] }));
+  await assert.rejects(seedBundledProjects(source, data), /名称无效/);
+});

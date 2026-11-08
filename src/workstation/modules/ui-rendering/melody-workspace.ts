@@ -1067,7 +1067,8 @@ export function mountMelodyWorkspace(root: HTMLElement, options: {
     }
     const now = point(event);
     if (active.kind === 'create') {
-      if (options.readLessonInput && options.readLessonInput() !== 'edit') return;
+      const mode = options.readLessonInput?.();
+      if (mode && mode !== 'edit' && mode !== 'draw') return;
       const scale = melodyScale(view, width(), melodyDuration(active.base));
       const extent = drawExtent(active.base, active.note.startBeat);
       const seconds = melodyClamp(view.leftSeconds + now.x / scale - melodySeconds(active.note.startBeat, active.base), extent.cell, extent.maximum);
