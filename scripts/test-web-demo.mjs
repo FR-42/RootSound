@@ -141,7 +141,7 @@ let expression='starting',stage='setup';
    if(step===6) {
      await ready('.music-guide[data-timbre-phase=select]');
      await click('.melody-note-family');
-     assert.match(await js("document.querySelector('.music-guide-copy').textContent"),/按住不松手，上下拖动可改变时长/);
+     assert.equal(await js("document.querySelector('.music-guide-copy p:nth-child(2)').textContent"),'左键卷帘添加音符');
      const drawn=await js("(()=>{const canvas=document.querySelector('.melody-canvas'),r=document.querySelector('.melody-scroll').getBoundingClientRect(),x=r.x+r.width*.58,y=r.y+180;const opts={bubbles:true,cancelable:true,pointerId:31,isPrimary:true,pointerType:'mouse',button:0,buttons:1,clientX:x,clientY:y};const note=()=>document.querySelector('.melody-note.is-drawing');const length=()=>parseFloat(note().style.height);const count=()=>document.querySelectorAll('.melody-note').length;const before=count();canvas.dispatchEvent(new PointerEvent('pointerdown',opts));const initial=length();document.dispatchEvent(new PointerEvent('pointermove',{...opts,clientY:y+100}));const down=length();document.dispatchEvent(new PointerEvent('pointermove',{...opts,clientY:y+55}));const up=length();document.dispatchEvent(new PointerEvent('pointerup',{...opts,clientY:y+55,buttons:0}));return {initial,down,up,added:count()-before,finished:!note(),notice:document.querySelector('.melody-notice')?.textContent}})()");
      assert(drawn.down>drawn.initial&&drawn.up<drawn.down,JSON.stringify(drawn));
      assert.equal(drawn.added,1,JSON.stringify(drawn));

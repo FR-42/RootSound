@@ -2,6 +2,7 @@
 .guidance-shell .settings-dialog button.primary { color:#fff; background:#506f87; border-color:#506f87; }
 .guidance-invitation { position:fixed; inset:0; z-index:110; display:grid; place-items:center; background:#e6edebbb; backdrop-filter:blur(14px); color-scheme:light; }
 .guidance-invitation-card { display:flex; flex-direction:column; align-items:stretch; gap:14px; padding:30px 44px 26px; width:min(280px,calc(100vw - 110px)); background:#ffffffed; border:1px solid #d0ded9; border-radius:22px; box-shadow:0 20px 90px #26483d1c; }
+.guidance-invitation-card h2 { margin: 0; color: var(--text); font-size: 19px; text-align: center; }
 .guidance-invitation-card svg { display:block; width:100%; height:auto; margin-bottom:12px; }
 .guidance-invitation button { padding:13px 22px; border-radius:10px; border:0; font:inherit; font-size:14px; cursor:pointer; }
 .guidance-watch { color:white; background:#38695e; }

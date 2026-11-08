@@ -19,7 +19,7 @@ export function introduceTimbres(shell: HTMLElement, host: HTMLElement, heading:
   const selectTip = tip('点击左上角音色卡可以进入选中状态');
   const mutedTip = document.createElement('p');
   mutedTip.textContent = '选中音色时，其他音色的音符将变暗且静默';
-  const drawTip = tip('左键卷帘添加音符，按住不松手，上下拖动可改变时长');
+  const drawTip = tip('左键卷帘添加音符');
   const deselectTip = tip('右键卷帘空白处以取消选中');
   let animations: Animation[] = [];
   let disposed = false;

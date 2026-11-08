@@ -24,7 +24,7 @@ contextBridge.exposeInMainWorld('rootSoundDesktop',{storage:{Read:()=>sync('stor
  files:{Open:()=>{},Save:()=>{}},audioFiles:{Save:()=>{}},timbreFiles:{State:()=>call('timbres.State'),Sync:id=>call('timbres.Sync',id??''),Open:()=>{}},
  projectDirectories:Object.fromEntries(${JSON.stringify(methods)}.map(name=>[name,(...args)=>call('project.'+name,...args)]))});
 `);
-const setupScript=`localStorage.setItem('rootsound.learning.v1',JSON.stringify({version:1,multipleTempoRolls:true,guides:{basics:{status:'skipped',step:0},'tempo-rolls':{status:'skipped',step:0}}}));window.__errors=[];window.addEventListener('error',e=>__errors.push(e.message));window.addEventListener('unhandledrejection',e=>__errors.push(String(e.reason)));`;
+const setupScript=`localStorage.setItem('rootsound.learning.v1',JSON.stringify({version:1,multipleTempoRolls:true,guides:{basics:{status:'new',step:0},'tempo-rolls':{status:'skipped',step:0}}}));window.__errors=[];window.addEventListener('error',e=>__errors.push(e.message));window.addEventListener('unhandledrejection',e=>__errors.push(String(e.reason)));`;
 const code=`
 const {app,BrowserWindow,ipcMain,session}=require('electron'),fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict'),{spawn}=require('node:child_process'),{createInterface}=require('node:readline');
 const root=${JSON.stringify(root)},project=path.join(root,'project'),ui=${JSON.stringify(path.resolve('dist'))},hostDll=${JSON.stringify(path.resolve('.test-output/music-formats/host/RootSound.Host.dll'))};
@@ -42,7 +42,12 @@ ipcMain.handle('call',(_event,method,args)=>rpc(method,args));ipcMain.on('sync',
 await session.defaultSession.protocol.handle('https',async request=>{const url=new URL(request.url);if(url.hostname!=='rootsound.local')return new Response('',{status:403});const file=path.join(ui,decodeURIComponent(url.pathname));let bytes=fs.readFileSync(file);const ext=path.extname(file);if(ext==='.html')bytes=Buffer.from(bytes.toString().replace('<head>','<head><script>'+${JSON.stringify(setupScript)}+'</script>'));return new Response(bytes,{headers:{'Content-Type':{'.html':'text/html','.js':'application/javascript','.css':'text/css','.json':'application/json','.wasm':'application/wasm'}[ext]??'application/octet-stream'}});});
 async function open(name){const file=path.join(project,name),source=await host('project.OpenKnown',[file]);await host('project.OpenDocument',[file,source.token,fs.readFileSync(path.join(root,name+'.json'),'utf8')]);}
 await open('Demo.mid');win=new BrowserWindow({show:false,width:1300,height:900,webPreferences:{preload:path.join(root,'preload.cjs'),contextIsolation:true,sandbox:true,backgroundThrottling:false}});
-await win.loadURL('https://rootsound.local/index.html');await wait("!!document.querySelector('.melody-workspace')");
+await win.loadURL('https://rootsound.local/index.html');
+stage='first launch with a project already open';
+await wait("!!document.querySelector('.guidance-invitation')");
+check(await js("document.querySelector('.guidance-invitation h2').textContent==='是否观看引导'&&!document.querySelector('.melody-workspace')"),'first startup asks before rendering an already-open score');
+await js("document.querySelector('.guidance-skip').click()");await wait("!!document.querySelector('.melody-workspace')");
+check(await js("localStorage.getItem('rootsound.desktop-guide-choice.v1')==='no'"),'skip is remembered for the desktop profile');
 stage='MIDI startup';check(await js("document.querySelectorAll('.melody-note').length===1"),'source note renders');check(await js("!document.querySelector('.song-save-as, .song-midi-effects')"),'the top bar has no native Save As or MIDI effects button');
 check(await js("document.querySelectorAll('.melody-key').length===128&&document.querySelector('.melody-key[data-pitch-label=\\\"C-1\\\"]')!==null&&document.querySelector('.melody-key[data-pitch-label=\\\"G9\\\"]')!==null"),'complete MIDI keyboard renders');
 check(await js("document.querySelector('.melody-tempo-input').min==='1'&&document.querySelector('.melody-tempo-input').max==='1000'"),'BPM field exposes expanded range');

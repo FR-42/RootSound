@@ -103,8 +103,11 @@ async function runTest() {
   win.webContents.setAudioMuted(true);
   win.webContents.debugger.attach('1.3');
   await win.loadURL('https://rootsound.local/index.html');
-  await ready('.music-guide-launch');
-  await click('.music-guide-launch');
+  await ready('.guidance-invitation');
+  assert.equal(await js('document.querySelector(".guidance-invitation h2").textContent'), '是否观看引导');
+  assert.equal(await visible('.welcome'), false);
+  await click('.guidance-watch');
+  assert.equal(await js('localStorage.getItem("rootsound.desktop-guide-choice.v1")'), 'yes');
   bridgeCalls.length = 0;
   assert.equal(await js('getComputedStyle(document.querySelector(".music-guide")).backgroundColor'), 'rgb(255, 255, 255)');
   assert.equal(await visible('.music-guide-words'), false);
@@ -442,7 +445,7 @@ async function runTest() {
   const actionPrompt = '.music-guide-copy p:nth-child(2)';
   const selectText = '点击左上角音色卡可以进入选中状态';
   const mutedText = '选中音色时，其他音色的音符将变暗且静默';
-  const drawText = '左键卷帘添加音符，按住不松手，上下拖动可改变时长';
+  const drawText = '左键卷帘添加音符';
   const deselectText = '右键卷帘空白处以取消选中';
   const copyLines = () => call(() => Array.from(document.querySelectorAll('.music-guide-copy p'), line => line.textContent));
   const cardNames = selector => call(selector => Array.from(document.querySelectorAll(selector), card => card.textContent), selector);

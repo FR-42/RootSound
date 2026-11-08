@@ -33,6 +33,19 @@ export interface ReleasePlatform {
   samplePayloads?: SamplePayloadPort;
 }
 
+const desktopGuideChoiceKey = 'rootsound.desktop-guide-choice.v1';
+
+function firstDesktopGuideChoice(storage: Storage, previousStatus: string) {
+  if (previousStatus !== 'new') return undefined;
+  try {
+    const choice = storage.getItem(desktopGuideChoiceKey);
+    if (choice === 'yes' || choice === 'no') return undefined;
+  } catch {}
+  return (watch: boolean) => {
+    try { storage.setItem(desktopGuideChoiceKey, watch ? 'yes' : 'no'); } catch {}
+  };
+}
+
 export async function mountReleaseStudio(root: HTMLElement, platform: ReleasePlatform, navigate?: () => void) {
   const runtime = createBrowserSoundRuntime(), directories = platform.projectDirectories;
   try {
@@ -88,6 +101,7 @@ export async function mountReleaseStudio(root: HTMLElement, platform: ReleasePla
       musicGuide: { createDocument: createMusicGuideDocument, createSound: createBrowserSoundRuntime },
       initialEntry: current ? 'song' : 'welcome', audioFiles: platform.audioFiles, demo: !!platform.demoProject,
       startWithGuide: platform.demoProject?.startWithGuide,
+      onFirstGuideChoice: directories && firstDesktopGuideChoice(localStorage, learning.read().guides.basics.status),
       projectSetup: directories && createProjectSetup(directories, () => {
         runtime.stopAll();
         navigate?.();

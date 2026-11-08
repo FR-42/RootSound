@@ -38,6 +38,9 @@ async function run(){
   await app.whenReady();await waitFor(()=>BrowserWindow.getAllWindows().length>0);
   const window=BrowserWindow.getAllWindows()[0];assert(!window.isVisible());
   const js=code=>window.webContents.executeJavaScript('(async()=>('+code+'))()');
+  await waitFor(async()=>await js("!!document.querySelector('.guidance-invitation')").catch(()=>false));
+  assert.equal(await js("document.querySelector('.guidance-invitation h2').textContent"),'是否观看引导');
+  await js("document.querySelector('.guidance-skip').click()");
   await waitFor(async()=>await js("!!document.querySelector('.welcome-actions')").catch(()=>false));
   const welcome=await js("({name:document.querySelector('.wordmark').textContent,start:document.querySelector('.welcome-actions').textContent,bridge:typeof rootSoundDesktop.storage.Read})");
   assert.equal(welcome.name,'RootSound');assert.equal(welcome.bridge,'function');

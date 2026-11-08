@@ -18,6 +18,7 @@ import { showLearningSettings, showFeatureGate } from './settings.ts';
 import { needsTempoRolls } from './guidance-flow.ts';
 import { mountPhraseComposition } from './phrase-composition.ts';
 import { mountMusicGuide, type MusicGuideFactory } from './music-guide.ts';
+import { mountGuidanceInvitation } from './guidance-invitation.ts';
 import { createProjectWelcome } from './project-welcome.ts';
 import { mountProjectStart } from './project-start.ts';
 import { mountProjectLibrary } from './project-library.ts';
@@ -70,6 +71,7 @@ export interface StudioOptions {
   musicGuide?: MusicGuideFactory;
   demo?: boolean;
   startWithGuide?: boolean;
+  onFirstGuideChoice?(watch: boolean): void;
   workspaceState?: MusicWorkspaceStatePort;
   references?: ReferenceEditingPort;
   previewContent?(contentId: string, signal?: AbortSignal): Promise<PlaybackSession>;
@@ -170,7 +172,16 @@ export function mountStudio(root: HTMLElement, options: StudioOptions): { dispos
   }
   const initialView = options.initialEntry && options.initialEntry !== 'welcome' ? showMusic : showWelcome;
   if (options.startWithGuide && options.musicGuide) showGuide(initialView);
-  else initialView();
+  else if (options.onFirstGuideChoice && options.musicGuide) {
+    const remember = options.onFirstGuideChoice;
+    root.replaceChildren();
+    function choose(watch: boolean) {
+      remember(watch);
+      if (watch) showGuide(initialView);
+      else initialView();
+    }
+    page = mountGuidanceInvitation(root, { onWatch: () => choose(true), onSkip: () => choose(false) });
+  } else initialView();
   return { openGuide, async prepareClose(closeOptions = {}) {
     if (disposed) throw new Error('当前页面已关闭。');
     // Toolbar actions have already flushed their edits before invoking the project service.
