@@ -86,7 +86,10 @@ let expression='starting',stage='setup';
  assert.equal(await js("document.querySelector('.melody-tempo-button').textContent"),'148');
  assert.equal(await js("document.querySelectorAll('.melody-key').length"),128);
  assert(await js("(()=>{const note=document.querySelector('.melody-note');if(!note)return false;const style=getComputedStyle(note),canvas=document.createElement('canvas').getContext('2d');canvas.fillStyle=style.getPropertyValue('--tone-color').trim();canvas.fillRect(0,0,1,1);const original=[...canvas.getImageData(0,0,1,1).data];canvas.fillStyle=style.backgroundColor;canvas.fillRect(0,0,1,1);const lighter=[...canvas.getImageData(0,0,1,1).data];return lighter.slice(0,3).every((value,index)=>value>=original[index])&&lighter.slice(0,3).some((value,index)=>value>original[index])})()"));
- assert(await parentJs("[...document.querySelectorAll('.platform-download')].every(link=>link.hidden&&!link.hasAttribute('href'))"));
+ const downloads=await parentJs("[...document.querySelectorAll('.platform-download:not([hidden])')].map(link=>link.href)");
+ assert.equal(downloads.length,2,'download links remain visible with GitHub API blocked');
+ assert(downloads.every(url=>url.startsWith('https://github.com/FR-42/RootSound/releases/download/')));
+ assert(downloads[0].endsWith('-Setup.exe')&&downloads[1].endsWith('.pkg'));
  assert.equal(await parentJs("document.querySelector('.release-history').href"),'https://github.com/FR-42/RootSound/releases');
  assert.equal(await js('__webTest.audioCreated'),0);
 
