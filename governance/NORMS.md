@@ -143,6 +143,8 @@ user's actual instructions.
 - Do not add code comments or explanatory UI annotations/tooltips on your own.
   The user specifically requested removal of the note-group drag tooltip.
 - Origin: user's explicit instruction, 2026-11-05: “把你写的注释给删掉……以后不要写注释”.
+- Update, 2026-11-08: a behavior change does not authorize changing existing user-facing wording.
+  Keep guide prompts and other user-authored copy verbatim unless the user requests a text change.
 
 ## N19 · Keep current guidance separate from recoverable history — ACTIVE
 
@@ -152,3 +154,12 @@ user's actual instructions.
 - Report actual test scopes and failures. Old counts and archived acceptance
   steps are not current evidence; a failing test alone is not a reason to retire it.
 - Origin: user's documentation/files overhaul request, 2026-11-05.
+
+## N20 · GitHub Releases are published manually by the user — ACTIVE
+
+- The user creates and publishes GitHub Releases manually. The assistant may prepare and
+  verify installers, checksums and release notes locally for handoff.
+- Keep release drafts, release assets and release tags off GitHub until the user performs
+  the publication steps. Website deployment is a separate action governed by the user's
+  instructions for that task.
+- Origin: user's explicit instruction, 2026-11-08.
