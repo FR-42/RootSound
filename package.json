@@ -2,29 +2,39 @@
   "name": "rootsound",
   "private": true,
   "version": "0.1.0",
-  "description": "RootSound —— 面向普通人创作音乐的工作站（架构重建验证）",
+  "description": "简乐：让音游曲爱好者快速上手做出满意的音乐",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "check": "tsc --noEmit",
+    "check:docs": "node scripts/check-documentation.mjs",
     "build:website": "node scripts/build-web-demo.mjs",
     "test:website": "npm run build:website && node --test tests/workstation.web-demo.test.ts",
     "test": "npm run test:workstation",
-    "test:workstation": "node --test src/workstation/modules/materials/library.test.ts src/workstation/modules/sound-runtime/browser.test.ts tests/workstation.flow.test.ts tests/workstation.files.test.ts tests/workstation.platform.test.ts tests/workstation.project-platform.test.ts tests/workstation.phrase.test.ts tests/workstation.song.test.ts tests/workstation.audio-export.test.ts tests/workstation.management.test.ts tests/workstation.live-preview.test.ts tests/workstation.references.test.ts tests/workstation.project.test.ts tests/workstation.project-transfer.test.ts tests/workstation.co-creation.test.ts tests/workstation.co-creation-generation.test.ts tests/workstation.reference-activity.test.ts tests/workstation.sampling.test.ts tests/workstation.sampling-capture.test.ts tests/workstation.sample-platform.test.ts tests/workstation.sample-preview.test.ts tests/workstation.pcm.test.ts tests/workstation.melody-analysis.test.ts tests/workstation.melody-recognition.test.ts tests/workstation.melody-worker.test.ts tests/workstation.humming-flow.test.ts tests/workstation.phrase-viewport.test.ts tests/workstation.sample-instrument.test.ts tests/workstation.sample-instrument-flow.test.ts tests/workstation.sample-runtime.test.ts tests/workstation.co-creation-rename.test.ts tests/workstation.project-scope.test.ts tests/workstation.project-detail-flow.test.ts tests/workstation.reference-save-policy.test.ts tests/workstation.post-production.test.ts tests/workstation.entities.test.ts tests/workstation.song-save.test.ts tests/workstation.current-project-catalog.test.ts tests/workstation.synthesis.test.ts tests/workstation.synthesis-runtime.test.ts tests/workstation.boundaries.test.ts tests/workstation.project-directories.test.ts tests/workstation.project-start-ui.test.ts tests/workstation.playlist-domain.test.ts tests/workstation.playlist-transport.test.ts tests/workstation.project-phrases.test.ts tests/workstation.playlist-geometry.test.ts tests/workstation.playlist-ui.test.ts tests/workstation.playlist-refinement-domain.test.ts tests/workstation.playlist-refinement-project.test.ts tests/workstation.playlist-runtime.test.ts tests/workstation.project-exit.test.ts tests/workstation.project-menu.test.ts tests/workstation.phrase-inspector.test.ts tests/workstation.phrase-library.test.ts tests/workstation.welcome-library.test.ts tests/workstation.phrase-library-creation-ui.test.ts tests/workstation.phrase-deletion.test.ts tests/workstation.project-save-as-ui.test.ts tests/workstation.playlist-controls.test.ts tests/workstation.song-phrase-audition.test.ts tests/workstation.phrase-shell-save.test.ts tests/workstation.phrase-composition-transport.test.ts tests/workstation.phrase-master-level.test.ts tests/workstation.phrase-composition-ui.test.ts tests/workstation.phrase-studio-integration.test.ts tests/workstation.phrase-note-mix.test.ts tests/workstation.project-timbres.test.ts tests/workstation.melody-workspace.test.ts tests/workstation.rhythm-domain.test.ts tests/workstation.rhythm-workspace.test.ts tests/workstation.melody-key-entry.test.ts tests/workstation.melody-key-entry-ui.test.ts tests/workstation.note-width.test.ts tests/workstation.midi.test.ts tests/workstation.midi-platform.test.ts tests/workstation.midi-project.test.ts tests/workstation.midi-entry.test.ts tests/workstation.windowed-runtime.test.ts tests/workstation.playlist-performance.test.ts tests/workstation.phrase-overview-notes.test.ts tests/workstation.phrase-section-split.test.ts tests/workstation.timbre-import.test.ts tests/workstation.spectral-timbre.test.ts tests/workstation.host-assets.test.ts tests/workstation.large-project-bootstrap.test.ts tests/workstation.gm-midi.test.ts tests/workstation.soundfont.test.ts tests/workstation.output-limiter.test.ts",
+    "pretest:workstation": "npm run build:website",
+    "test:workstation": "node scripts/test-workstation.mjs",
     "desktop:build": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Build-Desktop.ps1",
-    "test:project-directories": "node --test tests/workstation.project-directories.test.ts tests/workstation.project-start-ui.test.ts",
+    "test:project-directories": "node --test tests/workstation.project-directories.test.ts tests/workstation.project-start-ui.test.ts tests/workstation.project-folders.test.ts",
     "test:launcher": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Test-Launcher.ps1",
     "test:desktop-entry": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Test-DesktopEntry.ps1",
     "desktop": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Start-Desktop.ps1",
-    "test:music": "node --test --test-concurrency=1 tests/workstation.music-document.test.ts tests/workstation.music-workspace.test.ts tests/workstation.tempo-rolls.test.ts tests/workstation.melody-note-index.test.ts tests/workstation.music-workspace-state.test.ts tests/workstation.project-directories.test.ts tests/workstation.midi-entry.test.ts tests/workstation.phrase-composition-transport.test.ts tests/workstation.host-assets.test.ts tests/workstation.instrument-catalog.test.ts tests/workstation.sample-bank.test.ts tests/workstation.timbre-removal.test.ts tests/workstation.tap-tempo.test.ts tests/workstation.note-width.test.ts tests/workstation.gm-midi.test.ts tests/workstation.soundfont.test.ts tests/workstation.output-limiter.test.ts"
+    "test:music": "node --test --test-concurrency=1 tests/workstation.music-document.test.ts tests/workstation.music-workspace.test.ts tests/workstation.tempo-rolls.test.ts tests/workstation.melody-note-index.test.ts tests/workstation.music-workspace-state.test.ts tests/workstation.project-directories.test.ts tests/workstation.midi-entry.test.ts tests/workstation.phrase-composition-transport.test.ts tests/workstation.host-assets.test.ts tests/workstation.instrument-catalog.test.ts tests/workstation.sample-bank.test.ts tests/workstation.timbre-removal.test.ts tests/workstation.tap-tempo.test.ts tests/workstation.note-width.test.ts tests/workstation.gm-midi.test.ts tests/workstation.soundfont.test.ts tests/workstation.output-limiter.test.ts tests/workstation.guidance.test.ts tests/workstation.music-file.test.ts tests/workstation.music-ranges.test.ts",
+    "test:midi-expression": "node --test tests/workstation.midi-expression.test.ts",
+    "test:music-files": "node --test tests/workstation.music-file.test.ts tests/workstation.midi-entry.test.ts tests/workstation.project-folders.test.ts",
+    "test:music-ranges": "node --test tests/workstation.music-ranges.test.ts tests/workstation.music-file.test.ts tests/workstation.music-document.test.ts tests/workstation.music-workspace.test.ts tests/workstation.tempo-rolls.test.ts tests/workstation.melody-key-entry.test.ts tests/workstation.tap-tempo.test.ts tests/workstation.music-workspace-state.test.ts tests/workstation.soundfont.test.ts",
+    "test:release": "node --test tests/release-host.test.mjs tests/release-bundled-projects.test.mjs"
   },
   "devDependencies": {
+    "@electron/osx-sign": "2.7.2",
     "@types/node": "^26.6.5",
     "typescript": "^5.6.0",
     "vite": "^7.0.0"
   },
   "dependencies": {
+    "@xmldom/xmldom": "0.9.12",
+    "fflate": "0.8.3",
+    "midi-file": "1.2.4",
     "spessasynth_core": "4.4.4"
   }
 }

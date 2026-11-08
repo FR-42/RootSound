@@ -56,6 +56,7 @@ class Context {
   createBufferSource(): Sample { if (this.failSource) throw new Error('source allocation failed'); const node = new Sample(); this.samples.push(node); return node; }
   createOscillator(): Oscillator { const node = new Oscillator(); this.oscillators.push(node); return node; }
   createGain(): Gain { const node = new Gain(); this.gains.push(node); return node; }
+  createWaveShaper(): Node { return new Node(); }
   createStereoPanner(): Panner { const node = new Panner(); this.panners.push(node); return node; }
   createConstantSource(): Constant { const node = new Constant(); this.clocks.push(node); return node; }
   resume(): Promise<void> { if (Context.blocked) return new Promise(() => {}); this.state = 'running'; this.onstatechange?.(); return Promise.resolve(); }
@@ -108,6 +109,12 @@ async function fixture(run: () => Promise<void>, options: { blocked?: boolean; p
   try { await run(); } finally { for (const [name, descriptor] of descriptors) { if (descriptor) Object.defineProperty(globalThis, name, descriptor); else Reflect.deleteProperty(globalThis, name); } }
 }
 function audio(): Context { return Context.instances[0]!; }
+function noteEnvelope(index: number): Param {
+  const context = audio();
+  const envelope = context.gains.find(node => node.connections.includes(context.panners[index]!));
+  assert(envelope);
+  return envelope.gain;
+}
 function sample(audio: PcmAudio = { sampleRate: 8000, channels: [new Float32Array(8000).fill(0.5)] }): SampleSoundPlan {
   return { kind: 'sample', version: 1, source: { id: 'recorded-bell', revision: 1, audio }, startSeconds: 0.1, endSeconds: 0.9, playbackRate: 2,
     envelope: { attackSeconds: 0.01, releaseSeconds: 0.08 }, note: { frequencyHz: 440, holdSeconds: 0.2, velocity: 0.8 }, level: 0.5 };
@@ -128,8 +135,8 @@ test('layered GM notes allocate and render every original recording with linked 
   assert.equal(audio().samples.length,2);assert.equal(audio().buffers.length,1,'identical PCM shares the device buffer, while both layers sound');
   assert.equal(audio().oscillators.length,0);
   close(audio().samples[0]!.startTime,audio().samples[1]!.startTime);
-  close(audio().gains[0]!.gain.at(session.startedAtSeconds+.1),.2);
-  close(audio().gains[1]!.gain.at(session.startedAtSeconds+.1),.1);
+  close(noteEnvelope(0).at(session.startedAtSeconds+.1),.2);
+  close(noteEnvelope(1).at(session.startedAtSeconds+.1),.1);
   const rendered=await runtime.render({...layered,level:.25},{sampleRate:48000});
   // Both constant PCM layers contribute at 100 ms, including equal-power pan.
   close(pcm(rendered.bytes,4800,0),.15*Math.SQRT1_2*8388607,2);
@@ -141,8 +148,8 @@ test('one-shot sample notes use exact trim, rate, velocity and release on the gl
   const session = await playing; const node = audio().samples[0]!;
   assert.equal(node.loop, false); assert.equal(node.buffer!.data[0]![4000], 0.5); close(node.offset, 0.1); close(node.sourceDuration, 0.8);
   close(node.playbackRate.at(session.startedAtSeconds), 2); close(node.startTime, session.startedAtSeconds); close(session.durationSeconds!, 0.28);
-  close(node.stopTime - node.startTime, 0.281); close(audio().gains[0]!.gain.at(session.startedAtSeconds + 0.1), 0.4);
-  close(audio().gains[0]!.gain.at(session.startedAtSeconds + 0.24), 0.2);
+  close(node.stopTime - node.startTime, 0.281); close(noteEnvelope(0).at(session.startedAtSeconds + 0.1), 0.4);
+  close(noteEnvelope(0).at(session.startedAtSeconds + 0.24), 0.2);
   node.end(); assert.ok(node.disconnected && node.stopped); close(runtime.position(session.id)!, 0.28); await runtime.dispose();
 }));
 
@@ -197,7 +204,7 @@ test('actual finite PCM peaks bound mixed sample and synthesized amplitudes', as
   const input: SoundSequencePlan = { kind: 'sequence', version: 1, durationSeconds: 1, events: [{ atSeconds: 0, sound: loud }, { atSeconds: 0, sound: basic() }] };
   const checked = readPreview(input); close(checked.normalization, 1 / (4 * 0.5 * 0.8 + 0.4));
   const runtime = createBrowserSoundRuntime(); const session = await runtime.preview(input);
-  close(audio().gains[0]!.gain.at(session.startedAtSeconds + 0.1), 0.2); close(audio().gains[1]!.gain.at(session.startedAtSeconds + 0.1), 0.2);
+  close(noteEnvelope(0).at(session.startedAtSeconds + 0.1), 0.2); close(noteEnvelope(1).at(session.startedAtSeconds + 0.1), 0.2);
   assert.equal(audio().samples.length, 1); assert.equal(audio().oscillators.length, 1); await runtime.dispose();
 }));
 

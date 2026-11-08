@@ -79,7 +79,7 @@ def prepare():
     projects=[]
     if os.environ.get('ROOTSOUND_INCLUDE_PROJECTS')=='1':
         snapshot=stage/'bundled-projects';snapshot.mkdir()
-        for source in sorted((ROOT/'project').glob('*.rootsound')):
+        for source in sorted((ROOT/'project'/'演示项目').glob('*.rootsound')):
             if source.is_symlink() or not source.is_file():continue
             checksum=hashlib.sha256();target=snapshot/source.name
             with source.open('rb') as input,target.open('xb') as output:

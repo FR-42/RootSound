@@ -10,6 +10,7 @@ await mkdir('.test-output/rb130',{recursive:true});
 const root=await mkdtemp(path.resolve('.test-output/rb130/ui-'));
 const requests=[];
 const offline=`
+localStorage.setItem('rootsound.learning.v1',JSON.stringify({version:1,multipleTempoRolls:true,guides:{basics:{status:'skipped',step:0},'tempo-rolls':{status:'skipped',step:0}}}));
 window.__webTest={audioCreated:0,now:0,downloads:[],blobs:new Map(),errors:[]};
 window.addEventListener('error',e=>__webTest.errors.push(e.message));
 window.addEventListener('unhandledrejection',e=>__webTest.errors.push(String(e.reason)));

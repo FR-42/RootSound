@@ -1,4 +1,4 @@
-import type { MidiImportNotice, ProjectDirectoriesPort, ProjectSetupPort } from '../contracts/project-directory.ts';
+import type { ProjectDirectoriesPort, ProjectSetupPort } from '../contracts/project-directory.ts';
 import { createMaterialLibrary } from '../modules/materials/public.ts';
 import { createTimbrePlayback, createTimbreReferenceAdapter } from '../modules/timbre/public.ts';
 import { createPhraseEditor, createPhrasePlayback, createPhraseReferenceAdapter } from '../modules/phrase/public.ts';
@@ -6,7 +6,6 @@ import { createSongEditor, createSongReferenceAdapter } from '../modules/song/pu
 import { createCoCreationReferenceAdapter } from '../modules/co-creation/public.ts';
 import { createSampleReferenceAdapter } from '../modules/sampling/public.ts';
 import { ensureProjectMelodyTimbres } from './project-timbres.ts';
-import { createMidiProjectLibrary } from './midi-project.ts';
 import { openMusicDocument, commitMusicDocument } from './music-document.ts';
 
 export function projectName(input: string): string {
@@ -66,8 +65,8 @@ export function renameProjectLibrary(text: string, input: string): string {
   return snapshot;
 }
 
-export function createProjectSetup(directories: ProjectDirectoriesPort, enter: (notice?: MidiImportNotice) => void,
-  source?: { read(): string; songDraftId(): string; name?(): string; prepareSave?(): void | Promise<void> }): ProjectSetupPort {
+export function createProjectSetup(directories: ProjectDirectoriesPort, enter: () => void,
+  source?: { read(): string; songDraftId(): string; name?(): string; prepareSave?(target?: 'source' | 'rootsound'): void | Promise<void> }): ProjectSetupPort {
   let busy = false;
   async function exclusive<T>(action: () => Promise<T>): Promise<T> {
     if (busy) throw new Error('正在处理项目，请稍候。');
@@ -87,27 +86,18 @@ export function createProjectSetup(directories: ProjectDirectoriesPort, enter: (
       if (!directories.list) throw new Error('当前窗口暂不支持列出项目，请重新打开 RootSound。');
       return directories.list();
     },
+    ...(directories.browse ? { browse: (path?: string) => directories.browse!(path) } : {}),
     open: path => exclusive(async () => {
       const result = await directories.open(path);
       if (result.status === 'opened') enter();
-      else if (result.status === 'midi') {
-        // Validate/convert in an isolated library before any active file switch.
-        const base = midiProjectName(result.name);
-        const imported = createMidiProjectLibrary(result.bytes, base);
-        const state = await directories.read();
-        const existing = directories.list ? await directories.list() : [];
-        const names = new Set(existing.flatMap(project => [project.name,
-          project.path.replace(/[\\/]+$/u, '').split(/[\\/]/u).at(-1)!.replace(/\.rootsound$/iu, '')])
-          .map(name => name.normalize('NFC').toLocaleLowerCase('en-US')));
-        let name = base, suffix = 1;
-        while (names.has(name.normalize('NFC').toLocaleLowerCase('en-US'))) {
-          const ending = ` ${suffix++}`;
-          name = base.slice(0, 80 - ending.length).replace(/[\uD800-\uDBFF]$/u, '').trimEnd() + ending;
-        }
-        const text = renameProjectLibrary(imported.libraryText, name);
-        const created = await directories.create(name, state.defaultLocation, text);
-        enter({ projectId: created.id, name, trackCount: imported.trackCount, noteCount: imported.noteCount, warnings: [...imported.warnings] });
-      }
+      else if (result.status === 'document') {
+        // Conversion completes before the host switches sessions. Opening never creates a music file.
+        if (!directories.openDocument) throw new Error('请重新打开更新后的简乐，以原格式打开音乐文件。');
+        const { readMusicFile } = await import('./music-file.ts');
+        const imported = readMusicFile(result.bytes, result.name, result.format);
+        await directories.openDocument(result, imported.libraryText);
+        enter();
+      } else if (result.status === 'midi') throw new Error('请关闭旧窗口，重新打开更新后的简乐；MIDI 不再自动转换成工程文件。');
     }),
     remove: selected => exclusive(async () => {
       if (!directories.remove) throw new Error('当前窗口尚不支持删除歌曲，请重新打开 RootSound。');
@@ -131,14 +121,16 @@ export function createProjectSetup(directories: ProjectDirectoriesPort, enter: (
     },
     exit: mode => exclusive(async () => {
       if (!directories.exit) throw new Error('当前窗口尚不支持退出项目，请重新打开 RootSound。');
-      if (mode === 'save') await source?.prepareSave?.();
-      await directories.exit(mode, source?.name?.());
+      if (mode === 'save') {
+        await source?.prepareSave?.();
+        await directories.exit('save', source?.name?.());
+      } else await directories.exit('discard');
       enter();
     }),
     ...(source ? { saveAs: (input: string, location: string) => exclusive(async () => {
       const name = projectName(input);
       if (!location.trim()) throw new Error('请选择项目的存储位置。');
-      await source.prepareSave?.();
+      await source.prepareSave?.('rootsound');
       const text = createProjectCopyLibrary(source.read(), name, source.songDraftId());
       if (directories.createCopy) await directories.createCopy(name, location.trim(), text);
       else await directories.create(name, location.trim(), text);

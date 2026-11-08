@@ -6,6 +6,7 @@ import './workspace.css';
 export function showAudioExport(root: HTMLElement, options: {
   name: string; plan: PlayableNotePlan | SoundSequencePlan | (() => PlayableNotePlan | SoundSequencePlan);
   prepare?(): Promise<void>; sound: SoundRuntimePort; files: AudioFilesPort;
+  onSaved?(status: 'saved' | 'download-started'): void;
 }): void {
   const dialog = document.createElement('dialog'); dialog.className = 'settings-dialog';
   const title = document.createElement('h2'); title.textContent = '让它，成为一段真正的声音。';
@@ -41,6 +42,7 @@ export function showAudioExport(root: HTMLElement, options: {
       status.textContent = outcome.status === 'saved' ? `“${outcome.name}”已保存，可以在其他播放器中打开。`
         : outcome.status === 'download-started' ? '已发起音频下载，请在浏览器中确认文件保存位置。' : '已取消保存文件，当前创作仍然保留。';
       start.textContent = '再次导出';
+      if (outcome.status !== 'cancelled') { options.onSaved?.(outcome.status); if (options.onSaved) dialog.close(); }
     } catch (error) {
       if (!dialog.isConnected) return;
       stage = 'idle'; status.textContent = controller.signal.aborted ? '导出已取消，当前创作仍然保留。' : error instanceof Error ? error.message : String(error);

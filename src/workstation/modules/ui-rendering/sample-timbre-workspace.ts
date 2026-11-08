@@ -1,4 +1,5 @@
 import type { SampleTimbreBody, TimbreEditorPort } from '../../contracts/timbre.ts';
+import { MIN_PITCH_HZ, MAX_PITCH_HZ } from '../../contracts/music-limits.ts';
 import type { SoundPlan, SoundRuntimePort } from '../../contracts/sound.ts';
 import { createLivePreview } from './live-preview.ts';
 import { createSaveControls } from './save-controls.ts';
@@ -100,7 +101,7 @@ export function mountSampleTimbreWorkspace(root: HTMLElement, options: {
   }
   tuning.append(pitchPicker);
   const precise = node('details', 'sample-timbre-precise'); precise.append(node('summary', '', '频率'));
-  const frequencyField = node('label', '', '原始频率'); const frequency = node('input'); frequency.type = 'number'; frequency.min = '20'; frequency.max = '5000'; frequency.step = 'any'; frequency.setAttribute('aria-label', '原始音高频率'); frequencyField.append(frequency, node('span', '', 'Hz')); precise.append(frequencyField); tuning.append(precise);
+  const frequencyField = node('label', '', '原始频率'); const frequency = node('input'); frequency.type = 'number'; frequency.min = String(MIN_PITCH_HZ); frequency.max = String(MAX_PITCH_HZ); frequency.step = 'any'; frequency.setAttribute('aria-label', '原始音高频率'); frequencyField.append(frequency, node('span', '', 'Hz')); precise.append(frequencyField); tuning.append(precise);
   const audition = node('div', 'sample-timbre-audition');
   for (const [ratio, label] of [[0.5, '低八度'], [1, '原音'], [2, '高八度']] as const) {
     const control = button(label, ratio === 1 ? 'preview-button' : 'secondary', () => { void play(ratio); }); pitchButtons.set(ratio, control); audition.append(control);
@@ -134,7 +135,7 @@ export function mountSampleTimbreWorkspace(root: HTMLElement, options: {
     stop.hidden = !preparing && !sessionId; stop.textContent = preparing ? '取消准备' : '停止试听';
     const current = liveBody ?? body();
     for (const [ratio, control] of pitchButtons) {
-      control.disabled = current.rootFrequencyHz * ratio < 20 || current.rootFrequencyHz * ratio > 5000;
+      control.disabled = current.rootFrequencyHz * ratio < MIN_PITCH_HZ || current.rootFrequencyHz * ratio > MAX_PITCH_HZ;
       control.setAttribute('aria-pressed', String(selectedPitch === ratio && (preparing || !!sessionId)));
     }
   }

@@ -33,6 +33,6 @@ const config=path.join(root,'config.json');await writeFile(config,JSON.stringify
 console.log('Render directory: '+root);
 const env={...process.env};delete env.ELECTRON_RUN_AS_NODE;
 try{
- const code=await new Promise(resolve=>{const child=spawn(path.resolve('.cache/release-smoke-engine/electron.exe'),[path.resolve('scripts/operation-guides-renderer.cjs'),config],{env,windowsHide:true,stdio:['ignore','pipe','pipe']});child.stdout.on('data',d=>process.stdout.write(d));child.stderr.on('data',d=>process.stderr.write(d));child.on('error',()=>resolve(1));child.on('exit',resolve);});
+ const code=await new Promise(resolve=>{const child=spawn(path.resolve(process.env.ROOTSOUND_TEST_ELECTRON||'.cache/release-smoke-engine/electron.exe'),[path.resolve('scripts/operation-guides-renderer.cjs'),config],{env,windowsHide:true,stdio:['ignore','pipe','pipe']});child.stdout.on('data',d=>process.stdout.write(d));child.stderr.on('data',d=>process.stderr.write(d));child.on('error',()=>resolve(1));child.on('exit',resolve);});
  const report=await readFile(path.join(root,'report.json'),'utf8');console.log(report);if(code)process.exitCode=1;else await writeFile('.test-output/rb137/latest.json',JSON.stringify({root}));
 }finally{server.close();}

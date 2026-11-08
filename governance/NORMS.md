@@ -4,8 +4,8 @@ Current user-confirmed collaboration principles. DECISIONS.md records
 project conclusions; TODO.md records work and verification. This file
 records how the user and assistant work together.
 
-Updated 2026-10-23: inherited rules do not automatically bind the current
-assistant. Former N1-N7 are retained as [historical reference](history/2026-10-23-legacy-conversation-rules.md).
+Updated 2026-11-05: inherited rules do not automatically bind the current
+assistant. Former N1-N7 are retained as [historical reference](../history/2026-11-05-maintenance/governance/history/2026-10-23-legacy-conversation-rules.md).
 Current user instructions take precedence over historical notes. The user
 permits revising and reorganizing governance rather than only appending.
 
@@ -113,3 +113,42 @@ user's actual instructions.
 - Rule: this delivery preference is not listening acceptance of the music and
   does not authorize overwriting or removing existing projects.
 - Origin: user's instruction, 2026-10-28: “以后你做出来音乐项目后，可以直接把成品项目文件放到默认目录下面。”
+
+## N16 · Keep new parallel-chat worktrees off C: — ACTIVE
+
+- Rule: do not create new parallel-chat workspaces/worktrees on C:. Reject a
+  C: default and establish a non-C: destination before creation or handoff.
+- Origin: user's explicit instruction, 2026-11-05. This does not itself
+  authorize moving or deleting existing worktrees.
+
+## N17 · Organize worktrees by project and chat title — ACTIVE
+
+- Rule: use `D:\CodexWorkTrees` as the root, then a project-name directory,
+  then a directory named after the chat. Apply the same rule to coordinating
+  chats. Preserve file changes and update both Git and chat bindings when
+  relocating existing worktrees; a filesystem move alone is incomplete.
+- Origin: user's explicit directory-organization instruction, 2026-11-05.
+- Path spelling corrected by the user in the same conversation, 2026-11-05.
+- Update 2026-11-05: use native Git worktrees at the specified paths with
+  separate branches and ordinary local chats. Preserve old chat history,
+  branches and edits; clean old worktrees only after the new directories
+  are verified and the chats no longer depend on the old paths.
+- Update 2026-11-05: the user requested integration into the main project but
+  explicitly deferred syncing updated main back to the four source worktrees.
+  The user lifted this deferral on 2026-11-05 and requested syncing all four
+  worktrees. Preserve branch names and edits; fast-forward clean branches where possible.
+
+## N18 · Do not add unsolicited annotations — ACTIVE
+
+- Do not add code comments or explanatory UI annotations/tooltips on your own.
+  The user specifically requested removal of the note-group drag tooltip.
+- Origin: user's explicit instruction, 2026-11-05: “把你写的注释给删掉……以后不要写注释”.
+
+## N19 · Keep current guidance separate from recoverable history — ACTIVE
+
+- Archive superseded guidance and checks under root history with reasons and
+  recoverable originals. Rewrite current docs rather than appending delivery logs.
+  Preserve confirmed purposes, useful data guarantees, user music and licenses.
+- Report actual test scopes and failures. Old counts and archived acceptance
+  steps are not current evidence; a failing test alone is not a reason to retire it.
+- Origin: user's documentation/files overhaul request, 2026-11-05.

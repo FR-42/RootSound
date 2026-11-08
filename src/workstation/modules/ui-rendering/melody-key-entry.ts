@@ -1,4 +1,5 @@
 import { PHRASE_STEPS_PER_BEAT } from '../../contracts/phrase.ts';
+import { MIN_TEMPO_BPM, MAX_TEMPO_BPM, MIN_MIDI_PITCH, MAX_MIDI_PITCH, MIN_PITCH_OCTAVE, MAX_PITCH_OCTAVE } from '../../contracts/music-limits.ts';
 
 /** Physical typing order follows the twelve semitones from C through B. */
 export const MELODY_ENTRY_KEYS = 'cfvgbnjmk,l.';
@@ -10,13 +11,12 @@ function keyIndex(key: string): number {
 
 export function melodyEntryKey(key: string): boolean { return keyIndex(key) >= 0; }
 
-/** Edge octaves are partial because the existing sound domain supports 20–5000 Hz. */
+/** The top octave ends at G9, matching the complete MIDI 0–127 keyboard. */
 export function melodyEntryPitch(key: string, octave: number): number | undefined {
   const index = keyIndex(key);
-  if (index < 0 || !Number.isInteger(octave) || octave < 0 || octave > 8) return;
+  if (index < 0 || !Number.isInteger(octave) || octave < MIN_PITCH_OCTAVE || octave > MAX_PITCH_OCTAVE) return;
   const midi = (octave + 1) * 12 + index;
-  const frequency = 440 * 2 ** ((midi - 69) / 12);
-  return frequency >= 20 && frequency <= 5000 ? frequency : undefined;
+  return midi >= MIN_MIDI_PITCH && midi <= MAX_MIDI_PITCH ? 440 * 2 ** ((midi - 69) / 12) : undefined;
 }
 
 export type MelodyEntryStep = {
@@ -29,7 +29,7 @@ export type MelodyEntryStep = {
 
 /** A key advances once to the strictly next cell line; it never wraps or extends the phrase. */
 export function nextMelodyEntryStep(positionSeconds: number, tempoBpm: number, lengthBeats = 16, stepsPerBeat = PHRASE_STEPS_PER_BEAT): MelodyEntryStep | undefined {
-  if (!Number.isFinite(positionSeconds) || !Number.isFinite(tempoBpm) || tempoBpm < 40 || tempoBpm > 240
+  if (!Number.isFinite(positionSeconds) || !Number.isFinite(tempoBpm) || tempoBpm < MIN_TEMPO_BPM || tempoBpm > MAX_TEMPO_BPM
     || !Number.isFinite(lengthBeats) || lengthBeats <= 0 || !Number.isInteger(stepsPerBeat) || stepsPerBeat < 2 || stepsPerBeat > 9) return;
   const limit = lengthBeats;
   const cells = Math.max(0, positionSeconds) * tempoBpm / 60 * stepsPerBeat;

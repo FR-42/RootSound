@@ -1,13 +1,15 @@
+import {phraseExpression} from '../../contracts/phrase-expression.ts';
 import type { PhraseBody } from '../../contracts/phrase.ts';
 import { phraseBeatSeconds, phraseDurationSeconds, phraseHeldSeconds, phraseSecondsBeat, phraseTempoSpanAtBeat } from '../../contracts/phrase-time.ts';
 
 /** End at the bar containing the final held note, not the empty editable extent. */
-export function phraseAuditionExtent(body: PhraseBody): { noteEnd: number; barEnd: number; fullEnd: number } {
+export function phraseAuditionExtent(body: PhraseBody, midiEffects=true): { noteEnd: number; barEnd: number; fullEnd: number } {
   const fullEnd = phraseDurationSeconds(body);
   let noteEnd = 0;
+  const gates=midiEffects?phraseExpression(body).gates:undefined;
   for (const part of body.parts) if (!part.unassigned) for (const note of part.notes) {
     if (note.startBeat < body.lengthBeats) noteEnd = Math.max(noteEnd,
-      Math.min(fullEnd, phraseBeatSeconds(body, note.startBeat) + phraseHeldSeconds(body, note)));
+      Math.min(fullEnd, gates?.get(note.id)?.soundEnd ?? phraseBeatSeconds(body, note.startBeat) + phraseHeldSeconds(body, note)));
   }
   const endBeat = phraseSecondsBeat(body, noteEnd);
   const span = phraseTempoSpanAtBeat(body, Math.max(0, endBeat - 1e-8));

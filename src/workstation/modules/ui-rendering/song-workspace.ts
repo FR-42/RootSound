@@ -1,4 +1,5 @@
 import type { SaveConfirmation, SaveResult } from '../../contracts/content.ts';
+import { MIN_TEMPO_BPM, MAX_TEMPO_BPM } from '../../contracts/music-limits.ts';
 import type { SongBody, SongClip, SongClipRef, SongEditorPort } from '../../contracts/song.ts';
 import type { PlaybackSession, SoundRuntimePort } from '../../contracts/sound.ts';
 import { songGridTempoAt } from '../song/public.ts';
@@ -104,7 +105,7 @@ export function mountSongWorkspace(root: HTMLElement, options: {
   let mixPreview: { kind: 'clip' | 'row'; trackId: string; clipId?: string; field: 'level' | 'pan'; value: number } | undefined;
   let pendingRename = 0;
   function report(message: string, error = false): void {
-    if (disposed || !notice) return;
+    if (disposed || !notice || !error) return;
     notice.textContent = message; notice.classList.toggle('is-error', error); notice.hidden = !message;
     window.clearTimeout(noticeTimer); noticeTimer = window.setTimeout(() => { if (notice) notice.hidden = true; }, error ? 7000 : 3200);
   }
@@ -990,7 +991,7 @@ export function mountSongWorkspace(root: HTMLElement, options: {
   }
   function localSave(mode: 'overwrite' | 'new', confirmation?: SaveConfirmation): void {
     const result = song.save(mode, confirmation);
-    if (result.status === 'saved') { sync(); report('已保存。'); }
+    if (result.status === 'saved') sync();
     else if (result.status === 'needs-confirmation') confirmSave(result);
     else throw new Error(result.status === 'conflict' ? result.reason : result.message);
   }
@@ -1076,12 +1077,12 @@ export function mountSongWorkspace(root: HTMLElement, options: {
     playButton = action('', 'song-icon-button song-play', () => { audition?.stop(); void transport.toggle(); }); clock = node('output', 'song-clock'); clock.setAttribute('aria-label', '当前时间'); controls.append(stopButton, playButton, clock);
     const rates = node('div', 'song-rate-options'); const rateWrapper = popover(`${transportState.rate}x`, rates); const rateButton = rateWrapper.querySelector<HTMLButtonElement>('button')!;
     for (const rate of [1, .75, 1.25]) rates.append(action(`${rate}x`, 'song-rate-choice', () => { transport.setRate(rate); rateButton.textContent = `${rate}x`; })); controls.append(rateWrapper);
-    const tempoPanel = node('div', 'song-tempo-panel'); tempoInput = node('input'); tempoInput.type = 'number'; tempoInput.min = '40'; tempoInput.max = '240'; tempoInput.step = '1'; tempoInput.required = true;
+    const tempoPanel = node('div', 'song-tempo-panel'); tempoInput = node('input'); tempoInput.type = 'number'; tempoInput.min = String(MIN_TEMPO_BPM); tempoInput.max = String(MAX_TEMPO_BPM); tempoInput.step = 'any'; tempoInput.required = true;
     tempoInput.value = String(current.body ? songGridTempoAt(current.body, transport.position()) : 120); tempoInput.setAttribute('aria-label', '网格 BPM');
     const commitTempo = () => {
       if (exiting) return;
       const value = Number(tempoInput.value);
-      if (!tempoInput.value.trim() || !Number.isFinite(value) || value < 40 || value > 240) { fieldCommitError = 'BPM 应在 40 至 240 之间。'; report(fieldCommitError, true); return; }
+      if (!tempoInput.value.trim() || !Number.isFinite(value) || value < MIN_TEMPO_BPM || value > MAX_TEMPO_BPM) { fieldCommitError = `BPM 应在 ${MIN_TEMPO_BPM} 至 ${MAX_TEMPO_BPM} 之间。`; report(fieldCommitError, true); return; }
       const at = tempoEditAt ?? transport.position();
       const resetsFuture = tempoEdited && current.body?.gridTempoChanges?.some(change => change.atSeconds >= at);
       if (current.body && (value !== songGridTempoAt(current.body, at) || resetsFuture)) {
@@ -1090,7 +1091,7 @@ export function mountSongWorkspace(root: HTMLElement, options: {
     };
     tempoInput.addEventListener('focus', () => { tempoEditAt = transport.position(); tempoEdited = false; pendingCommit = commitTempo; });
     pendingCommit = commitTempo; tempoInput.addEventListener('blur', () => { commitTempo(); tempoEditAt = undefined; });
-    tempoInput.addEventListener('input', () => { tempoEdited = true; const value = Number(tempoInput.value); if (tempoInput.value && value >= 40 && value <= 240) commitTempo(); });
+    tempoInput.addEventListener('input', () => { tempoEdited = true; const value = Number(tempoInput.value); if (tempoInput.value && value >= MIN_TEMPO_BPM && value <= MAX_TEMPO_BPM) commitTempo(); });
     tempoPanel.append(node('span', '', 'BPM'), tempoInput); controls.append(popover('BPM', tempoPanel, 'tempo'));
     const volumePanel = node('div', 'song-volume-panel'); masterInput = node('input'); masterInput.type = 'range'; masterInput.min = '0'; masterInput.max = '1'; masterInput.step = '.01';
     masterInput.value = String(current.body?.masterLevel ?? 1); masterInput.setAttribute('aria-label', '总音量');
@@ -1116,10 +1117,10 @@ export function mountSongWorkspace(root: HTMLElement, options: {
     rowControls = node('div', 'song-row-controls'); rowControls.setAttribute('aria-label', '行调控');
     rowTrash = node('div', 'song-row-trash'); rowTrash.hidden = true; rowTrash.setAttribute('aria-hidden', 'true'); rowTrash.append(icon('trash')); rowControls.append(rowTrash);
     erasures = node('div', 'song-erasures'); notice = node('div', 'song-notice'); notice.setAttribute('role', 'status'); notice.hidden = true;
-    viewport.append(rowControls, ruler, content, erasures, notice);
+    viewport.append(rowControls, ruler, content, erasures);
     if (!phrases().length) { const curtain = node('div', 'song-empty-curtain'); curtain.append(node('p', '', '先创建音乐吧'), node('span', 'song-empty-arrow', '←')); viewport.append(curtain); }
     const arrangement = node('div', 'song-arrangement'); arrangement.append(viewport, inspector.element);
-    main.append(palette, arrangement); page.append(main);
+    main.append(palette, arrangement); page.append(main, notice);
     trash = node('div', 'song-phrase-trash'); trash.hidden = true; trash.setAttribute('role', 'region');
     const trashIcon = document.createElementNS('http://www.w3.org/2000/svg', 'svg'); trashIcon.setAttribute('viewBox', '0 0 24 24'); trashIcon.setAttribute('aria-hidden', 'true');
     const trashPath = document.createElementNS('http://www.w3.org/2000/svg', 'path'); trashPath.setAttribute('d', 'M4 6h16M9 6V3h6v3M6 6l1 15h10l1-15M10 10v7m4-7v7');

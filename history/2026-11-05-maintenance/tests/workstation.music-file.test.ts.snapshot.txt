@@ -1,0 +1,154 @@
+import assert from 'node:assert/strict';
+import test from 'node:test';
+import { writeMidi, parseMidi as rawMidi } from 'midi-file';
+import { zipSync, strToU8 } from 'fflate';
+import { readMusicFile, createMusicFileSession, musicFileFormat, scoreForFile } from '../src/workstation/app/music-file.ts';
+import { readExchangeMidi, writeExchangeMidi } from '../src/workstation/app/music-interchange-midi.ts';
+import { readExchangeXml, writeExchangeXml } from '../src/workstation/app/music-interchange-xml.ts';
+import { exchangeSeconds } from '../src/workstation/app/music-interchange-model.ts';
+import { createMaterialLibrary, createProjectPackages } from '../src/workstation/modules/materials/public.ts';
+import { createTimbrePlayback, createTimbreReferenceAdapter } from '../src/workstation/modules/timbre/public.ts';
+import { createPhraseEditor, createPhrasePlayback, createPhraseReferenceAdapter } from '../src/workstation/modules/phrase/public.ts';
+import { createSongEditor, createSongReferenceAdapter } from '../src/workstation/modules/song/public.ts';
+import { createSampleReferenceAdapter } from '../src/workstation/modules/sampling/public.ts';
+import { openMusicDocument, commitMusicDocument } from '../src/workstation/app/music-document.ts';
+import type { EditableFileFormat } from '../src/workstation/contracts/project-directory.ts';
+import type { ExchangeScore } from '../src/workstation/app/music-interchange-model.ts';
+
+export function midiFixture() {
+  return Uint8Array.from(writeMidi({ header: { format: 1, numTracks: 2, ticksPerBeat: 480 }, tracks: [
+    [{ deltaTime: 0, type: 'setTempo', microsecondsPerBeat: 500000 }, { deltaTime: 480, type: 'setTempo', microsecondsPerBeat: 750000 },
+      { deltaTime: 0, type: 'marker', text: 'keep-me' }, { deltaTime: 960, type: 'endOfTrack' }],
+    [{ deltaTime: 0, type: 'trackName', text: 'Piano' }, { deltaTime: 0, type: 'programChange', channel: 0, programNumber: 0 },
+      { deltaTime: 0, type: 'noteOn', channel: 0, noteNumber: 60, velocity: 100 },
+      { deltaTime: 480, type: 'noteOff', channel: 0, noteNumber: 60, velocity: 0 },
+      { deltaTime: 0, type: 'noteOn', channel: 0, noteNumber: 64, velocity: 90 },
+      { deltaTime: 480, type: 'noteOff', channel: 0, noteNumber: 64, velocity: 0 }, { deltaTime: 480, type: 'endOfTrack' }],
+  ] }));
+}
+const adapters = () => [createTimbreReferenceAdapter(), createPhraseReferenceAdapter(), createSongReferenceAdapter(), createSampleReferenceAdapter()];
+function load(bytes: Uint8Array, format: EditableFileFormat = 'midi', filename = 'Demo.mid') {
+  const imported = readMusicFile(bytes, filename, format); let snapshot = imported.libraryText;
+  const library = createMaterialLibrary({ read: () => snapshot, write: value => { snapshot = value; } }, { project: { rootKind: 'rootsound.song', adapters: adapters() } });
+  const tones = createTimbrePlayback(library), score = createPhraseEditor(library, tones);
+  const song = createSongEditor(library, createPhrasePlayback(library, tones), { defaultTempoMode: 'source' });
+  openMusicDocument(library, song, score, filename.replace(/\.[^.]+$/u, '')); commitMusicDocument(library, song, score);
+  const session = createMusicFileSession(format, bytes, library, score.read().body!, song.read().draft!.name);
+  return { imported, library, score, song, session, text: () => snapshot,
+    save() { commitMusicDocument(library, song, score); return session.serialize(library, score.read().body!, score.read().draft!.name, snapshot); } };
+}
+test('file family detection includes SMF/RMI, plain/compressed MusicXML and legacy native packages', () => {
+  for (const file of ['x.MID','x.midi','x.smf','x.kar','x.rmi']) assert.equal(musicFileFormat(file),'midi');
+  assert.equal(musicFileFormat('x.XML'),'musicxml'); assert.equal(musicFileFormat('x.musicxml'),'musicxml');
+  assert.equal(musicFileFormat('x.mxl'),'mxl'); assert.equal(musicFileFormat('x.rsproject'),'rsproject');
+  assert.equal(musicFileFormat('x.mp3'),undefined);
+});
+test('direct MIDI score preserves original beats and complete tempo map instead of flattening to seconds', () => {
+  const f = load(midiFixture()), body = f.score.read().body!;
+  assert.equal(body.tempoBpm,120); assert.equal(body.tempoSections?.length,1); assert.equal(body.tempoSections?.[0]?.startBeat,1);
+  assert.equal(body.tempoSections?.[0]?.tempoBpm,80);
+  assert.deepEqual(body.parts[0]!.notes.map(note => [note.startBeat,note.durationBeats]),[[0,1],[1,1]]);
+});
+test('saving an untouched MIDI retains every byte, including markers and event ordering', () => {
+  const bytes = midiFixture(), f = load(bytes); assert.deepEqual(f.save().bytes,bytes); assert.deepEqual(f.save().warnings,[]);
+});
+test('editing notes writes valid MIDI, preserving edited duration, velocity, tempo and original marker', () => {
+  const f=load(midiFixture()), draft=f.score.read().draft!, body=structuredClone(f.score.read().body!);
+  body.parts[0]!.notes[0]!.startBeat=.125; body.parts[0]!.notes[0]!.durationBeats=.25;
+  f.library.updateDraft(draft.id,{body}); const saved=f.save(), result=readExchangeMidi(saved.bytes,'Demo');
+  assert.deepEqual(result.score.parts[0]!.notes.map(note=>[note.beat,note.duration]),[[.125,.25],[1,1]]);
+  assert.equal(Math.round(result.score.parts[0]!.notes[0]!.velocity*127),100);
+  assert.equal(exchangeSeconds(result.score,2),1.25);
+  assert(rawMidi(saved.bytes).tracks.flat().some(item=>item.type==='marker'&&item.text==='keep-me'));
+});
+test('RMI wraps edited output in RIFF rather than silently replacing it with plain SMF', () => {
+  const source=Uint8Array.from([...Buffer.from('RIFF'),0,0,0,0,...Buffer.from('RMIDdata'),0,0,0,0,...midiFixture()]);
+  const view=new DataView(source.buffer); view.setUint32(4,source.length-8,true);view.setUint32(16,source.length-20,true);
+  const f=load(source,'midi','Demo.rmi');f.score.rename('Changed');const bytes=f.save().bytes;
+  assert.equal(Buffer.from(bytes.subarray(0,4)).toString(),'RIFF');assert.equal(readExchangeMidi(bytes,'x').score.parts[0]!.notes.length,2);
+});
+test('valid empty MIDI can be reopened after all notes were removed',()=>{
+  const source=writeExchangeMidi({name:'Empty',length:4,tempos:[{beat:0,bpm:120}],parts:[]}).bytes;
+  const f=load(source);assert.equal(f.score.read().body!.parts.length,0);assert.deepEqual(f.save().bytes,source);
+});
+test('ordinary MIDI note edits preserve the original bend and controller events',()=>{
+  const original=rawMidi(midiFixture());original.tracks[1]!.unshift({deltaTime:0,type:'pitchBend',channel:0,value:1024});
+  const f=load(Uint8Array.from(writeMidi(original)));f.score.rename('Changed');
+  assert(rawMidi(f.save().bytes).tracks.flat().some(item=>item.type==='pitchBend'&&item.value===1024));
+});
+
+const xml = strToU8(`<?xml version="1.0"?><score-partwise version="4.0"><part-list><score-part id="P1"><part-name>Flute</part-name><midi-instrument id="I1"><midi-program>74</midi-program></midi-instrument></score-part></part-list><part id="P1"><measure number="1"><attributes><divisions>4</divisions><time><beats>2</beats><beat-type>4</beat-type></time><transpose><chromatic>2</chromatic></transpose></attributes><direction><sound tempo="120"/></direction><note><pitch><step>C</step><octave>4</octave></pitch><duration>4</duration><voice>1</voice><tie type="start"/></note><note><pitch><step>C</step><octave>4</octave></pitch><duration>4</duration><voice>1</voice><tie type="stop"/></note><backup><duration>8</duration></backup><note><pitch><step>E</step><octave>4</octave></pitch><duration>8</duration><voice>2</voice></note></measure><measure number="2"><direction><sound tempo="80"/></direction><note><rest/><duration>4</duration></note><note><pitch><step>G</step><octave>4</octave></pitch><duration>4</duration></note></measure></part></score-partwise>`);
+test('MusicXML reads voices, backup, rests, ties, transpose, GM programs and variable tempi',()=>{
+  const parsed=readExchangeXml(xml,'Demo',false).score;
+  assert.equal(parsed.parts[0]!.program,73);assert.equal(parsed.parts[0]!.notes.length,3);
+  assert.deepEqual(parsed.parts[0]!.notes.map(note=>[note.beat,note.duration,note.pitch]),[[0,2,62],[0,2,66],[3,1,69]]);
+  assert.deepEqual(parsed.tempos,[{beat:0,bpm:120},{beat:2,bpm:80}]);
+});
+test('MusicXML unchanged save is byte exact; edited save remains MusicXML and warns about notation',()=>{
+  const f=load(xml,'musicxml','Demo.musicxml');assert.deepEqual(f.save().bytes,xml);
+  f.score.rename('Changed');const result=f.save();assert(result.warnings.some(item=>item.includes('排版')));
+  const reloaded=readExchangeXml(result.bytes,'Changed',false).score;
+  assert.equal(reloaded.parts[0]!.notes.length,3);assert.deepEqual(reloaded.tempos,[{beat:0,bpm:120},{beat:2,bpm:80}]);
+});
+test('compressed MXL uses its declared rootfile and can be edited then read again',()=>{
+  const zipped=zipSync({'META-INF/container.xml':strToU8('<container><rootfiles><rootfile full-path="scores/main.xml" media-type="application/vnd.recordare.musicxml+xml"/></rootfiles></container>'),'scores/main.xml':xml,'unrelated.txt':strToU8('ignore')});
+  const f=load(zipped,'mxl','Demo.mxl');assert.deepEqual(f.save().bytes,zipped);f.score.rename('Changed');
+  const result=f.save();assert.equal(result.bytes[0],80);assert.equal(readExchangeXml(result.bytes,'x',true).score.parts[0]!.notes.length,3);
+});
+test('invalid XML, MXL and out-of-range scores fail before a host file is opened for editing',()=>{
+  assert.throws(()=>readMusicFile(strToU8('<unrelated/>'),'x.xml','musicxml'),/MusicXML/);
+  assert.throws(()=>readExchangeXml(strToU8('<!DOCTYPE x [<!ENTITY a "x">]><score-partwise/>'),'x',false),/实体/);
+  assert.throws(()=>readExchangeXml(zipSync({'file.xml':xml}),'x',true),/container/);
+  assert.throws(()=>readMusicFile(strToU8('<score-partwise>'),'x.xml','musicxml'),/MusicXML/);
+});
+test('large number of legal tempo changes remains editable as one score',()=>{
+  const score:ExchangeScore={name:'Tempi',length:160,tempos:Array.from({length:150},(_,beat)=>({beat,bpm:beat%2?100:120})),
+    parts:[{name:'Piano',program:0,notes:[{beat:0,duration:159,pitch:60,velocity:.8,level:1,pan:0}]}]};
+  const f=load(writeExchangeMidi(score).bytes);assert.equal(f.score.read().body!.tempoSections!.length,149);
+});
+test('legacy rsproject packages open and save as packages rather than a workspace envelope',()=>{
+  const initial=load(midiFixture());const scoreDraft=initial.score.read().draft!;
+  const transaction=initial.library.commitTransaction({expectedToken:initial.library.currentToken(),label:'Test export',deleteDrafts:[scoreDraft]});assert.equal(transaction.status,'committed');
+  const bytes=strToU8(createProjectPackages(initial.library,adapters(),{rootKind:'rootsound.song'}).exportDraft(initial.song.read().draft!.id).text);
+  const f=load(bytes,'rsproject','Demo.rsproject');assert.deepEqual(f.save().bytes,bytes);
+  f.score.rename('Changed');const result=f.save();assert.equal(JSON.parse(Buffer.from(result.bytes).toString()).format,'RootSoundProject');
+  const reopened=load(result.bytes,'rsproject','Changed.rsproject');assert.equal(reopened.score.read().body!.parts[0]!.notes.length,2);
+});
+test('XML output handles escaped names, overlapping notes and drums',()=>{
+  const f=load(midiFixture()), score=scoreForFile(f.library,f.score.read().body!,'A&B <C>').score;
+  score.parts[0]!.name='A&B';score.parts.push({name:'Snare',program:0,drum:38,notes:[{beat:.5,duration:.25,pitch:38,velocity:.8,level:1,pan:0}]});
+  const xml=writeExchangeXml(score,false), output=readExchangeXml(xml,'x',false).score;
+  assert.equal(output.parts[0]!.name,'A&B');assert.equal(output.parts[1]!.drum,38);assert.equal(output.parts[1]!.notes[0]!.beat,.5);
+});
+test('XML export splits sustained notes at measure boundaries and merges the ties on reopen',()=>{
+  const score:ExchangeScore={name:'Long',length:12,tempos:[{beat:0,bpm:120},{beat:5,bpm:90}],parts:[{name:'Piano',program:0,
+    notes:[{beat:1,duration:9,pitch:60,velocity:.8,level:1,pan:.5}]}]};
+  const output=readExchangeXml(writeExchangeXml(score,false),'Long',false).score;
+  assert.equal(output.parts[0]!.notes.length,1);assert.equal(output.parts[0]!.notes[0]!.duration,9);assert.equal(output.parts[0]!.notes[0]!.pan,.5);
+  assert.deepEqual(output.tempos,score.tempos);
+});
+test('new per-note volume and pan use independent MIDI channels without changing velocity',()=>{
+  const score:ExchangeScore={name:'Mixed',length:4,tempos:[{beat:0,bpm:120}],parts:[{name:'Piano',program:0,
+    notes:[{beat:0,duration:2,pitch:60,velocity:100/127,level:.5,pan:-1},{beat:0,duration:2,pitch:64,velocity:90/127,level:1,pan:1}]}]};
+  const output=readExchangeMidi(writeExchangeMidi(score).bytes,'Mixed').score;
+  const notes=output.parts.flatMap(part=>part.notes).sort((a,b)=>a.pitch-b.pitch);
+  assert.equal(notes[0]!.velocity,100/127);assert.equal(notes[1]!.velocity,90/127);const settings=(pitch:number)=>{const part=output.parts.find(part=>part.notes.some(note=>note.pitch===pitch))!;return output.midiExpression!.find(lane=>lane.id===part.midiChannelId)!.events;};
+  assert(settings(60).some(e=>e.type==='controller'&&e.controller===10&&e.value===0));
+  assert(settings(64).some(e=>e.type==='controller'&&e.controller===10&&e.value===127));
+  assert(settings(60).some(e=>e.type==='controller'&&e.controller===7&&e.value===64));
+});
+test('undefined silent notes cannot silently masquerade as the original unchanged MIDI',()=>{
+  const f=load(midiFixture()),part=f.score.read().body!.parts[0]!;
+  const body=structuredClone(f.score.read().body!);body.parts[0]!.unassigned=true;
+  f.library.updateDraft(f.score.read().draft!.id,{body,dependencies:[part.timbreId]});
+  const saved=f.save();assert(saved.warnings.some(item=>item.includes('静默')));assert.notDeepEqual(saved.bytes,midiFixture());
+});
+test('renderer reload cannot adopt an unsaved edit as the original source baseline',()=>{
+  const bytes=midiFixture(),f=load(bytes),saved=f.text(),body=structuredClone(f.score.read().body!);
+  body.parts[0]!.notes[0]!.startBeat=.25;body.parts[0]!.notes[0]!.durationBeats=.5;
+  f.library.updateDraft(f.score.read().draft!.id,{body});commitMusicDocument(f.library,f.song,f.score);
+  const reloaded=createMusicFileSession('midi',bytes,f.library,f.score.read().body!,'Demo',saved);
+  const output=reloaded.serialize(f.library,f.score.read().body!,'Demo',f.text());
+  const note=readExchangeMidi(output.bytes,'Demo').score.parts[0]!.notes[0]!;
+  assert.equal(note.beat,.25);assert.equal(note.duration,.5);assert.notDeepEqual(output.bytes,bytes);
+});

@@ -61,6 +61,7 @@ export interface SongPlaybackPort {
 }
 export interface SongEditorPort {
   read(): SongView;
+  readDraft(): Draft | undefined;
   create(): void;
   /** A complete starting arrangement is created in one write, preserving the previous song draft. */
   createFromPhrase(phraseId: string, name?: string): void;

@@ -22,11 +22,13 @@ test('the twelve typing keys follow one chromatic C4–B4 octave including accid
 });
 
 test('octave edges respect the shared playable range without silently transposing unsupported notes', () => {
-  assert.equal(melodyEntryPitch('c', 0), undefined); assert.equal(melodyEntryPitch('g', 0), undefined);
+  close(melodyEntryPitch('c', -1), 8.175798915643707); close(melodyEntryPitch('c', 0), 16.351597831287414);
+  close(melodyEntryPitch('g', 0), 19.445436482630058);
   close(melodyEntryPitch('b', 0), 20.601722307054366); close(melodyEntryPitch(',', 0), 27.5);
   close(melodyEntryPitch('c', 8), 4186.009044809578); close(melodyEntryPitch('g', 8), 4978.031739553295);
-  assert.equal(melodyEntryPitch('b', 8), undefined); assert.equal(melodyEntryPitch('.', 8), undefined);
-  for (const octave of [-1, 9, 4.5, NaN, Infinity]) assert.equal(melodyEntryPitch('c', octave), undefined);
+  close(melodyEntryPitch('m', 9), 12543.853951415975);
+  assert.equal(melodyEntryPitch('k', 9), undefined); assert.equal(melodyEntryPitch('.', 9), undefined);
+  for (const octave of [-2, 10, 4.5, NaN, Infinity]) assert.equal(melodyEntryPitch('c', octave), undefined);
 });
 
 test('entry uses the strictly next quarter beat at supported tempos and preserves one-cell seconds duration', () => {
@@ -78,7 +80,7 @@ test('short legacy phrase bounds and invalid coordinates never create an out-of-
   const partial = nextMelodyEntryStep(0, 120, .3)!; assert.equal(partial.startBeat, .25); assert.equal(partial.canWrite, false);
   assert.equal(nextMelodyEntryStep(partial.seconds, 120, .3), undefined);
   for (const value of [NaN, Infinity, -Infinity]) assert.equal(nextMelodyEntryStep(value, 120), undefined);
-  for (const tempo of [NaN, Infinity, 0, -1, 39, 241]) assert.equal(nextMelodyEntryStep(0, tempo), undefined);
+  for (const tempo of [NaN, Infinity, 0, -1, 1001]) assert.equal(nextMelodyEntryStep(0, tempo), undefined);
   for (const length of [NaN, Infinity, 0, -1]) assert.equal(nextMelodyEntryStep(0, 120, length), undefined);
 });
 

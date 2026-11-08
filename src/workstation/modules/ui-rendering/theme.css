@@ -40,7 +40,7 @@ body, .welcome, .studio { background: var(--surface-base); color: var(--text); }
 .melody-grid-line.is-beat { background: #55718d35; }
 .melody-grid-line.is-bar { background: #55718d66; }
 .melody-key { background: #f7f9fc; color: #202938; border-color: #858f9e; }
-.is-vertical .melody-key.is-accidental, .melody-key.is-accidental { background: #647181; color: #fff; border-color: #4c596c; }
+.melody-key.is-accidental { background: #647181; color: #fff; border-color: #4c596c; }
 .melody-key:hover, .is-vertical .melody-key:hover { background: #b9cfdf; color: #142033; }
 .melody-key.is-entry-range { box-shadow: inset 4px 0 var(--accent); }
 .is-vertical .melody-key.is-entry-range { box-shadow: inset 0 -4px var(--accent); }

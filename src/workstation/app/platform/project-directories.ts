@@ -1,4 +1,4 @@
-import type { ProjectDirectoriesPort, ProjectDirectory } from '../../contracts/project-directory.ts';
+import type { EditableFileFormat, EditableFileSource, ProjectDirectoriesPort, ProjectDirectory, ProjectLibraryEntry, ProjectLibraryPage } from '../../contracts/project-directory.ts';
 import { MAX_MIDI_FILE_BYTES } from '../../contracts/midi.ts';
 
 export interface NativeProjectDirectoriesBridge {
@@ -6,14 +6,19 @@ export interface NativeProjectDirectoriesBridge {
   ChooseLocation(current: string): Promise<unknown>;
   Create(name: string, location: string, libraryText: string): Promise<unknown>;
   CreateCopy?(name: string, location: string, libraryText: string): Promise<unknown>;
+  CreateDetached?(name: string, location: string, libraryText: string): Promise<unknown>;
   Open(): Promise<unknown>;
   List?(): Promise<unknown>;
+  Browse?(path: string): Promise<unknown>;
   Delete?(path: string, expectedId: string): Promise<unknown>;
   Inspect?(path: string, expectedId: string): Promise<unknown>;
   Rename?(path: string, expectedId: string, name: string, libraryText: string, token: string): Promise<unknown>;
   OpenKnown?(path: string): Promise<unknown>;
   Save?(name?: string): Promise<unknown>;
   FinishLoading?(): Promise<unknown>;
+  OpenDocument?(path: string, token: string, libraryText: string): Promise<unknown>;
+  ReadDocument?(): Promise<unknown>;
+  PrepareDocumentSave?(base64: string): Promise<unknown>;
   Exit?(mode: string, name?: string): Promise<unknown>;
 }
 
@@ -34,7 +39,42 @@ function project(value: unknown): ProjectDirectory {
   const item = value as Record<string, unknown>;
   if (typeof item.id !== 'string' || !item.id.trim() || typeof item.name !== 'string' || !item.name.trim()
     || typeof item.path !== 'string' || !item.path.trim()) return fail();
-  return { id: item.id, name: item.name, path: item.path };
+  return { id: item.id, name: item.name, path: item.path, ...(item.format ? { format: fileFormat(item.format) } : {}) };
+}
+
+function fileFormat(value: unknown): EditableFileFormat {
+  if (value === 'midi' || value === 'musicxml' || value === 'mxl' || value === 'rsproject') return value;
+  return fail('不支持这种音乐文件格式。');
+}
+function documentSource(result: Record<string, unknown>): EditableFileSource {
+  if (typeof result.name !== 'string' || typeof result.path !== 'string' || typeof result.token !== 'string'
+    || typeof result.base64 !== 'string' || result.base64.length > 44739244) return fail();
+  let binary: string; try { binary = atob(result.base64); } catch { return fail(); }
+  return { name: result.name, path: result.path, format: fileFormat(result.format), token: result.token,
+    bytes: Uint8Array.from(binary, character => character.charCodeAt(0)), ...(typeof result.libraryText === 'string' ? { libraryText: result.libraryText } : {}) };
+}
+
+function libraryPage(value: unknown): ProjectLibraryPage {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return fail();
+  const page = value as Record<string, unknown>;
+  if (typeof page.root !== 'string' || !page.root.trim() || typeof page.path !== 'string' || !page.path.trim()
+    || !Array.isArray(page.entries)) return fail();
+  const normalized = (path: string) => path.replaceAll('\\', '/').replace(/\/+$/u, '').toLocaleLowerCase('en-US');
+  const root = normalized(page.root), current = normalized(page.path);
+  if (current !== root && !current.startsWith(root + '/')) return fail();
+  if (page.parent !== undefined && (typeof page.parent !== 'string' || normalized(page.parent) !== current.slice(0, current.lastIndexOf('/')))) return fail();
+  if (current === root ? page.parent !== undefined : page.parent === undefined) return fail();
+  const entries = page.entries.map((raw): ProjectLibraryEntry => {
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return fail();
+    const entry = raw as Record<string, unknown>;
+    if (!['folder', 'project', 'midi', 'document'].includes(String(entry.kind)) || typeof entry.name !== 'string' || !entry.name.trim()
+      || typeof entry.path !== 'string' || normalized(entry.path).slice(0, normalized(entry.path).lastIndexOf('/')) !== current) return fail();
+    if (entry.kind === 'project') return { kind: 'project', ...project(entry) };
+    return entry.kind === 'midi' || entry.kind === 'document' ? { kind: entry.kind, name: entry.name, path: entry.path }
+      : { kind: 'folder', name: entry.name, path: entry.path };
+  });
+  if (new Set(entries.map(entry => normalized(entry.path))).size !== entries.length) return fail();
+  return { root: page.root, path: page.path, ...(page.parent === undefined ? {} : { parent: page.parent as string }), entries };
 }
 
 function midiBytes(name: unknown, base64: unknown): { name: string; bytes: Uint8Array } {
@@ -84,6 +124,11 @@ export function createDesktopProjectDirectories(bridge: NativeProjectDirectories
       if (result.status !== 'created') return fail();
       return project(result.project);
     } } : {}),
+    ...(bridge.CreateDetached ? { async createDetached(name: string, location: string, libraryText: string) {
+      const result = await call(() => bridge.CreateDetached!(name, location, libraryText));
+      if (result.status !== 'created') return fail();
+      return project(result.project);
+    } } : {}),
     async list() {
       if (!bridge.List) return fail('当前窗口尚不支持项目列表，请关闭旧窗口后重新打开 RootSound。');
       const result = await call(() => bridge.List!());
@@ -92,12 +137,22 @@ export function createDesktopProjectDirectories(bridge: NativeProjectDirectories
       if (new Set(projects.map(item => item.path.toLocaleLowerCase('en-US'))).size !== projects.length) return fail();
       return projects;
     },
+    ...(bridge.Browse ? { async browse(path?: string) {
+      const result = await call(() => bridge.Browse!(path ?? ''));
+      if (result.status !== 'browsed') return fail();
+      return libraryPage(result.page);
+    } } : {}),
     async open(path) {
       if (path !== undefined && (!path.trim() || !bridge.OpenKnown)) return fail('当前窗口尚不支持直接打开这个项目，请重新打开 RootSound。');
       const result = await call(() => path === undefined ? bridge.Open() : bridge.OpenKnown!(path));
       if (result.status === 'cancelled') return { status: 'cancelled' };
+      if (result.status === 'document') {
+        const source = documentSource(result);
+        if (path !== undefined && source.path.replaceAll('\\','/').toLocaleLowerCase() !== path.replaceAll('\\','/').toLocaleLowerCase()) return fail('选中的文件不能被替换为其他文件。');
+        return { status: 'document', ...source };
+      }
       if (result.status === 'midi') {
-        if (path !== undefined) return fail('乐曲库项目入口不能被替换为 MIDI 选择结果。');
+        if (path !== undefined && !/\.midi?$/iu.test(path)) return fail('这个工程不能被替换为 MIDI 文件。');
         return { status: 'midi', ...midiBytes(result.name, result.base64) };
       }
       if (result.status !== 'opened') return fail();
@@ -143,6 +198,22 @@ export function createDesktopProjectDirectories(bridge: NativeProjectDirectories
       const result = await call(() => bridge.FinishLoading!());
       if (result.status !== 'ready') return fail();
     },
+    ...(bridge.OpenDocument ? { async openDocument(source: EditableFileSource, libraryText: string) {
+      const result = await call(() => bridge.OpenDocument!(source.path, source.token, libraryText));
+      if (result.status !== 'opened') return fail();
+      return project(result.project);
+    } } : {}),
+    ...(bridge.ReadDocument ? { async readDocument() {
+      const result = await call(() => bridge.ReadDocument!());
+      if (result.status === 'none') return undefined;
+      if (result.status !== 'document') return fail();
+      return documentSource(result);
+    } } : {}),
+    ...(bridge.PrepareDocumentSave ? { async prepareDocumentSave(bytes: Uint8Array) {
+      let binary = ''; for (let offset = 0; offset < bytes.length; offset += 16384) binary += String.fromCharCode(...bytes.subarray(offset, offset + 16384));
+      const result = await call(() => bridge.PrepareDocumentSave!(btoa(binary)));
+      if (result.status !== 'ready') return fail();
+    } } : {}),
     async exit(mode, name) {
       if (mode !== 'save' && mode !== 'discard') return fail('请选择保存退出或直接退出。');
       if (!bridge.Exit) return fail('当前窗口尚不支持退出项目，请关闭旧窗口后重新打开 RootSound。');

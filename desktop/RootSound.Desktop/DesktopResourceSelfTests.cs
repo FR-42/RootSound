@@ -18,6 +18,7 @@ internal static class DesktopResourceSelfTests
         File.WriteAllBytes(Path.Combine(ui, "index.html"), index); File.WriteAllBytes(Path.Combine(ui, "assets", "main.js"), script);
         File.WriteAllText(Path.Combine(ui, "assets", "main.css"), "body{color:black}");
         File.WriteAllBytes(Path.Combine(ui, "assets", "processor.wasm"), [0, 97, 115, 109, 1, 0, 0, 0]);
+        File.WriteAllBytes(Path.Combine(ui, "assets", "guide.mp4"), [0, 0, 0, 8, 102, 116, 121, 112]);
         File.WriteAllText(Path.Combine(root, "secret.txt"), "outside UI");
         string token = "rootsound-payload:" + new string('a', 32) + ":" + new string('b', 64);
         int opens = 0, passed = 0;
@@ -42,7 +43,7 @@ internal static class DesktopResourceSelfTests
         });
         Case(() =>
         {
-            foreach (var item in new[] { ("main.js", "text/javascript"), ("main.css", "text/css"), ("processor.wasm", "application/wasm") })
+            foreach (var item in new[] { ("main.js", "text/javascript"), ("main.css", "text/css"), ("processor.wasm", "application/wasm"), ("guide.mp4", "video/mp4") })
             {
                 var response = router.Open(origin + "/assets/" + item.Item1 + "?v=1", "GET"); using var content = response.Content;
                 Check(response.StatusCode == 200 && response.Headers.Contains(item.Item2), "module MIME");
@@ -56,6 +57,19 @@ internal static class DesktopResourceSelfTests
             Check(DesktopResourceRouter.TrustedOrigin("https://rootsound.local:443/index.html"), "explicit default HTTPS port");
             Status(origin + "/index.html", "POST", 405);
             Status(origin + "/missing.js", "GET", 404); Status(origin + "/assets", "GET", 404);
+        });
+        Case(() =>
+        {
+            const string url = origin + "/assets/guide.mp4";
+            foreach (var item in new[] { ("bytes=4-6", new byte[] { 102, 116, 121 }, "4-6/8"), ("bytes=6-", new byte[] { 121, 112 }, "6-7/8"), ("bytes=-2", new byte[] { 121, 112 }, "6-7/8"), ("bytes=6-99", new byte[] { 121, 112 }, "6-7/8") })
+            {
+                var response = router.Open(url, "GET", item.Item1); using var stream = response.Content; using var bytes = new MemoryStream(); stream.CopyTo(bytes);
+                Check(response.StatusCode == 206 && bytes.ToArray().SequenceEqual(item.Item2), "exact video slice");
+                Check(response.Headers.Contains("Content-Range: bytes " + item.Item3) && response.Headers.Contains("Accept-Ranges: bytes"), "seekable video headers");
+                stream.Position = 0; Check(stream.ReadByte() == item.Item2[0] && stream.Length == item.Item2.Length, "media slice seek");
+            }
+            foreach (string range in new[] { "bytes=99-", "bytes=5-2", "bytes=-0", "bytes=0-1,3-4", "bytes=999999999999999999999999999-" })
+            { var response = router.Open(url, "GET", range); using var stream = response.Content; Check(response.StatusCode == 416 && response.Headers.Contains("bytes */8"), "invalid range rejected"); }
         });
         Case(() =>
         {

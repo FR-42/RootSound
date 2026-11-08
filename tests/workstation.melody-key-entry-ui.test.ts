@@ -52,9 +52,10 @@ class Document extends Element { activeElement?: Element; createElement(tag: str
 function dom() {
   const document = new Document(); const window = new Element(); const timers: ReturnType<typeof setTimeout>[] = [];
   Object.assign(window, { setTimeout(callback: () => void, delay: number) { const timer = setTimeout(callback, delay); timer.unref(); timers.push(timer); return Number(timer); }, clearTimeout });
-  const values = { document, window, HTMLElement: Element, HTMLInputElement: Input, HTMLSelectElement: Select, HTMLTextAreaElement: TextArea };
+  let frameId = 0; const frames = new Map<number, FrameRequestCallback>();
+  const values = { document, window, requestAnimationFrame: (callback: FrameRequestCallback) => { frames.set(++frameId, callback); return frameId; }, cancelAnimationFrame: (id: number) => { frames.delete(id); }, HTMLElement: Element, HTMLInputElement: Input, HTMLSelectElement: Select, HTMLTextAreaElement: TextArea };
   const previous = new Map<string, PropertyDescriptor | undefined>(); for (const [key, value] of Object.entries(values)) { previous.set(key, Object.getOwnPropertyDescriptor(globalThis, key)); Object.defineProperty(globalThis, key, { value, writable: true, configurable: true }); }
-  return { document, restore() { timers.forEach(clearTimeout); for (const [key, descriptor] of previous) if (descriptor) Object.defineProperty(globalThis, key, descriptor); else Reflect.deleteProperty(globalThis, key); } };
+  return { document, flushFrames() { const pending = [...frames.values()]; frames.clear(); pending.forEach(callback => callback(performance.now())); }, restore() { timers.forEach(clearTimeout); for (const [key, descriptor] of previous) if (descriptor) Object.defineProperty(globalThis, key, descriptor); else Reflect.deleteProperty(globalThis, key); } };
 }
 async function settle() { for (let index = 0; index < 10; index++) await Promise.resolve(); }
 
@@ -64,11 +65,11 @@ function fixture(config:{rhythm?:boolean;existing?:boolean;authoritativeHead?:nu
  if(config.rhythm)partId=phrase.addPart(saved.content.id,'rhythm');
  if(config.existing)phrase.addNote(partId,{startBeat:4,durationBeats:1,durationSeconds:.5,frequencyHz:440,velocity:.75});
  const root=new Element('main'),seeks:number[]=[],auditions:PlayableNotePlan[]=[];let authoritative=config.authoritativeHead;let performance=config.performance??true;
- const workspace=mountMelodyWorkspace(root as unknown as HTMLElement,{phrase,sound:{async audition(plan:PlayableNotePlan){auditions.push(plan);},cancelAudition(){}} as unknown as SoundRuntimePort,gridBpm:()=>phrase.read().body!.tempoBpm,onChange(){},onPreview(){},onSeek(seconds){seeks.push(seconds);if(authoritative!==undefined)authoritative=seconds;return config.seekReady;},readPlayhead:authoritative===undefined?undefined:()=>authoritative!,readPerformanceMode:config.omitMode?undefined:()=>performance,listTimbres:()=>[{id:saved.content.id,name:saved.content.name}],onAddTimbre:()=>partId,section:config.rhythm?'rhythm':'melody'});
+ const workspace=mountMelodyWorkspace(root as unknown as HTMLElement,{phrase,initialViewport:{leftSeconds:0,zoom:1,top:1200,rowHeight:config.rhythm?72:24},sound:{async audition(plan:PlayableNotePlan){auditions.push(plan);},cancelAudition(){}} as unknown as SoundRuntimePort,gridBpm:()=>phrase.read().body!.tempoBpm,onChange(){},onPreview(){},onSeek(seconds){seeks.push(seconds);if(authoritative!==undefined)authoritative=seconds;return config.seekReady;},readPlayhead:authoritative===undefined?undefined:()=>authoritative!,readPerformanceMode:config.omitMode?undefined:()=>performance,listTimbres:()=>[{id:saved.content.id,name:saved.content.name}],onAddTimbre:()=>partId,section:config.rhythm?'rhythm':'melody'});
  const scroll=root.querySelector('.melody-scroll')!;
  const selectTone=()=>root.querySelectorAll('.melody-tone').find(card=>card.dataset.partId===partId)!.emit('click');
  const press=(key:string,extras:Record<string,unknown>={})=>environment.document.emit('keydown',{target:scroll,key,...extras});
- const notes=()=>phrase.read().body!.parts.find(part=>part.id===partId)!.notes;
+ const notes=()=>phrase.read().body!.parts.find(part=>part.id===partId)?.notes ?? [];
  const highlighted=()=>root.querySelectorAll('.melody-key').filter(key=>key.classList.contains('is-entry-range')).map(key=>key.textContent);
  return{...environment,library,root,phrase,partId,workspace,selectTone,press,notes,seeks,auditions,highlighted,scroll,head(seconds:number){workspace.setPlayhead(seconds);},mode(enabled:boolean){performance=enabled;workspace.refresh();},cleanup(){workspace.dispose();environment.restore();}};
 }
@@ -98,10 +99,10 @@ test('Space inserts one rest, repeated keydown does not flood notes or advance t
 test('Z and X select bounded octaves and unsupported edge pitches never move the head',()=>{
  const f=fixture();try{
   f.selectTone();f.press('x');f.press('c');assert(Math.abs(f.notes()[0]!.frequencyHz-523.2511306011972)<1e-9);assert.deepEqual(f.highlighted(),octave4.map(label=>label.replace('4','5')));
-  for(let index=0;index<8;index++)f.press('x');assert.deepEqual(f.highlighted(),['D♯8','D8','C♯8','C8']);
+  for(let index=0;index<8;index++)f.press('x');assert.deepEqual(f.highlighted(),['G9','F♯9','F9','E9','D♯9','D9','C♯9','C9']);
   const before=f.seeks.length;f.press('.');assert.equal(f.seeks.length,before);assert.equal(f.notes().length,1);f.press('c');assert.equal(f.notes().length,2);
-  for(let index=0;index<12;index++)f.press('z');assert.deepEqual(f.highlighted(),['B0','A♯0','A0','G♯0','G0','F♯0','F0','E0']);
-  const low=f.seeks.length;f.press('c');assert.equal(f.seeks.length,low);f.press('b');assert.equal(f.notes().length,3);assert(f.notes()[2]!.frequencyHz>=20);
+  for(let index=0;index<12;index++)f.press('z');assert.deepEqual(f.highlighted(),['B-1','A♯-1','A-1','G♯-1','G-1','F♯-1','F-1','E-1','D♯-1','D-1','C♯-1','C-1']);
+  const low=f.seeks.length;f.press('c');assert.equal(f.seeks.length,low+1);assert.equal(f.notes().length,3);assert(f.notes()[2]!.frequencyHz<20);
  }finally{f.cleanup();}
 });
 
@@ -131,10 +132,10 @@ test('editable targets, composition, modifiers and modal dialogs never enter not
  }finally{f.cleanup();}
 });
 
-test('note selection and rhythm keep their existing editing keys without activating note entry',()=>{
+test('note selection and rhythm never activate typing or retired QWEASD edits',()=>{
  const f=fixture({existing:true});try{
   f.selectTone();const block=f.root.querySelector('.melody-note')!,bounds=block.getBoundingClientRect();f.scroll.emit('pointerdown',{target:block,clientX:bounds.left+2,clientY:bounds.top+5});f.document.emit('pointerup');
-  assert.equal(f.workspace.isStepInputActive(),false);assert.deepEqual(f.highlighted(),[]);f.press('c');assert.equal(f.notes().length,1);f.press('q');assert.equal(f.notes()[0]!.pan,-.05);assert.deepEqual(f.seeks,[]);
+  assert.equal(f.workspace.isStepInputActive(),false);assert.deepEqual(f.highlighted(),[]);f.press('c');assert.equal(f.notes().length,1);f.press('q');assert.equal(f.notes()[0]!.pan,undefined);assert.deepEqual(f.seeks,[]);
  }finally{f.cleanup();}
  const rhythm=fixture({rhythm:true});try{rhythm.selectTone();assert.equal(rhythm.workspace.isStepInputActive(),false);assert.equal(rhythm.root.querySelector('.melody-entry-octave'),undefined);rhythm.press('c');rhythm.press(' ',{code:'Space'});rhythm.press('x');assert.equal(rhythm.notes().length,0);assert.deepEqual(rhythm.seeks,[]);}finally{rhythm.cleanup();}
 });
@@ -163,7 +164,7 @@ test('a high-tempo one-cell note can be moved from its centre and resized from i
 
 test('Backspace undoes edits instead of deleting a selected note and keeps a valid typing context',()=>{
  const f=fixture();try{
-  f.selectTone();f.press('c');const first=f.notes()[0]!.id;f.press('q');assert.equal(f.notes()[0]!.pan,-.05);
+  f.selectTone();f.press('c');const first=f.notes()[0]!.id;f.phrase.updateNote(f.partId,first,{pan:-.05});f.workspace.refresh();assert.equal(f.notes()[0]!.pan,-.05);
   f.press('Backspace');assert.equal(f.notes()[0]!.id,first);assert.equal(f.notes()[0]!.pan,undefined);assert.equal(f.workspace.isStepInputActive(),true);
   f.press('Backspace',{repeat:true});assert.equal(f.notes().length,1);
   f.press('Backspace');assert.equal(f.notes().length,0);assert.equal(f.workspace.isStepInputActive(),true);f.press('f');assert.equal(f.notes()[0]!.startBeat,.25);
@@ -204,11 +205,11 @@ test('zooming a newly generated short note keeps its drawn span within its actua
  const f=fixture();try{
   f.phrase.setTempo(240);f.workspace.refresh();f.selectTone();f.press('c');const note=f.notes()[0]!,body=f.phrase.read().body!;
   const rect=melodyNoteRect(note,body,f.phrase.keyboard(),{leftSeconds:0,zoom:.25,rowHeight:24},800);assert.equal(rect.width,1.5625);
-  f.scroll.emit('wheel',{target:f.root.querySelector('.melody-canvas'),clientX:212,clientY:100,ctrlKey:true,deltaY:Math.log(4)/.002});
-  const block=f.root.querySelector('.melody-note')!,lines=f.root.querySelectorAll('.melody-grid-line');
+  f.scroll.emit('wheel',{target:f.root.querySelector('.melody-canvas'),clientX:212,clientY:100,ctrlKey:true,shiftKey:true,deltaY:Math.log(4)/.002});f.flushFrames();
+  const block=f.root.querySelector('.melody-note')!;
   const left=Number.parseFloat(block.style.left!),right=left+Number.parseFloat(block.style.width!);
-  assert(Math.abs(left-Number.parseFloat(lines[1]!.style.left!))<1e-8);
-  assert(Math.abs(right-Number.parseFloat(lines[2]!.style.left!))<1e-8);
+  assert(Math.abs(left-note.startBeat*60/body.tempoBpm*25)<1e-8);
+  assert(Math.abs(right-left-note.durationSeconds!*25)<1e-8);
   assert.equal(f.notes()[0]!.durationSeconds,note.durationSeconds,'view zoom never shortens the sound');
  }finally{f.cleanup();}
 });
@@ -225,7 +226,7 @@ test('right-dragging from blank space still erases crossed notes and supports Un
 
 test('Backspace ignores editing fields and a failed undo preserves the selected note and history',()=>{
  const f=fixture();try{
-  f.selectTone();f.press('c');f.press('q');const before=structuredClone(f.phrase.read().body),history=f.library.readDraftHistory(f.phrase.read().draft!.id);
+  f.selectTone();f.press('c');f.phrase.updateNote(f.partId,f.notes()[0]!.id,{pan:-.05});f.workspace.refresh();const before=structuredClone(f.phrase.read().body),history=f.library.readDraftHistory(f.phrase.read().draft!.id);
   f.press('Backspace',{target:new Input('input')});assert.deepEqual(f.phrase.read().body,before);
   const undo=f.phrase.undo;f.phrase.undo=()=>{throw new Error('测试无法撤销');};f.press('Backspace');assert.deepEqual(f.phrase.read().body,before);assert.deepEqual(f.library.readDraftHistory(f.phrase.read().draft!.id),history);assert.match(f.root.querySelector('.melody-notice')!.textContent,/测试无法撤销/u);f.phrase.undo=undo;
   const slider=f.root.querySelectorAll('input').find(input=>input.attributes.get('aria-label')==='音量')!;assert(slider);f.press('Backspace',{target:slider});assert.equal(f.notes()[0]!.pan,undefined,'a focused note slider permits Undo');assert.equal(f.notes().length,1);
@@ -291,7 +292,7 @@ test('changing performance octave centers its highlighted range inside the visib
 
 test('undo and redo restore the cursor of typed notes while ordinary edits and mouse notes leave it alone',()=>{
  const f=fixture({authoritativeHead:.37});try{
-  f.selectTone();f.press('c');const first=f.notes()[0]!.id;assert.deepEqual(f.seeks,[.375]);f.press('q');f.press('Backspace');assert.deepEqual(f.seeks,[.375]);
+  f.selectTone();f.press('c');const first=f.notes()[0]!.id;assert.deepEqual(f.seeks,[.375]);f.phrase.updateNote(f.partId,first,{pan:-.05});f.workspace.refresh();f.press('Backspace');assert.deepEqual(f.seeks,[.375]);
   f.press('Backspace');assert.equal(f.notes().length,0);assert.deepEqual(f.seeks,[.375,.37]);
   f.press('y',{ctrlKey:true});assert.equal(f.notes()[0]!.id,first);assert.deepEqual(f.seeks,[.375,.37,.375]);
   f.press('f');assert.equal(f.notes().length,2);f.press('Backspace');assert.equal(f.notes().length,1);assert.equal(f.seeks.at(-1),.375);
@@ -355,15 +356,15 @@ test('dropping a library tone into the icon removes its last use and notes, reta
   const original=structuredClone(f.phrase.read().body);f.root.querySelector('.melody-add-tone')!.emit('click');
   const data=new Map<string,string>();const transfer={effectAllowed:'',dropEffect:'',setData(type:string,value:string){data.set(type,value);},getData(type:string){return data.get(type)??'';}};
   const frame=f.root.querySelector('.melody-library-card')!;frame.emit('dragstart',{dataTransfer:transfer});const trash=f.root.querySelector('.melody-tone-trash')!;assert.equal(trash.hidden,false);assert.equal(trash.parentElement,f.root.querySelector('.melody-tone-library'));
-  trash.emit('dragover',{dataTransfer:transfer});trash.emit('drop',{dataTransfer:transfer});assert.equal(trash.hidden,true);assert.deepEqual(f.phrase.read().body!.parts,[]);assert.equal(f.root.querySelector('.melody-console')!.hidden,true);
+  trash.emit('dragover',{dataTransfer:transfer});trash.emit('drop',{dataTransfer:transfer});assert.equal(trash.hidden,true);assert.deepEqual(f.phrase.read().body,original,'dropping a used tone requires confirmation');f.root.querySelector('.melody-tone-delete-confirm')!.emit('click');assert.deepEqual(f.phrase.read().body!.parts,[]);assert.equal(f.root.querySelector('.melody-console')!.hidden,true);
   assert(f.library.readContent(original!.parts[0]!.timbreId));assert.equal(f.root.querySelectorAll('.melody-library-tone').length,1);f.root.querySelector('.melody-library-close')!.emit('click');f.press('Backspace');assert.deepEqual(f.phrase.read().body,original);
  }finally{f.cleanup();}
 });
 
-test('two deliberate Delete presses or a console double-click clear all tone notes, single actions and repeats do not',()=>{
+test('two deliberate Delete presses remove the group and the console requires confirmation',()=>{
  const f=fixture({existing:true});const oldNow=Date.now;let now=1000;Date.now=()=>now;try{
   f.phrase.addNote(f.partId,{startBeat:6,durationBeats:.25,frequencyHz:330,velocity:.75});f.workspace.refresh();const original=structuredClone(f.phrase.read().body);
-  f.selectTone();f.press('Delete');f.press('Delete',{repeat:true});assert.equal(f.notes().length,2);now+=600;f.press('Delete');assert.equal(f.notes().length,2);now+=100;f.press('Delete');assert.equal(f.notes().length,0);assert.equal(f.phrase.read().body!.parts.length,1);
-  f.press('Backspace');assert.deepEqual(f.phrase.read().body,original);const remove=f.root.querySelector('.melody-delete-tone-notes')!;remove.emit('click');assert.equal(f.notes().length,2);remove.emit('dblclick');assert.equal(f.notes().length,0);f.press('Backspace');assert.deepEqual(f.phrase.read().body,original);assert.deepEqual(f.seeks,[]);
+  f.selectTone();f.press('Delete');f.press('Delete',{repeat:true});assert.equal(f.notes().length,2);now+=600;f.press('Delete');assert.equal(f.notes().length,2);now+=100;f.press('Delete');assert.equal(f.notes().length,0);assert.equal(f.phrase.read().body!.parts.length,0);
+  f.press('Backspace');assert.deepEqual(f.phrase.read().body,original);f.selectTone();const remove=f.root.querySelector('.melody-delete-tone-notes')!;remove.emit('click');assert.equal(f.notes().length,2);assert(f.root.querySelector('.melody-tone-delete-dialog'));f.root.querySelector('.melody-tone-delete-confirm')!.emit('click');assert.equal(f.notes().length,0);assert.equal(f.phrase.read().body!.parts.length,0);f.press('Backspace');assert.deepEqual(f.phrase.read().body,original);assert.deepEqual(f.seeks,[]);
  }finally{Date.now=oldNow;f.cleanup();}
 });

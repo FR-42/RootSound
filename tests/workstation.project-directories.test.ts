@@ -284,6 +284,7 @@ test('project Save, Save As and save-exit refuse unfinished phrase edits while d
   f.directories.createCopy = async () => { copies++; return entry; };
   f.directories.exit = async mode => { exits.push(mode); };
   const service = createProjectSetup(f.directories, () => {}, { read: () => original, songDraftId: () => root,
+    name() { throw new Error('放弃时无需读取工作标题'); },
     prepareSave() { prepares++; throw new Error('请先保存或放弃乐句草稿'); } });
   await assert.rejects(service.save!(), /乐句草稿/u);
   await assert.rejects(service.saveAs!('保存边界 1', 'E:\\副本'), /乐句草稿/u);
@@ -306,16 +307,17 @@ test('Save As waits for field preparation and snapshots only the prepared workin
   assert.equal(JSON.parse(current).drafts.find((draft: { id: string }) => draft.id === root).name, '准备后的工作名');
 });
 
-test('window-close preparation flushes without saving and still allows discard when phrase saving is blocked', async () => {
-  const calls: string[] = []; let failed = false;
+test('window-close checks do not prepare a save until explicitly requested', async () => {
+  const calls: string[] = [];
   const prepare = createProjectClosePreparation({ async flush() { calls.push('flush'); await Promise.resolve(); },
-    assertSaveReady() { calls.push('check'); if (failed) throw new Error('还有乐句草稿'); }, name: () => '正在编辑的歌' });
-  assert.deepEqual(await prepare(), { ready: true, canSave: true, name: '正在编辑的歌' });
-  failed = true;
-  assert.deepEqual(await prepare(), { ready: true, canSave: false, name: '正在编辑的歌', saveMessage: '还有乐句草稿' });
-  assert.deepEqual(calls, ['flush', 'check', 'flush', 'check']);
-  const invalid = createProjectClosePreparation({ flush() { throw new Error('名称无效'); }, assertSaveReady() { throw new Error('must not run'); }, name: () => '旧名' });
-  assert.deepEqual(await invalid(), { ready: true, canSave: false, name: '旧名', saveMessage: '名称无效' });
+    prepareSave() { calls.push('prepareSave'); }, name() { calls.push('name'); return '正在编辑的歌'; } });
+  assert.deepEqual(await prepare('check'), { ready: true, canSave: true });
+  assert.deepEqual(calls, ['flush']);
+  assert.deepEqual(await prepare('save'), { ready: true, canSave: true, name: '正在编辑的歌' });
+  assert.deepEqual(calls, ['flush', 'flush', 'prepareSave', 'name']);
+  const invalid = createProjectClosePreparation({ flush() { throw new Error('名称无效'); },
+    prepareSave() { assert.fail('must not prepare a save'); }, name: () => assert.fail('must not read a title') });
+  assert.deepEqual(await invalid('check'), { ready: true, canSave: false, saveMessage: '名称无效' });
 });
 
 test('failed save-as cannot enter the copy or mutate its source, and a failed checkpoint is not success', async () => {

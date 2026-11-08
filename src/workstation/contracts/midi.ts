@@ -1,4 +1,5 @@
 /** Bounded Standard MIDI File interchange; channels and programs are zero based. */
+import type { MidiExpressionMessage } from './midi-expression.ts';
 export const MAX_MIDI_FILE_BYTES = 10 * 1024 * 1024;
 export const MIDI_LIMITS = Object.freeze({ bytes: MAX_MIDI_FILE_BYTES, tracks: 256,
   events: 200_000, notes: 50_000, durationSeconds: 7_200 });
@@ -12,10 +13,12 @@ export type MidiNote = {
   velocity: number; level: number; pan: number;
   startTick: number; endTick: number; startBeat: number; endBeat: number;
   startSeconds: number; endSeconds: number;
+  port?: number; keyEndTick?: number; keyEndBeat?: number; keyEndSeconds?: number; onOrder?: number; offOrder?: number;
 };
 export type MidiDocument = {
   format: 0 | 1; division: number; initialTempoBpm: number;
   durationSeconds: number; durationBeats: number;
   tracks: MidiTrack[]; tempos: MidiTempo[]; timeSignatures: MidiTimeSignature[];
   notes: MidiNote[]; warnings: string[];
+  expression?: (MidiExpressionMessage & { port: number; channel: number; beat: number; order: number })[];
 };

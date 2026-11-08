@@ -22,5 +22,14 @@ test('a long pause or reset starts a new estimate and the rolling window follows
 test('unsupported speeds are reported honestly instead of being silently clamped',()=>{
   const tap=createTapTempo();for(const at of [0,200,400,600])tap.tap(at);assert.equal(tap.read().bpm,300);
   tap.reset();for(const at of [0,2000,4000,6000])tap.tap(at);assert.equal(tap.read().bpm,30);
-  tap.reset();for(const at of [0,500,1000,2000,3000])tap.tap(at);assert(Number.isFinite(tap.read().bpm));
+});
+test('inconsistent taps leave tempo unconfirmed until enough matching intervals arrive', () => {
+  const tap = createTapTempo();
+  for (const at of [0, 360, 860, 1540]) tap.tap(at);
+  assert.deepEqual(tap.read(), { count: 4 });
+  for (const at of [2040, 2540]) tap.tap(at);
+  assert.equal(tap.read().bpm, 120);
+  tap.reset();
+  for (const at of [0, 500, 1000, 2000, 3000]) tap.tap(at);
+  assert.deepEqual(tap.read(), { count: 5 });
 });

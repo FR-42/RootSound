@@ -57,7 +57,7 @@ export function createSampleBankAudio(library:MaterialLibrary, samples?:SampleAu
   const preparedRegions=new Map<string,AssetZone[]>();
   const readySources=new Map<string,Asset>();
   async function prepareForNotes(body:SampleBankTimbreBody,notes:readonly SoundPlan['note'][]) {
-    if(full){const zones=await regions(body);preparedRegions.set(body.instrument,zones);return;}
+    if(full){if(!preparedRegions.has(body.instrument))preparedRegions.set(body.instrument,await regions(body));return;}
     await prepare(body,notes); if(body.zones)return;
     const zones=await regions(body);preparedRegions.set(body.instrument,zones);
     for(const note of notes)for(const zone of selectBankZones(zones,frequency(body,note),note.velocity))readySources.set(zone.asset,await source(zone));
@@ -66,9 +66,14 @@ export function createSampleBankAudio(library:MaterialLibrary, samples?:SampleAu
     if(full) {
       const info=defaultInstrumentInfo('',body);if(!info)throw new Error('找不到这个内置音色的完整音源。');
       const pitch=69+12*Math.log2(frequency(body,note)/440),drums='drum' in info;
-      const key=drums?info.drum!:Math.max(0,Math.min(127,Math.round(pitch)));
       const zones=preparedRegions.get(body.instrument);if(!zones)throw new Error('音源尚未准备。');
-      const release=Math.max(...selectBankZones(zones,frequency(body,note),note.velocity).map(zone=>{
+      const selected=selectBankZones(zones,frequency(body,note),note.velocity);
+      const wanted=Math.max(0,Math.min(127,Math.round(pitch)));
+      // Some SF2 instruments deliberately stop below G9. Trigger their nearest
+      // recorded key and tune it to the requested pitch instead of going silent.
+      const key=drums?info.drum!:selected.some(zone=>wanted>=zone.keyMin&&wanted<=zone.keyMax)?wanted
+        :Math.max(selected[0]!.keyMin,Math.min(selected[0]!.keyMax,wanted));
+      const release=Math.max(...selected.map(zone=>{
         const r=zone.sf2Release,strength=Math.round(note.velocity*127)/127;
         const seconds=r?2**(Math.max(-12000,Math.min(8000,r.base+r.velocity*strength+r.inverseVelocity*(1-strength)))/1200):zone.releaseSeconds;
         return zone.loop?seconds:Math.max(0,Math.min(seconds,(zone.endSeconds-zone.startSeconds)/(frequency(body,note)/zone.rootFrequencyHz)-note.holdSeconds));

@@ -58,17 +58,17 @@ test('a deleted song disappears while a retained external tone-copy notice remai
     assert.equal(named(f.root, 'project-delete-overlay').hidden, true);
   } finally { f.cleanup(); }
 });
-test('song library discovers default files with new first, song tiles in between and file picker last', async t => {
+test('song library keeps new/import in its toolbar and files in the row list', async t => {
   t.mock.timers.enable({ apis: ['setTimeout'] });
   const f = fixture(); try {
     f.menu.open(); await settle();
     assert.deepEqual(f.opened, []);
     const labels = visible(f.root).filter(element => element.tagName === 'button').map(element => element.textContent);
-    assert.deepEqual(labels, ['', '×', '+', '第一首', '📁']);
+    assert.deepEqual(labels, ['', '＋ 新建', '打开', '×', '第一首']);
     assert(flatten(f.root).some(element => element.attributes.get('role') === 'dialog' && element.attributes.get('aria-label') === '乐曲库'));
     f.button('第一首').dispatchEvent(new Event('click')); t.mock.timers.tick(600); await settle();
     assert.deepEqual(f.opened, ['D:/RootSound/project/第一首.rootsound']);
-    f.button('选择歌曲项目文件').dispatchEvent(new Event('click')); await settle();
+    f.button('选择音乐文件').dispatchEvent(new Event('click')); await settle();
     assert.deepEqual(f.opened, ['D:/RootSound/project/第一首.rootsound', undefined]);
     // A cancelled native picker does not dismiss the library.
     assert.equal(f.trigger.attributes.get('aria-expanded'), 'true');
@@ -81,9 +81,9 @@ test('a failed listing keeps creation and custom-file opening available and a fa
   const f = fixture({ list: async () => { throw new Error('无法读取默认目录'); }, open: async () => { if (++attempts === 1) throw new Error('工程已移走'); } });
   try {
     f.menu.open(); await settle(); assert(flatten(f.root).some(element => element.textContent === '无法读取默认目录'));
-    f.button('选择歌曲项目文件').dispatchEvent(new Event('click')); await settle();
+    f.button('选择音乐文件').dispatchEvent(new Event('click')); await settle();
     assert(flatten(f.root).some(element => element.textContent === '工程已移走'));
-    f.button('选择歌曲项目文件').dispatchEvent(new Event('click')); await settle(); assert.equal(attempts, 2);
+    f.button('选择音乐文件').dispatchEvent(new Event('click')); await settle(); assert.equal(attempts, 2);
   } finally { f.cleanup(); }
 });
 test('disposal ignores a late project listing and pending opens cannot overlap', async t => {
@@ -95,7 +95,7 @@ test('disposal ignores a late project listing and pending opens cannot overlap',
   const f = fixture({ open: () => { opens++; return new Promise(resolve => { finish = resolve; }); } });
   try {
     f.menu.open(); await settle(); f.button('第一首').dispatchEvent(new Event('click')); t.mock.timers.tick(600);
-    f.button('选择歌曲项目文件').dispatchEvent(new Event('click')); f.menu.open(); assert.equal(opens, 1);
+    f.button('选择音乐文件').dispatchEvent(new Event('click')); f.menu.open(); assert.equal(opens, 1);
     f.button('新的开始').dispatchEvent(new Event('click')); assert.equal(f.created, 0);
     f.button('关闭乐曲库').dispatchEvent(new Event('click')); assert.equal(f.trigger.attributes.get('aria-expanded'), 'true');
     finish(); await settle(); f.button('关闭乐曲库').dispatchEvent(new Event('click'));
@@ -108,7 +108,7 @@ test('empty library stays minimal, Escape restores focus and reopening refreshes
   const f = fixture({ list: async () => { reads++; return []; } });
   try {
     f.menu.open(); await settle();
-    assert.deepEqual(flatten(f.root).filter(node => node.className.includes('project-library-tile')).map(node => node.textContent), ['+', '📁']);
+    assert.deepEqual(flatten(f.root).filter(node => node.className.includes('project-library-tile')).map(node => node.textContent), []);
     const event = new Event('keydown', { cancelable: true }); Object.assign(event, { key: 'Escape' });
     f.document.dispatchEvent(event); assert.equal(event.defaultPrevented, true);
     assert.equal(f.trigger.attributes.get('aria-expanded'), 'false');
@@ -215,7 +215,7 @@ test('confirmed library deletion passes the listed identity exactly once and ref
     assert.deepEqual(removed, [project]); assert.equal(f.button('确认彻底删除乐曲').disabled, true);
     assert.equal(f.trigger.attributes.get('aria-expanded'), 'true');
     finish(); await settle(); assert.equal(lists, 2);
-    assert.deepEqual(visible(f.root).filter(node => node.className.includes('project-library-tile')).map(node => node.textContent), ['+', '📁']);
+    assert.deepEqual(visible(f.root).filter(node => node.className.includes('project-library-tile')).map(node => node.textContent), []);
     assert.equal(named(f.root, 'project-delete-overlay').hidden, true); assert.deepEqual(f.opened, []);
   } finally { f.cleanup(); }
 });

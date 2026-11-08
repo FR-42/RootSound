@@ -1,9 +1,11 @@
 import { samePcm } from './pcm.ts';
 import { envelopeValue } from './envelope.ts';
 import { noteDuration, type SampleSourceSnapshot, type ScheduledPreview, type ScheduledSound } from './plan.ts';
-import {createSoundFontSource} from './soundfont-node.ts';
+import { createSoundFontSource, type SoundFontSource } from './soundfont-node.ts';
+import type { FontEvent } from './soundfont-schedule.ts';
 
 export interface GraphResources {
+  soundFont?: { source: SoundFontSource; gain: GainNode };
   sourceErrors?:Promise<never>[];
   sourceScheduling?:Promise<void>[];
   readonly oscillators: OscillatorNode[];
@@ -65,6 +67,13 @@ function leaseBuffer(audio: BaseAudioContext, source: SampleSourceSnapshot): { b
 }
 
 /** One graph builder and one envelope scheduler serve live and offline clocks. */
+export function soundFontEvents(events: ScheduledPreview['events']): FontEvent[] {
+  return events.flatMap(({ atSeconds, sound, pan }) => sound.kind === 'sample' && sound.soundFont ? [{
+    atSeconds, holdSeconds: sound.note.holdSeconds, releaseSeconds: sound.envelope.releaseSeconds,
+    level: sound.level, pan: pan ?? 0, font: sound.soundFont,
+  }] : []);
+}
+
 export function allocateGraph(audio: BaseAudioContext, preview: ScheduledPreview, resources: GraphResources, ended?: () => void,
   destination: AudioNode = audio.destination): SoundGraph {
   let output: SoundGraph['output'];
@@ -80,14 +89,11 @@ export function allocateGraph(audio: BaseAudioContext, preview: ScheduledPreview
   const graph: SoundGraph = { envelopes: [], starts: [], pans: [], ...(output ? { output } : {}) };
   const fonts=preview.events.filter(event=>event.sound.kind==='sample'&&event.sound.soundFont);
   if(fonts.length) {
-    const node=createSoundFontSource(audio,fonts.map(event=>{
-      const sound=event.sound as Extract<ScheduledSound,{kind:'sample'}>;
-      return {atSeconds:event.atSeconds,holdSeconds:sound.note.holdSeconds,releaseSeconds:sound.envelope.releaseSeconds,
-        level:sound.level,pan:event.pan??0,font:sound.soundFont!};
-    }));
+    const node = createSoundFontSource(audio, soundFontEvents(fonts), preview.midiExpression);
     (resources.sourceErrors??=[]).push(node.failure);
     (resources.sourceScheduling??=[]).push(node.scheduled);
     const gain=audio.createGain();resources.gains.push(gain);resources.samples.push(node);node.connect(gain);gain.connect(destination);
+    resources.soundFont = { source: node, gain };
     if(ended)node.onended=ended;
     const original=fonts[0]!.sound as Extract<ScheduledSound,{kind:'sample'}>;
     const {soundFont:_font,...clock}=original;

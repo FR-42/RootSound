@@ -15,8 +15,9 @@ class Param {
 }
 class Node {
   disconnected = false;
-  connect(): void { /* No audio is produced by these scheduling tests. */ }
-  disconnect(): void { this.disconnected = true; }
+  connections: Node[] = [];
+  connect(node: Node): void { this.connections.push(node); }
+  disconnect(): void { this.disconnected = true; this.connections.length = 0; }
 }
 class Oscillator extends Node {
   frequency = new Param(); type = 'sine'; onended: (() => void) | null = null;
@@ -35,6 +36,7 @@ class Context {
   constructor() { Context.instances.push(this); }
   createOscillator(): Oscillator { const node = new Oscillator(); this.oscillators.push(node); return node; }
   createGain(): Gain { const node = new Gain(); this.gains.push(node); return node; }
+  createWaveShaper(): Node { return new Node(); }
   createStereoPanner(): Panner { const node = new Panner(); this.panners.push(node); return node; }
   createConstantSource(): Constant { return new Constant(); }
   async resume(): Promise<void> { /* Always available for the scheduling fixture. */ }
@@ -125,7 +127,9 @@ test('live and offline use identical normalized envelope, source, panning and no
   assert.equal(live.durationSeconds, 2);
   assert.equal(offline.length, 96000);
   const liveGraph = Context.instances[0]!;
-  const afterStart = liveGraph.gains[0]!.gain.changes.map(change => ({ ...change, time: change.time - live.startedAtSeconds }));
+  const liveEnvelope = liveGraph.gains.find(node => node.connections.includes(liveGraph.panners[0]!));
+  assert(liveEnvelope);
+  const afterStart = liveEnvelope.gain.changes.map(change => ({ ...change, time: change.time - live.startedAtSeconds }));
   for (let index = 0; index < allocated.length; index += 1) {
     assert.equal(afterStart[index]!.value, allocated[index]!.value);
     assert.equal(afterStart[index]!.ramp, allocated[index]!.ramp);
@@ -287,7 +291,10 @@ test('live playback and WAV rendering share the same final-output envelope inclu
     events: [{ atSeconds: 0.9, sound: { ...plan(), note: { ...plan().note, holdSeconds: 0.1 }, envelope: { attackSeconds: 0, releaseSeconds: 0.5 } } }],
     output: { level: 0.45, fadeInSeconds: 0.2, fadeOutSeconds: 0.4 } };
   const live = await runtime.preview(input); const result = await runtime.render(input);
-  const offline = Offline.instances[0]!; const liveBus = Context.instances[0]!.gains[0]!.gain;
+  const offline = Offline.instances[0]!;
+  const liveOutput = Context.instances[0]!.panners[0]!.connections[0];
+  assert(liveOutput instanceof Gain);
+  const liveBus = liveOutput.gain;
   const offlineBus = offline.gains[0]!.gain;
   assert.equal(result.durationSeconds, 1.5); assert.equal(live.durationSeconds, 1.5);
   const levels = [0, 0.45, 0.45, 0];

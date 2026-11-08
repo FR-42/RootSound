@@ -1,0 +1,25 @@
+.guidance-shell .settings-dialog button { border:1px solid #c9d3dc; border-radius:6px; background:#fff; padding:8px 14px; font-size:13px; }
+.guidance-shell .settings-dialog button.primary { color:#fff; background:#506f87; border-color:#506f87; }
+.guidance-invitation { position:fixed; inset:0; z-index:110; display:grid; place-items:center; background:#e6edebbb; backdrop-filter:blur(14px); color-scheme:light; }
+.guidance-invitation-card { display:flex; flex-direction:column; align-items:stretch; gap:14px; padding:30px 44px 26px; width:min(280px,calc(100vw - 110px)); background:#ffffffed; border:1px solid #d0ded9; border-radius:22px; box-shadow:0 20px 90px #26483d1c; }
+.guidance-invitation-card svg { display:block; width:100%; height:auto; margin-bottom:12px; }
+.guidance-invitation button { padding:13px 22px; border-radius:10px; border:0; font:inherit; font-size:14px; cursor:pointer; }
+.guidance-watch { color:white; background:#38695e; }
+.guidance-skip { color:#698077; background:transparent; }
+.guidance-shell { position:fixed; inset:0; z-index:100; background:white; color:#263746; color-scheme:light; }
+.guidance-shell:focus { outline:none; }
+.guidance-editor { width:100%; height:100%; }
+.guidance-editor .phrase-composition-studio { color-scheme:light; }
+.guidance-editor .phrase-composition-notice,.guidance-editor .melody-notice { display:none; }
+.guidance-effects { position:fixed; inset:0; z-index:10000; pointer-events:none; }
+.guidance-effects > svg { display:block; width:100%; height:100%; }
+.guidance-shell [hidden] { display:none; }
+@media(max-width:680px) {
+  .guidance-editor .song-topbar { grid-template-columns:minmax(0,1fr) auto; grid-template-rows:auto auto; gap:6px; padding:7px 8px; }
+  .guidance-editor .phrase-composition-identity { grid-column:1; grid-row:1; }
+  .guidance-editor .song-file-actions { grid-column:2; grid-row:1; overflow:visible; }
+  .guidance-editor .song-transport { grid-column:1 / -1; grid-row:2; justify-self:center; gap:4px; }
+  .guidance-editor .song-file-actions button { padding:5px 6px; font-size:11px; }
+  .guidance-editor .output-volume input { width:74px; }
+}
+.guidance-invitation button:focus-visible { outline:2px solid #9db8a9; outline-offset:3px; }

@@ -138,7 +138,7 @@ test('save-as copies the current long edit into this song atomically without rew
   const history = f.library.readDraftHistory(f.songId); const writes = f.writes();
   const copy = copyProjectPhrase(f.library, f.songId, draft.id);
   assert.equal(f.writes(), writes + 1); assert.notEqual(copy.id, f.created.id);
-  assert.equal(f.library.readContent(copy.id)!.name, '乐句 2');
+  assert.equal(f.library.readContent(copy.id)!.name, '音乐 2');
   assert.deepEqual(readPhraseBody(f.library.readContent(copy.id)!.body), body);
   assert.deepEqual(f.library.readContent(copy.id)!.dependencies, draft.dependencies, 'private sound references stay shared');
   assert.deepEqual(f.library.readContent(f.created.id), original); assert.deepEqual(f.library.readDraft(draft.id), draft);

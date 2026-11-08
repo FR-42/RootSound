@@ -2,7 +2,7 @@ import type { KeyboardPitch, PhraseBody, PhraseSection } from '../../contracts/p
 import { melodyScale, melodySeconds } from './melody-geometry.ts';
 import { phrasePitchRow } from './phrase-viewport.ts';
 
-const COLORS = ['#8bb6e8', '#e9a184', '#8ac7b2', '#c0a3e2', '#e4c374', '#89c4d5', '#d89dbb', '#b3c982'];
+const COLORS = ['#4388d8', '#e47749', '#31ad8b', '#9a68d5', '#dfa62d', '#329db8', '#d4649c', '#88ad37'];
 const orderedKeyboard = (keys: readonly KeyboardPitch[]) => [...keys].sort((left, right) => right.frequencyHz - left.frequencyHz);
 const positive = (value: number | undefined, fallback: number) => Number.isFinite(value) && value! > 0 ? value! : fallback;
 const nonnegative = (value: number) => Number.isFinite(value) ? Math.max(0, value) : 0;

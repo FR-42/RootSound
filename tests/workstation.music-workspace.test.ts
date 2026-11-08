@@ -6,8 +6,10 @@ import type { PlayableNotePlan, SoundRuntimePort, SoundSequencePlan } from '../s
 import type { ProjectDirectoriesPort } from '../src/workstation/contracts/project-directory.ts';
 import type { MusicWorkspaceStatePort } from '../src/workstation/contracts/workspace.ts';
 import type { PhraseBody } from '../src/workstation/contracts/phrase.ts';
+import type { LearningAction } from '../src/workstation/contracts/guidance.ts';
 import { createMusicWorkspaceState } from '../src/workstation/app/platform/music-workspace-state.ts';
 import { createWorkspacePreferences } from '../src/workstation/app/platform/preferences.ts';
+import { createLearningSettings } from '../src/workstation/app/platform/learning-settings.ts';
 import { createInitialProjectLibrary, createProjectSetup } from '../src/workstation/app/project-setup.ts';
 import { openMusicDocument, commitMusicDocument } from '../src/workstation/app/music-document.ts';
 import { createMaterialLibrary } from '../src/workstation/modules/materials/public.ts';
@@ -46,6 +48,7 @@ class Element {
   setAttribute(key: string, value: string): void { this.attributes.set(key, value); }
   showModal(): void { this.attributes.set('open', ''); }
   close(): void { this.attributes.delete('open'); this.emit('close'); }
+  click(): void { this.emit('click'); }
   matches(selector: string): boolean {
     if (selector.startsWith('.')) return this.classList.contains(selector.slice(1));
     const match = /^([a-z][a-z0-9]*)(?:\[([^\]]+)\])?$/u.exec(selector);
@@ -98,8 +101,8 @@ function installDom() {
 }
 const settle = async () => { for (let index = 0; index < 24; index++) await Promise.resolve(); };
 
-test('unified music opens directly in the piano roll, plays and saves the complete document with Ctrl+S', async () => {
-  const dom = installDom(); let working = createInitialProjectLibrary('直达创作'); let disk = working; let saves = 0;
+test('unified music opens in the piano roll, plays and tracks unsaved changes through Ctrl+S', async () => {
+  const dom = installDom(); let working = createInitialProjectLibrary('直达创作'); let saves = 0; let failSave = false;
   const library = createMaterialLibrary({ read: () => working, write: text => { working = text; } },
     { project: { rootKind: 'rootsound.song', adapters: [createTimbreReferenceAdapter(), createPhraseReferenceAdapter(), createSongReferenceAdapter()] } });
   const tones = createTimbrePlayback(library,undefined,undefined,musicClockVoice), phrase = createPhraseEditor(library, tones);
@@ -107,20 +110,28 @@ test('unified music opens directly in the piano roll, plays and saves the comple
   openMusicDocument(library, song, phrase);
   const part = phrase.addPart(library.listContentInfo().find(item => item.kind === 'rootsound.timbre')!.id);
   phrase.addNote(part, { startBeat: 0, durationBeats: 1, frequencyHz: 440, velocity: .5 });
+  const timbre = createTimbreEditor(library);
+  let disk = working;
   const plans: SoundSequencePlan[] = [];
   const sound = { stopAll() {}, stop() {}, cancelAudition() {}, subscribe() { return () => {}; }, position() { return 0; },
     async preview(plan: SoundSequencePlan) { plans.push(plan); return { id: 'play', status: 'playing', durationSeconds: plan.durationSeconds }; }, async audition() {} } as unknown as SoundRuntimePort;
   const directories = { read: async () => ({ defaultLocation: 'D:/RootSound/project', hasUnsavedChanges: working !== disk }),
-    async save() { disk = working; saves++; return { id: 'file', name: song.read().draft!.name, path: 'D:/RootSound/project/test.rootsound' }; } } as unknown as ProjectDirectoriesPort;
+    async save() {
+      if (failSave) throw new Error('模拟保存失败');
+      disk = working; saves++;
+      return { id: 'file', name: song.read().draft!.name, path: 'D:/RootSound/project/test.rootsound' };
+    } } as unknown as ProjectDirectoriesPort;
   const root = new Element('main');
   const setup = createProjectSetup(directories, () => {}, { read: () => working, songDraftId: () => song.read().draft!.id,
     name: () => song.read().draft!.name, prepareSave() { commitMusicDocument(library, song, phrase); } });
   let openingReads=0;const readPhrase=phrase.read.bind(phrase);phrase.read=()=>{openingReads++;return readPhrase();};
-  const studio = mountStudio(root as unknown as HTMLElement, { timbre: createTimbreEditor(library), sound, hasPrevious: true,
+  const studio = mountStudio(root as unknown as HTMLElement, { timbre, sound, hasPrevious: true,
     preferences:createWorkspacePreferences({getItem:()=>JSON.stringify({version:1,keyboardPerformance:true}),setItem(){}}),
     phrase, song, projectSetup: setup, initialEntry: 'song' });
   try {
     await settle();
+    const unsaved = root.querySelector('.song-project-unsaved')!;
+    assert(unsaved.hidden, 'opening a clean project leaves its title unmarked');
     assert(openingReads<=3,'opening the active canvas must reuse its view instead of repeatedly reading the entire score');
     assert(root.querySelector('.melody-workspace'));
     assert.equal(root.querySelector('.melody-note')!.style.width,'30px','direct project entry uses equally wide pitch columns');
@@ -129,11 +140,15 @@ test('unified music opens directly in the piano roll, plays and saves the comple
     assert.equal(root.querySelector('.song-topbar')!.querySelector('.song-tempo-panel'),undefined,'BPM is beside the keyboard, not in the topbar');
     assert.equal(root.querySelector('.song-topbar')!.querySelector('.phrase-grid-button'),undefined,'grid division is beside BPM, not in the topbar');
     assert(root.querySelector('.melody-tempo-dock')!.querySelector('.melody-tempo-button'));
+    const beatPositions = () => root.querySelectorAll('.melody-grid-line').filter(line=>line.classList.contains('is-beat')).map(line=>line.style.top);
+    const originalBeatPositions = beatPositions();
     const grid=root.querySelector('.melody-grid-select')!;grid.value='3';grid.emit('change');await settle();
-    assert.equal(phrase.read().body!.stepsPerBeat,3);grid.value='4';grid.emit('change');await settle();
+    assert.equal(phrase.read().body!.stepsPerBeat,3);
+    assert(!unsaved.hidden, 'a grid edit marks the project as unsaved');
+    grid.value='4';grid.emit('change');await settle();
     const openingLines=root.querySelectorAll('.melody-grid-line');
-    assert(Math.abs(Number.parseFloat(String(openingLines[1]!.style.top))-Number.parseFloat(String(openingLines[0]!.style.top))-128)<1e-8);
-    assert(openingLines.every(line=>line.classList.contains('is-beat')),'initial view shows only beat/bar lines');
+    assert.deepEqual(beatPositions(), originalBeatPositions, 'changing divisions preserves beat positions and scale');
+    assert(openingLines.some(line=>!line.classList.contains('is-beat')), 'explicit division changes reveal subdivision lines');
     assert.equal(root.querySelector('.phrase-composition-main')!.hidden, true);
     assert.equal(root.querySelector('.phrase-melody-back'), undefined);
     assert.equal(root.querySelector('.song-project-kind'), undefined);
@@ -167,6 +182,7 @@ test('unified music opens directly in the piano roll, plays and saves the comple
     root.querySelector('.song-play')!.emit('click'); await settle(); assert.equal(plans[0]!.events.length, 1);
     dom.document.emit('keydown', { key: 's', ctrlKey: true }); await settle();
     assert.equal(saves, 1); assert.equal(disk, working);
+    assert(unsaved.hidden, 'successful save clears the marker');
     const parsed = JSON.parse(disk); const rootDraft = parsed.drafts.find((item: {kind:string}) => item.kind === 'rootsound.song');
     const savedScore = parsed.contents.find((item: {id:string}) => item.id === rootDraft.dependencies[0]);
     assert.equal(savedScore.body.parts[0].notes.length, 1);
@@ -183,11 +199,16 @@ test('unified music opens directly in the piano roll, plays and saves the comple
       root.querySelector('.tap-tempo-apply')!.emit('click');await settle();
       assert.equal(phrase.read().body!.tempoBpm,150);assert.equal(phrase.read().body!.parts[0]!.notes[0]!.durationSeconds,.4);
       assert.equal(saves,1,'applying tempo is a working edit, not a disk save');
+      assert(!unsaved.hidden, 'another edit brings the marker back');
+      failSave = true;
+      dom.document.emit('keydown', { key: 's', ctrlKey: true }); await settle();
+      assert.equal(saves, 1);
+      assert(!unsaved.hidden, 'failed save leaves the marker visible');
     }finally{if(originalPerformance)Object.defineProperty(globalThis,'performance',originalPerformance);}
   } finally { studio.dispose(); dom.restore(); }
 });
 
-test('family selection scopes transport without changing music; clearing, selecting a note and deleting the family restore all parts', async () => {
+test('only family selection changes the playback scope, and clicking a note keeps it', async () => {
   const dom = installDom(); let text = createInitialProjectLibrary('选择族试听');
   const library = createMaterialLibrary({ read: () => text, write: next => { text = next; } });
   const tones = createTimbrePlayback(library, undefined, undefined, musicClockVoice);
@@ -225,7 +246,7 @@ test('family selection scopes transport without changing music; clearing, select
     root.querySelector('.melody-scroll')!.emit('pointerdown', { target: block, pointerId: 93,
       clientX: block.getBoundingClientRect().left + 5, clientY: block.getBoundingClientRect().top + 2 });
     dom.document.emit('pointerup', { pointerId: 93 });
-    await settle(); assert.deepEqual(pitches(), [440, 660], 'selecting an individual note does not solo its family');
+    await settle(); assert.deepEqual(pitches(), [660], 'clicking a note keeps the selected family');
     assert.equal(text, before, 'listening scope must not edit or save music');
     choose(first); phrase.removePart(first); shell.refresh(); await settle();
     assert.deepEqual(pitches(), [660], 'removed family must not leave a stale listening scope');
@@ -234,23 +255,26 @@ test('family selection scopes transport without changing music; clearing, select
 
 test('tap dialog supports mouse and keyboard, reset, cancel and listener cleanup',()=>{
   const dom=installDom(),root=new Element('main'),applied:number[]=[];let now=0;
-  let dialog=showTapTempo(root as unknown as HTMLElement,{now:()=>now,onApply:value=>applied.push(value)});
+  let dialog=showTapTempo(root as unknown as HTMLElement,{now:()=>now,onApply(value){applied.push(value);}});
   try{
     for(const at of [0,500,1000,1500]){now=at;dom.document.emit('keydown',{key:' ',code:'Space'});}
     assert.equal(root.querySelector('.tap-tempo-value')!.textContent,'120');assert.equal(applied.length,0);
     now=1700;dom.document.emit('keydown',{key:' ',code:'Space',repeat:true});assert.equal(root.querySelector('.tap-tempo-value')!.textContent,'120');
-    root.querySelector('.tap-tempo-reset')!.emit('click');assert.equal(root.querySelector('.tap-tempo-apply')!.disabled,true);
+    root.querySelector('.tap-tempo-reset')!.emit('click');assert.equal(root.querySelector('.tap-tempo-apply')!.hidden,true);
     for(const at of [2000,2400,2800,3200]){now=at;root.querySelector('.tap-tempo-pad')!.emit('click');}
     root.querySelector('.tap-tempo-cancel')!.emit('click');assert.equal(applied.length,0);assert.equal(root.querySelector('.tap-tempo-dialog'),undefined);
     assert.equal(dom.document.emit('keydown',{key:' ',code:'Space'}).defaultPrevented,false,'dialog shortcuts must be released on close');
-    dialog=showTapTempo(root as unknown as HTMLElement,{now:()=>now,onApply:value=>applied.push(value)});
+    dialog=showTapTempo(root as unknown as HTMLElement,{now:()=>now,onApply(value){applied.push(value);}});
     for(const at of [0,200,400,600]){now=at;dom.document.emit('keydown',{key:' ',code:'Space'});}
-    assert.equal(root.querySelector('.tap-tempo-value')!.textContent,'300');assert(root.querySelector('.tap-tempo-apply')!.disabled);
-    dom.document.emit('keydown',{key:'Escape'});assert.equal(applied.length,0);assert.equal(root.querySelector('.tap-tempo-dialog'),undefined);
+    assert.equal(root.querySelector('.tap-tempo-value')!.textContent,'300');assert.equal(root.querySelector('.tap-tempo-apply')!.hidden,false);
+    dom.document.emit('keydown',{key:'Enter'});assert.deepEqual(applied,[300]);assert.equal(root.querySelector('.tap-tempo-dialog'),undefined);
+    dialog=showTapTempo(root as unknown as HTMLElement,{now:()=>now,onApply(value){applied.push(value);}});
+    dom.document.emit('keydown',{key:'Enter'});assert(root.querySelector('.tap-tempo-dialog'));
+    dom.document.emit('keydown',{key:'Escape'});assert.deepEqual(applied,[300]);assert.equal(root.querySelector('.tap-tempo-dialog'),undefined);
   }finally{dialog.dispose();dom.restore();}
 });
 
-function editableRoll(options: { workspaceState?: MusicWorkspaceStatePort; performance?: boolean; orientation?: 'vertical'; playing?: boolean } = {}) {
+function editableRoll(options: { workspaceState?: MusicWorkspaceStatePort; performance?: boolean; orientation?: 'vertical'; playing?: boolean; multipleRolls?: boolean; onLearningAction?(action: LearningAction): void } = {}) {
   const dom=installDom();let text=createInitialProjectLibrary('交互测试');
   const library=createMaterialLibrary({read:()=>text,write:value=>{text=value;}});
   const tones=createTimbrePlayback(library,undefined,undefined,musicClockVoice),phrase=createPhraseEditor(library,tones);
@@ -261,31 +285,64 @@ function editableRoll(options: { workspaceState?: MusicWorkspaceStatePort; perfo
   const b=phrase.addNote(second,{startBeat:1,durationBeats:1,frequencyHz:293.6647679174076,velocity:.7});
   const root=new Element('main'),auditions:PlayableNotePlan[]=[];const sound={cancelAudition(){},async audition(plan:PlayableNotePlan){auditions.push(plan);}} as unknown as SoundRuntimePort;
   const previews:Array<PhraseBody|undefined>=[];
+  const seeks: number[] = [];
+  const commits: boolean[] = [];
   const mount=()=>mountMelodyWorkspace(root as unknown as HTMLElement,{phrase,sound,gridBpm:()=>120,workspaceState:options.workspaceState,orientation:options.orientation,readPerformanceMode:()=>!!options.performance,
     readIsPlaying:options.playing===undefined?undefined:()=>options.playing!,
-    listTimbres:()=>sounds,onAddTimbre:id=>phrase.addPart(id),onChange(){},onPreview(body){previews.push(body);},onSeek(){}});
+    readMultipleTempoRolls: options.multipleRolls === undefined ? undefined : () => options.multipleRolls!, onLearningAction: options.onLearningAction,
+    listTimbres:()=>sounds,onAddTimbre:id=>phrase.addPart(id),onChange(_view, preserveSounding){commits.push(!!preserveSounding);},onPreview(body){previews.push(body);},onSeek(seconds){seeks.push(seconds);}});
   let roll=mount();
   const family=(id:string)=>root.querySelectorAll('.melody-tone').find(item=>item.dataset.partId===id)!;
   const remove=(id:string)=>family(id).parentElement!.querySelector('.melody-family-remove')!;
   const note=(id:string)=>root.querySelectorAll('.melody-note').find(item=>item.dataset.noteId===id)!;
-  return {...dom,root,get roll(){return roll;},phrase,first,second,empty,a,b,family,remove,note,previews,read:()=>text,reopen(workspaceState=options.workspaceState){roll.dispose();options.workspaceState=workspaceState;roll=mount();},
+  return {...dom,root,get roll(){return roll;},phrase,library,song,first,second,empty,a,b,family,remove,note,previews,seeks,commits,read:()=>text,reopen(workspaceState=options.workspaceState){roll.dispose();options.workspaceState=workspaceState;roll=mount();},
     auditions,cleanup(){roll.dispose();dom.restore();}};
 }
 
-test('idle drag skips audio copies and playing drag previews only the latest frame',()=>{
-  for(const playing of [false,true]){
-    const f=editableRoll({playing});try{
-      const scroll=f.root.querySelector('.melody-scroll')!,block=f.note(f.a);
-      const from={clientX:Number.parseFloat(String(block.style.left))+2,clientY:Number.parseFloat(String(block.style.top))+2};
-      scroll.emit('pointerdown',{target:block,...from});
-      f.document.emit('pointermove',{...from,clientX:from.clientX+15});
-      f.document.emit('pointermove',{...from,clientX:from.clientX+30});
-      assert.equal(f.previews.filter(Boolean).length,0);
-      f.flushFrames();assert.equal(f.previews.filter(Boolean).length,playing?1:0);
-      f.document.emit('pointerup');assert.equal(f.previews.at(-1),undefined);
-      const count=f.previews.length;f.flushFrames();assert.equal(f.previews.length,count,'released gesture cannot replay a stale preview');
-    }finally{f.cleanup();}
-  }
+test('playing note drags and resizes commit once, and undo and redo skip copying full history', () => {
+  const f = editableRoll({ playing: true });
+  try {
+    const original = f.phrase.read().body;
+    const scroll = f.root.querySelector('.melody-scroll')!, block = f.note(f.a);
+    const from = { clientX: Number.parseFloat(String(block.style.left)) + 2, clientY: Number.parseFloat(String(block.style.top)) + 2 };
+    const before = block.style.left;
+    scroll.emit('pointerdown', { target: block, ...from });
+    for (let index = 1; index <= 20; index++) {
+      f.document.emit('pointermove', { ...from, clientX: from.clientX + index * 2 });
+      f.flushFrames();
+    }
+    assert.notEqual(block.style.left, before);
+    assert.deepEqual(f.previews, []);
+    assert.deepEqual(f.auditions, []);
+    assert.deepEqual(f.phrase.read().body, original);
+    f.document.emit('pointerup');
+    const moved = f.phrase.read().body;
+    assert.notDeepEqual(moved, original);
+    f.flushFrames();
+    assert.deepEqual(f.previews, [undefined]);
+    assert.deepEqual(f.commits, [true]);
+
+    let historyCopies = 0;
+    const history = f.library.readDraftHistory.bind(f.library);
+    f.library.readDraftHistory = id => { historyCopies++; return history(id); };
+    f.document.emit('keydown', { key: 'z', ctrlKey: true });
+    assert.deepEqual(f.phrase.read().body, original);
+    f.document.emit('keydown', { key: 'y', ctrlKey: true });
+    assert.deepEqual(f.phrase.read().body, moved);
+    assert.equal(historyCopies, 0);
+    assert.deepEqual(f.seeks, []);
+
+    const movedBlock = f.note(f.a);
+    const resize = movedBlock.querySelector('.melody-note-resize')!;
+    const edge = movedBlock.getBoundingClientRect();
+    scroll.emit('pointerdown', { target: resize, clientX: edge.right - 1, clientY: edge.top + 2 });
+    f.document.emit('pointermove', { clientX: edge.right + 30, clientY: edge.top + 2 });
+    f.flushFrames();
+    assert.deepEqual(f.phrase.read().body, moved);
+    f.document.emit('pointerup');
+    assert.notDeepEqual(f.phrase.read().body, moved);
+    assert.equal(f.commits.at(-1), true);
+  } finally { f.cleanup(); }
 });
 
 test('added families can be removed, populated removal can be cancelled and note edits remain undoable',()=>{
@@ -310,9 +367,9 @@ test('roll starts with spacious cells even for a long score, and subdivision cha
       assert(Math.abs(melodyScale(view,1000,melodyDuration(score))*60/score.tempoBpm/stepsPerBeat-32)<1e-8);
     }
     assert.equal(f.roll.readViewport().rowHeight,32);
-    const gap=()=>{const lines=f.root.querySelectorAll('.melody-grid-line');return Number.parseFloat(String(lines[1]!.style.left))-Number.parseFloat(String(lines[0]!.style.left));};
+    const gap=()=>{const lines=f.root.querySelectorAll('.melody-grid-line').filter(line=>line.classList.contains('is-beat'));return Number.parseFloat(String(lines[1]!.style.left))-Number.parseFloat(String(lines[0]!.style.left));};
     const original=structuredClone(body.parts);assert(Math.abs(gap()/4-32)<1e-8);
-    for(const n of [9,2,4]){f.phrase.setStepsPerBeat(n);f.roll.refresh();assert(Math.abs(gap()/n-32)<1e-8);assert.deepEqual(f.phrase.read().body!.parts,original);}
+    for(const n of [9,2,4]){f.phrase.setStepsPerBeat(n);f.roll.refresh();assert(Math.abs(gap()/4-32)<1e-8);assert.deepEqual(f.phrase.read().body!.parts,original);}
     f.roll.refresh();assert(Math.abs(gap()/4-32)<1e-8,'repeated refresh must not compound zoom');
   }finally{f.cleanup();}
 });
@@ -361,6 +418,21 @@ test('duration wheel requires hovering the selected note; blank and unselected n
   }finally{f.cleanup();}
 });
 
+test('vertical time lines use one physical pixel at 125 percent scaling', () => {
+  const f = editableRoll({ orientation: 'vertical' });
+  try {
+    Object.assign(f.window, { devicePixelRatio: 1.25 });
+    f.phrase.setTempo(137);
+    f.roll.refresh();
+    const grid = f.root.querySelector('.melody-grid')!;
+    assert.equal(grid.style['--melody-grid-stroke'], '0.8px');
+    const pixels = grid.querySelectorAll('.melody-grid-line').map(line => parseFloat(String(line.style.top)) * 1.25);
+    assert(pixels.length > 1);
+    assert(pixels.every(pixel => Math.abs(pixel - Math.round(pixel)) < 1e-8));
+    assert.equal(new Set(pixels.map(Math.round)).size, pixels.length);
+  } finally { f.cleanup(); }
+});
+
 test('zoom reveals finer drawing cells and black and white pitch rows have equal size',()=>{
   const f=editableRoll();try{
     const scroll=f.root.querySelector('.melody-scroll')!,canvas=f.root.querySelector('.melody-canvas')!;
@@ -368,7 +440,7 @@ test('zoom reveals finer drawing cells and black and white pitch rows have equal
     assert(lines().every(line=>line.classList.contains('is-beat')));
     const zoom=()=>{scroll.emit('wheel',{target:canvas,ctrlKey:true,shiftKey:true,deltaY:-Math.log(2)/.002,clientX:0,clientY:100});f.flushFrames();};
     zoom();assert(lines().some(line=>!line.classList.contains('is-beat')));
-    zoom();const keys=f.root.querySelectorAll('.melody-key'),black=keys.find(key=>key.textContent==='C♯4'||key.textContent==='C#4')!;
+    zoom();zoom();const keys=f.root.querySelectorAll('.melody-key'),black=keys.find(key=>key.textContent==='C♯4'||key.textContent==='C#4')!;
     assert(black,'keyboard contains C sharp');const rowHeight=f.roll.readViewport().rowHeight;
     assert.equal(Number.parseFloat(String(black.style.height)),rowHeight);
     f.family(f.first).emit('click');
@@ -378,7 +450,7 @@ test('zoom reveals finer drawing cells and black and white pitch rows have equal
     scroll.emit('pointerdown',{target:canvas,...at});f.document.emit('pointerup',at);
     const notes=f.phrase.read().body!.parts.find(part=>part.id===f.first)!.notes;assert.equal(notes.length,before+1);
     const added=notes.at(-1)!;assert(Math.abs(added.frequencyHz-Number(black.dataset.frequencyHz))<1e-8);
-    assert(Math.abs(added.durationSeconds!-.0625)<1e-8,'finer visible divisions enable notes shorter than a configured quarter-beat cell');
+    assert(Math.abs(added.durationSeconds!-.03125)<1e-8,'finer visible divisions enable notes shorter than a configured quarter-beat cell');
     assert.equal(f.note(added.id).style.top,`${Number.parseFloat(String(black.style.top))+1}px`);
     assert.equal(f.note(added.id).style.height,`${rowHeight-2}px`);
     const lowerKey=keys[keys.indexOf(black)+1]!,moving=f.note(added.id);
@@ -447,8 +519,10 @@ test('music shell restores playhead before the roll can persist a new context',a
   const sound={stopAll(){},stop(){},cancelAudition(){},subscribe(){return()=>{};},position(){return 0;},async audition(){}} as unknown as SoundRuntimePort;
   const composition=mountPhraseComposition(f.root as unknown as HTMLElement,{phrase:f.phrase,sound,directMusic:true,workspaceState:port});
   try{
-    await settle();assert(f.note(f.a).classList.contains('is-selected'));
-    assert.equal(f.root.querySelector('.song-clock')!.textContent,'00:02.500');
+    await settle();assert(!f.root.querySelector('.melody-note.is-selected'));
+    assert(!f.root.querySelector('.melody-note-family.is-selected'));
+    assert(!f.root.querySelector('.song-clock'));
+    assert.equal(f.root.querySelector('.melody-playhead-time')!.textContent,'00:02.500');
     await composition.flush();assert.deepEqual(port.read()!.viewport,expected);assert.equal(port.read()!.playheadSeconds,2.5);
   }finally{composition.dispose();f.cleanup();}
 });
@@ -461,7 +535,7 @@ test('vertical roll transposes time, pitches, gestures, resize and physical whee
     const keys=f.root.querySelectorAll('.melody-key');
     assert(Number(keys[0]!.dataset.frequencyHz)<Number(keys.at(-1)!.dataset.frequencyHz));
     assert(keys.every(key=>key.style.width==='32px'),'white and black keys have equal pitch width');
-    assert(keys.filter(key=>key.textContent).every(key=>/^C\d+$/u.test(key.textContent)),'only C octave names are printed');
+    assert(keys.filter(key=>key.textContent).every(key=>/^C-?\d+$/u.test(key.textContent)),'only C octave names are printed');
     assert(keys.every(key=>key.title.startsWith(key.dataset.pitchLabel!)),'all pitches remain readable on hover');
     assert.equal(f.note(f.a).style.width,'30px');
     const initial=f.roll.readViewport(),before=structuredClone(f.phrase.read().body);
@@ -494,9 +568,39 @@ test('vertical roll transposes time, pitches, gestures, resize and physical whee
     ruler.emit('pointerdown',{button:0,clientX:0,clientY:120});f.document.emit('pointerup');
     assert(!f.root.querySelector('.melody-head-handle')!.hidden);
     const remembered=f.roll.readViewport();f.roll.flush();assert.equal(state.read()!.orientation,'vertical');
-    f.reopen(createMusicWorkspaceState(storage,'vertical-test'));assert.deepEqual(f.roll.readViewport(),remembered);assert(f.note(moved.id).classList.contains('is-selected'));
+    f.reopen(createMusicWorkspaceState(storage,'vertical-test'));assert.deepEqual(f.roll.readViewport(),remembered);
+    assert(f.family(f.first).classList.contains('is-selected'));assert(!f.note(moved.id).classList.contains('is-selected'));
     f.family(f.first).emit('dblclick');assert(f.root.querySelector('.melody-tone-library'),'family sound replacement remains accessible without a console');
   }finally{f.cleanup();}
+});
+
+test('playhead drag follows the pointer during playback and seeks only once on release', () => {
+  const f = editableRoll({ orientation: 'vertical', playing: true });
+  try {
+    const ruler = f.root.querySelector('.melody-ruler')!;
+    const head = f.root.querySelector('.melody-head-handle')!;
+    const displayed = () => Number(head.attributes.get('aria-valuenow'));
+    ruler.emit('pointerdown', { clientY: 120 });
+    const start = displayed();
+    for (let index = 1; index <= 60; index++) {
+      f.document.emit('pointermove', { clientY: 120 + index });
+      const preview = displayed();
+      f.roll.setPlayhead(index / 100, true);
+      assert.equal(displayed(), preview);
+    }
+    const target = displayed();
+    assert(target > start);
+    assert.deepEqual(f.seeks, []);
+    f.document.emit('pointerup');
+    ruler.emit('lostpointercapture');
+    assert.deepEqual(f.seeks, [target]);
+
+    ruler.emit('pointerdown', { clientY: 200 });
+    f.roll.setPlayhead(.8, true);
+    f.document.emit('pointercancel');
+    assert.equal(displayed(), .8);
+    assert.deepEqual(f.seeks, [target]);
+  } finally { f.cleanup(); }
 });
 
 test('vertical scroll renders notes in its visible time window without altering offscreen music',()=>{
@@ -508,6 +612,46 @@ test('vertical scroll renders notes in its visible time window without altering 
     f.flushFrames();
     assert(f.note(far));assert.deepEqual(f.phrase.read().body,before);
   }finally{f.cleanup();}
+});
+
+test('8192-note roll mounts only visible pitches and restores notes on native scrolling', t => {
+  const records = new Map<string, string>();
+  const workspaceState = createMusicWorkspaceState({ getItem: key => records.get(key) ?? null,
+    setItem(key, value) { records.set(key, value); } }, 'dense-roll');
+  const f = editableRoll({ orientation: 'vertical', workspaceState });
+  try {
+    const keys = f.phrase.keyboard();
+    f.phrase.addNotes(f.first, Array.from({ length: 8192 }, (_, i) => ({ startBeat: (i % 64) / 32,
+      durationBeats: .125, frequencyHz: keys[i % keys.length]!.frequencyHz, velocity: .7 })));
+    let created = 0;
+    const createElement = f.document.createElement.bind(f.document);
+    f.document.createElement = tag => { created++; return createElement(tag); };
+    f.reopen();
+    assert(created < 7000, `opening created ${created} elements including resize handles`);
+    const before = structuredClone(f.phrase.read().body);
+    const scroll = f.root.querySelector('.melody-scroll')!;
+    const mounted = () => f.root.querySelectorAll('.melody-note');
+    assert(mounted().length > 0 && mounted().length < 3000, `mounted ${mounted().length} notes`);
+    t.diagnostic(`8194 stored notes: ${mounted().length} mounted note blocks, ${created} total elements created on reopen`);
+    scroll.scrollLeft = 0; scroll.emit('scroll'); f.flushFrames();
+    const lowIds = new Set(mounted().map(block => block.dataset.noteId));
+    const retained = mounted()[0]!;
+    let writes = 0;
+    const setAttribute = retained.setAttribute.bind(retained);
+    retained.setAttribute = (name, value) => { writes++; setAttribute(name, value); };
+    retained.style = new Proxy(retained.style, { set(target, key, value) { writes++; return Reflect.set(target, key, value); } });
+    scroll.emit('scroll'); f.flushFrames();
+    assert.equal(writes, 0, 'an unchanged viewport does not rewrite retained note styles or labels');
+    const lowPitch = Math.min(...keys.map(key => key.frequencyHz));
+    assert(before!.parts.find(part => part.id === f.first)!.notes.filter(note => note.frequencyHz === lowPitch)
+      .every(note => lowIds.has(note.id)), 'native pitch scrolling restores low notes');
+    scroll.scrollLeft = 100000; scroll.emit('scroll'); f.flushFrames();
+    assert(mounted().length > 0 && mounted().length < 3000);
+    assert(mounted().every(block => !lowIds.has(block.dataset.noteId)), 'opposite pitch window releases old nodes');
+    scroll.scrollLeft = 0; scroll.emit('scroll'); f.flushFrames();
+    assert.deepEqual(new Set(mounted().map(block => block.dataset.noteId)), lowIds);
+    assert.deepEqual(f.phrase.read().body, before, 'virtualization preserves every stored note');
+  } finally { f.cleanup(); }
 });
 
 test('footer plus appends connected rolls and the BPM menu has no duplicate creation entry',()=>{
@@ -541,7 +685,52 @@ test('footer plus appends connected rolls and the BPM menu has no duplicate crea
   }finally{f.cleanup();}
 });
 
-test('each roll has its own arrow-free grid control and its tap button edits only that roll',()=>{
+test('the keyboard BPM follows and edits the tempo roll at the lower viewport edge', () => {
+  const f = editableRoll({ orientation: 'vertical' });
+  try {
+    f.phrase.setLength(16);
+    const section = f.phrase.addTempoSection();
+    f.phrase.setTempoSection(section, 90);
+    f.roll.refresh();
+    const scroll = f.root.querySelector('.melody-scroll')!, canvas = f.root.querySelector('.melody-canvas')!;
+    const dock = f.root.querySelector('.melody-tempo-dock')!, button = dock.querySelector('.melody-tempo-button')!;
+    const view = f.roll.readViewport(), scale = melodyScale(view, scroll.clientHeight - 48, melodyDuration(f.phrase.read().body!));
+    const lowerEdge = (seconds: number) => {
+      const left = f.roll.readViewport().leftSeconds;
+      scroll.emit('wheel', { target: canvas, deltaY: (seconds - left) * scale - (scroll.clientHeight - 48), clientX: 200, clientY: 100 });
+      f.flushFrames();
+    };
+    lowerEdge(8);
+    assert.equal(dock.dataset.sectionId, 'first');
+    assert.equal(button.textContent, '120');
+    lowerEdge(8.25);
+    assert(f.roll.readViewport().leftSeconds < 8);
+    assert.equal(dock.dataset.sectionId, section);
+    assert.equal(button.textContent, '90');
+    button.emit('click');
+    const input = f.root.querySelector('.melody-tempo-input')!;
+    assert.equal(input.value, '90');
+    input.value = '100'; input.emit('change');
+    assert.equal(f.phrase.read().body!.tempoBpm, 120);
+    assert.equal(f.phrase.read().body!.tempoSections![0]!.tempoBpm, 100);
+    const control = f.root.querySelector('.melody-tempo-rate')!;
+    const commits = f.commits.length;
+    control.emit('pointerdown', { target: input, clientY: 300 });
+    control.emit('pointermove', { target: input, clientY: 260 });
+    f.flushFrames();
+    assert.equal(input.value, '140');
+    assert.equal(f.phrase.read().body!.tempoSections![0]!.tempoBpm, 100);
+    assert.equal(f.commits.length, commits);
+    control.emit('pointerup', { target: input, clientY: 260 });
+    assert.equal(f.phrase.read().body!.tempoBpm, 120);
+    assert.equal(f.phrase.read().body!.tempoSections![0]!.tempoBpm, 140);
+    assert.equal(f.commits.length, commits + 1);
+    f.phrase.undo();
+    assert.equal(f.phrase.read().body!.tempoSections![0]!.tempoBpm, 100);
+  } finally { f.cleanup(); }
+});
+
+test('compact roll labels open shared controls that edit only the selected roll',()=>{
   const f=editableRoll({orientation:'vertical'}),original=Object.getOwnPropertyDescriptor(globalThis,'performance');let now=0;
   Object.defineProperty(globalThis,'performance',{configurable:true,value:{now:()=>now}});
   try{
@@ -549,7 +738,10 @@ test('each roll has its own arrow-free grid control and its tap button edits onl
     const scroll=f.root.querySelector('.melody-scroll')!,canvas=f.root.querySelector('.melody-canvas')!;
     scroll.emit('wheel',{target:canvas,deltaY:1800,clientX:200,clientY:100});f.flushFrames();
     const block=f.root.querySelectorAll('.melody-tempo-block').find(b=>b.dataset.sectionId===section)!;
-    assert(!block.hidden);const grid=block.querySelector('.melody-tempo-grid')!;
+    assert(!block.hidden);assert.equal(block.querySelector('.melody-tempo-grid'),undefined);
+    assert.equal(f.root.querySelector('.melody-tempo-dock')!.querySelector('select'),undefined);
+    block.querySelector('.melody-tempo-marker')!.emit('click');
+    const grid=f.root.querySelector('.melody-tempo-panel')!.querySelector('.melody-tempo-grid')!;
     grid.value='3';grid.emit('change');let body=f.phrase.read().body!;
     assert.equal(body.tempoSections![0]!.stepsPerBeat,3);assert.equal(body.stepsPerBeat,undefined);
     block.querySelector('.melody-tempo-marker')!.emit('click');
@@ -567,15 +759,21 @@ test('each roll has its own arrow-free grid control and its tap button edits onl
 });
 
 test('last roll edge is reachable after the end, previews without saving and resizes in one undo step',()=>{
-  const f=editableRoll({orientation:'vertical'});try{
+  const f=editableRoll({orientation:'vertical',playing:true});try{
     f.phrase.setLength(16);const section=f.phrase.addTempoSection();
     const late=f.phrase.addNote(f.first,{startBeat:30,durationBeats:.5,durationSeconds:.25,frequencyHz:440,velocity:.7});f.roll.refresh();
     const scroll=f.root.querySelector('.melody-scroll')!,canvas=f.root.querySelector('.melody-canvas')!,edge=f.root.querySelector('.melody-roll-end')!;
     scroll.emit('wheel',{target:canvas,deltaY:100000,clientX:200,clientY:100});f.flushFrames();
     assert(!edge.hidden);const top=Number.parseFloat(String(edge.style.top));assert(top>0&&top<scroll.clientHeight-48-10,'the edge has blank space below it');
     const before=f.phrase.read().body!,text=f.read(),scale=melodyScale(f.roll.readViewport(),scroll.clientHeight-48,melodyDuration(before));
-    edge.emit('pointerdown',{clientY:100});f.document.emit('pointermove',{clientY:100-2*scale});f.flushFrames();assert.equal(f.read(),text);
+    edge.emit('pointerdown',{clientY:100});f.document.emit('pointermove',{clientY:100-2*scale});f.flushFrames();
+    f.roll.setPlayhead(15.2, true);
+    assert.equal(f.read(),text);
+    assert.deepEqual(f.previews, []);
+    assert.deepEqual(f.commits, []);
+    assert.deepEqual(f.seeks, []);
     f.document.emit('pointerup');let body=f.phrase.read().body!;assert.equal(body.lengthBeats,28);
+    assert.deepEqual(f.commits, [true]);
     assert.equal(body.tempoSections![0]!.startBeat,16);assert.equal(body.tempoSections![0]!.id,section);assert(body.parts[0]!.hiddenNotes!.some(item=>item.note.id===late));
     f.phrase.undo();assert.deepEqual(f.phrase.read().body,before);f.roll.refresh();
     edge.emit('pointerdown',{clientY:100});f.document.emit('pointermove',{clientY:100+scale});f.flushFrames();f.document.emit('pointercancel');assert.deepEqual(f.phrase.read().body,before);
@@ -583,7 +781,7 @@ test('last roll edge is reachable after the end, previews without saving and res
   }finally{f.cleanup();}
 });
 
-test('dragging a BPM label previews smoothly, commits once in bars, retains hidden notes and can be cancelled',()=>{
+test('dragging a BPM label previews only the boundary, snaps to a beat and supports undo and cancel',()=>{
   const f=editableRoll({orientation:'vertical',playing:true});try{
     f.phrase.setLength(16);const section=f.phrase.addTempoSection();
     const late=f.phrase.addNote(f.first,{startBeat:14,durationBeats:.5,durationSeconds:.25,frequencyHz:440,velocity:.7});
@@ -592,25 +790,34 @@ test('dragging a BPM label previews smoothly, commits once in bars, retains hidd
     scroll.emit('wheel',{target:canvas,deltaY:1800,clientX:200,clientY:100});f.flushFrames();
     let marker=f.root.querySelectorAll('.melody-tempo-marker').find(m=>m.attributes.get('aria-label')==='卷帘 2 BPM')!;
     const scale=melodyScale(f.roll.readViewport(),scroll.clientHeight-48,melodyDuration(f.phrase.read().body!));
-    const before=f.read(),viewport=f.roll.readViewport();
+    const before=f.read(),viewport=f.roll.readViewport(),original=f.phrase.read().body!;
+    const markerTop = Number.parseFloat(String(marker.parentElement!.style.top));
     marker.emit('pointerdown',{clientY:100});f.document.emit('pointermove',{clientY:100-2*scale});f.flushFrames();
-    f.flushFrames();assert(f.previews.at(-1)?.parts[0]!.hiddenNotes?.some(item=>item.note.id===late),'playing preview receives the cropped score');
+    f.flushFrames();
+    assert(Math.abs(Number.parseFloat(String(marker.parentElement!.style.top)) - markerTop + 2 * scale) < 1e-6);
+    assert.deepEqual(f.previews, []);
+    assert.deepEqual(f.commits, []);
+    assert.deepEqual(f.phrase.read().body!.parts, original.parts);
     assert.equal(f.read(),before,'preview cannot change persisted working content');assert(!f.root.querySelector('.melody-tempo-resize-hint')!.hidden);
     f.roll.setPlayhead(0,true);assert.deepEqual(f.roll.readViewport(),viewport,'label drag owns the camera');
     f.document.emit('pointerup');
-    let body=f.phrase.read().body!;assert.equal(body.tempoSections![0]!.startBeat,12);assert.equal(body.parts[0]!.hiddenNotes![0]!.note.id,late);
-    assert.equal(body.parts[0]!.notes.find(n=>n.id===lower)!.startBeat,14);
+    let body=f.phrase.read().body!;assert.equal(body.tempoSections![0]!.startBeat,12);
+    assert.deepEqual(f.commits, [true]);
+    assert.equal(body.parts[0]!.notes.find(n=>n.id===late)!.startBeat,14);
+    assert.equal(body.parts[0]!.notes.find(n=>n.id===lower)!.startBeat,18);
     f.phrase.undo();assert.equal(f.phrase.read().body!.tempoSections![0]!.startBeat,16);assert(f.phrase.read().body!.parts[0]!.notes.some(n=>n.id===late));f.roll.refresh();
     marker=f.root.querySelectorAll('.melody-tempo-marker').find(m=>m.attributes.get('aria-label')==='卷帘 2 BPM')!;
     const restored=f.read();marker.emit('pointerdown',{clientY:100});f.document.emit('pointermove',{clientY:100+scale});f.flushFrames();
     f.document.emit('pointercancel');assert.equal(f.read(),restored);assert(f.root.querySelector('.melody-tempo-resize-hint')!.hidden);
     assert(!marker.hasPointerCapture(1));
-    marker.emit('keydown',{key:'ArrowDown'});body=f.phrase.read().body!;assert.equal(body.tempoSections![0]!.startBeat,20);
+    marker.emit('pointerdown',{clientY:100});f.document.emit('pointermove',{clientY:100+.65*scale});f.flushFrames();
+    f.document.emit('pointerup');body=f.phrase.read().body!;assert.equal(body.tempoSections![0]!.startBeat,17);
+    marker.emit('keydown',{key:'ArrowDown'});body=f.phrase.read().body!;assert.equal(body.tempoSections![0]!.startBeat,18);
     assert.equal(body.tempoSections![0]!.id,section);
   }finally{f.cleanup();}
 });
 
-test('off-grid note heads and triplets retain exact placement and QWEASD no longer edit the selected note',()=>{
+test('off-grid note heads and triplets retain exact placement and QWEASD leave notes unchanged',()=>{
   const f=editableRoll({orientation:'vertical'});
   try{
     const scroll=f.root.querySelector('.melody-scroll')!,canvas=f.root.querySelector('.melody-canvas')!;
@@ -774,12 +981,95 @@ test('narrow pitch columns stack C octave labels and keep every full pitch avail
     const scroll=f.root.querySelector('.melody-scroll')!,canvas=f.root.querySelector('.melody-canvas')!,before=structuredClone(f.phrase.read().body);
     scroll.emit('wheel',{target:canvas,ctrlKey:true,shiftKey:true,deltaY:1000,clientX:0,clientY:100});
     let keys=f.root.querySelectorAll('.melody-key');assert(keys.some(key=>key.textContent==='C\n4'));
-    assert(keys.filter(key=>key.textContent).every(key=>/^C\n\d+$/u.test(key.textContent)&&key.classList.contains('is-stacked-label')));
+    assert(keys.filter(key=>key.textContent).every(key=>/^C\n-?\d+$/u.test(key.textContent)&&key.classList.contains('is-stacked-label')));
     assert(keys.every(key=>key.title.startsWith(key.dataset.pitchLabel!)));
     scroll.emit('wheel',{target:canvas,ctrlKey:true,shiftKey:true,deltaY:-1000,clientX:0,clientY:100});
     keys=f.root.querySelectorAll('.melody-key');assert(keys.some(key=>key.textContent==='C4'));
     assert(keys.every(key=>!key.classList.contains('is-stacked-label')));assert.deepEqual(f.phrase.read().body,before);
   }finally{f.cleanup();}
+});
+
+test('single-roll mode keeps the draggable end and blocks adding tempo sections',()=>{
+  const options = { orientation: 'vertical' as const, multipleRolls: false };
+  const f = editableRoll(options); try {
+    const original = structuredClone(f.phrase.read().body);
+    const plus = f.root.querySelector('.melody-extend')!; assert.equal(plus.hidden, true);
+    plus.emit('click'); assert.deepEqual(f.phrase.read().body, original);
+    const edge = f.root.querySelector('.melody-roll-end')!;
+    const scroll = f.root.querySelector('.melody-scroll')!, canvas = f.root.querySelector('.melody-canvas')!;
+    scroll.emit('wheel', { target: canvas, deltaY: 100000, clientX: 200, clientY: 100 });
+    f.flushFrames();
+    assert.equal(edge.hidden, false);
+    const scale = melodyScale(f.roll.readViewport(), scroll.clientHeight - 48, melodyDuration(original!));
+    edge.emit('pointerdown', { clientY: 100 });
+    f.document.emit('pointermove', { clientY: 100 + 2 * scale }); f.flushFrames();
+    assert.deepEqual(f.phrase.read().body, original);
+    f.document.emit('pointerup');
+    assert.equal(f.phrase.read().body!.lengthBeats, original!.lengthBeats + 4);
+    assert.equal(f.phrase.read().body!.tempoSections, undefined);
+    edge.emit('keydown', {key:'ArrowDown'});
+    assert.equal(f.phrase.read().body!.lengthBeats, original!.lengthBeats + 8);
+    const measures = f.root.querySelectorAll('input').find(input => input.attributes.get('aria-label') === '小节数')!;
+    measures.value = '8'; measures.emit('change');
+    assert.equal(f.phrase.read().body!.lengthBeats, 32);
+    options.multipleRolls = true; f.roll.refresh(); assert.equal(plus.hidden, false);
+    plus.emit('click'); assert.equal(f.phrase.read().body!.tempoSections!.length, 1);
+  } finally { f.cleanup(); }
+});
+
+test('desktop blocks a multi-roll project until its required feature is explicitly enabled', async()=>{
+  const f = editableRoll({ orientation: 'vertical' }); let studio: ReturnType<typeof mountStudio> | undefined;
+  try {
+    f.roll.dispose(); f.phrase.addTempoSection(); const before = structuredClone(f.phrase.read().body);
+    let raw: string | null = null;
+    const learning = createLearningSettings({ getItem: () => raw, setItem(_key,value) { raw = value; } });
+    learning.record('basics', { status: 'learning', step: 1 });
+    const sound = { stopAll() {}, stop() {}, cancelAudition() {}, subscribe() { return () => {}; }, position() { return 0; } } as unknown as SoundRuntimePort;
+    studio = mountStudio(f.root as unknown as HTMLElement, { timbre: createTimbreEditor(f.library), phrase: f.phrase,
+      song: f.song, sound, learning, hasPrevious: true, initialEntry: 'song' });
+    assert(f.root.querySelector('.learning-feature-gate')); assert.equal(f.root.querySelector('.melody-workspace'), undefined);
+    const gate = f.root.querySelector('.learning-feature-gate')!;
+    const enable = gate.querySelectorAll('button').find(node => node.textContent === '启用并打开')!;
+    enable.emit('click'); await settle();
+    assert.equal(learning.read().multipleTempoRolls, true); assert(f.root.querySelector('.melody-workspace'));
+    assert.equal(f.root.querySelector('.guidance-invitation'), undefined);
+    assert.equal(f.root.querySelector('.guidance-shell'), undefined);
+    assert.deepEqual(f.phrase.read().body, before, 'unlocking only changes local visibility, never music');
+  } finally { studio?.dispose(); f.cleanup(); }
+});
+
+test('playback pulses notes and matching piano keys without repainting or modifying music',()=>{
+  const f = editableRoll({ orientation: 'vertical' }); try {
+    const original = f.read(), a = f.note(f.a), b = f.note(f.b);
+    const keys = f.root.querySelectorAll('.melody-key');
+    const c = keys.find(key => key.dataset.pitchLabel === 'C4')!, d = keys.find(key => key.dataset.pitchLabel === 'D4')!;
+    f.roll.setPlayhead(.51, true); assert(a.classList.contains('is-sounding')); assert(b.classList.contains('is-sounding'));
+    assert(c.classList.contains('is-sounding')); assert(d.classList.contains('is-sounding'));
+    assert.equal(c.style['--key-flash-color'], a.style['--tone-color']);
+    assert.equal(d.style['--key-flash-color'], b.style['--tone-color']);
+    f.roll.setPlayhead(.7, true); assert(!a.classList.contains('is-sounding')); assert(!b.classList.contains('is-sounding'));
+    assert(!c.classList.contains('is-sounding')); assert(!d.classList.contains('is-sounding'));
+    f.family(f.first).emit('click'); f.roll.setPlayhead(.51, true);
+    assert(a.classList.contains('is-sounding')); assert(!b.classList.contains('is-sounding'), 'the unplayed family cannot flash');
+    assert(c.classList.contains('is-sounding')); assert(!d.classList.contains('is-sounding'));
+    assert.equal(f.note(f.a), a, 'ordinary clock ticks reuse the same note element');
+    f.roll.setPlayhead(.52, false); assert(!a.classList.contains('is-sounding')); assert(!c.classList.contains('is-sounding')); assert.equal(f.read(), original);
+  } finally { f.cleanup(); }
+});
+
+test('learning reports real pan, wheel axes and committed edit actions without counting unrelated clicks',()=>{
+  const actions: LearningAction[] = [];
+  const f = editableRoll({ orientation: 'vertical', onLearningAction: action => actions.push(action) }); try {
+    const canvas = f.root.querySelector('.melody-canvas')!, scroll = f.root.querySelector('.melody-scroll')!;
+    scroll.emit('pointerdown', { target: canvas, clientX: 500, clientY: 400 });
+    f.document.emit('pointermove', { clientX: 450, clientY: 350 }); f.document.emit('pointerup');
+    assert(actions.includes('pan'));
+    for (const modifiers of [{}, {shiftKey: true}, {ctrlKey: true}, {ctrlKey: true, shiftKey: true}])
+      scroll.emit('wheel', {target: canvas, deltaY: 60, clientX: 250, clientY: 250, ...modifiers});
+    for (const action of ['scroll-y', 'scroll-x', 'zoom-y', 'zoom-x']) assert(actions.includes(action as LearningAction));
+    f.family(f.first).emit('click'); assert.equal(actions.at(-1), 'select-group');
+    scroll.emit('pointerdown', { target: canvas, button: 2 }); f.document.emit('pointerup'); assert(actions.includes('deselect'));
+  } finally { f.cleanup(); }
 });
 
 test('dim notes reject selection, dragging and right-click erasure while another family is active',()=>{
@@ -799,4 +1089,245 @@ test('dim notes reject selection, dragging and right-click erasure while another
     assert.equal(f.phrase.read().body!.parts.find(part=>part.id===f.first)!.notes.length,0);
     assert.equal(f.phrase.read().body!.parts.find(part=>part.id===f.second)!.notes.length,1,'an erase sweep must not touch dim notes');
   }finally{f.cleanup();}
+});
+
+
+test('vertical roll selects only groups and drops legacy note selection on reopen', () => {
+  const records = new Map<string, string>();
+  const storage = { getItem: (key: string) => records.get(key) ?? null, setItem(key: string, value: string) { records.set(key, value); } };
+  const port = createMusicWorkspaceState(storage, 'vertical-selection');
+  const f = editableRoll({ orientation: 'vertical', workspaceState: port });
+  try {
+    const scroll = () => f.root.querySelector('.melody-scroll')!;
+    const canvas = () => f.root.querySelector('.melody-canvas')!;
+    const press = (target: Element, button = 0) => {
+      scroll().emit('pointerdown', { target, button, clientX: 500, clientY: 350 });
+      f.document.emit('pointerup');
+    };
+    const initial = structuredClone(f.phrase.read().body);
+    press(canvas());
+    assert.deepEqual(f.phrase.read().body, initial);
+    press(f.note(f.a));
+    assert(!f.note(f.a).classList.contains('is-selected'));
+    assert(!f.family(f.first).classList.contains('is-selected'));
+    assert(!f.note(f.b).classList.contains('is-dim'));
+    assert(!canvas().classList.contains('is-write-mode'));
+    press(canvas());
+    assert.deepEqual(f.phrase.read().body, initial);
+    assert(!f.note(f.a).classList.contains('is-selected'));
+    const viewport = f.roll.readViewport();
+    scroll().emit('pointerdown', { target: canvas(), clientX: 500, clientY: 350 });
+    f.document.emit('pointermove', { clientX: 480, clientY: 300 });
+    f.document.emit('pointerup');
+    assert(f.roll.readViewport().leftSeconds > viewport.leftSeconds);
+    assert(f.roll.readViewport().top > viewport.top);
+    assert.deepEqual(f.phrase.read().body, initial);
+    f.roll.flush();
+    port.write({ ...port.read()!, selection: { partId: f.first, noteId: f.a }, entryToneId: f.first });
+    f.reopen(createMusicWorkspaceState(storage, 'vertical-selection'));
+    assert(!f.note(f.a).classList.contains('is-selected'));
+    assert(!f.family(f.first).classList.contains('is-selected'));
+    press(f.note(f.b));
+    assert(!f.note(f.b).classList.contains('is-selected'));
+    assert(!f.note(f.a).classList.contains('is-selected'));
+    f.family(f.first).emit('click');
+    assert(canvas().classList.contains('is-write-mode'));
+    press(canvas());
+    press(canvas());
+    assert.equal(f.phrase.read().body!.parts.find(part => part.id === f.first)!.notes.length, 3);
+    assert(f.family(f.first).classList.contains('is-selected'));
+    assert(f.note(f.b).classList.contains('is-dim'));
+    assert(!f.root.querySelectorAll('.melody-note').some(note => note.classList.contains('is-selected')));
+    press(canvas(), 2);
+    assert(!f.family(f.first).classList.contains('is-selected'));
+    assert(!f.note(f.b).classList.contains('is-dim'));
+  } finally { f.cleanup(); }
+});
+
+test('vertical roll adjusts hovered notes with Alt-wheel and confirms group removal separately', async () => {
+  const f = editableRoll({ orientation: 'vertical' });
+  try {
+    const scroll = f.root.querySelector('.melody-scroll')!;
+    const before = structuredClone(f.phrase.read().body!);
+    scroll.emit('pointerdown', { target: f.note(f.a) });
+    f.document.emit('pointerup');
+    await settle();
+    assert.equal(f.auditions.length, 1);
+    assert(!f.root.querySelector('.melody-note-family.is-selected'));
+    scroll.emit('wheel', { target: f.note(f.a), deltaY: 10 });
+    assert.deepEqual(f.phrase.read().body, before);
+    scroll.emit('wheel', { target: f.note(f.a), deltaY: -100, altKey: true });
+    assert.equal(f.phrase.read().body!.parts[0]!.notes[0]!.durationSeconds, .51);
+    assert(!f.root.querySelector('.melody-note.is-selected'));
+    f.family(f.first).emit('click');
+    f.document.emit('keydown', { key: 'Delete' });
+    f.document.emit('keydown', { key: 'Delete' });
+    assert.equal(f.phrase.read().body!.parts[0]!.notes.length, 1);
+    f.document.emit('keydown', { key: 'Delete', shiftKey: true });
+    assert(f.root.querySelector('.melody-tone-delete-dialog'));
+    f.root.querySelector('.melody-tone-delete-cancel')!.emit('click');
+    assert.equal(f.phrase.read().body!.parts[0]!.notes.length, 1);
+  } finally { f.cleanup(); }
+});
+
+test('vertical roll can grab any bright note or its lower edge and right-click deletes the targeted note', () => {
+  for (const mode of ['none', 'group']) {
+    const f = editableRoll({ orientation: 'vertical' });
+    try {
+      const scroll = f.root.querySelector('.melody-scroll')!;
+      const canvas = f.root.querySelector('.melody-canvas')!;
+      const note = () => f.phrase.read().body!.parts.find(part => part.id === f.first)!.notes.find(item => item.id === f.a)!;
+      const clear = (target: Element) => {
+        scroll.emit('pointerdown', { target, button: 2 });
+        f.document.emit('pointerup');
+      };
+      const setMode = () => {
+        if (mode === 'group') f.family(f.first).emit('click');
+        else clear(canvas);
+      };
+      setMode();
+      if (mode === 'group') {
+        const before = structuredClone(f.phrase.read().body);
+        for (const target of [f.note(f.b), f.note(f.b).querySelector('.melody-note-resize')!]) {
+          scroll.emit('pointerdown', { target, clientX: 400, clientY: 200 });
+          f.document.emit('pointermove', { clientX: 440, clientY: 260 });
+          f.document.emit('pointerup');
+        }
+        assert.deepEqual(f.phrase.read().body, before);
+        assert(f.family(f.first).classList.contains('is-selected'));
+      }
+      const original = { ...note() };
+      const bounds = f.note(f.a).getBoundingClientRect();
+      const x = bounds.left + bounds.width / 2, y = bounds.top + bounds.height / 2;
+      scroll.emit('pointerdown', { target: f.note(f.a), clientX: x, clientY: y });
+      f.document.emit('pointermove', { clientX: x + 36, clientY: y + 60 });
+      f.document.emit('pointerup');
+      assert(note().startBeat > original.startBeat);
+      assert(note().frequencyHz > original.frequencyHz);
+      assert.equal(note().durationBeats, original.durationBeats);
+      assert(!f.note(f.a).classList.contains('is-selected'));
+      assert.equal(f.note(f.b).classList.contains('is-dim'), mode === 'group');
+      setMode();
+      const moved = { ...note() };
+      const edge = f.note(f.a).getBoundingClientRect();
+      scroll.emit('pointerdown', { target: f.note(f.a).querySelector('.melody-note-resize'), clientX: edge.left + 4, clientY: edge.bottom - 1 });
+      f.document.emit('pointermove', { clientX: edge.left + 4, clientY: edge.bottom + 49 });
+      f.document.emit('pointerup');
+      assert(note().durationBeats > moved.durationBeats);
+      assert.equal(note().startBeat, moved.startBeat);
+      assert.equal(note().frequencyHz, moved.frequencyHz);
+      setMode();
+      const beforeDelete = structuredClone(f.phrase.read().body);
+      clear(f.note(f.a));
+      assert.equal(note(), undefined);
+      f.phrase.undo();
+      assert.deepEqual(f.phrase.read().body, beforeDelete);
+    } finally { f.cleanup(); }
+  }
+});
+
+test('holding right click erases across groups along the swept path in one undo step', () => {
+  const f = editableRoll({ orientation: 'vertical', playing: true });
+  try {
+    const scroll = f.root.querySelector('.melody-scroll')!, canvas = f.root.querySelector('.melody-canvas')!;
+    f.family(f.first).emit('click');
+    const centre = (id: string) => {
+      const bounds = f.note(id).getBoundingClientRect();
+      return { clientX: bounds.left + bounds.width / 2 - scroll.scrollLeft, clientY: bounds.top + bounds.height / 2 };
+    };
+    const a = centre(f.a), b = centre(f.b);
+    const original = structuredClone(f.phrase.read().body);
+    scroll.emit('pointerdown', { target: canvas, button: 2, clientX: a.clientX, clientY: a.clientY - 4 });
+    f.document.emit('pointermove', { ...b, getCoalescedEvents: () => [a, b] });
+    f.flushFrames();
+    assert.deepEqual(f.phrase.read().body, original);
+    assert.equal(f.root.querySelectorAll('.melody-note').length, 0);
+    f.document.emit('pointercancel');
+    assert.equal(f.root.querySelectorAll('.melody-note').length, 2);
+    scroll.emit('pointerdown', { target: f.note(f.b), button: 2, ...b });
+    f.document.emit('pointermove', a);
+    f.document.emit('pointermove', b);
+    f.document.emit('pointerup', { button: 2, ...b });
+    assert(f.phrase.read().body!.parts.every(part => part.notes.length === 0));
+    assert.deepEqual(f.commits, [true]);
+    f.phrase.undo();
+    assert.deepEqual(f.phrase.read().body, original);
+  } finally { f.cleanup(); }
+});
+
+test('fast raw pointer turns catch thin note edges even when the regular move only reports the return point', () => {
+  const f = editableRoll({ orientation: 'vertical' });
+  try {
+    const scroll = f.root.querySelector('.melody-scroll')!, canvas = f.root.querySelector('.melody-canvas')!;
+    const bounds = f.note(f.a).getBoundingClientRect(), x = bounds.left - scroll.scrollLeft;
+    const from = { clientX: x - 8, clientY: bounds.top - 12 };
+    const corner = { clientX: from.clientX, clientY: bounds.top - 1 };
+    const across = { clientX: x + bounds.width + 4, clientY: corner.clientY };
+    scroll.emit('pointerdown', { target: canvas, button: 2, ...from });
+    f.document.emit('pointerrawupdate', { ...across, getCoalescedEvents: () => [corner, across] });
+    f.document.emit('pointerrawupdate', from);
+    f.document.emit('pointermove', { ...from, buttons: 2 });
+    f.flushFrames();
+    assert.equal(f.root.querySelectorAll('.melody-note').length, 1);
+    f.document.emit('pointerup', { ...from, button: 2 });
+    const remaining = f.phrase.read().body!.parts.flatMap(part => part.notes.map(note => note.id));
+    assert.deepEqual(remaining, [f.b]);
+  } finally { f.cleanup(); }
+});
+
+test('a sparse fast sweep combines raw and newer move samples without erasing the neighbouring pitch', () => {
+  const f = editableRoll({ orientation: 'vertical' });
+  try {
+    f.phrase.updateNote(f.first, f.a, { durationSeconds: .001 });
+    f.roll.refresh();
+    const scroll = f.root.querySelector('.melody-scroll')!, canvas = f.root.querySelector('.melody-canvas')!;
+    const bounds = f.note(f.a).getBoundingClientRect();
+    const x = bounds.left - scroll.scrollLeft - 5;
+    const start = { clientX: x, clientY: bounds.top - 60, timeStamp: 10 };
+    const after = { clientX: x, clientY: bounds.top + 30, timeStamp: 30 };
+    const stale = { clientX: f.note(f.b).getBoundingClientRect().left - scroll.scrollLeft + 10, clientY: bounds.top + 15, timeStamp: 11 };
+    scroll.emit('pointerdown', { target: canvas, button: 2, ...start });
+    f.document.emit('pointerrawupdate', { ...start, clientY: start.clientY + 4, timeStamp: 20 });
+    f.document.emit('pointermove', { ...after, buttons: 2, getCoalescedEvents: () => [stale, after] });
+    f.flushFrames();
+    assert.deepEqual(f.root.querySelectorAll('.melody-note').map(note => note.dataset.noteId), [f.b]);
+    f.document.emit('pointermove', { ...start, timeStamp: 40, buttons: 2 });
+    f.document.emit('pointerup', { ...start, timeStamp: 41, button: 2 });
+    const remaining = f.phrase.read().body!.parts.flatMap(part => part.notes.map(note => note.id));
+    assert.deepEqual(remaining, [f.b]);
+    assert.deepEqual(f.commits, [true]);
+  } finally { f.cleanup(); }
+});
+
+test('dense group merging reads only history status and keeps the canvas windowed', () => {
+  const f = editableRoll({ orientation: 'vertical' });
+  try {
+    const body = f.phrase.read().body!;
+    body.lengthBeats = 1024;
+    const source = body.parts.find(part => part.id === f.first)!, targetPart = body.parts.find(part => part.id === f.second)!;
+    targetPart.timbreId = source.timbreId;
+    for (const [index, part] of [source, targetPart].entries()) part.notes = Array.from({ length: 6000 }, (_, note) => ({
+      id: `dense-${index}-${note}`, startBeat: note / 8, durationBeats: .25, frequencyHz: 440, velocity: .7,
+    }));
+    f.library.updateDraft(f.phrase.read().draft!.id, { body: JSON.parse(JSON.stringify(body)), dependencies: [...new Set(body.parts.map(part => part.timbreId))] });
+    f.roll.refresh();
+    let reads = 0, fullHistoryReads = 0;
+    const read = f.phrase.read.bind(f.phrase), history = f.library.readDraftHistory.bind(f.library);
+    f.phrase.read = () => { reads++; return read(); };
+    f.library.readDraftHistory = id => { fullHistoryReads++; return history(id); };
+    const payload = new Map<string, string>();
+    const dataTransfer = { effectAllowed: '', dropEffect: '', setData(type: string, value: string) { payload.set(type, value); }, getData(type: string) { return payload.get(type) ?? ''; } };
+    f.family(f.first).emit('dragstart', { dataTransfer });
+    const target = f.family(f.second).parentElement!;
+    for (let index = 0; index < 20; index++) target.emit('dragover', { dataTransfer });
+    assert.equal(reads, 0);
+    target.emit('drop', { dataTransfer });
+    assert.equal(reads, 1); assert.equal(fullHistoryReads, 0);
+    assert(f.root.querySelectorAll('.melody-note').length < 400);
+    const merged = f.phrase.read().body!;
+    assert(!merged.parts.some(part => part.id === f.first));
+    assert.equal(merged.parts.find(part => part.id === f.second)!.notes.length, 12000);
+    assert.equal(JSON.parse(f.read()).editHistory.entries.at(-1).past.length, 1);
+    f.phrase.undo(); assert.deepEqual(f.phrase.read().body, body);
+  } finally { f.cleanup(); }
 });

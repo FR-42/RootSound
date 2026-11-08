@@ -50,7 +50,7 @@ test('phrase catalog keeps saved metadata through draft rename, undo and redo un
   const f = fixture(), made = f.createWithNotes();
   const original = readProjectPhrases(f.library, f.songId)[0]!;
   f.phrase.rename('新名称');
-  assert.equal(readProjectPhrases(f.library, f.songId)[0]!.name, '乐句 1');
+  assert.equal(readProjectPhrases(f.library, f.songId)[0]!.name, '音乐 1');
   f.phrase.undo(); assert.deepEqual(readProjectPhrases(f.library, f.songId)[0], original);
   f.phrase.redo(); assert.deepEqual(readProjectPhrases(f.library, f.songId)[0], original);
   f.phrase.setTempo(144); saved(f.phrase.save('overwrite'));
@@ -65,7 +65,7 @@ test('phrase catalog keeps saved metadata through draft rename, undo and redo un
 test('the library starts empty, lists each current private phrase once and excludes global and other-song sources', () => {
   const f = fixture(); assert.deepEqual(readProjectPhrases(f.library, f.songId), []);
   const voice = createTimbreEditor(f.library); voice.rename('公共音色'); const timbre = saved(voice.save('new'));
-  f.phrase.create(timbre.id); f.phrase.rename('公共乐句');
+  f.phrase.create(timbre.id); f.phrase.rename('公共音乐');
   f.phrase.addNote(f.phrase.read().body!.parts[0]!.id, { startBeat: 0, durationBeats: .5, frequencyHz: 440, velocity: .5 });
   const global = saved(f.phrase.save('new'));
   assert(f.song.read().availablePhrases.some(item => item.id === global.id));
@@ -132,7 +132,7 @@ test('dirty editors contribute one library identity and reference forks remain d
   const f = fixture(); const made = f.createWithNotes(); const row = f.song.read().body!.tracks[0]!.id;
   f.phrase.openDraft(made.draftId); f.phrase.rename('正在细调');
   const working = readProjectPhrases(f.library, f.songId);
-  assert.deepEqual(working.map(item => [item.id, item.name]), [[made.id, '乐句 1']]);
+  assert.deepEqual(working.map(item => [item.id, item.name]), [[made.id, '音乐 1']]);
   f.phrase.undo();
   const first = f.song.addClip(row, made.id, 0); f.song.addClip(row, made.id, 8);
   f.song.setPhraseShelfVisible(made.id, false);
@@ -160,7 +160,7 @@ test('song format validates shelf metadata and preserves older songs without cre
   assert.equal(readSongBody(body).hiddenPhraseIds, undefined);
   assert.deepEqual(readSongBody({ ...body, hiddenPhraseIds: ['one'] }).hiddenPhraseIds, ['one']);
   for (const hiddenPhraseIds of [['one', 'one'], [null], [''], {}, 4]) {
-    assert.throws(() => readSongBody({ ...body, hiddenPhraseIds }), /乐句栏/);
+    assert.throws(() => readSongBody({ ...body, hiddenPhraseIds }), /音乐栏/);
   }
 });
 

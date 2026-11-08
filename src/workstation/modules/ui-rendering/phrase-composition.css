@@ -3,7 +3,9 @@
 .phrase-composition-studio .song-transport { justify-self: center; }
 .phrase-composition-studio .song-file-actions { min-width: 0; overflow-x: auto; scrollbar-width: none; }
 .phrase-composition-identity { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.phrase-composition-title { display: flex; align-items: center; min-width: 0; }
 .phrase-composition-identity .song-project-name { min-width: 0; }
+.song-project-unsaved { flex: none; align-self: flex-start; margin-left: 2px; font-size: 12px; line-height: 1; }
 .phrase-composition-section-label { flex-shrink: 0; font-size: 12px; color: var(--muted); }
 .phrase-melody-back { flex-shrink: 0; font-size: 24px; }
 .phrase-grid-button { width: 40px; padding: 6px 2px; font-size: 11px; white-space: nowrap; }
@@ -49,7 +51,7 @@
 .phrase-composition-head-handle { position: absolute; top: 0; bottom: 0; width: 16px; transform: translateX(-50%); border: 0; background: transparent; color: var(--danger); padding: 0; cursor: ew-resize; }
 .phrase-composition-head-handle svg { display: block; width: 16px; height: 16px; margin: 0; pointer-events: none; }
 .phrase-composition-head-handle:focus-visible { outline: 1px solid #b94b51; outline-offset: -2px; }
-.phrase-composition-notice { position: absolute; left: 16px; right: 16px; bottom: 12px; z-index: 3; width: fit-content; max-width: calc(100% - 32px); border-radius: 4px; padding: 7px 10px; background: var(--surface); color: var(--text); box-shadow: 0 2px 10px #24334315; font-size: 12px; pointer-events: none; }
+.phrase-composition-notice { flex: 0 0 auto; max-height: 20vh; overflow: auto; padding: 6px 12px; color: var(--danger); font-size: 12px; overflow-wrap: anywhere; }
 .phrase-composition-notice[hidden] { display: none; }
 .phrase-composition-notice.is-error { color: var(--danger); }
 @media (max-width: 720px) {

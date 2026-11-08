@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import type { PhraseBody, PhraseNote } from '../src/workstation/contracts/phrase.ts';
 import { readPhraseBody } from '../src/workstation/modules/phrase/public.ts';
-import { melodyGrid, melodyNoteRect, melodyScale, initialMelodyView, melodyDetailGrid, melodyDetailSteps, melodyPitchTop, melodyPitchHeight, melodyPitchAt } from '../src/workstation/modules/ui-rendering/melody-geometry.ts';
+import { melodyGrid, melodyNoteRect, melodyScale, initialMelodyView, melodyDetailGrid, melodyDetailSteps, melodyScoreGrid, melodyPitchTop, melodyPitchHeight, melodyPitchAt } from '../src/workstation/modules/ui-rendering/melody-geometry.ts';
 
 const keys = [{ label: 'C4', frequencyHz: 261.6255653005986, accidental: false }];
 const close = (actual: number, expected: number) => assert(Math.abs(actual - expected) < 1e-8);
@@ -48,7 +48,9 @@ test('detail grid reveals beats, configured cells and finer cells in successive 
     assert(lines(view.zoom).every(line=>line.beat));
     assert.equal(melodyDetailSteps(120,stepsPerBeat,melodyScale({...view,zoom:view.zoom*2},1000,8)),stepsPerBeat);
     assert(lines(view.zoom*2).some(line=>!line.beat));
-    const finer=lines(view.zoom*4);close(finer[1]!.seconds-finer[0]!.seconds,.5/(stepsPerBeat*2));
+    const finer=lines(view.zoom*2*stepsPerBeat);close(finer[1]!.seconds-finer[0]!.seconds,.5/stepsPerBeat**2);
+    const forced = melodyDetailSteps(120, stepsPerBeat, 2 * 48 * stepsPerBeat ** 3, 0);
+    assert.equal(forced, stepsPerBeat ** 3);
     assert(finer.filter(line=>line.bar).every(line=>line.seconds%2===0));
     assert.equal(score.stepsPerBeat,stepsPerBeat);
   }
@@ -63,6 +65,23 @@ test('deep zoom generates only visible lines for long music and retains configur
     assert(lines.length<50);assert(lines.length>0);
     assert(lines.every(line=>line.seconds>=299.999&&line.seconds<=300+8/view.zoom+.001));
   }
+});
+
+test('tempo rolls share a subdivision detail level while retaining their beat positions', () => {
+  const score = { ...body(60), tempoSections: [{ id: 'fast', startBeat: 4, tempoBpm: 120 }] };
+  const view = { leftSeconds: 3, zoom: 1, rowHeight: 32 };
+  const beats = melodyScoreGrid(score, view, 2000);
+  assert(beats.every(line => line.beat));
+  assert.deepEqual(beats.slice(0, 4).map(line => line.seconds), [3, 4, 4.5, 5]);
+  const cells = melodyScoreGrid(score, view, 4000);
+  assert(cells.some(line => !line.beat && line.seconds === 3.25));
+  assert(cells.some(line => !line.beat && line.seconds === 4.125));
+  assert(!cells.some(line => line.seconds === 3.125));
+  assert(melodyScoreGrid(score, view, 100, 0).every(line => line.beat));
+  const mixed = { ...score, stepsPerBeat: 3, tempoSections: [{ ...score.tempoSections[0]!, stepsPerBeat: 2 }] };
+  const finer = melodyScoreGrid(mixed, view, 6500);
+  assert(finer.some(line => Math.abs(line.seconds - (3 + 1 / 9)) < 1e-8));
+  assert(finer.some(line => line.seconds === 4.125));
 });
 
 test('equal black and white rows share exact boundaries for drawing, hit testing, notes and zoom', () => {
@@ -123,5 +142,5 @@ test('non-four subdivisions draw exact cells with independent beat/bar flags and
     const held = { ...note, startBeat: .173, durationBeats: .713, durationSeconds: .413 };
     assert.deepEqual(melodyNoteRect(held, value, keys, view, 320), melodyNoteRect(held, { ...value, stepsPerBeat: 4 }, keys, view, 320));
   }
-  for (const n of [0, 1, 10, -1, 2.5, NaN, Infinity, null, '3']) assert.throws(() => melodyGrid(8, 120, n as number), /每拍格数/);
+  for (const n of [0, 1, 10, -1, 2.5, NaN, Infinity, null, '3']) assert.throws(() => melodyGrid(8, 120, n as number), /每拍细分/);
 });

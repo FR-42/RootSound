@@ -14,7 +14,7 @@ let window, host, closeAccepted = false, preparingClose = false, pickerBusy = fa
 const failure = error => JSON.stringify({ status: 'error', message: error.message ?? String(error), ok: false, error: error.message ?? String(error) });
 const cancelled = () => JSON.stringify({ status: 'cancelled' });
 const syncMethods = new Set(['storage.Read', 'storage.WriteScoped', 'storage.WriteScopedCheckpoint']);
-const projectMethods = new Set(['Read', 'Create', 'CreateCopy', 'List', 'OpenKnown', 'Delete', 'Inspect', 'Rename', 'Save', 'FinishLoading', 'Exit']);
+const projectMethods = new Set(['Read', 'Create', 'CreateCopy', 'CreateDetached', 'List', 'Browse', 'OpenKnown', 'OpenDocument', 'ReadDocument', 'PrepareDocumentSave', 'Delete', 'Inspect', 'Rename', 'Save', 'FinishLoading', 'Exit']);
 let lastDirectory;
 function trusted(event) {
   return window && event.sender === window.webContents && event.senderFrame === window.webContents.mainFrame
@@ -31,18 +31,13 @@ async function remember(filename) {
 }
 async function openFile(kind) {
   return pick(async () => {
-    const chosen = await dialog.showOpenDialog(window, { title: kind === 'project' ? '打开音乐项目或 MIDI' : '导入音色',
+    const chosen = await dialog.showOpenDialog(window, { title: kind === 'project' ? '打开音乐文件' : '导入音色',
       defaultPath: lastDirectory, properties: ['openFile'], filters: kind === 'project'
-        ? [{ name: 'RootSound / MIDI', extensions: ['rootsound', 'mid', 'midi'] }]
+        ? [{ name: '可编辑音乐', extensions: ['rootsound', 'mid', 'midi', 'smf', 'kar', 'rmi', 'musicxml', 'xml', 'mxl', 'rsproject'] }]
         : [{ name: 'RootSound 音色', extensions: ['rssynth', 'rssound'] }] });
     if (chosen.canceled || !chosen.filePaths[0]) return cancelled();
     const filename = chosen.filePaths[0]; await remember(filename);
     if (kind === 'timbre') return host.call('timbres.OpenPath', [filename]);
-    if (/\.midi?$/i.test(filename)) {
-      const info = await fsp.stat(filename); if (info.size < 14 || info.size > 10 * 1024 * 1024) throw new Error('MIDI 文件为空或超过当前导入范围。');
-      const bytes = await fsp.readFile(filename); if (bytes.toString('ascii', 0, 4) !== 'MThd') throw new Error('请选择有效的 MIDI 文件。');
-      return JSON.stringify({ status: 'midi', name: path.basename(filename), base64: bytes.toString('base64') });
-    }
     return host.call('project.OpenPath', [filename]);
   });
 }
@@ -106,14 +101,18 @@ async function confirmClose(event) {
   try {
     const state = readResponse(await host.call('project.Read'));
     if (state.current) {
-      const prepared = await window.webContents.executeJavaScript('globalThis.__rootSoundPrepareClose()');
+      const prepared = await window.webContents.executeJavaScript('globalThis.__rootSoundPrepareClose("check")');
       if (!prepared?.ready) throw new Error('当前编辑尚未准备好，请稍后重试。');
       const dirty = readResponse(await host.call('project.Read')).hasUnsavedChanges || !prepared.canSave;
       if (dirty) {
         const selected = await dialog.showMessageBox(window, { type: 'question', title: '关闭 RootSound', message: '保存当前修改吗？',
           buttons: ['保存并退出', '放弃修改', '取消'], defaultId: 2, cancelId: 2, noLink: true });
         if (selected.response === 2) return;
-        if (selected.response === 0) { if (!prepared.canSave) throw new Error(prepared.saveMessage); readResponse(await host.call('project.Save', [prepared.name ?? ''])); }
+        if (selected.response === 0) {
+          const save = await window.webContents.executeJavaScript('globalThis.__rootSoundPrepareClose("save")');
+          if (!save?.ready || !save.canSave) throw new Error(save?.saveMessage ?? save?.message ?? '当前编辑尚未准备好，请稍后重试。');
+          readResponse(await host.call('project.Save', [save.name ?? '']));
+        }
       }
       readResponse(await host.call('project.Exit', ['discard', '']));
     }
@@ -122,7 +121,10 @@ async function confirmClose(event) {
   finally { preparingClose = false; }
 }
 app.whenReady().then(async () => {
-  const dataDirectory = process.platform === 'darwin' ? path.join(app.getPath('music'), 'RootSound') : path.dirname(process.execPath);
+  const executableDirectory = path.dirname(process.execPath);
+  const installed = process.platform === 'win32' && await fsp.access(path.join(base, 'rootsound-installed')).then(() => true, () => false);
+  const dataDirectory = process.platform === 'darwin' ? path.join(app.getPath('music'), 'RootSound')
+    : installed ? path.dirname(executableDirectory) : executableDirectory;
   await seedBundledProjects(path.join(base, 'seed-projects'), dataDirectory);
   await fsp.mkdir(app.getPath('userData'), { recursive: true });
   try { lastDirectory = JSON.parse(await fsp.readFile(path.join(app.getPath('userData'), 'last-import-directory.json'), 'utf8')); } catch { lastDirectory = path.join(dataDirectory, 'project'); }

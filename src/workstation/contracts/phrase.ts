@@ -1,5 +1,6 @@
 import type { ContentRecord, Draft, SaveConfirmation, SaveResult } from './content.ts';
 import type { PlayableNotePlan, SoundPlan, SoundSequencePlan } from './sound.ts';
+import type { MidiExpressionLane } from './midi-expression.ts';
 
 /** Legacy default. Each phrase can choose its own editing resolution without retiming notes. */
 export const PHRASE_STEPS_PER_BEAT = 4;
@@ -7,7 +8,7 @@ export const PHRASE_STEPS_PER_BEAT = 4;
 /** Omitted older phrases retain four cells per beat; explicit choices are validated. */
 export function phraseStepsPerBeat(body?: Pick<PhraseBody, 'stepsPerBeat'>): number {
   const steps = body?.stepsPerBeat === undefined ? PHRASE_STEPS_PER_BEAT : body.stepsPerBeat;
-  if (!Number.isInteger(steps) || steps < 2 || steps > 9) throw new Error('每拍格数必须是 2 至 9 的整数。');
+  if (!Number.isInteger(steps) || steps < 2 || steps > 9) throw new Error('每拍细分的份数必须是 2 至 9 的整数。');
   return steps;
 }
 
@@ -25,6 +26,9 @@ export type PhraseNote = {
   level?: number;
   /** Per-note stereo position; omitted older notes are centered. */
   pan?: number;
+  /** Source ordering at simultaneous MIDI keys/pedals; ordinary edits need no order. */
+  midiOnOrder?: number; midiOffOrder?: number;
+  midiChannelId?: string | null;
 };
 export type PhraseSection = 'melody' | 'rhythm';
 /** Older unmarked parts belong to Melody; both sections share one phrase clock. */
@@ -33,6 +37,7 @@ export type PhrasePart = {
   /** Unassigned tone uses keep notes and origin identity for rebinding but remain silent. */
   unassigned?: boolean;
   notes: PhraseNote[];
+  midiChannelId?: string;
   /** Notes outside a shortened BPM roll, with startBeat local to that roll. */
   hiddenNotes?: { sectionId: string; note: PhraseNote }[];
 };
@@ -42,7 +47,11 @@ export type PhraseBody = {
   timeUnit: 'beat';
   tempoBpm: number;
   /** Additional sequential BPM rolls; the first roll starts at beat0/tempoBpm. */
-  tempoSections?: { id: string; startBeat: number; tempoBpm: number; stepsPerBeat?: number }[];
+  tempoSections?: {
+    id: string; startBeat: number; tempoBpm: number; stepsPerBeat?: number;
+    /** Beats elapsed in the local grid at the boundary, modulo one bar. */
+    gridOffsetBeats?: number;
+  }[];
   lengthBeats: number;
   /** Editing cells per beat only; changing this never quantizes existing notes. Omitted values are four. */
   stepsPerBeat?: number;
@@ -52,6 +61,7 @@ export type PhraseBody = {
   pickupBeats?: number;
   /** Phrase output gain; omitted older content uses unity gain. */
   masterLevel?: number;
+  midiExpression?: MidiExpressionLane[];
   parts: PhrasePart[];
 };
 export type KeyboardPitch = { label: string; frequencyHz: number; accidental: boolean };
@@ -89,9 +99,9 @@ export interface PhraseEditorPort {
   setTempoSection(id: string, tempoBpm: number): void;
   /** Change one roll's grid, retaining all note timing and other rolls' resolutions. */
   setTempoSectionSteps(id: string | undefined, stepsPerBeat: number): void;
-  previewTempoSectionStart(id: string, startBeat: number): PhraseBody;
+  previewTempoSectionStart(id: string, startBeat: number, gridOnlyBase?: PhraseBody): PhraseBody;
   setTempoSectionStart(id: string, startBeat: number): void;
-  previewLastTempoRollLength(lengthBeats: number): PhraseBody;
+  previewLastTempoRollLength(lengthBeats: number, base?: PhraseBody): PhraseBody;
   setLastTempoRollLength(lengthBeats: number): void;
   /** Changes the shared Melody/Rhythm editing grid, preserving every stored note coordinate and duration. */
   setStepsPerBeat(stepsPerBeat: number): void;
@@ -106,6 +116,7 @@ export interface PhraseEditorPort {
   removePart(partId: string): void;
   /** Removes the selected uses and their notes together, retaining the sound assets. */
   removeParts(partIds: string[]): void;
+  mergeParts(sourcePartId: string, targetPartId: string): void;
   addNote(partId: string, input: Omit<PhraseNote, 'id'>): string;
   /** Each bulk operation validates and persists once, with one undo step. */
   addNotes(partId: string, inputs: Array<Omit<PhraseNote, 'id'>>): string[];
@@ -117,7 +128,7 @@ export interface PhraseEditorPort {
   removeNotes(notes: PhraseNoteRef[]): void;
   undo(): void;
   redo(): void;
-  /** All supported equal-tempered pitches, ascending (20–5000 Hz), A4=440 Hz; content remains exact Hz. */
+  /** Full MIDI 0–127 keyboard, ascending (C−1–G9), A4=440 Hz; content remains exact Hz. */
   keyboard(): KeyboardPitch[];
   /** Prepare the same current or temporary body that previewPlan will compile. */
   preparePreview(bodyOverride?: PhraseBody): Promise<void>;
@@ -128,6 +139,6 @@ export interface PhraseEditorPort {
   /** Reference piano remains available with no selected family, even if removed from the library. */
   previewPianoPlan(note: SoundPlan['note']): Promise<PlayableNotePlan>;
   /** A temporary body supports live gestures without changing the draft/history. */
-  previewPlan(bodyOverride?: PhraseBody, options?: { allowSilence?: boolean }): SoundSequencePlan;
+  previewPlan(bodyOverride?: PhraseBody, options?: { allowSilence?: boolean; midiEffects?: boolean }): SoundSequencePlan;
   save(mode: 'overwrite' | 'new', confirmation?: SaveConfirmation): SaveResult;
 }

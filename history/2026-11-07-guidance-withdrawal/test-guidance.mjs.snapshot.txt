@@ -1,0 +1,154 @@
+import { readFile, writeFile, mkdir, mkdtemp } from 'node:fs/promises';
+import { spawn } from 'node:child_process';
+import http from 'node:http';
+import path from 'node:path';
+import { build } from 'vite';
+import { guideScenes } from '../src/workstation/modules/ui-rendering/guidance-flow.ts';
+
+await mkdir('.test-output/guidance-live', { recursive: true });
+const evidence=await mkdtemp(path.resolve('.test-output/guidance-live/ui-'));
+const absolute=name=>path.resolve(name).replaceAll('\\','/');
+await writeFile(path.join(evidence,'index.html'),'<html><head><meta charset="utf-8"></head><body style="margin:0"><div id="app"></div><script type="module" src="./fixture.ts"></script></body></html>');
+await writeFile(path.join(evidence,'fixture.ts'),`
+import {mountStudio} from ${JSON.stringify(absolute('src/workstation/modules/ui-rendering/public.ts'))};
+import {createBrowserSoundRuntime} from ${JSON.stringify(absolute('src/workstation/modules/sound-runtime/public.ts'))};
+import {createLearningSettings} from ${JSON.stringify(absolute('src/workstation/app/platform/learning-settings.ts'))};
+import {createPracticeFactory} from ${JSON.stringify(absolute('src/workstation/app/practice-document.ts'))};
+const runtime=createBrowserSoundRuntime(),base=createPracticeFactory(localStorage,async()=>{__guideTest.fileCalls++;throw Error('No music files in a demonstration')});
+function createPractice(id,resume){const value=base(id,resume);__guideTest.practice=value;return value;}
+mountStudio(document.getElementById('app'),{timbre:{},sound:runtime,hasPrevious:false,initialEntry:'welcome',learning:createLearningSettings(localStorage),createPractice,audioFiles:{async save(){__guideTest.fileCalls++;throw Error('No audio files in a demonstration')}},projectSetup:{list:async()=>[],open:async()=>{}}});
+`);
+await build({configFile:false,root:evidence,base:'./',publicDir:false,logLevel:'error',build:{outDir:path.resolve('.cache/guidance-ui-test'),emptyOutDir:true}});
+const injected=`
+window.__guideTest={fileCalls:0,errors:[],rate:1};
+const realNow=performance.now.bind(performance);let clock=realNow(),lastReal=clock;
+Object.defineProperty(performance,'now',{value:()=>{const now=realNow();clock+=(now-lastReal)*__guideTest.rate;lastReal=now;return clock}});
+const raf=requestAnimationFrame.bind(window);window.requestAnimationFrame=callback=>raf(()=>callback(performance.now()));
+Object.defineProperty(window,'AudioContext',{value:class{constructor(){const context=new OfflineAudioContext(2,44100,44100),start=performance.now();Object.defineProperties(context,{state:{get:()=> 'running'},currentTime:{get:()=> (performance.now()-start)/1000},close:{value:async()=>{}}});return context}}});
+addEventListener('error',event=>__guideTest.errors.push(event.message));addEventListener('unhandledrejection',event=>__guideTest.errors.push(String(event.reason)));
+HTMLAnchorElement.prototype.click=function(){if(this.download)__guideTest.fileCalls++};
+`;
+const server=http.createServer(async(req,res)=>{try{
+ const pathname=decodeURIComponent(new URL(req.url,'http://local').pathname);
+ let file;
+ if(pathname.startsWith('/desktop/')){const relative=pathname.slice(9);file=path.resolve(relative.startsWith('instruments/')?'.cache/website/play':'.cache/guidance-ui-test',relative||'index.html')}
+ else file=path.resolve('.cache/website',pathname.replace(/^\/RootSound\//,''));
+ const allowed=[path.resolve('.cache/website')+path.sep,path.resolve('.cache/guidance-ui-test')+path.sep];if(!allowed.some(prefix=>file.startsWith(prefix)))throw Error('outside fixture');
+ let bytes=await readFile(file);if(file.endsWith('.html'))bytes=Buffer.from(bytes.toString().replace('<head>','<head><script>'+injected+'</script>'));
+ const mime={'.html':'text/html; charset=utf-8','.js':'text/javascript','.css':'text/css','.json':'application/json','.wav':'audio/wav'};
+ res.setHeader('Content-Type',mime[path.extname(file)]||'application/octet-stream');res.end(bytes);
+}catch{res.writeHead(404);res.end()}});
+await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));const origin='http://127.0.0.1:'+server.address().port;
+const basicScenes=guideScenes('basics').map(scene=>scene.id);
+const harness=path.join(evidence,'qa.cjs');
+await writeFile(harness,`
+const {app,BrowserWindow,session}=require('electron'),fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
+const root=${JSON.stringify(evidence)},origin=${JSON.stringify(origin)},scenes=${JSON.stringify(basicScenes)};app.setPath('userData',path.join(root,'profile'));app.commandLine.appendSwitch('disable-gpu');app.commandLine.appendSwitch('mute-audio');
+const delay=ms=>new Promise(resolve=>setTimeout(resolve,ms));let win,stage='start';setTimeout(()=>{fs.writeFileSync(root+'/report.json',JSON.stringify({error:'Harness timeout',stage}));app.exit(1)},90000).unref();
+(async()=>{try{
+ await app.whenReady();session.defaultSession.webRequest.onBeforeRequest({urls:['https://*/*']},(_details,callback)=>callback({cancel:true}));
+ win=new BrowserWindow({show:false,width:1280,height:900,webPreferences:{sandbox:true,contextIsolation:true,offscreen:true,backgroundThrottling:false}});
+ const js=code=>win.webContents.executeJavaScript('(async()=>('+code+'))()');
+ async function wait(code){for(let i=0;i<1200;i++){if(await js(code).catch(()=>false))return;await delay(30)}throw Error(stage+' timed out: '+code)}
+ const click=selector=>js('document.querySelector('+JSON.stringify(selector)+').click()');
+ async function noBar(){assert.equal(await js("document.querySelectorAll('.guidance-controls,.guidance-chapters,.guidance-timeline,.guidance-effects button,.guidance-effects input,.guidance-effects nav,.guidance-effects progress').length"),0,'no guide toolbar or replacement controls');}
+ async function capture(name){await delay(100);win.webContents.invalidate();await delay(70);fs.writeFileSync(root+'/'+name,(await win.webContents.capturePage()).toPNG())}
+ async function inScene(name,local=0){stage=name;await wait("document.querySelector('.guidance-shell')?.dataset.scene==="+JSON.stringify(name));const start=await js('performance.now()');if(local)await wait('performance.now()>='+String(start+local*1000));await js('__guideTest.rate=0');await delay(60);assert.equal(await js("document.querySelector('.guidance-shell')?.dataset.scene"),name);await noBar();}
+ async function resume(){await js('__guideTest.rate=5')}
+ await win.loadURL(origin+'/desktop/index.html');await wait("!!document.querySelector('.guidance-invitation')");
+ assert.deepEqual(await js("[...document.querySelectorAll('.guidance-invitation button')].map(n=>n.textContent)"),['观看引导','跳过']);
+ assert.equal(await js("!!document.querySelector('.guidance-shell')"),false);assert(await js("!!document.querySelector('.welcome')"));await capture('first-choice.png');
+ await click('.guidance-skip');assert(await js("!!document.querySelector('.welcome')&&!document.querySelector('.guidance-shell')"));
+ await win.reload();await wait("!!document.querySelector('.welcome')");assert.equal(await js("!!document.querySelector('.guidance-invitation')"),false);
+ await js("(()=>{const k='rootsound.learning.v1',p=JSON.parse(localStorage.getItem(k));p.guides.basics={status:'new',step:0};localStorage.setItem(k,JSON.stringify(p))})()");
+ await win.reload();await wait("!!document.querySelector('.guidance-watch')");await click('.guidance-watch');await wait("!!document.querySelector('.guidance-shell .melody-note')");await noBar();
+ assert.equal(await js("document.querySelectorAll('.guidance-effects text,.guidance-caption,.guidance-prompt,video').length"),0);
+ await js("(()=>{__guideTest.rate=5;__guideTest.visited=['rows'];__guideTest.editor=document.querySelector('.guidance-editor .melody-scroll');const shell=document.querySelector('.guidance-shell');new MutationObserver(()=>{if(!__guideTest.visited.includes(shell.dataset.scene))__guideTest.visited.push(shell.dataset.scene)}).observe(shell,{attributes:true,attributeFilter:['data-scene']})})()");
+ const groups=()=>js("__guideTest.practice.phrase.read().body.parts");
+ const action=()=>js("document.querySelector('.guidance-shell').dataset.action");
+ const activeGroup=()=>js("document.querySelector('.melody-note-family.is-selected')?.dataset.partId");
+ const dimmed=()=>js("document.querySelectorAll('.melody-note.is-dim').length");
+ const selected=()=>js("[...document.querySelectorAll('.melody-note.is-selected')].map(n=>n.dataset.noteId)");
+ const dimensions=id=>js("document.querySelector('[data-note-id="+JSON.stringify(id)+"]').getBoundingClientRect().toJSON()");
+ await inScene('rows',2.2);
+ const initial=await groups();
+ const sameTime=await Promise.all(initial.flatMap(part=>part.notes.filter(n=>n.startBeat===1).map(n=>dimensions(n.id))));
+ assert.equal(sameTime.length,3);
+ const bandY=await js("Number(document.querySelector('.guidance-effects rect[fill=\\\"#087f8c\\\"]').getAttribute('y'))");
+ assert(sameTime.every(box=>Math.abs(box.y-bandY)<2));
+ await capture('01-time-row.png');await resume();
+ await inScene('columns',3.3);
+ const samePitch=await Promise.all(initial[0].notes.filter(n=>n.frequencyHz<270).map(n=>dimensions(n.id)));
+ const bandX=await js("Number(document.querySelector('.guidance-effects rect[fill=\\\"#9358ad\\\"]').getAttribute('x'))");
+ assert.equal(samePitch.length,2);
+ assert(samePitch.every(box=>Math.abs(box.x-bandX)<2));
+ await capture('02-pitch-column.png');await resume();
+ await inScene('pan',4.1);
+ assert.equal(await action(),'pan');
+ const shifted=await dimensions(initial[0].notes[0].id);
+ assert(shifted.x<samePitch[0].x-10&&shifted.y<sameTime[0].y-15);
+ assert.deepEqual(await groups(),initial);assert.deepEqual(await selected(),[]);
+ await capture('03-pan.png');await resume();
+ await inScene('note',2.1);
+ const [one]=await selected();assert.equal(one,initial[0].notes[1].id);assert.deepEqual(await selected(),[one]);
+ assert.equal(await activeGroup(),undefined);assert.equal(await dimmed(),0);
+ await capture('04-single-note.png');await resume();
+ await inScene('note-pan',4.15);
+ assert.equal(await action(),'pan');assert.deepEqual(await groups(),initial);
+ assert.deepEqual(await selected(),[one]);assert.equal(await dimmed(),0);
+ const pannedWithNote=await dimensions(initial[0].notes[0].id);
+ assert(pannedWithNote.x>shifted.x+5&&pannedWithNote.y>shifted.y+15);
+ await resume();
+ await inScene('group',2.2);
+ assert.equal(await action(),'select-group');
+ assert.equal(await js("document.querySelector('.melody-note-family.is-selected').dataset.partId"),initial[0].id);
+ assert.deepEqual(await selected(),[]);
+ assert.equal(await js("document.querySelectorAll('.guidance-effects rect[stroke=\\\"#188369\\\"]').length"),4);
+ assert.equal(await js("document.querySelectorAll('.melody-note.is-dim').length"),2);
+ await capture('05-group.png');await resume();
+ await inScene('add',2.5);
+ assert.equal(await action(),'draw-note');
+ const afterAdd=await groups(), short=afterAdd[0].notes.find(n=>!initial[0].notes.some(old=>old.id===n.id));
+ assert(short);assert.equal(afterAdd[0].notes.length,4);assert.deepEqual(afterAdd[1],initial[1]);
+ assert.deepEqual(await selected(),[]);assert.equal(await activeGroup(),initial[0].id);await capture('06-click-add.png');await resume();
+ await inScene('draw',5.5);
+ assert.equal(await action(),'draw-note');
+ const afterDraw=await groups(), drawn=afterDraw[0].notes.find(n=>!afterAdd[0].notes.some(old=>old.id===n.id));
+ assert(drawn);assert(drawn.durationBeats>short.durationBeats*2);assert.deepEqual(await selected(),[]);assert.equal(await activeGroup(),initial[0].id);
+ await capture('07-drag-add.png');await resume();
+ await inScene('move',4.3);
+ assert.equal(await action(),'move-note');assert.deepEqual(await selected(),[drawn.id]);assert.equal(await dimmed(),0);
+ const moved=(await groups())[0].notes.find(n=>n.id===drawn.id);
+ assert(moved.startBeat>drawn.startBeat+.5&&moved.frequencyHz<drawn.frequencyHz);
+ assert.equal(moved.durationSeconds,drawn.durationSeconds);await capture('08-move.png');await resume();
+ await inScene('resize',4.25);
+ assert.equal(await action(),'resize-note');
+ const resized=(await groups())[0].notes.find(n=>n.id===drawn.id);
+ assert(resized.durationBeats>moved.durationBeats+.5);
+ assert.equal(resized.startBeat,moved.startBeat);assert.equal(resized.frequencyHz,moved.frequencyHz);
+ await capture('09-resize.png');await resume();
+ await inScene('deselect',1.73);
+ assert.equal(await action(),'deselect');assert.deepEqual(await selected(),[]);
+ assert.equal(await js("document.querySelectorAll('.melody-note.is-dim,.melody-note-family.is-selected').length"),0);
+ assert.deepEqual((await groups())[0].notes.find(n=>n.id===drawn.id),resized);
+ assert(await js("__guideTest.editor===document.querySelector('.guidance-editor .melody-scroll')"));
+ await capture('10-right-click.png');await resume();
+ stage='automatic completion';await wait("!document.querySelector('.guidance-shell')");
+ assert.equal(await js("JSON.parse(localStorage.getItem('rootsound.learning.v1')).guides.basics.status"),'completed');
+ assert.equal(await js('__guideTest.fileCalls'),0);assert.deepEqual(await js('__guideTest.visited'),scenes);
+ assert.deepEqual(await js('__guideTest.errors'),[]);
+ stage='existing advanced tools';await click('.welcome-settings');await js("(()=>{const n=document.querySelector('.learning-feature input');n.checked=true;n.dispatchEvent(new Event('change'))})()");await wait("!!document.querySelector('.guidance-shell .melody-note')");await resume();
+ await inScene('rolls',3.3);assert(await js("__guideTest.practice.phrase.read().body.tempoSections.length>0"));assert.equal(await js("document.querySelector('.guidance-shell').dataset.action"),'add-roll');await resume();
+ await inScene('boundary',6.5);assert.equal(await js("document.querySelector('.guidance-shell').dataset.action"),'resize-roll');await resume();await wait("!document.querySelector('.guidance-shell')");assert(await js("!!document.querySelector('.welcome')"));assert.equal(await js("JSON.parse(localStorage.getItem('rootsound.learning.v1')).guides['tempo-rolls'].status"),'completed');
+ stage='web choice and isolation';await js("localStorage.removeItem('rootsound.learning.v1')");await win.loadURL(origin+'/RootSound/play/index.html');await wait("!!document.querySelector('.guidance-invitation')");await click('.guidance-skip');await wait("document.querySelectorAll('.web-workspace .melody-note').length===40");
+ stage='small screen reduced motion';win.webContents.debugger.attach('1.3');await win.webContents.debugger.sendCommand('Emulation.setEmulatedMedia',{features:[{name:'prefers-reduced-motion',value:'reduce'}]});
+ await js("localStorage.removeItem('rootsound.learning.v1')");win.setContentSize(320,720);await win.loadURL(origin+'/desktop/index.html');await wait("!!document.querySelector('.guidance-watch')");await click('.guidance-watch');await wait("!!document.querySelector('.guidance-shell')");await resume();await inScene('rows',1);await noBar();await capture('mobile-guide.png');await resume();
+ await inScene('deselect',2.2);
+ assert.equal(await action(),'deselect');assert.equal((await groups())[0].notes.length,5);
+ await js("document.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true,cancelable:true}))");await wait("!!document.querySelector('.welcome')");assert.equal(await js("JSON.parse(localStorage.getItem('rootsound.learning.v1')).guides.basics.status"),'skipped');
+ assert(!win.isVisible());fs.writeFileSync(root+'/report.json',JSON.stringify({passed:true,firstChoiceOnly:true,skipToNativeWelcome:true,choicePersists:true,noGuideBarOrReplacementControls:true,noAddedVisibleDescription:true,realEditorNoVideo:true,sameTimeRowsAndPitchColumns:true,continuousEditor:true,panWithNoSelectionOrSingleNote:true,individualAndGroupSelection:true,clickAndDragToCreate:true,moveBothAxes:true,resizeFromBottom:true,rightClickDeselect:true,existingAdvancedTools:true,allScenesCompleteInOrderWithoutNavigation:true,noUserFilesCreated:true,originalWebExampleUnchanged:true,reducedMotionDoesNotStall:true,escapeExits:true},null,2));win.destroy();app.exit(0);
+}catch(error){let diagnostic;try{diagnostic=await win.webContents.executeJavaScript("({scene:document.querySelector('.guidance-shell')?.dataset.scene,action:document.querySelector('.guidance-shell')?.dataset.action,errors:globalThis.__guideTest?.errors,progress:localStorage.getItem('rootsound.learning.v1'),dialogs:[...document.querySelectorAll('dialog[open]')].map(n=>n.className),notes:document.querySelectorAll('.guidance-editor .melody-note').length})");fs.writeFileSync(root+'/failure.png',(await win.webContents.capturePage()).toPNG())}catch{}fs.writeFileSync(root+'/report.json',JSON.stringify({stage,error:String(error),stack:error.stack,diagnostic},null,2));app.exit(1)}})();
+`);
+await new Promise((resolve,reject)=>{const check=spawn(process.execPath,['--check',harness],{windowsHide:true,stdio:'inherit'});check.on('error',reject);check.on('exit',code=>code?reject(Error('Invalid generated harness')):resolve())});
+const env={...process.env};delete env.ELECTRON_RUN_AS_NODE;
+try{const result=await new Promise(resolve=>{const child=spawn(path.resolve(process.env.ROOTSOUND_TEST_ELECTRON||'.cache/release-smoke-engine/electron.exe'),[harness],{env,windowsHide:true,stdio:['ignore','pipe','pipe']});let log='';for(const stream of [child.stdout,child.stderr])stream.on('data',data=>log=(log+data).slice(-5000));child.on('error',error=>resolve({code:1,log:String(error)}));child.on('exit',code=>resolve({code,log}))});console.log(await readFile(path.join(evidence,'report.json'),'utf8').catch(()=>result.log));console.log('Evidence: '+evidence);if(result.code)process.exitCode=1}finally{server.close()}

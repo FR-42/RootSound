@@ -157,7 +157,7 @@ test('new songs can start with seven rows, add more, and preserve an existing on
 test('new controls strictly reject invalid values and unknown fields without writing or altering history', () => {
   const f = fixture(); const clip = f.song.addClip(f.track, f.slow.id, 0);
   const raw = f.raw(); const before = f.song.read();
-  for (const bpm of [0, 39, 241, NaN, Infinity]) assert.throws(() => f.song.setGridTempo(bpm));
+  for (const bpm of [0, .99, 1001, NaN, Infinity]) assert.throws(() => f.song.setGridTempo(bpm));
   for (const seconds of [-1e6 - 1, 1e6 + 1, NaN, Infinity]) {
     assert.throws(() => f.song.setGridOffset(seconds)); assert.throws(() => readSongBody({ ...before.body!, gridOffsetSeconds: seconds }));
   }
@@ -173,6 +173,6 @@ test('new controls strictly reject invalid values and unknown fields without wri
   assert.throws(() => f.song.updateClip(f.track, 'missing', { level: 0.5 }));
   const body = structuredClone(before.body!); body.tracks[0]!.clips[0]!.pan = 2;
   assert.throws(() => readSongBody(body));
-  assert.throws(() => readSongBody({ ...before.body!, gridTempoBpm: 39 }));
+  assert.throws(() => readSongBody({ ...before.body!, gridTempoBpm: 1001 }));
   assert.equal(f.raw(), raw); assert.deepEqual(f.song.read(), before);
 });

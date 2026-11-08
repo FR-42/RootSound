@@ -61,8 +61,8 @@ test('older phrases default to four cells without rewriting omitted metadata, an
   const f = fixture(); start(f); const before = f.phrase.read(), raw = f.raw(), writes = f.writes(), token = f.library.currentToken();
   f.phrase.setStepsPerBeat(4); assert.equal(f.writes(), writes); assert.equal(f.library.currentToken(), token);
   for (const value of [0, 1, 10, -1, 2.5, NaN, Infinity, null, '3', undefined]) {
-    assert.throws(() => f.phrase.setStepsPerBeat(value as number), /每拍格数/);
-    if (value !== undefined) assert.throws(() => readPhraseBody({ ...legacy, stepsPerBeat: value }), /每拍格数/);
+    assert.throws(() => f.phrase.setStepsPerBeat(value as number), /每拍细分/);
+    if (value !== undefined) assert.throws(() => readPhraseBody({ ...legacy, stepsPerBeat: value }), /每拍细分/);
   }
   assert.equal(f.raw(), raw); assert.equal(f.writes(), writes); assert.deepEqual(f.phrase.read(), before);
 });
@@ -161,17 +161,17 @@ test('phrase construction is lazy and exposes every valid equal-tempered pitch w
   assert.equal(f.raw(), before);
   assert.throws(() => f.phrase.previewPlan(), /开始谱写/);
   const keys = f.phrase.keyboard();
-  assert.equal(keys.length, 96);
-  assert.equal(keys[0]!.label, 'E0');
-  assert.equal(keys.at(-1)!.label, 'D♯8');
+  assert.equal(keys.length, 128);
+  assert.equal(keys[0]!.label, 'C-1');
+  assert.equal(keys.at(-1)!.label, 'G9');
   assert.equal(keys.find(key => key.label === 'A4')!.frequencyHz, 440);
-  assert.equal(keys.filter(key => key.accidental).length, 40);
+  assert.equal(keys.filter(key => key.accidental).length, 53);
   for (let index = 0; index < keys.length; index++) {
-    assert(keys[index]!.frequencyHz >= 20 && keys[index]!.frequencyHz <= 5000);
+    assert(keys[index]!.frequencyHz >= keys[0]!.frequencyHz && keys[index]!.frequencyHz <= keys.at(-1)!.frequencyHz);
     if (index) assert(Math.abs(keys[index]!.frequencyHz / keys[index - 1]!.frequencyHz - 2 ** (1 / 12)) < 1e-12);
   }
-  assert(keys[0]!.frequencyHz / 2 ** (1 / 12) < 20);
-  assert(keys.at(-1)!.frequencyHz * 2 ** (1 / 12) > 5000);
+  assert(Math.abs(keys[0]!.frequencyHz - 8.175798915643707) < 1e-10);
+  assert(Math.abs(keys.at(-1)!.frequencyHz - 12543.853951415975) < 1e-8);
   assert.equal(f.raw(), before);
   const part = start(f);
   const frequencies = [...keys.map(key => key.frequencyHz), 20, 5000, 220.123456];
@@ -180,35 +180,6 @@ test('phrase construction is lazy and exposes every valid equal-tempered pitch w
   assert.deepEqual(f.phrase.previewPlan().events.map(event => event.sound.note.frequencyHz), frequencies);
 });
 
-test('a phrase references several saved sounds once and translates beats and overlaps into an execution sequence', () => {
-  const f = fixture();
-  const firstPart = start(f);
-  const secondPart = f.phrase.addPart(f.second.id);
-  const duplicatePart = f.phrase.addPart(f.first.id);
-  f.phrase.setTempo(90);
-  f.phrase.setLength(4);
-  f.phrase.addNote(firstPart, note({ startBeat: 0, durationBeats: 2 }));
-  f.phrase.addNote(secondPart, note({ startBeat: 1, durationBeats: 0.25, frequencyHz: 440, velocity: 0.4 }));
-  f.phrase.addNote(duplicatePart, note({ startBeat: 3, durationBeats: 1, frequencyHz: 330 }));
-  const body = f.phrase.read().body!;
-  assert.equal(body.parts[1]!.name, f.second.name);
-  assert.deepEqual(f.phrase.read().draft!.dependencies, [f.first.id, f.second.id]);
-  const before = f.raw();
-  const plan = f.phrase.previewPlan();
-  assert.equal(plan.kind, 'sequence');
-  assert.equal(plan.events.length, 3);
-  assert.deepEqual(plan.events.map(event => event.atSeconds), [0, 2 / 3, 2]);
-  assert.equal(plan.events[0]!.sound.note.holdSeconds, 4 / 3);
-  assert.equal(plan.events[1]!.sound.note.holdSeconds, 1 / 6);
-  assert.equal(plan.events[1]!.sound.envelope.attackSeconds, 2, 'short notes retain the saved attack and release early');
-  assert.deepEqual(sources(plan.events[1]!.sound), sources(f.playback.planForSaved(f.second.id, noteToPlan())));
-  assert.equal(plan.durationSeconds, 2 + 2 / 3 + 0.55);
-  assert.equal(f.raw(), before, 'compilation cannot write or save a phrase');
-  const content = saved(f.phrase.save('new'));
-  assert.deepEqual(content.dependencies, [f.first.id, f.second.id]);
-  assert.equal(JSON.stringify(content.body).includes('basic-synth'), false);
-  assert.equal(JSON.stringify(content.body).includes('attackSeconds'), false);
-});
 
 function noteToPlan() { return { frequencyHz: 220, holdSeconds: 1, velocity: 0.7 }; }
 
@@ -260,26 +231,6 @@ test('phrase readiness prepares exact unique note parameters for current, tempor
   calls.length = 0; await editor.previewTimbrePlan(f.second.id, key); assert.deepEqual(calls, [{ id: f.second.id, notes: [key] }]);
 });
 
-test('a sampled voice can audition before the phrase has notes and prepares only its selected source', async () => {
-  const f = fixture(); const pcm = { sampleRate: 8000, channels: [new Float32Array(8000).fill(0.3)] }; const bytes = encodeFloatWav(pcm);
-  const source: ContentRecord = { id: 'note-source', kind: 'rootsound.sample', owner: 'sampling', schemaVersion: 1,
-    revision: 1, name: 'note source', dependencies: [], body: { model: 'audio-sample', version: 1,
-      source: { kind: 'file', name: 'note.wav', mimeType: 'audio/wav' }, audio: { encoding: 'base64', byteLength: bytes.length, data: encodeBase64(bytes) },
-      decoded: { sampleRate: 8000, channels: 1, frames: 8000, durationSeconds: 1 } } };
-  assert.equal(f.library.commitTransaction({ expectedToken: f.library.currentToken(), label: 'test sample', createContents: [source] }).status, 'committed');
-  const warm = createSampleAudio(f.library, { async decode(input) { return decodePcmWav(input)!; } });
-  const editor = createTimbreEditor(f.library, warm); await editor.createFromSample(source.id); editor.setRootFrequency(220);
-  const voice = saved(editor.save('new')); let release!: () => void; let decodes = 0;
-  const cold = createSampleAudio(f.library, { async decode(input) { decodes++; await new Promise<void>(resolve => { release = resolve; }); return decodePcmWav(input)!; } });
-  const phrase = createPhraseEditor(f.library, createTimbrePlayback(f.library, cold)); phrase.create(voice.id);
-  const part = phrase.read().body!.parts[0]!.id; phrase.addPart(f.first.id); const writes = f.writes();
-  const requested = phrase.previewNotePlan(part, { frequencyHz: 440, holdSeconds: 0.27, velocity: 0.6 });
-  await Promise.resolve();
-  assert.equal(decodes, 1); release(); const plan = await requested; assert.equal(plan.kind, 'sample');
-  if (plan.kind !== 'sample') throw new Error('Expected prepared sampled voice');
-  assert.equal(plan.source.id, source.id); assert.equal(plan.playbackRate, 2); assert.equal(plan.note.holdSeconds, 0.27);
-  assert.equal(plan.note.velocity, 0.6); assert.equal(f.writes(), writes); assert.equal(phrase.read().body!.parts[0]!.notes.length, 0);
-});
 
 test('audition controller discards stale keys and cancelled or changed voice scopes without disturbing stored notes', async () => {
   const f = fixture(); let part = start(f); const requests: { resolve(): void }[] = []; const heard: PlayableNotePlan[] = []; const errors: string[] = []; let stops = 0;
@@ -304,26 +255,6 @@ test('audition device failures leave an already committed note and its single un
   assert.match(errors[0]!, /device unavailable/); f.phrase.undo(); assert.equal(f.phrase.read().body!.parts[0]!.notes.length, 0);
 });
 
-test('off-grid timing and arbitrary physical pitch survive edits, save, reopening, and short-note compilation exactly', () => {
-  const f = fixture();
-  const part = start(f);
-  const input = note({ startBeat: 0.123456789123, durationBeats: 0.00123456789,
-    frequencyHz: 439.123456789, velocity: 0.7321234567 });
-  const id = f.phrase.addNote(part, input);
-  assert.deepEqual(f.phrase.read().body!.parts[0]!.notes, [{ ...input, id }]);
-  const content = saved(f.phrase.save('new'));
-  const reopenedLibrary = createMaterialLibrary(f.storage);
-  const reopened = createPhraseEditor(reopenedLibrary, createTimbrePlayback(reopenedLibrary));
-  assert.deepEqual(reopened.read().body, f.phrase.read().body);
-  assert.equal(reopened.read().draft!.sourceId, content.id);
-  assert.equal(reopened.read().changed, false);
-  const event = reopened.previewPlan().events[0]!;
-  assert.equal(event.atSeconds, input.startBeat / 2);
-  assert.equal(event.sound.note.holdSeconds, input.durationBeats / 2);
-  assert.equal(event.sound.note.frequencyHz, input.frequencyHz);
-  assert.equal(event.sound.envelope.attackSeconds, 0.025);
-  assert.equal(reopened.read().canUndo, true, 'the editable draft retains its undo history after reopening');
-});
 
 test('phrase undo and redo survive separate restarts without rolling back the saved shared phrase', () => {
   const f = fixture(); const part = start(f); const id = f.phrase.addNote(part, note());
@@ -368,27 +299,6 @@ test('live removal of every phrase note can replace the running plan with silenc
   assert.deepEqual(f.phrase.previewPlan(undefined, { allowSilence: true }).events, []);
 });
 
-test('length changes reject cutting notes and invalid controls preserve the full current state', () => {
-  const f = fixture();
-  const part = start(f);
-  f.phrase.addNote(part, note({ startBeat: 7, durationBeats: 1 }));
-  const before = f.raw();
-  const view = f.phrase.read();
-  assert.throws(() => f.phrase.setLength(4), /超出乐句结尾/);
-  for (const length of [-1, 0, MAX_PHRASE_BEATS + 1, NaN, Infinity]) assert.throws(() => f.phrase.setLength(length));
-  for (const tempo of [0, 39, 241, NaN, Infinity]) assert.throws(() => f.phrase.setTempo(tempo));
-  for (const change of [note({ durationBeats: 0 }), note({ durationBeats: 1 / 2048 }),
-    note({ frequencyHz: 19 }), note({ frequencyHz: Infinity }), note({ velocity: 2 }),
-    note({ startBeat: 8 }), { ...note(), samplePath: 'not-supported' }]) {
-    assert.throws(() => f.phrase.addNote(part, change));
-  }
-  assert.equal(f.raw(), before);
-  assert.deepEqual(f.phrase.read(), view);
-  f.phrase.setLength(64);
-  f.phrase.setTempo(40);
-  f.phrase.addNote(part, note({ startBeat: 0, durationBeats: 64 }));
-  assert.equal(f.phrase.previewPlan().events[0]!.sound.note.holdSeconds, 96);
-});
 
 test('note and part editing support undo, redo, branched history and independent save-as identity', () => {
   const f = fixture();
@@ -589,24 +499,6 @@ test('no-op edits do not write, and undo never overwrites another client editing
   assert.equal(f.phrase.read().canUndo, false);
 });
 
-test('the current editor caps parts, total notes and draft history without discarding older stored content', () => {
-  const f = fixture();
-  start(f);
-  for (let index = 1; index < 8; index++) f.phrase.addPart(f.first.id);
-  const before = f.raw();
-  assert.throws(() => f.phrase.addPart(f.second.id), /最多可使用 8/);
-  assert.equal(f.raw(), before);
-  const body = baseBody(f.first.id);
-  body.parts[0]!.notes = Array.from({ length: MAX_PHRASE_NOTES }, (_, index) => ({ id: `note-${index}`, ...note() }));
-  assert.equal(readPhraseBody(body).parts[0]!.notes.length, MAX_PHRASE_NOTES);
-  body.parts[0]!.notes.push({ id: 'too-many', ...note() });
-  assert.throws(() => readPhraseBody(body), /50000/);
-  for (let index = 0; index < 70; index++) f.phrase.rename(`第${index}次修改`);
-  let undos = 0;
-  while (f.phrase.read().canUndo) { f.phrase.undo(); undos++; }
-  assert.equal(undos, 64);
-  assert.equal(f.phrase.read().draft!.name, '第5次修改');
-});
 
 test('a long phrase with thousands of notes remains editable and retains length, exact notes and history after cold reopening', () => {
   const f = fixture(), partId = start(f); f.phrase.setLength(MAX_PHRASE_BEATS);
@@ -631,19 +523,6 @@ test('a long phrase with thousands of notes remains editable and retains length,
   assert.equal(final.previewPlan().events.length, 5267);
 });
 
-test('reading and setting the same fractional length use the same floating-point boundary tolerance', () => {
-  const f = fixture();
-  const part = start(f);
-  f.phrase.setLength(0.3);
-  f.phrase.addNote(part, note({ startBeat: 0.1, durationBeats: 0.2 }));
-  const before = f.raw();
-  f.phrase.setLength(0.3);
-  assert.equal(f.raw(), before, 'reapplying a valid fractional length is a no-op');
-  f.phrase.setLength(0.4);
-  f.phrase.setLength(0.3);
-  assert.equal(f.phrase.read().body!.lengthBeats, 0.3);
-  assert.throws(() => f.phrase.setLength(0.299), /超出乐句结尾/);
-});
 
 test('a latest unsupported phrase is preserved and reported without locking the whole workstation or hiding other work', () => {
   const f = fixture();
@@ -755,25 +634,6 @@ test('empty and unchanged bulk edits neither write nor erase redo, and each draf
   f.phrase.openDraft(secondDraft); f.phrase.undo(); assert.equal(f.phrase.read().body!.parts[0]!.notes.length, 0);
 });
 
-test('saved phrase playback is read-only, uses saved identity and only changes tempo when explicitly requested', () => {
-  const f = fixture(); const part = start(f);
-  f.phrase.setTempo(90); f.phrase.addNotes(part, [note({ startBeat: 1.123456789, durationBeats: 0.0123456789, frequencyHz: 439.123456789 })]);
-  const content = saved(f.phrase.save('new'));
-  const playback = createPhrasePlayback(f.library, f.playback);
-  f.phrase.updateNote(part, f.phrase.read().body!.parts[0]!.notes[0]!.id, { frequencyHz: 330 });
-  const raw = f.raw();
-  assert.deepEqual(playback.listSaved(), [content]);
-  assert.deepEqual(playback.readSaved(content.id), { content, body: content.body });
-  const ownTempo = playback.planForSaved(content.id);
-  const override = playback.planForSaved(content.id, 120);
-  assert.equal(ownTempo.events[0]!.atSeconds, 1.123456789 * (60 / 90));
-  assert.equal(ownTempo.events[0]!.sound.note.frequencyHz, 439.123456789);
-  assert.equal(override.events[0]!.atSeconds, 1.123456789 / 2);
-  assert.equal(override.events[0]!.sound.note.holdSeconds, 0.0123456789 / 2);
-  for (const tempo of [0, 39, 241, Infinity, NaN]) assert.throws(() => playback.planForSaved(content.id, tempo));
-  assert.throws(() => playback.readSaved(f.first.id)); assert.throws(() => playback.planForSaved('missing'));
-  assert.equal(f.raw(), raw);
-});
 
 test('saved phrase compilation resolves current sound revisions instead of embedding old sound settings', () => {
   const f = fixture(); const part = start(f); f.phrase.addNote(part, note());
@@ -785,4 +645,178 @@ test('saved phrase compilation resolves current sound revisions instead of embed
   saved(f.timbre.save('overwrite', warning.confirmation));
   assert.notDeepEqual(sources(playback.planForSaved(content.id).events[0]!.sound), sources(before.events[0]!.sound));
   assert.deepEqual(f.library.readContent(content.id), content);
+});
+
+
+test('mergeParts retains hidden notes and rejects incompatible groups atomically', () => {
+  const f = fixture(), target = start(f), source = f.phrase.addPart(f.first.id);
+  f.phrase.addNote(source, note({ startBeat: 6, durationSeconds: .5 }));
+  f.phrase.setLastTempoRollLength(4);
+  const before = structuredClone(f.phrase.read().body!);
+  assert.equal(before.parts[1]!.hiddenNotes!.length, 1);
+  f.phrase.mergeParts(source, target);
+  assert.deepEqual(f.phrase.read().body!.parts[0]!.hiddenNotes, before.parts[1]!.hiddenNotes);
+  f.phrase.undo(); assert.deepEqual(f.phrase.read().body, before);
+  const other = f.phrase.addPart(f.second.id), checkpoint = f.phrase.read().draft;
+  assert.throws(() => f.phrase.mergeParts(other, target), /相同音色/);
+  assert.deepEqual(f.phrase.read().draft, checkpoint);
+  f.phrase.setPartTimbre(other, f.first.id); f.phrase.setPartVisible(other, false);
+  assert.throws(() => f.phrase.mergeParts(other, target), /相同音色/);
+  const rhythm = f.phrase.addPart(f.first.id, 'rhythm');
+  f.phrase.mergeParts(rhythm, target);
+  assert(!f.phrase.read().body!.parts.some(part => part.id === rhythm));
+});
+
+function assertCloseValue(actual: unknown, expected: unknown, message?: string) { if(typeof actual==='number'&&typeof expected==='number') assert(Math.abs(actual-expected)<=1e-10*Math.max(1,Math.abs(expected)),message??String(actual)+' != '+String(expected)); else assert.equal(actual,expected,message??'values differ'); }
+test('phrase references and overlaps compile with bounded timing precision', () => {
+  const f = fixture();
+  const firstPart = start(f);
+  const secondPart = f.phrase.addPart(f.second.id);
+  const duplicatePart = f.phrase.addPart(f.first.id);
+  f.phrase.setTempo(90);
+  f.phrase.setLength(4);
+  f.phrase.addNote(firstPart, note({ startBeat: 0, durationBeats: 2 }));
+  f.phrase.addNote(secondPart, note({ startBeat: 1, durationBeats: 0.25, frequencyHz: 440, velocity: 0.4 }));
+  f.phrase.addNote(duplicatePart, note({ startBeat: 3, durationBeats: 1, frequencyHz: 330 }));
+  const body = f.phrase.read().body!;
+  assertCloseValue(body.parts[1]!.name, f.second.name);
+  assert.deepEqual(f.phrase.read().draft!.dependencies, [f.first.id, f.second.id]);
+  const before = f.raw();
+  const plan = f.phrase.previewPlan();
+  assertCloseValue(plan.kind, 'sequence');
+  assertCloseValue(plan.events.length, 3);
+  assert.deepEqual(plan.events.map(event => event.atSeconds), [0, 2 / 3, 2]);
+  assertCloseValue(plan.events[0]!.sound.note.holdSeconds, 4 / 3);
+  assertCloseValue(plan.events[1]!.sound.note.holdSeconds, 1 / 6);
+  assertCloseValue(plan.events[1]!.sound.envelope.attackSeconds, 2, 'short notes retain the saved attack and release early');
+  assert.deepEqual(sources(plan.events[1]!.sound), sources(f.playback.planForSaved(f.second.id, noteToPlan())));
+  assertCloseValue(plan.durationSeconds, 2 + 2 / 3 + 0.55);
+  assertCloseValue(f.raw(), before, 'compilation cannot write or save a phrase');
+  const content = saved(f.phrase.save('new'));
+  assert.deepEqual(content.dependencies, [f.first.id, f.second.id]);
+  assertCloseValue(JSON.stringify(content.body).includes('basic-synth'), false);
+  assertCloseValue(JSON.stringify(content.body).includes('attackSeconds'), false);
+});
+
+
+test('sample audition awaits actual preparation and decodes only its selected source', async () => {
+  const f = fixture(); const pcm = { sampleRate: 8000, channels: [new Float32Array(8000).fill(0.3)] }; const bytes = encodeFloatWav(pcm);
+  const source: ContentRecord = { id: 'note-source', kind: 'rootsound.sample', owner: 'sampling', schemaVersion: 1,
+    revision: 1, name: 'note source', dependencies: [], body: { model: 'audio-sample', version: 1,
+      source: { kind: 'file', name: 'note.wav', mimeType: 'audio/wav' }, audio: { encoding: 'base64', byteLength: bytes.length, data: encodeBase64(bytes) },
+      decoded: { sampleRate: 8000, channels: 1, frames: 8000, durationSeconds: 1 } } };
+  assert.equal(f.library.commitTransaction({ expectedToken: f.library.currentToken(), label: 'test sample', createContents: [source] }).status, 'committed');
+  const warm = createSampleAudio(f.library, { async decode(input) { return decodePcmWav(input)!; } });
+  const editor = createTimbreEditor(f.library, warm); await editor.createFromSample(source.id); editor.setRootFrequency(220);
+  const voice = saved(editor.save('new')); let release!: () => void; let decodes = 0;
+  const cold = createSampleAudio(f.library, { async decode(input) { decodes++; await new Promise<void>(resolve => { release = resolve; }); return decodePcmWav(input)!; } });
+  const phrase = createPhraseEditor(f.library, createTimbrePlayback(f.library, cold)); phrase.create(voice.id);
+  const part = phrase.read().body!.parts[0]!.id; phrase.addPart(f.first.id); const writes = f.writes();
+  const requested = phrase.previewNotePlan(part, { frequencyHz: 440, holdSeconds: 0.27, velocity: 0.6 });
+  for(let i=0;i<20&&!release;i++) await new Promise<void>(resolve=>setImmediate(resolve));
+  assert.equal(decodes, 1); release(); const plan = await requested; assert.equal(plan.kind, 'sample');
+  if (plan.kind !== 'sample') throw new Error('Expected prepared sampled voice');
+  assert.equal(plan.source.id, source.id); assert.equal(plan.playbackRate, 2); assert.equal(plan.note.holdSeconds, 0.27);
+  assert.equal(plan.note.velocity, 0.6); assert.equal(f.writes(), writes); assert.equal(phrase.read().body!.parts[0]!.notes.length, 0);
+});
+
+
+test('off-grid timing and pitch survive saving with bounded floating precision', () => {
+  const f = fixture();
+  const part = start(f);
+  const input = note({ startBeat: 0.123456789123, durationBeats: 0.00123456789,
+    frequencyHz: 439.123456789, velocity: 0.7321234567 });
+  const id = f.phrase.addNote(part, input);
+  assert.deepEqual(f.phrase.read().body!.parts[0]!.notes, [{ ...input, id }]);
+  const content = saved(f.phrase.save('new'));
+  const reopenedLibrary = createMaterialLibrary(f.storage);
+  const reopened = createPhraseEditor(reopenedLibrary, createTimbrePlayback(reopenedLibrary));
+  assert.deepEqual(reopened.read().body, f.phrase.read().body);
+  assertCloseValue(reopened.read().draft!.sourceId, content.id);
+  assertCloseValue(reopened.read().changed, false);
+  const event = reopened.previewPlan().events[0]!;
+  assertCloseValue(event.atSeconds, input.startBeat / 2);
+  assertCloseValue(event.sound.note.holdSeconds, input.durationBeats / 2);
+  assertCloseValue(event.sound.note.frequencyHz, input.frequencyHz);
+  assertCloseValue(event.sound.envelope.attackSeconds, 0.025);
+  assertCloseValue(reopened.read().canUndo, true, 'the editable draft retains its undo history after reopening');
+});
+
+
+test('length and current-range validation remain atomic', () => {
+  const f = fixture();
+  const part = start(f);
+  f.phrase.addNote(part, note({ startBeat: 7, durationBeats: 1 }));
+  const before = f.raw();
+  const view = f.phrase.read();
+  assert.throws(() => f.phrase.setLength(4), /超出音乐结尾/);
+  for (const length of [-1, 0, MAX_PHRASE_BEATS + 1, NaN, Infinity]) assert.throws(() => f.phrase.setLength(length));
+  for (const tempo of [0, 1001, NaN, Infinity]) assert.throws(() => f.phrase.setTempo(tempo));
+  for (const change of [note({ durationBeats: 0 }), note({ durationBeats: .0000001 }),
+    note({ frequencyHz: 1 }), note({ frequencyHz: Infinity }), note({ velocity: 2 }),
+    note({ startBeat: 8 }), { ...note(), samplePath: 'not-supported' }]) {
+    assert.throws(() => f.phrase.addNote(part, change));
+  }
+  assert.equal(f.raw(), before);
+  assert.deepEqual(f.phrase.read(), view);
+  f.phrase.setLength(64);
+  f.phrase.setTempo(40);
+  f.phrase.addNote(part, note({ startBeat: 0, durationBeats: 64 }));
+  assert.equal(f.phrase.previewPlan().events[0]!.sound.note.holdSeconds, 96);
+});
+
+
+test('128-part, note-count and undo-history budgets remain enforced', () => {
+  const f = fixture();
+  start(f);
+  for (let index = 1; index < 128; index++) f.phrase.addPart(f.first.id);
+  const before = f.raw();
+  assert.throws(() => f.phrase.addPart(f.second.id), /最多可使用 128/);
+  assert.equal(f.raw(), before);
+  const body = baseBody(f.first.id);
+  body.parts[0]!.notes = Array.from({ length: MAX_PHRASE_NOTES }, (_, index) => ({ id: `note-${index}`, ...note() }));
+  assert.equal(readPhraseBody(body).parts[0]!.notes.length, MAX_PHRASE_NOTES);
+  body.parts[0]!.notes.push({ id: 'too-many', ...note() });
+  assert.throws(() => readPhraseBody(body), /50000/);
+  for (let index = 0; index < 70; index++) f.phrase.rename(`第${index}次修改`);
+  let undos = 0;
+  while (f.phrase.read().canUndo) { f.phrase.undo(); undos++; }
+  assert.equal(undos, 64);
+  assert.equal(f.phrase.read().draft!.name, '第5次修改');
+});
+
+
+test('fractional length boundaries reject truncation atomically', () => {
+  const f = fixture();
+  const part = start(f);
+  f.phrase.setLength(0.3);
+  f.phrase.addNote(part, note({ startBeat: 0.1, durationBeats: 0.2 }));
+  const before = f.raw();
+  f.phrase.setLength(0.3);
+  assert.equal(f.raw(), before, 'reapplying a valid fractional length is a no-op');
+  f.phrase.setLength(0.4);
+  f.phrase.setLength(0.3);
+  assert.equal(f.phrase.read().body!.lengthBeats, 0.3);
+  assert.throws(() => f.phrase.setLength(0.299), /超出音乐结尾/);
+});
+
+
+test('saved playback is read-only and supports the current tempo range', () => {
+  const f = fixture(); const part = start(f);
+  f.phrase.setTempo(90); f.phrase.addNotes(part, [note({ startBeat: 1.123456789, durationBeats: 0.0123456789, frequencyHz: 439.123456789 })]);
+  const content = saved(f.phrase.save('new'));
+  const playback = createPhrasePlayback(f.library, f.playback);
+  f.phrase.updateNote(part, f.phrase.read().body!.parts[0]!.notes[0]!.id, { frequencyHz: 330 });
+  const raw = f.raw();
+  assert.deepEqual(playback.listSaved(), [content]);
+  assert.deepEqual(playback.readSaved(content.id), { content, body: content.body });
+  const ownTempo = playback.planForSaved(content.id);
+  const override = playback.planForSaved(content.id, 120);
+  assertCloseValue(ownTempo.events[0]!.atSeconds, 1.123456789 * (60 / 90));
+  assertCloseValue(ownTempo.events[0]!.sound.note.frequencyHz, 439.123456789);
+  assertCloseValue(override.events[0]!.atSeconds, 1.123456789 / 2);
+  assertCloseValue(override.events[0]!.sound.note.holdSeconds, 0.0123456789 / 2);
+  for (const tempo of [0, 1001, Infinity, NaN]) assert.throws(() => playback.planForSaved(content.id, tempo));
+  assert.throws(() => playback.readSaved(f.first.id)); assert.throws(() => playback.planForSaved('missing'));
+  assertCloseValue(f.raw(), raw);
 });

@@ -41,7 +41,14 @@ test('shelf reorder is a single durable nonmusical edit and survives restart, un
   assert.deepEqual(orderSongPhraseShelf(readProjectPhrases(reopened, f.id), editor.read().body).map(item => item.id), [c.id, a.id, b.id]);
   const copied = createProjectCopyLibrary(f.raw()!, '复制后的歌', f.id); const copy = createMaterialLibrary({ read: () => copied, write() { throw new Error('Read only'); } }, f.policy);
   const copySong = createSongEditor(copy, createPhrasePlayback(copy, createTimbrePlayback(copy)), { defaultTempoMode: 'source' }); copySong.openDraft(f.id);
-  assert.deepEqual(copySong.read().body!.phraseShelfOrder, [c.id, a.id, b.id]);
+  assert.equal(copySong.read().body!.tracks.length, 1);
+  assert.equal(copySong.read().body!.tracks[0]!.clips.length, 1);
+  assert.deepEqual(copySong.read().body!.phraseShelfOrder, []);
+  const copiedPlan = copySong.previewPlan();
+  assert.equal(copiedPlan.kind, before.kind); assert.equal(copiedPlan.version, before.version);
+  assert.deepEqual(copiedPlan.events, before.events, 'copy preserves every sound event and its timing');
+  assert.equal(before.durationSeconds, 12); assert.equal(copiedPlan.durationSeconds, 8);
+  assert(copiedPlan.durationSeconds >= Math.max(...copiedPlan.events.map(event => event.atSeconds + event.sound.note.holdSeconds + event.sound.envelope.releaseSeconds)));
 });
 
 test('hidden sources retain their slot while visible sources reorder, new ones append and renaming keeps identity order', () => {
@@ -94,7 +101,7 @@ test('solo and mute reject missing rows and cannot partially change a failing st
   const f = fixture(); const first = f.song.read().body!.tracks[0]!.id; const original = f.raw();
   assert.throws(() => f.song.toggleTrackMute('missing')); assert.throws(() => f.song.toggleTrackSolo('missing')); assert.equal(f.raw(), original);
   const body = f.song.read().body!; assert.equal(readSongBody(body).phraseShelfOrder, undefined);
-  for (const phraseShelfOrder of [['a', 'a'], [''], [null], {}, 3]) assert.throws(() => readSongBody({ ...body, phraseShelfOrder }), /乐句栏顺序/);
+  for (const phraseShelfOrder of [['a', 'a'], [''], [null], {}, 3]) assert.throws(() => readSongBody({ ...body, phraseShelfOrder }), /音乐栏顺序/);
   f.fail(); assert.throws(() => f.song.toggleTrackSolo(first), /测试磁盘失败/); assert.throws(() => f.song.toggleTrackMute(first), /测试磁盘失败/);
   assert.equal(f.raw(), original);
 });

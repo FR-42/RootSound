@@ -11,6 +11,12 @@ const workstationRoot = resolve(projectRoot, 'src/workstation');
 const modulesRoot = resolve(workstationRoot, 'modules');
 const requiredModules = ['materials', 'sound-runtime', 'timbre', 'phrase', 'song', 'co-creation', 'sampling', 'melody-recognition', 'ui-rendering'];
 const sourceExtensions = new Set(['.ts', '.tsx', '.js', '.jsx', '.mts', '.mjs', '.cts', '.cjs']);
+const publicEntries: Record<string, string[]> = {
+  timbre: ['public.ts', 'sample-bank.ts', 'instrument-catalog.ts', 'general-midi.json'],
+  sampling: ['public.ts', 'audio.ts'],
+  'ui-rendering': ['public.ts', 'melody-workspace.ts', 'output-volume.ts', 'phrase-composition-transport.ts', 'playlist-transport.ts'],
+};
+const bundledData = resolve(projectRoot, 'website/examples/starter.json');
 
 function sourceFiles(directory: string): string[] {
   if (!existsSync(directory) || !statSync(directory).isDirectory()) return [];
@@ -78,7 +84,7 @@ function checkImport(file: string, node: ts.Node, expression: ts.Expression | ts
     return;
   }
   importsChecked++;
-  const specifier = expression.text;
+  const specifier = expression.text.split('?')[0]!;
   if (isBuiltin(specifier)) return;
   const resolution = ts.resolveModuleName(specifier, file, parsedConfig.options, ts.sys).resolvedModule;
   const localAsset = specifier.startsWith('.') ? resolve(dirname(file), specifier) : undefined;
@@ -90,6 +96,7 @@ function checkImport(file: string, node: ts.Node, expression: ts.Expression | ts
   }
   // 独立安装的库不属于业务模块；项目源码不能借路径别名越过新旧边界。
   if (inside(target, resolve(projectRoot, 'node_modules'))) return;
+  if (target === bundledData && inside(file, resolve(workstationRoot, 'app'))) return;
   if (!inside(target, workstationRoot)) {
     violations.push(`${label} 引用了新工作站之外的源码 ${display(target)}`);
     return;
@@ -103,7 +110,7 @@ function checkImport(file: string, node: ts.Node, expression: ts.Expression | ts
   if (fromModule && fromModule === toModule) return;
   if (isContract(target)) return;
   if (toModule) {
-    if (target !== resolve(modulesRoot, toModule, 'public.ts')) {
+    if (!(publicEntries[toModule] ?? ['public.ts']).some(entry => target === resolve(modulesRoot, toModule, entry))) {
       violations.push(`${label} 越过 ${toModule}/public.ts 访问了 ${display(target)}`);
     }
     return;

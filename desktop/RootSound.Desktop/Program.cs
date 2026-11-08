@@ -111,7 +111,7 @@ internal static class Program
             Directory.CreateDirectory(projectTestDirectory);
             try
             {
-                int passed = ProjectDirectoriesSelfTests.Run(projectTestDirectory);
+                int passed = ProjectDirectoriesSelfTests.Run(projectTestDirectory, Argument(args, "--project-case"));
                 File.WriteAllText(Path.Combine(projectTestDirectory, "project-directories-report.json"), JsonSerializer.Serialize(new { passed }));
                 return 0;
             }

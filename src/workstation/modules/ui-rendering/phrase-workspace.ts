@@ -1,4 +1,5 @@
 import type { PhraseBody, PhraseEditorPort, PhraseNote, PhrasePart } from '../../contracts/phrase.ts';
+import { MIN_TEMPO_BPM, MAX_TEMPO_BPM, MIN_PITCH_HZ, MAX_PITCH_HZ } from '../../contracts/music-limits.ts';
 import type { SaveConfirmation, SaveResult } from '../../contracts/content.ts';
 import type { SoundRuntimePort } from '../../contracts/sound.ts';
 import { createLivePreview } from './live-preview.ts';
@@ -339,7 +340,7 @@ export function mountPhraseWorkspace(root: HTMLElement, options: {
 
       const controls = node('div', 'phrase-controls');
       const tempoLabel = node('label', 'phrase-tempo');
-      const tempoText = node('span', '', `速度 ${body.tempoBpm}`); const tempo = node('input'); tempo.type = 'range'; tempo.min = '40'; tempo.max = '240'; tempo.step = '1'; tempo.value = String(body.tempoBpm); tempo.setAttribute('aria-label', '音乐速度');
+      const tempoText = node('span', '', `速度 ${body.tempoBpm}`); const tempo = node('input'); tempo.type = 'range'; tempo.min = String(MIN_TEMPO_BPM); tempo.max = String(MAX_TEMPO_BPM); tempo.step = '1'; tempo.value = String(body.tempoBpm); tempo.setAttribute('aria-label', '音乐速度');
       tempo.addEventListener('input', () => {
         tempoText.textContent = `速度 ${tempo.value}`;
         liveBody = { ...phrase.read().body!, tempoBpm: Number(tempo.value) }; playbackTempo = liveBody.tempoBpm;
@@ -469,8 +470,8 @@ export function mountPhraseWorkspace(root: HTMLElement, options: {
             const rawDelta = Math.max(-minStart, Math.min(body.lengthBeats - maxEnd, Math.abs(dx) <= dragThreshold ? 0 : target.beat - origin.beat));
             const landedDelta = Math.abs(dx) <= dragThreshold ? 0 : Math.max(-minStart, Math.min(body.lengthBeats - maxEnd, quantize(original.startBeat + rawDelta) - original.startBeat));
             const rowDelta = Math.abs(dy) <= dragThreshold ? 0 : target.row - origin.row;
-            const minRowDelta = Math.ceil(12 * Math.log2(Math.max(...originals.map(note => note.frequencyHz)) / 5000));
-            const maxRowDelta = Math.floor(12 * Math.log2(Math.min(...originals.map(note => note.frequencyHz)) / 20));
+            const minRowDelta = Math.ceil(12 * Math.log2(Math.max(...originals.map(note => note.frequencyHz)) / MAX_PITCH_HZ));
+            const maxRowDelta = Math.floor(12 * Math.log2(Math.min(...originals.map(note => note.frequencyHz)) / MIN_PITCH_HZ));
             const limitedRowDelta = Math.max(minRowDelta, Math.min(maxRowDelta, rowDelta));
             candidates = originals.map(note => ({ ...note, startBeat: note.startBeat + landedDelta,
               frequencyHz: limitedRowDelta ? note.frequencyHz * 2 ** (-limitedRowDelta / 12) : note.frequencyHz }));
@@ -526,7 +527,7 @@ export function mountPhraseWorkspace(root: HTMLElement, options: {
         block.append(node('span', 'phrase-note-label', label), node('span', 'phrase-resize-handle'));
         const description = `${soundName}，${label}（${Number(note.frequencyHz.toFixed(3))} Hz），第 ${Number((note.startBeat + 1).toFixed(3))} 拍，持续 ${Number(note.durationBeats.toFixed(3))} 拍`;
         block.setAttribute('aria-label', (otherSound ? '其他声音：' : '') + description);
-        block.title = description + (otherSound ? '；来自其他声音，单击切换，右键删除。' : '；单击选中，拖动移动，右键或双击删除。'); place(block, note);
+        place(block, note);
         const removeThisNote = () => {
           stopGesture?.();
           block.focus({ preventScroll: true });

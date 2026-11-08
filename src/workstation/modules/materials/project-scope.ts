@@ -1,5 +1,5 @@
 import type { ContentRecord, Draft, JsonValue } from '../../contracts/content.ts';
-import type { ReferenceAdapter } from '../../contracts/references.ts';
+import type { ReferenceAdapter, ReferenceSlot } from '../../contracts/references.ts';
 import { copyJson, sameJson } from './json-value.ts';
 
 export type ProjectPolicy = { rootKind: string; adapters: ReferenceAdapter[] };
@@ -55,18 +55,18 @@ export function createProjectScopePolicy(policy: ProjectPolicy) {
   const adapters = new Map(policy.adapters.map(adapter => [adapter.kind, adapter]));
   if (adapters.size !== policy.adapters.length || !adapters.has(policy.rootKind)) fail('工程素材解释器配置无效。');
   const owner = (record: ContentRecord | Draft) => adapters.get(record.kind) ?? fail(`尚不能独立复制 ${record.kind} 类型的素材。`);
-  function closure(root: ContentRecord | Draft, contents: Map<string, ContentRecord>): ContentRecord[] {
+  function closure(root: ContentRecord | Draft, contents: Map<string, ContentRecord>, readSlots = (record: ContentRecord | Draft) => owner(record).slots(record)): ContentRecord[] {
     const result: ContentRecord[] = []; const seen = new Set<string>(); const visiting = new Set<string>();
     function visit(record: ContentRecord | Draft, include: boolean): void {
       if (visiting.has(record.id)) fail('工程中存在循环引用。');
       if (include && seen.has(record.id)) return;
       visiting.add(record.id);
-      const adapter = owner(record); const slots = adapter.slots(record);
+      const adapter = owner(record); const slots = readSlots(record);
       const actual = new Set(slots.map(slot => slot.targetId));
       if (actual.size !== record.dependencies.length || record.dependencies.some(id => !actual.has(id))) fail('素材引用与依赖列表不一致。');
       for (const slot of slots) {
         const child = contents.get(slot.targetId) ?? fail('工程缺少引用的素材，原稿已保留。');
-        adapter.validateTarget?.(record, slot.id, child); visit(child, true);
+        adapter.validateTarget?.(record, slot.id, child, slots); visit(child, true);
       }
       visiting.delete(record.id);
       if (include) { seen.add(record.id); result.push(record as ContentRecord); }
@@ -168,6 +168,12 @@ export function createProjectScopePolicy(policy: ProjectPolicy) {
   }
   function normalize(before: ProjectState, next: ProjectState, exactNameIds = new Set<string>()): void {
     validateDraftOwnership(next);
+    const slotsByRecord = new Map<ContentRecord | Draft, ReferenceSlot[]>();
+    function readSlots(record: ContentRecord | Draft): ReferenceSlot[] {
+      let slots = slotsByRecord.get(record);
+      if (!slots) { slots = owner(record).slots(record); slotsByRecord.set(record, slots); }
+      return slots;
+    }
     const oldContents = new Map(before.contents.map(record => [record.id, record]));
     const oldDrafts = new Map(before.drafts.map(record => [record.id, record]));
     const contents = new Map(next.contents.map(record => [record.id, record]));
@@ -237,7 +243,7 @@ export function createProjectScopePolicy(policy: ProjectPolicy) {
     for (const record of next.contents) {
       const previous = oldContents.get(record.id);
       if (!previous || same(previous, record) || record.kind === policy.rootKind) continue;
-      const users = new Set(roots(before).filter(({ record: root }) => closure(root, oldContents).some(item => item.id === record.id))
+      const users = new Set(roots(before).filter(({ record: root }) => closure(root, oldContents, readSlots).some(item => item.id === record.id))
         .map(({ type, record: root }) => bindings.get(`${type}:${root.id}`) ?? root.id));
       if (users.size > 1) fail('这份旧素材仍被多首歌曲共用。请从歌曲中的具体位置修改，系统会为该歌曲保留独立版本。');
     }
@@ -264,7 +270,7 @@ export function createProjectScopePolicy(policy: ProjectPolicy) {
     }
     for (const { type, record: root } of projectRoots) {
       const previous = type === 'draft' ? oldDrafts.get(root.id) : oldContents.get(root.id);
-      const dependencies = closure(root, contents);
+      const dependencies = closure(root, contents, readSlots);
       const touched = !previous || !same(previous, root) || dependencies.some(record => !same(record, oldContents.get(record.id)));
       if (!touched) continue;
       const scopeId = bindings.get(`${type}:${root.id}`)!;
@@ -294,7 +300,7 @@ export function createProjectScopePolicy(policy: ProjectPolicy) {
           }
         }
         const identity = external ? crypto.randomUUID() : record.id;
-        const adapter = owner(record); const slots = adapter.slots(record);
+        const adapter = owner(record); const slots = readSlots(record);
         const children = slots.map(slot => ({ slotId: slot.id, targetId: visit(contents.get(slot.targetId)!).id }));
         const changes = adapter.replace(record, children);
         let name = record.name.trim(); let suffix = 2;
@@ -314,7 +320,7 @@ export function createProjectScopePolicy(policy: ProjectPolicy) {
       }
       // Reserve local branches first even if an incoming clip appears earlier.
       for (const item of dependencies) if (ownership.get(item.id) === scopeId) visit(item);
-      const replacements = owner(root).slots(root).map(slot => ({ slotId: slot.id, targetId: visit(contents.get(slot.targetId)!).id }));
+      const replacements = readSlots(root).map(slot => ({ slotId: slot.id, targetId: visit(contents.get(slot.targetId)!).id }));
       const updated = { ...root, ...owner(root).replace(root, replacements) };
       if (type === 'draft') next.drafts[next.drafts.findIndex(item => item.id === root.id)] = updated as Draft;
       else {
@@ -322,7 +328,7 @@ export function createProjectScopePolicy(policy: ProjectPolicy) {
         if (!same(content, root) && oldContents.get(root.id)?.revision === content.revision) content.revision++;
         contents.set(content.id, content); ownership.set(content.id, scopeId);
       }
-      const finalGraph = closure(updated, contents); const finalNames = new Map<string, string>();
+      const finalGraph = closure(updated, contents, readSlots); const finalNames = new Map<string, string>();
       for (const item of finalGraph) {
         const nameKey = key(item.kind, item.name); const existing = finalNames.get(nameKey);
         if (existing && existing !== item.id) fail(`这首歌曲已经有同类素材“${item.name}”。`);

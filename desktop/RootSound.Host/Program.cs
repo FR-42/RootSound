@@ -29,9 +29,16 @@ for (string? line; (line = Console.ReadLine()) is not null;)
                 hasUnsavedChanges = manager.HasUnsavedChanges, doubleClickIntervalMs = 500 }),
             "project.Create" => Pack(new { status = "created", project = manager.Create(A(0), A(1), A(2)) }),
             "project.CreateCopy" => Pack(new { status = "created", project = manager.CreateCopy(A(0), A(1), A(2)) }),
+            "project.CreateDetached" => Pack(new { status = "created", project = manager.CreateDetached(A(0), A(1), A(2)) }),
             "project.List" => Pack(new { status = "listed", projects = manager.List() }),
-            "project.OpenPath" => Pack(new { status = "opened", project = manager.Open(A(0)) }),
-            "project.OpenKnown" => Pack(new { status = "opened", project = manager.OpenKnown(A(0)) }),
+            "project.Browse" => Pack(new { status = "browsed", page = manager.Browse(A(0)) }),
+            "project.OpenPath" => NativeDocumentFiles.Format(A(0)) is not null ? Source(manager.ReadDocumentFile(A(0))) : Pack(new { status = "opened", project = manager.Open(A(0)) }),
+            "project.OpenKnown" => NativeDocumentFiles.Format(A(0)) is not null
+                ? Source(manager.ReadDocumentFile(A(0), known: true))
+                : Pack(new { status = "opened", project = manager.OpenKnown(A(0)) }),
+            "project.OpenDocument" => Pack(new { status = "opened", project = manager.OpenDocument(A(0), A(1), A(2)) }),
+            "project.ReadDocument" => manager.ReadDocument() is { } source ? Source(source) : "{\"status\":\"none\"}",
+            "project.PrepareDocumentSave" => PrepareDocument(A(0)),
             "project.Save" => Pack(new { status = "saved", project = manager.Save(A(0)) }),
             "project.FinishLoading" => FinishLoading(),
             "project.Exit" => ExitProject(A(0), A(1)),
@@ -50,6 +57,10 @@ for (string? line; (line = Console.ReadLine()) is not null;)
     Console.Out.Flush();
 }
 return 0;
+
+string Source(EditableSourceData source) => JsonSerializer.Serialize(new { status = "document", source.Name, source.Path, source.Format,
+    source.Base64, source.Token, source.LibraryText }, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
+string PrepareDocument(string base64) { manager.PrepareDocumentSave(base64); return "{\"status\":\"ready\"}"; }
 
 string ReadStorage()
 {

@@ -6,6 +6,7 @@ import type { SongBody, SongTrack } from '../contracts/song.ts';
 import type { SampleBankTimbreBody } from '../contracts/timbre.ts';
 import { MAX_SEQUENCE_EVENTS, MAX_SEQUENCE_SECONDS } from '../contracts/playback-limits.ts';
 import { MAX_PHRASE_BEATS, MAX_PHRASE_NOTES } from '../contracts/phrase-limits.ts';
+import { MIN_TEMPO_BPM, MAX_TEMPO_BPM, MIN_PITCH_HZ, MAX_PITCH_HZ } from '../contracts/music-limits.ts';
 import { parseMidi } from '../modules/midi-import/public.ts';
 import { createMaterialLibrary } from '../modules/materials/public.ts';
 import { createTimbreReferenceAdapter, readEditableTimbreBody } from '../modules/timbre/public.ts';
@@ -30,10 +31,8 @@ function reserve(taken: Set<string>, proposed: string): string {
   taken.add(name.toLocaleLowerCase('en-US')); return name;
 }
 function coordinateTempo(value: number): number {
-  let result = value;
-  while (result > 240) result /= 2;
-  while (result < 40) result *= 2;
-  return result;
+  if (value < MIN_TEMPO_BPM || value > MAX_TEMPO_BPM) reject(`MIDI 速度超出 ${MIN_TEMPO_BPM}～${MAX_TEMPO_BPM} BPM 编辑范围`);
+  return value;
 }
 function frequency(pitch: number): number { return 440 * 2 ** ((pitch - 69) / 12); }
 // A same-tick GM drum note is a strike, not an instruction to drop that hit.
@@ -74,15 +73,14 @@ export function createMidiProjectLibrary(bytes: Uint8Array, inputName: string): 
   if (drumTriggers) warnings.push(`${drumTriggers} 个零长度打击触发已使用0.12秒击发时长，鼓点开始位置保持不变。`);
   const tempos = midi.tempos.filter((tempo, index, all) => !index || tempo.bpm !== all[index - 1]!.bpm)
     .map(tempo => ({ ...tempo, coordinateBpm: coordinateTempo(tempo.bpm) }));
-  if (tempos.some(tempo => tempo.bpm !== tempo.coordinateBpm)) warnings.push('部分 MIDI 速度超出40～240 BPM，已使用半速或倍速编辑坐标；所有音符的实际开始时间和持续秒数保持原值。');
   if (tempos.length > 2048) reject('这份 MIDI 的速度分段超过当前2048段范围');
   let baseBpm = coordinateTempo(midi.initialTempoBpm);
-  while ((midi.durationSeconds + .4) * baseBpm / 60 > MAX_BEATS && baseBpm / 2 >= 40) baseBpm /= 2;
-  if ((midi.durationSeconds + .4) * baseBpm / 60 > MAX_BEATS) baseBpm = 40;
+  while ((midi.durationSeconds + .4) * baseBpm / 60 > MAX_BEATS && baseBpm / 2 >= MIN_TEMPO_BPM) baseBpm /= 2;
+  if ((midi.durationSeconds + .4) * baseBpm / 60 > MAX_BEATS) baseBpm = MIN_TEMPO_BPM;
   const palette = voices(), lanes = new Map<string, Lane>(), rowNames = new Set<string>();
   for (const note of midi.notes) {
     const pitch = frequency(note.pitch), duration = noteDuration(note);
-    if (pitch < 20 || pitch > 5000) reject(`音符 ${note.pitch} 的音高超出当前20～5000 Hz编辑范围`);
+    if (pitch < MIN_PITCH_HZ || pitch > MAX_PITCH_HZ) reject(`音符 ${note.pitch} 的音高超出当前完整 MIDI 音域`);
     if (duration < .0001 || duration > 96) reject('部分音符的持续时间超出当前0.1毫秒～96秒范围');
     const rhythm = note.channel === 9;
     const key = `${note.trackIndex}:${note.channel}:${rhythm ? `drum:${note.pitch}` : `program:${note.program}`}`;
@@ -190,7 +188,7 @@ export function createMidiProjectLibrary(bytes: Uint8Array, inputName: string): 
     const group = expected.get(key) ?? { times: [], cursor: 0 }; group.times.push(note.startSeconds); expected.set(key, group);
   }
   for (const group of expected.values()) group.times.sort((a, b) => a - b);
-  for (const event of plan.events) {
+  for (const event of [...plan.events].sort((a, b) => a.atSeconds - b.atSeconds)) {
     const key = JSON.stringify([event.sound.note.holdSeconds, event.sound.note.frequencyHz, event.sound.note.velocity, event.pan ?? 0, event.sound.level]);
     const group = expected.get(key), time = group ? group.times[group.cursor++] : undefined;
     if (time === undefined || Math.abs(event.atSeconds - time) > EPSILON) reject('导入后的演奏时间与源文件不一致');

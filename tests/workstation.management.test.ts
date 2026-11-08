@@ -3,10 +3,10 @@ import { test } from 'node:test';
 import { createMaterialLibrary, createMaterialCatalog } from '../src/workstation/modules/materials/public.ts';
 import { createWorkspacePreferences } from '../src/workstation/app/platform/preferences.ts';
 import type { SaveResult } from '../src/workstation/contracts/content.ts';
-import type { WorkspacePreferences } from '../src/workstation/contracts/workspace.ts';
+import { createLearningSettings } from '../src/workstation/app/platform/learning-settings.ts';
 import { registerHooks } from 'node:module';
 const settingsHook = registerHooks({ load(url, context, next) { return url.endsWith('.css') ? { format: 'module', source: '', shortCircuit: true } : next(url, context); } });
-const { showWorkspaceSettings } = await import('../src/workstation/modules/ui-rendering/settings.ts'); settingsHook.deregister();
+const { showLearningSettings } = await import('../src/workstation/modules/ui-rendering/settings.ts'); settingsHook.deregister();
 
 function result(value: SaveResult) { assert.equal(value.status, 'saved'); if (value.status !== 'saved') throw new Error('Expected saved'); return value.content; }
 function fixture() {
@@ -106,44 +106,31 @@ class SettingsElement extends EventTarget {
   close() { this.attributes.delete('open'); this.dispatchEvent(new Event('close')); }
 }
 const settingsNodes = (root: SettingsElement): SettingsElement[] => [root, ...root.children.flatMap(settingsNodes)];
-function settingsFixture(fail = false, initial?: Record<string, unknown>) {
+function settingsFixture(fail = false, required = false) {
   const descriptor = Object.getOwnPropertyDescriptor(globalThis, 'document');
-  Object.defineProperty(globalThis, 'document', { configurable: true, value: { createElement: (tag: string) => new SettingsElement(tag), createTextNode(text: string) { const node = new SettingsElement('text'); node.textContent = text; return node; } } });
-  const map = new Map<string, string>(initial ? [['rootsound.workstation.preferences.v1', JSON.stringify(initial)]] : []); const preferences = createWorkspacePreferences({ getItem: key => map.get(key) ?? null, setItem(key, value) { if (fail) throw new Error('read-only'); map.set(key, value); } });
-  const updates: Partial<WorkspacePreferences>[] = []; const update = preferences.update;
-  preferences.update = changes => { updates.push({ ...changes }); return update(changes); };
-  const root = new SettingsElement('root'); let closed = 0;
-  const open = () => showWorkspaceSettings(root as unknown as HTMLElement, preferences, () => { closed++; }); open();
+  Object.defineProperty(globalThis, 'document', { configurable: true, value: { createElement: (tag: string) => new SettingsElement(tag) } });
+  const map = new Map<string, string>([['song-data', '完整工程原文']]);
+  const preferences = createLearningSettings({ getItem: key => map.get(key) ?? null, setItem(key, value) { if (fail) throw new Error('read-only'); map.set(key, value); } });
+  const root = new SettingsElement('root');
+  const open = () => showLearningSettings(root as unknown as HTMLElement, preferences, { requiresTempoRolls: required }); open();
   const find = (predicate: (node: SettingsElement) => boolean) => { const result = settingsNodes(root).find(predicate); assert(result); return result; };
-  return { root, preferences, map, updates, open, get closed() { return closed; }, performance: () => find(node => node.attributes.get('aria-label') === '键盘演奏'),
-    submit: () => find(node => node.tag === 'form').dispatchEvent(new Event('submit', { cancelable: true })),
-    back: () => find(node => node.textContent === '返回').dispatchEvent(new Event('click')),
-    error: () => find(node => node.attributes.get('role') === 'status'),
+  return { root, preferences, map, open,
+    feature: () => find(node => node.attributes.get('aria-label') === '分段调整速度'),
+    error: () => find(node => node.attributes.get('role') === 'alert'),
     cleanup() { if (descriptor) Object.defineProperty(globalThis, 'document', descriptor); else Reflect.deleteProperty(globalThis, 'document'); } };
 }
 
-test('settings exposes one opt-in keyboard switch, saves it on submit and refreshes once after close', () => {
+test('settings expose segmented tempo without any guide and keep the settings open on enable', () => {
   const f = settingsFixture(); try {
-    assert.equal(f.performance().checked, false); assert.equal(f.preferences.read().keyboardPerformance, false);
+    assert.equal(f.feature().checked, false);
     assert.equal(settingsNodes(f.root).filter(node => node.tag === 'input').length, 1);
-    assert.equal(settingsNodes(f.root).filter(node => node.tag === 'select' || node.tag === 'option').length, 0);
-    assert(!settingsNodes(f.root).some(node => /欢迎|工作区|直接进入/u.test(node.textContent)), 'removed entry controls and explanatory text are absent');
-    f.open(); assert.equal(settingsNodes(f.root).filter(node => node.tag === 'dialog').length, 1, 'repeated settings clicks reuse the open page');
-    f.performance().checked = true; f.submit(); assert.equal(f.preferences.read().keyboardPerformance, true); assert.equal(f.root.children.length, 0); assert.equal(f.closed, 1);
-    assert.deepEqual(f.updates, [{ keyboardPerformance: true }], 'the sole setting cannot reset any unrelated preference');
-    f.open(); assert.equal(f.performance().checked, true); f.performance().checked = false; f.back();
-    assert.equal(f.preferences.read().keyboardPerformance, true, 'Back discards uncommitted switch edits'); assert.equal(f.closed, 2);
-  } finally { f.cleanup(); }
-});
-
-test('saving the only visible setting preserves retired entry data and unrelated same-version preferences', () => {
-  const initial = { version: 1, keyboardPerformance: false, welcomeEnabled: false, startWorkspace: 'sampling', lastWorkspace: 'song', unrelated: { retained: '原有偏好' } };
-  const f = settingsFixture(false, initial); try {
-    f.performance().checked = true; f.submit();
-    const stored = JSON.parse(f.map.get('rootsound.workstation.preferences.v1')!);
-    assert.deepEqual(stored, { ...initial, keyboardPerformance: true });
-    assert.deepEqual(f.updates, [{ keyboardPerformance: true }]);
-    assert.equal(createWorkspacePreferences({ getItem: key => f.map.get(key) ?? null, setItem() { throw new Error('read only'); } }).read().keyboardPerformance, true);
+    assert.deepEqual(settingsNodes(f.root).filter(node => node.tag === 'button').map(node => node.textContent), ['×']);
+    f.open(); assert.equal(settingsNodes(f.root).filter(node => node.tag === 'dialog').length, 1);
+    f.feature().checked = true; f.feature().dispatchEvent(new Event('change'));
+    assert.equal(f.preferences.read().multipleTempoRolls, true);
+    assert.equal(f.preferences.read().guides['tempo-rolls'].status, 'new');
+    assert.equal(f.map.get('song-data'), '完整工程原文'); assert.equal(f.root.children.length, 1);
+    assert.equal(createLearningSettings({ getItem: key => f.map.get(key) ?? null, setItem() {} }).read().multipleTempoRolls, true);
   } finally { f.cleanup(); }
 });
 
@@ -160,10 +147,11 @@ test('keyboard setting migrates independently of missing or invalid retired cont
   }
 });
 
-test('failed settings persistence keeps the page and edited switch available without enabling performance', () => {
+test('failed feature persistence leaves the switch disabled in preferences and displays a retryable error', () => {
   const f = settingsFixture(true); try {
-    f.performance().checked = true; f.submit(); assert.equal(f.preferences.read().keyboardPerformance, false); assert.equal(f.performance().checked, true);
-    assert.match(f.error().textContent, /未能保存/); assert.equal(f.closed, 0); assert.equal(f.root.children.length, 1);
-    f.back(); assert.equal(f.closed, 1); assert.equal(f.root.children.length, 0);
+    f.feature().checked = true; f.feature().dispatchEvent(new Event('change'));
+    assert.equal(f.preferences.read().multipleTempoRolls, false); assert.equal(f.feature().checked, false);
+    assert.match(f.error().textContent, /未能保存/);
+    assert.equal(f.root.children.length, 1); assert.equal(f.map.get('song-data'), '完整工程原文');
   } finally { f.cleanup(); }
 });

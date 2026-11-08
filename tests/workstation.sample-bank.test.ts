@@ -109,8 +109,8 @@ test('quiet bow/noise overlays cannot displace the principal pitched recording',
 });
 
 test('native close preparation awaits asynchronous sample capture and reports a capture failure',async()=>{
-  let completed=false;const prepare=createProjectClosePreparation({flush(){},async assertSaveReady(){await Promise.resolve();completed=true;throw Error('采样读取失败');},name:()=> '音乐'});
-  const result=await prepare();assert(completed);assert.equal(result.canSave,false);assert.equal(result.saveMessage,'采样读取失败');
+  let completed=false;const prepare=createProjectClosePreparation({flush(){},async prepareSave(){await Promise.resolve();completed=true;throw Error('采样读取失败');},name:()=> '音乐'});
+  const result=await prepare('save');assert(completed);assert.equal(result.canSave,false);assert.equal(result.saveMessage,'采样读取失败');
 });
 
 test('installed recordings support actual piano, bowed string, wind, brass and drum plans without a sound device',async()=>{

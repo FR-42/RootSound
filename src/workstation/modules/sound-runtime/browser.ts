@@ -9,7 +9,7 @@ import type {
 } from '../../contracts/sound.ts';
 
 import { noteDuration, previewFingerprint, readPreview, samePreviewSamples, validateFrequency, type ScheduledPreview } from './plan.ts';
-import { allocateGraph, releaseGraph, scheduleGraph, startGraphSource, watchSourceErrors, type GraphResources } from './graph.ts';
+import { allocateGraph, releaseGraph, scheduleGraph, startGraphSource, watchSourceErrors, soundFontEvents, type GraphResources } from './graph.ts';
 import { renderOffline } from './offline.ts';
 import { readPcmAudio } from './pcm.ts';
 import { WindowedGraph, WINDOWED_EVENT_THRESHOLD } from './windowed.ts';
@@ -21,6 +21,7 @@ const LIVE_TRANSITION_SECONDS = 0.005;
 let runtimeSequence = 0;
 
 interface ActiveVoice {
+  soundFont?: GraphResources['soundFont'];
   audioSource?: AudioBufferSourceNode;
   windowed?: WindowedGraph;
   session: PlaybackSession;
@@ -35,7 +36,7 @@ interface ActiveVoice {
   remaining: number;
   generation: number;
   fadeGains: GainNode[];
-  fingerprint: string;
+  fingerprint?: string;
   preview?: ScheduledPreview;
   startTimes: Map<AudioScheduledSourceNode, number>;
   readonly retiring: Set<{ resources: GraphResources; clock: ConstantSourceNode; until: number; windowed?: WindowedGraph }>;
@@ -142,28 +143,6 @@ export function createBrowserSoundRuntime(): SoundRuntimePort {
   }
 
   function listeningOutput(audio: AudioContext): AudioNode { return outputMix ?? audio.destination; }
-  function applyOutputLevel(force = false): void {
-    if (!context || (outputLevel === 1 && !outputMix && !force)) return;
-    const audio = context;
-    if (!outputMix) {
-      outputMix = audio.createGain(); outputMix.gain.setValueAtTime(1, audio.currentTime);
-      outputLimiter = createOutputLimiter(audio, audio.destination);
-      outputMix.connect(outputLimiter.input);
-      const redirect = (resources: GraphResources) => {
-        for (const node of resources.outputBuses?.length ? resources.outputBuses : resources.panners) { node.disconnect(); node.connect(outputMix!); }
-      };
-      if (mainMix) { mainMix.disconnect(); mainMix.connect(outputMix); }
-      else {
-        if (active) redirect(active);
-        for (const item of active?.retiring ?? []) redirect(item.resources);
-        if (active?.audioSource) { active.audioSource.disconnect(); active.audioSource.connect(outputMix); }
-      }
-      if (auditionVoice) redirect(auditionVoice.resources);
-    }
-    outputMix.gain.cancelAndHoldAtTime(audio.currentTime);
-    outputMix.gain.linearRampToValueAtTime(outputLevel, audio.currentTime + .015);
-  }
-
   function cancelAudition(): void {
     auditionSequence++;
     cancelPendingResumes(pendingAuditionResumes);
@@ -193,7 +172,7 @@ export function createBrowserSoundRuntime(): SoundRuntimePort {
     voice.retiring.clear();
     voice.completion = null;
     voice.oscillators.length = 0; voice.samples.length = 0; voice.gains.length = 0; voice.panners.length = 0;
-    voice.outputBuses = undefined; voice.filters = undefined; voice.fadeGains = []; voice.startTimes.clear();
+    voice.outputBuses = undefined; voice.filters = undefined; voice.soundFont = undefined; voice.fadeGains = []; voice.startTimes.clear();
   }
 
   function finish(voice: ActiveVoice, status: Exclude<PlaybackStatus, 'playing' | 'paused'>, error?: string): void {
@@ -236,7 +215,10 @@ export function createBrowserSoundRuntime(): SoundRuntimePort {
       }
       context = new AudioContext();
       context.onstatechange = deviceChanged;
-      applyOutputLevel();
+      outputMix = context.createGain();
+      outputMix.gain.setValueAtTime(outputLevel, context.currentTime);
+      outputLimiter = createOutputLimiter(context, context.destination);
+      outputMix.connect(outputLimiter.input);
     }
     const audio = context;
     if (audio.state === 'closed') throw new Error('声音设备已关闭，请重新打开工作站。');
@@ -283,7 +265,6 @@ export function createBrowserSoundRuntime(): SoundRuntimePort {
     if(hasSoundFont(preview))await prepareSoundFont(audio,preview);
     if (disposed || request !== requestSequence) throw new Error('这次试听已取消。');
     validateFrequency(preview, audio.sampleRate);
-    if (hasSoundFont(preview)) applyOutputLevel(true);
     let session: PlaybackSession = Object.freeze({
       id: `preview-${runtimeId}-${++sequence}`,
       status: 'playing',
@@ -394,7 +375,6 @@ export function createBrowserSoundRuntime(): SoundRuntimePort {
     if(hasSoundFont(preview))await prepareSoundFont(audio,preview);
     if (disposed || request !== auditionSequence) throw new Error('这次试音已取消。');
     validateFrequency(preview, audio.sampleRate);
-    if (hasSoundFont(preview)) applyOutputLevel(true);
     const resources: GraphResources = { oscillators: [], samples: [], bufferReleases: [], gains: [], panners: [] };
     const voice: AuditionVoice = { resources, remaining: 0 };
     try {
@@ -420,7 +400,7 @@ export function createBrowserSoundRuntime(): SoundRuntimePort {
     }
   }
 
-  function update(sessionId: string, input: PlayableNotePlan | SoundSequencePlan): PlaybackSession | undefined {
+  function update(sessionId: string, input: PlayableNotePlan | SoundSequencePlan, options?: { preserveSounding?: boolean; elapsedSeconds?: number }): PlaybackSession | undefined {
     const voice = active;
     const audio = context;
     if (disposed || voice === null || audio === null || voice.session.id !== sessionId || voice.session.status !== 'playing') return undefined;
@@ -431,21 +411,37 @@ export function createBrowserSoundRuntime(): SoundRuntimePort {
       finish(voice, 'ended');
       return undefined;
     }
-    const preview = readPreview(input, { allowEmptySequence: true, previous: voice.preview, transportElapsed: elapsed(voice) });
+    const preview = readPreview(input, { allowEmptySequence: true, previous: voice.preview, transportElapsed: options?.elapsedSeconds ?? elapsed(voice) });
     validateFrequency(preview, audio.sampleRate);
-    if (hasSoundFont(preview)) applyOutputLevel(true);
     const fontUpdate=++fontUpdateSequence;
     if(hasSoundFont(preview)&&!soundFontReady(audio)) {
       void prepareSoundFont(audio,preview).then(()=>{
-        if(fontUpdate===fontUpdateSequence&&active===voice&&voice.session.status==='playing')update(sessionId,input);
+        if(fontUpdate===fontUpdateSequence&&active===voice&&voice.session.status==='playing')update(sessionId,input,options);
       }).catch(error=>{if(fontUpdate===fontUpdateSequence&&active===voice)finish(voice,'failed',message(error));});
       return voice.session;
     }
+    if (options?.preserveSounding && voice.preview && voice.soundFont && voice.completion && preview.sequence && !preview.output && !voice.preview.output
+      && preview.events.every(event => event.sound.kind === 'sample' && event.sound.soundFont)
+      && voice.preview.events.every(event => event.sound.kind === 'sample' && event.sound.soundFont)) {
+      if (audio.state !== 'running') throw new Error('声音设备当前不可用，请重新点击试听。');
+      voice.soundFont.source.updateSchedule(soundFontEvents(preview.events), preview.midiExpression ?? []);
+      if (Math.abs(preview.durationSeconds - voice.preview.durationSeconds) > 1e-7 || preview.normalization !== voice.preview.normalization) {
+        const now = audio.currentTime, end = Math.max(now + .025, voice.originSeconds + preview.durationSeconds);
+        voice.soundFont.gain.gain.cancelAndHoldAtTime(now);
+        voice.soundFont.gain.gain.linearRampToValueAtTime(preview.normalization, now + .02);
+        voice.soundFont.gain.gain.setValueAtTime(0, end);
+        voice.completion.stop(end + .001);
+      }
+      voice.preview = preview; voice.fingerprint = undefined;
+      voice.session = Object.freeze({ ...voice.session, durationSeconds: preview.durationSeconds });
+      emit({ type: 'session', session: voice.session });
+      return voice.session;
+    }
     const fingerprint = previewFingerprint(preview);
-    if (voice.fingerprint === fingerprint && samePreviewSamples(voice.preview, preview)) {
-      // The head may have changed speed during a long sustained tail without
-      // changing today's audible graph. Retain that history for later edits.
+    const previousFingerprint = voice.fingerprint ?? (voice.preview && previewFingerprint(voice.preview));
+    if (previousFingerprint === fingerprint && samePreviewSamples(voice.preview, preview)) {
       voice.preview = preview;
+      voice.fingerprint = fingerprint;
       return voice.session;
     }
     if (audio.state !== 'running') throw new Error('声音设备当前不可用，请重新点击试听。');
@@ -529,6 +525,7 @@ export function createBrowserSoundRuntime(): SoundRuntimePort {
       voice.panners.splice(0, voice.panners.length, ...resources.panners);
       voice.outputBuses = resources.outputBuses;
       voice.filters = resources.filters;
+      voice.soundFont = resources.soundFont;
       voice.completion = completion; voice.windowed = windowed;
       voice.generation += 1;
       const generation=voice.generation;
@@ -582,7 +579,6 @@ export function createBrowserSoundRuntime(): SoundRuntimePort {
     if(hasSoundFont(preview))await prepareSoundFont(audio,preview);
     if (disposed || request !== requestSequence || active !== voice || voice.session.status !== 'paused') throw new Error('这次试听已取消。');
     validateFrequency(preview, audio.sampleRate);
-    if (hasSoundFont(preview)) applyOutputLevel(true);
     const resources: GraphResources = { oscillators: [], samples: [], bufferReleases: [], gains: [], panners: [] };
     let completion: ConstantSourceNode | null = null;
     let windowed: WindowedGraph | undefined;
@@ -605,7 +601,7 @@ export function createBrowserSoundRuntime(): SoundRuntimePort {
       if (audio.currentTime >= start) throw new Error('当前声音续播未能及时完成，请减少同时使用的声音后重试。');
       voice.oscillators.push(...resources.oscillators); voice.samples.push(...resources.samples);
       voice.bufferReleases.push(...resources.bufferReleases); voice.gains.push(...resources.gains); voice.panners.push(...resources.panners);
-      voice.outputBuses = resources.outputBuses; voice.filters = resources.filters; voice.completion = completion; voice.windowed = windowed;
+      voice.outputBuses = resources.outputBuses; voice.filters = resources.filters; voice.soundFont = resources.soundFont; voice.completion = completion; voice.windowed = windowed;
       voice.fadeGains = windowed ? [windowed.fade] : graph.envelopes.map(item => item.node); voice.startTimes = starts;
       voice.preview = preview; voice.fingerprint = previewFingerprint(preview); voice.originSeconds = origin; voice.clockFloorSeconds = fromSeconds; voice.pausedElapsed = undefined;
       voice.session = Object.freeze({ ...voice.session, status: 'playing', durationSeconds: preview.durationSeconds });
@@ -625,8 +621,13 @@ export function createBrowserSoundRuntime(): SoundRuntimePort {
     readOutputLevel: () => outputLevel,
     setOutputLevel(level) {
       if (!Number.isFinite(level) || level < 0 || level > 4) throw new Error('试听音量应在 0% 至 400% 之间。');
-      if (disposed) return;
-      outputLevel = level; applyOutputLevel();
+      if (disposed || outputLevel === level) return;
+      outputLevel = level;
+      if (outputMix && context && context.state !== 'closed') {
+        const now = context.currentTime;
+        outputMix.gain.cancelAndHoldAtTime(now);
+        outputMix.gain.linearRampToValueAtTime(level, now + .035);
+      }
     },
     async activate() { await ready(); },
     preview,

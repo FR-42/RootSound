@@ -183,13 +183,6 @@ test('plain copies keep shared references while subsequent occurrence edits are 
   assert.notEqual(result.content.id, f.timbre.content.id); assert.deepEqual(f.library.readContent(copy.id)!.dependencies, [f.timbre.content.id]);
 });
 
-test('adapter replacements reject unknown slots and retain exact dependencies for partial repeated references', () => {
-  const f = fixture(); const phrase = createPhraseReferenceAdapter(); const song = createSongReferenceAdapter();
-  assert.throws(() => phrase.replace(f.phrase.content, [{ slotId: 'missing', targetId: 'new' }]), /位置/);
-  assert.throws(() => song.replace(f.song.content, [{ slotId: 'clip-a', targetId: 'new' }, { slotId: 'clip-a', targetId: 'other' }]), /位置/);
-  const rewritten = phrase.replace(f.phrase.content, [{ slotId: 'part-a', targetId: 'new' }]); assert.deepEqual(rewritten.dependencies, ['new', f.timbre.content.id]);
-  assert.throws(() => createTimbreReferenceAdapter().replace(f.timbre.content, [{ slotId: 'nothing', targetId: 'new' }]), /没有/);
-});
 
 test('actual song editor can redo a composite operation whose fork does not exist until restoration', () => {
   const f = fixture(); const edit = f.refs.begin({ root: f.root, path: ['clip-b'] }); changeNote(f.library, edit.draftId, 440);
@@ -338,4 +331,12 @@ test('cancelling an adopted outer editor also removes unfinished nested drafts w
   assert.equal(f.refs.cancel(outer.draftId).status, 'done'); assert.equal(f.library.readDraft(inner.draftId), undefined);
   assert.equal(f.library.readDraft(outer.draftId)!.editingContext, undefined);
   assert.equal(readPhraseBody(f.library.readDraft(outer.draftId)!.body).parts[0]!.notes[0]!.frequencyHz, 990);
+});
+
+test('invalid reference slots are rejected without altering dependencies', () => {
+  const f = fixture(); const phrase = createPhraseReferenceAdapter(); const song = createSongReferenceAdapter();
+  assert.throws(() => phrase.replace(f.phrase.content, [{ slotId: 'missing', targetId: 'new' }]), /位置/);
+  assert.throws(() => song.replace(f.song.content, [{ slotId: 'clip-a', targetId: 'new' }, { slotId: 'clip-a', targetId: 'other' }]), /位置/);
+  const rewritten = phrase.replace(f.phrase.content, [{ slotId: 'part-a', targetId: 'new' }]); assert.deepEqual(rewritten.dependencies, ['new', f.timbre.content.id]);
+  assert.throws(() => createTimbreReferenceAdapter().replace(f.timbre.content, [{ slotId: 'nothing', targetId: 'new' }]), /采样引用无效/);
 });

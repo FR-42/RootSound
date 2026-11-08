@@ -131,6 +131,8 @@ export interface MaterialLibrary {
   /** Plain external writes invalidate history; remembered edits persist history atomically. */
   updateDraft(id: string, changes: DraftChanges, options?: DraftEditOptions): Draft;
   readDraftHistory(id: string): DraftHistory;
+  readDraftHistoryStep?(id: string, direction: 'undo' | 'redo'): DraftSnapshot | undefined;
+  readDraftHistoryStatus?(id: string): { canUndo: boolean; canRedo: boolean };
   /** Callers validate ordinary targets; transaction targets restore their entire validated patch atomically. */
   travelDraft(id: string, direction: 'undo' | 'redo', expected: Draft): Draft;
   readContent(id: string): ContentRecord | undefined;

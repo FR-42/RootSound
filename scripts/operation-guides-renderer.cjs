@@ -9,7 +9,7 @@ const lessons=[
  {id:'bpm',title:'BPM',description:'',alt:'左侧调整BPM，右侧以相同缩放显示拍线间距变化；按空格敲击定速。'},
  {id:'cells',title:'格数',description:'',alt:'同样一拍分别分成2格、3格、4格。'},
  {id:'zoom',title:'缩放视角',description:'',alt:'先按Ctrl和Shift滚轮横向缩放，再按Ctrl滚轮竖向缩放。'},
- {id:'editing',title:'写音符与拖动画布',description:'',alt:'点击音符选中，点击卷帘添加音符，右键空白取消选中后拖动画布。'},
+ {id:'editing',title:'写音符与拖动画布',description:'',alt:'单选音符时拖动空白移动卷帘。选中左侧音符组后，在空白处点击添加音符，右键取消。',version:8},
  {id:'extend',title:'延长与新增卷帘',description:'',alt:'下拉卷帘底边增加拍数，再点击下方加号添加新卷帘。'},
 ];
 let win,lesson,frames=[],all=[],count=0,label='',keys='',camera={cx:600,cy:310,w:1200},cursor={x:70,y:70,down:false},last='',mode='normal';
@@ -31,6 +31,7 @@ async function snap(ms=80,transition=200){
 async function fresh(index){
  lesson=lessons[index];frames=[];label='';keys='';mode='normal';camera={cx:600,cy:310,w:1200};cursor={x:70,y:70,down:false};
  await win.loadURL(config.url);const zoomChanged=win.webContents.getZoomFactor()!==2;win.webContents.setZoomFactor(2);if(zoomChanged)await win.loadURL(config.url);await wait(()=>js('!!globalThis.__tutorial?.editor').catch(()=>false));
+ await js("document.querySelector('.guidance-skip')?.click()");
  // Tutorial data stays independent from the public starter composition.
  await js("document.querySelector('.web-new').click()");await wait(()=>js('__tutorial.model.score.read().body.parts.reduce((n,p)=>n+p.notes.length,0)===0'));
  await js("document.querySelector('.web-footer').style.visibility='hidden'");await delay(100);
@@ -51,7 +52,7 @@ async function wheel(delta,flags={},steps=18){
  for(let i=0;i<steps;i++){await js(`document.querySelector('.melody-scroll').dispatchEvent(new WheelEvent('wheel',{bubbles:true,cancelable:true,deltaY:${delta/steps},clientX:${cursor.x},clientY:${cursor.y},...${JSON.stringify(flags)}}))`);await snap(34,0);}
  await snap(350,0);
 }
-async function end(){assert.deepEqual(await js('__guide.errors'),[]);assert(!win.isVisible());const duration=frames.reduce((n,f)=>n+f.duration,0);all.push({...lesson,version:7,frames,duration});console.log(JSON.stringify({id:lesson.id,frames:frames.length,seconds:duration/1000}));}
+async function end(){assert.deepEqual(await js('__guide.errors'),[]);assert(!win.isVisible());const duration=frames.reduce((n,f)=>n+f.duration,0);all.push({version:7,...lesson,frames,duration});console.log(JSON.stringify({id:lesson.id,frames:frames.length,seconds:duration/1000}));}
 app.whenReady().then(async()=>{try{
  session.defaultSession.webRequest.onBeforeRequest({urls:['https://*/*']},(_d,cb)=>cb({cancel:true}));
  win=new BrowserWindow({show:false,useContentSize:true,width:2400,height:1240,webPreferences:{offscreen:true,sandbox:true,contextIsolation:true,backgroundThrottling:false}});win.setMenu(null);win.setContentSize(2400,1240);
@@ -92,17 +93,41 @@ app.whenReady().then(async()=>{try{
    label=horizontal?'横向收拢':'竖向收拢';await wheel(220,{ctrlKey:true,shiftKey:horizontal},28);await snap(700,0);
  }await end();
 
- await fresh(4);await seed();camera={cx:600,cy:300,w:1100};label='点音符，选中';
- const existing=await rect('.melody-note');cursor={x:existing.x+existing.w/2,y:existing.y+8,down:false};await snap(650,0);await pointer('pointerdown',cursor.x,cursor.y,'.melody-note');await pointer('pointerup',cursor.x,cursor.y);await snap(800,0);
+ await fresh(4);await seed();label='点音符，单选';
+ const existing=await rect('.melody-note');
+ cursor={x:existing.x+existing.w/2,y:existing.y+existing.h/2,down:false};
+ await snap(550,0);
+ await pointer('pointerdown',cursor.x,cursor.y,'.melody-note');
+ await pointer('pointerup',cursor.x,cursor.y);
+ await snap(700,0);
  assert.equal(await js("document.querySelectorAll('.melody-note.is-selected').length"),1);
- label='点卷帘，添加音符';const point2=await js("(()=>{const k=document.querySelector('[data-pitch-label=\"C4\"]').getBoundingClientRect(),c=document.querySelector('.melody-canvas').getBoundingClientRect(),s=document.querySelector('.melody-scroll'),v=__tutorial.editor.readViewport();return {x:k.x+k.width/2,y:c.y+(1.1-v.leftSeconds)*(s.clientHeight-48)*v.zoom/8}})()");
- cursor={...point2,down:false};await snap(500);await pointer('pointerdown',cursor.x,cursor.y,'.melody-canvas');await pointer('pointerup',cursor.x,cursor.y);await snap(850,0);
- assert.equal(await js('__tutorial.model.score.read().body.parts.reduce((n,p)=>n+p.notes.length,0)'),5);
- label='右键空白，取消选中';keys='鼠标右键';cursor={x:point2.x+130,y:point2.y-50,down:false};await snap(550);await pointer('pointerdown',cursor.x,cursor.y,'.melody-canvas',2);cursor.down=true;await snap(140,0);await pointer('pointerup',cursor.x,cursor.y,'document',2);cursor.down=false;await snap(650,0);
+ assert.equal(await js("document.querySelectorAll('.melody-note-family.is-selected').length"),0);
+ label='单选时，拖空白移动卷帘';
+ const from={x:775,y:370};
+ const beforePan=await js('__tutorial.editor.readViewport()');
+ cursor={...from,down:false};await snap(420);
+ await pointer('pointerdown',from.x,from.y,'.melody-canvas');cursor.down=true;
+ for(let i=1;i<=20;i++){cursor.x=from.x-90*i/20;cursor.y=from.y-70*i/20;await pointer('pointermove',cursor.x,cursor.y);await snap(34,0);}
+ await pointer('pointerup',cursor.x,cursor.y);cursor.down=false;await snap(640,0);
+ assert.notDeepEqual(await js('__tutorial.editor.readViewport()'),beforePan);
+ assert.equal(await js('__tutorial.model.score.read().body.parts[0].notes.length'),4);
+ label='选中左侧音符组';await click('.melody-note-family',580);
+ label='点空白，向这一组添加音符';
+ const point2=await js(`(()=>{const k=document.querySelector('[data-pitch-label="C4"]').getBoundingClientRect(),c=document.querySelector('.melody-canvas').getBoundingClientRect(),s=document.querySelector('.melody-scroll'),v=__tutorial.editor.readViewport();return {x:k.x+k.width/2,y:c.y+(1.1-v.leftSeconds)*(s.clientHeight-48)*v.zoom/8}})()`);
+ cursor={...point2,down:false};await snap(500);
+ await pointer('pointerdown',cursor.x,cursor.y,'.melody-canvas');await pointer('pointerup',cursor.x,cursor.y);
+ await snap(850,0);
+ assert.equal(await js('__tutorial.model.score.read().body.parts[0].notes.length'),5);
+ assert.equal(await js("document.querySelectorAll('.melody-note-family.is-selected').length"),1);
+ label='右键取消选中';keys='鼠标右键';
+ cursor={x:point2.x+110,y:point2.y-45,down:false};await snap(500);
+ await pointer('pointerdown',cursor.x,cursor.y,'.melody-canvas',2);
+ cursor.down=true;await snap(140,0);
+ await pointer('pointerup',cursor.x,cursor.y,'document',2);
+ cursor.down=false;await snap(670,0);
  assert.equal(await js("document.querySelectorAll('.melody-note.is-selected,.melody-tone.is-selected').length"),0);
- label='现在可以拖动画布';keys='';const from={...cursor};const beforePan=await js('__tutorial.editor.readViewport()');await pointer('pointerdown',cursor.x,cursor.y,'.melody-canvas');cursor.down=true;
- for(let i=1;i<=28;i++){cursor.x=from.x-110*i/28;cursor.y=from.y-95*i/28;await pointer('pointermove',cursor.x,cursor.y);await snap(34,0);}await pointer('pointerup',cursor.x,cursor.y);cursor.down=false;await snap(1100,0);
- assert.notDeepEqual(await js('__tutorial.editor.readViewport()'),beforePan);assert.equal(await js('__tutorial.model.score.read().body.parts.reduce((n,p)=>n+p.notes.length,0)'),5);await end();
+ assert.equal(await js('__tutorial.model.score.read().body.parts[0].notes.length'),5);
+ await end();
  await fresh(5);label='下拉底边，增加拍数';
  await js("document.querySelector('.melody-scroll').dispatchEvent(new WheelEvent('wheel',{bubbles:true,cancelable:true,deltaY:100000,clientX:900,clientY:300}))");await delay(80);await focus('.melody-roll-end',1100);
  const edge=await rect('.melody-roll-end');cursor={x:edge.x+edge.w*.5,y:edge.y+5,down:false};await snap(1000,0);const lengthBeforeEdge=await js('__tutorial.model.score.read().body.lengthBeats');

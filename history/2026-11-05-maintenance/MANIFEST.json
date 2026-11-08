@@ -1,0 +1,1054 @@
+{
+  "date": "2026-11-05",
+  "base": "a68f96f7f5a70aa5f01382e09d1d2dfc0b904a9b",
+  "entries": [
+    {
+      "source": "AGENTS.md",
+      "snapshot": "history/2026-11-05-maintenance/AGENTS.md",
+      "sha256": "908d78d2385044b5313d04d7b548f78c99b27586d450a2800097438b08311573",
+      "bytes": 1356,
+      "action": "updated",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "source": "README.md",
+      "snapshot": "history/2026-11-05-maintenance/README.md",
+      "sha256": "a00419c99b3140ef95415b26522a5c8db0ba84dc3c9be32f56c95383e44b1923",
+      "bytes": 531,
+      "action": "updated",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "source": "WORKTREE_LAYOUT.md",
+      "snapshot": "history/2026-11-05-maintenance/WORKTREE_LAYOUT.md",
+      "sha256": "080a02ba5dbe0724a7326135b35414492801e20cb44ad6f22615daebb8283b9f",
+      "bytes": 1102,
+      "action": "updated",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "source": "docs/GM_INSTRUMENTS.md",
+      "snapshot": "history/2026-11-05-maintenance/docs/GM_INSTRUMENTS.md",
+      "sha256": "9d198d26a12f7991d825fd0076951eb0633750233b95dbd9a0a7c6c19e88ca87",
+      "bytes": 5067,
+      "action": "updated",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "source": "docs/INTEGRATION_2026-11-05.md",
+      "snapshot": "history/2026-11-05-maintenance/docs/INTEGRATION_2026-11-05.md",
+      "sha256": "c411c1dd20ba5e579204d43835c4b138bd66a0f45aa2aa65a653f119a75e8915",
+      "bytes": 3402,
+      "action": "archived",
+      "reason": "Historical proposals or dated delivery/audit log; current decisions, current state and testing docs replace active guidance."
+    },
+    {
+      "source": "docs/MUSIC_FILES.md",
+      "snapshot": "history/2026-11-05-maintenance/docs/MUSIC_FILES.md",
+      "sha256": "125e8f398cd117902dea6a607a87feae12c82bd03df0ec6eafa1f9776a647121",
+      "bytes": 6046,
+      "action": "retained",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "source": "docs/REBUILD_ARCHITECTURE.md",
+      "snapshot": "history/2026-11-05-maintenance/docs/REBUILD_ARCHITECTURE.md",
+      "sha256": "eb4f57643f25312d385da62f4e1eab38360ccd2bf7c0cc0401f8c6a1417a0ffa",
+      "bytes": 31471,
+      "action": "archived",
+      "reason": "Historical proposals or dated delivery/audit log; current decisions, current state and testing docs replace active guidance."
+    },
+    {
+      "source": "docs/REBUILD_FOUNDATION.md",
+      "snapshot": "history/2026-11-05-maintenance/docs/REBUILD_FOUNDATION.md",
+      "sha256": "6bef67329f977ba67370f216f96f409e7c983d78892b52e364897d586fc618eb",
+      "bytes": 45338,
+      "action": "archived",
+      "reason": "Historical proposals or dated delivery/audit log; current decisions, current state and testing docs replace active guidance."
+    },
+    {
+      "source": "docs/REBUILD_PLAN.md",
+      "snapshot": "history/2026-11-05-maintenance/docs/REBUILD_PLAN.md",
+      "sha256": "1525952b74d7ae169d97f5f4f8d9b8c462b7fa96e9692fe39a5056b7a04101f7",
+      "bytes": 19089,
+      "action": "archived",
+      "reason": "Historical proposals or dated delivery/audit log; current decisions, current state and testing docs replace active guidance."
+    },
+    {
+      "source": "docs/REBUILD_PROGRESS.md",
+      "snapshot": "history/2026-11-05-maintenance/docs/REBUILD_PROGRESS.md",
+      "sha256": "5f8c6351f71912b20c979e6c617d36bae82c4bdda676d912dec44632ace80200",
+      "bytes": 209578,
+      "action": "archived",
+      "reason": "Historical proposals or dated delivery/audit log; current decisions, current state and testing docs replace active guidance."
+    },
+    {
+      "source": "docs/TEST_FAILURE_AUDIT_2026-11-05.md",
+      "snapshot": "history/2026-11-05-maintenance/docs/TEST_FAILURE_AUDIT_2026-11-05.md",
+      "sha256": "9cc038b45ccd070ebd46c701acfe77be1cef2cddd825a4fac4ca94a823492422",
+      "bytes": 11697,
+      "action": "archived",
+      "reason": "Historical proposals or dated delivery/audit log; current decisions, current state and testing docs replace active guidance."
+    },
+    {
+      "source": "docs/WEBSITE.md",
+      "snapshot": "history/2026-11-05-maintenance/docs/WEBSITE.md",
+      "sha256": "d6b20e260e843c20f9bbf1e1bed4d2caaffd8c30d94f1dae5861f5bef160beb9",
+      "bytes": 11304,
+      "action": "updated",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "source": "docs/WINDOWS_DESKTOP.md",
+      "snapshot": "history/2026-11-05-maintenance/docs/WINDOWS_DESKTOP.md",
+      "sha256": "9622771ffd16fe8cbd69b86d114922c1ae9c4c4b46aa55b5562ea9a327cc17ea",
+      "bytes": 59363,
+      "action": "updated",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "source": "governance/AItoHUMAN/DECISIONS.md",
+      "snapshot": "history/2026-11-05-maintenance/governance/AItoHUMAN/DECISIONS.md",
+      "sha256": "a82d9bf56df75a331bdaf49400104ae5b202a0a2102c70405df80260e0810eb0",
+      "bytes": 110290,
+      "action": "updated",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "source": "governance/AItoHUMAN/NORMS.md",
+      "snapshot": "history/2026-11-05-maintenance/governance/AItoHUMAN/NORMS.md",
+      "sha256": "dae2303e501b33a825ef1c4e3c39e10701bdb43bc3762e7029ba8470cc8d2996",
+      "bytes": 6973,
+      "action": "updated",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "source": "governance/AItoHUMAN/TODO.md",
+      "snapshot": "history/2026-11-05-maintenance/governance/AItoHUMAN/TODO.md",
+      "sha256": "37e747b2263bdc13a2dbb855070f62413279e6105f4a3ce6fcdd6e1bfc9c9b8b",
+      "bytes": 236090,
+      "action": "updated",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "source": "governance/AItoHUMAN/history/2026-10-23-legacy-conversation-rules.md",
+      "snapshot": "history/2026-11-05-maintenance/governance/AItoHUMAN/history/2026-10-23-legacy-conversation-rules.md",
+      "sha256": "662810d330785a131c5fd3363dc6437a45542d849edbbb5470dce78d684939ce",
+      "bytes": 2104,
+      "action": "archived",
+      "reason": "Superseded N1–N7 collaboration history; centralized under root history, linked by current NORMS."
+    },
+    {
+      "source": "governance/DECISIONS.md",
+      "snapshot": "history/2026-11-05-maintenance/governance/DECISIONS.md",
+      "sha256": "6f1dc57646f449d4a7cba6509f8206bb382ad14d721d3f051876cd25c9fbecda",
+      "bytes": 133681,
+      "action": "updated",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "source": "governance/NORMS.md",
+      "snapshot": "history/2026-11-05-maintenance/governance/NORMS.md",
+      "sha256": "f1064530dc758ed6bcbed5488326c853c22f693c4f13809dda721a533911dd3b",
+      "bytes": 8361,
+      "action": "updated",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "source": "governance/TODO.md",
+      "snapshot": "history/2026-11-05-maintenance/governance/TODO.md",
+      "sha256": "294b9b2e7c6035fb371a60839a1d6e82033aef5d94cc37a64313d6218b028ab0",
+      "bytes": 279185,
+      "action": "updated",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "source": "governance/history/2026-10-23-legacy-conversation-rules.md",
+      "snapshot": "history/2026-11-05-maintenance/governance/history/2026-10-23-legacy-conversation-rules.md",
+      "sha256": "159be75ad5b8cb135a338008dfd1dc33f27e83cd043a9b0ca9c39ed3d162bf0f",
+      "bytes": 3143,
+      "action": "archived",
+      "reason": "Superseded N1–N7 collaboration history; centralized under root history, linked by current NORMS."
+    },
+    {
+      "source": "tests/release-bundled-projects.test.mjs",
+      "snapshot": "history/2026-11-05-maintenance/tests/release-bundled-projects.test.mjs.snapshot.txt",
+      "sha256": "25cdba7a59a73cbacb0369e88eee4701736891f7f8a5c7334778e713f87870cd",
+      "bytes": 1896,
+      "action": "retained",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "source": "tests/release-host.test.mjs",
+      "snapshot": "history/2026-11-05-maintenance/tests/release-host.test.mjs.snapshot.txt",
+      "sha256": "db149b6acb199bf57f9ea22f1bb79e71f731c09661e1524ce430be2b066bb480",
+      "bytes": 11418,
+      "action": "retained",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "source": "tests/workstation.audio-export.test.ts",
+      "snapshot": "history/2026-11-05-maintenance/tests/workstation.audio-export.test.ts.snapshot.txt",
+      "sha256": "a81eecdb9da56292b4abdea5bc5a78e2db0b691ae6ee44cb68971bcb6990b7de",
+      "bytes": 18562,
+      "action": "retained",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "source": "tests/workstation.boundaries.test.ts",
+      "snapshot": "history/2026-11-05-maintenance/tests/workstation.boundaries.test.ts.snapshot.txt",
+      "sha256": "63fce3b261332453e86e6f788e6141e4ace0e4eb213e764cf45db48e69f4ff49",
+      "bytes": 6741,
+      "action": "updated",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "source": "tests/workstation.co-creation-generation.test.ts",
+      "snapshot": "history/2026-11-05-maintenance/tests/workstation.co-creation-generation.test.ts.snapshot.txt",
+      "sha256": "900f94a1cde235e6e96fee9694857e3edcc97031306bdd6d067c7f98ccce4a5d",
+      "bytes": 13854,
+      "action": "archived",
+      "reason": "Offline co-creation prototype has no current release entry; retain source and historical checks without treating it as current product acceptance."
+    },
+    {
+      "source": "tests/workstation.co-creation-rename.test.ts",
+      "snapshot": "history/2026-11-05-maintenance/tests/workstation.co-creation-rename.test.ts.snapshot.txt",
+      "sha256": "7d1501ad8661ca7d8e1695f41746dcf5f6021364c8dc04457401bd860d305da4",
+      "bytes": 7023,
+      "action": "archived",
+      "reason": "Offline co-creation prototype has no current release entry; retain source and historical checks without treating it as current product acceptance."
+    },
+    {
+      "source": "tests/workstation.co-creation.test.ts",
+      "snapshot": "history/2026-11-05-maintenance/tests/workstation.co-creation.test.ts.snapshot.txt",
+      "sha256": "4834a7350f8dab50bd0522dc3d056ced1a11f48f6d9174f721bfafbdd5d57b12",
+      "bytes": 16433,
+      "action": "archived",
+      "reason": "Offline co-creation prototype has no current release entry; retain source and historical checks without treating it as current product acceptance."
+    },
+    {
+      "source": "tests/workstation.current-project-catalog.test.ts",
+      "snapshot": "history/2026-11-05-maintenance/tests/workstation.current-project-catalog.test.ts.snapshot.txt",
+      "sha256": "d6839a13812aeda82426a64d209a3247aae1727560e860b94b93934d668043dd",
+      "bytes": 16600,
+      "action": "updated",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "source": "tests/workstation.entities.test.ts",
+      "snapshot": "history/2026-11-05-maintenance/tests/workstation.entities.test.ts.snapshot.txt",
+      "sha256": "d9e20f23199c84b3c235b0ca72c7bd14c25bdfd7cf5589c639132a5dfd72e5b5",
+      "bytes": 6845,
+      "action": "retained",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "source": "tests/workstation.files.test.ts",
+      "snapshot": "history/2026-11-05-maintenance/tests/workstation.files.test.ts.snapshot.txt",
+      "sha256": "499c7c8165a0edcaa2dcd6621d4192a72c84e880d5e530dc66a3e648e36b1d17",
+      "bytes": 8276,
+      "action": "retained",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "source": "tests/workstation.flow.test.ts",
+      "snapshot": "history/2026-11-05-maintenance/tests/workstation.flow.test.ts.snapshot.txt",
+      "sha256": "e3d9754bb15335b997a8c2683752a19fed06aea742fcd6ac6d66b46b9db7e8d2",
+      "bytes": 9758,
+      "action": "retained",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "source": "tests/workstation.gm-midi.test.ts",
+      "snapshot": "history/2026-11-05-maintenance/tests/workstation.gm-midi.test.ts.snapshot.txt",
+      "sha256": "d08391049d2e6924cd06351553ca6dae1daba7a84d30d43d750a356ed455c2e8",
+      "bytes": 4214,
+      "action": "retained",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "source": "tests/workstation.guidance.test.ts",
+      "snapshot": "history/2026-11-05-maintenance/tests/workstation.guidance.test.ts.snapshot.txt",
+      "sha256": "b1eef6158dc5e31fb4867e51b29e8dd4bf02eade75fff56d66757c657cd5d807",
+      "bytes": 4219,
+      "action": "retained",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "source": "tests/workstation.host-assets.test.ts",
+      "snapshot": "history/2026-11-05-maintenance/tests/workstation.host-assets.test.ts.snapshot.txt",
+      "sha256": "e699bd80349fc8b3445ff457080bab9647d44f1d5cfe29948468b2ec81d58d6f",
+      "bytes": 10922,
+      "action": "retained",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "source": "tests/workstation.humming-flow.test.ts",
+      "snapshot": "history/2026-11-05-maintenance/tests/workstation.humming-flow.test.ts.snapshot.txt",
+      "sha256": "457c96264ec38129d68129598c56eca158f0a84e17c1144e76a6319ed2876771",
+      "bytes": 5252,
+      "action": "retained",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "source": "tests/workstation.instrument-catalog.test.ts",
+      "snapshot": "history/2026-11-05-maintenance/tests/workstation.instrument-catalog.test.ts.snapshot.txt",
+      "sha256": "6018e694cd5f283119b1cb03552e89be2fa73a9a275367cd82f2db71dc796ce6",
+      "bytes": 5873,
+      "action": "retained",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "source": "tests/workstation.large-project-bootstrap.test.ts",
+      "snapshot": "history/2026-11-05-maintenance/tests/workstation.large-project-bootstrap.test.ts.snapshot.txt",
+      "sha256": "efd3292f8c8e6d2234933816f654da687692ff8a0f188502d322f3de12caf901",
+      "bytes": 13040,
+      "action": "retained",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "source": "tests/workstation.live-preview.test.ts",
+      "snapshot": "history/2026-11-05-maintenance/tests/workstation.live-preview.test.ts.snapshot.txt",
+      "sha256": "ebb48ba5aaf7a53023646e2f0527e15414780c899d3aac60305c2b2b5139fdc7",
+      "bytes": 10672,
+      "action": "retained",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "source": "tests/workstation.management.test.ts",
+      "snapshot": "history/2026-11-05-maintenance/tests/workstation.management.test.ts.snapshot.txt",
+      "sha256": "73a760dacf9fa370ef5749a52571ae65c4f2f7274e253f5b745d6a79b3415164",
+      "bytes": 13940,
+      "action": "retained",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "source": "tests/workstation.melody-analysis.test.ts",
+      "snapshot": "history/2026-11-05-maintenance/tests/workstation.melody-analysis.test.ts.snapshot.txt",
+      "sha256": "b4ff3538955190339030082ba91b1a445ed95f83ca452ef20c4ac52e966c3490",
+      "bytes": 13238,
+      "action": "retained",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "source": "tests/workstation.melody-key-entry-ui.test.ts",
+      "snapshot": "history/2026-11-05-maintenance/tests/workstation.melody-key-entry-ui.test.ts.snapshot.txt",
+      "sha256": "63c87b50fe67dabb8eb1c1ffe0caea2229dbcfb08bf00dec803fb18cdc73783b",
+      "bytes": 37717,
+      "action": "updated",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "source": "tests/workstation.melody-key-entry.test.ts",
+      "snapshot": "history/2026-11-05-maintenance/tests/workstation.melody-key-entry.test.ts.snapshot.txt",
+      "sha256": "d06d7902efda7003ddb622422fba85ca84e8c18414339f70c889a8bd26a5f737",
+      "bytes": 7646,
+      "action": "retained",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "source": "tests/workstation.melody-note-index.test.ts",
+      "snapshot": "history/2026-11-05-maintenance/tests/workstation.melody-note-index.test.ts.snapshot.txt",
+      "sha256": "6f6ac8f4f8dd9fb23d0530b0c3ad5baabfa3c3c9efec071358b31b3e17befd75",
+      "bytes": 3977,
+      "action": "retained",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "source": "tests/workstation.melody-recognition.test.ts",
+      "snapshot": "history/2026-11-05-maintenance/tests/workstation.melody-recognition.test.ts.snapshot.txt",
+      "sha256": "fe6047e4e33077cd52bbcbcde5f8ad8888b3529c85ba98b7ac061d46d90e9d5c",
+      "bytes": 16243,
+      "action": "retained",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "source": "tests/workstation.melody-worker.test.ts",
+      "snapshot": "history/2026-11-05-maintenance/tests/workstation.melody-worker.test.ts.snapshot.txt",
+      "sha256": "ad4d12e6e128fbcdc138f4eedded7120c167652aad52af99fe2df5b8fdb7a44f",
+      "bytes": 5477,
+      "action": "retained",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "source": "tests/workstation.melody-workspace.test.ts",
+      "snapshot": "history/2026-11-05-maintenance/tests/workstation.melody-workspace.test.ts.snapshot.txt",
+      "sha256": "883e68547b8ccef886f4c8bd0467885b9d49fba5b43cb4e541da7b6ea0207f7f",
+      "bytes": 84035,
+      "action": "updated",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "source": "tests/workstation.midi-entry.test.ts",
+      "snapshot": "history/2026-11-05-maintenance/tests/workstation.midi-entry.test.ts.snapshot.txt",
+      "sha256": "9bce1d23f6a52410b0c80793a828aa2666692ff00105da4c6c77b003f90ab540",
+      "bytes": 6344,
+      "action": "retained",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "source": "tests/workstation.midi-expression.test.ts",
+      "snapshot": "history/2026-11-05-maintenance/tests/workstation.midi-expression.test.ts.snapshot.txt",
+      "sha256": "7ac19179b2c5fe4bee677efd722d6d9342593eb3562031edfce64a1053910acb",
+      "bytes": 17559,
+      "action": "retained",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "source": "tests/workstation.midi-platform.test.ts",
+      "snapshot": "history/2026-11-05-maintenance/tests/workstation.midi-platform.test.ts.snapshot.txt",
+      "sha256": "f2c7e415752de44e44a093a28442745705fef19bd2ef18eff067c4ae66417a33",
+      "bytes": 4818,
+      "action": "retained",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "source": "tests/workstation.midi-project.test.ts",
+      "snapshot": "history/2026-11-05-maintenance/tests/workstation.midi-project.test.ts.snapshot.txt",
+      "sha256": "adaae833a18b172694b9afd36c0832044119d83b71c4665385fb21c6b04eedad",
+      "bytes": 20587,
+      "action": "archived",
+      "reason": "Superseded multi-phrase shelves, synthetic starter palette or import-to-new-project fixtures; current music-document/file, instrument-catalog and GM checks cover the replacement."
+    },
+    {
+      "source": "tests/workstation.midi.test.ts",
+      "snapshot": "history/2026-11-05-maintenance/tests/workstation.midi.test.ts.snapshot.txt",
+      "sha256": "0fb2b4f8a966f1cc5ba7c12190cc761edeb109f2798ccc1f4007b2648c9b53d8",
+      "bytes": 13965,
+      "action": "retained",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "source": "tests/workstation.music-document.test.ts",
+      "snapshot": "history/2026-11-05-maintenance/tests/workstation.music-document.test.ts.snapshot.txt",
+      "sha256": "ab4f4090289385de0cb5b33347e04b9d076bf0614b3f3aa0f9396f55a9704450",
+      "bytes": 7877,
+      "action": "retained",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "source": "tests/workstation.music-file.test.ts",
+      "snapshot": "history/2026-11-05-maintenance/tests/workstation.music-file.test.ts.snapshot.txt",
+      "sha256": "6e7fd82f83cd8ec3e8d3a0563f4745a87e7c45283f23ea52021f9d569a2c9ee5",
+      "bytes": 14649,
+      "action": "retained",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "source": "tests/workstation.music-ranges.test.ts",
+      "snapshot": "history/2026-11-05-maintenance/tests/workstation.music-ranges.test.ts.snapshot.txt",
+      "sha256": "9f1de39798e07308fd2896eb197fcb8a27062e7d03d67b9069da57b8b4b39644",
+      "bytes": 10413,
+      "action": "retained",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "source": "tests/workstation.music-workspace-state.test.ts",
+      "snapshot": "history/2026-11-05-maintenance/tests/workstation.music-workspace-state.test.ts.snapshot.txt",
+      "sha256": "2dbc637178503447bdfbfc2581778cd86b07bbb27a15ca2d438e56dce4f861ad",
+      "bytes": 2573,
+      "action": "retained",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "source": "tests/workstation.music-workspace.test.ts",
+      "snapshot": "history/2026-11-05-maintenance/tests/workstation.music-workspace.test.ts.snapshot.txt",
+      "sha256": "1d4aaeae1d97533b57191c3b234759a303b11b5a136365d158ad41a49700a94a",
+      "bytes": 80412,
+      "action": "retained",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "source": "tests/workstation.note-width.test.ts",
+      "snapshot": "history/2026-11-05-maintenance/tests/workstation.note-width.test.ts.snapshot.txt",
+      "sha256": "ab3dd08d359dcf5d90a9ecbd6341541ca677a1add0724a2811649142e6750a38",
+      "bytes": 7898,
+      "action": "retained",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "source": "tests/workstation.output-limiter.test.ts",
+      "snapshot": "history/2026-11-05-maintenance/tests/workstation.output-limiter.test.ts.snapshot.txt",
+      "sha256": "f092d35619e07d712ef18545672a496d78dcc76d4e395e8de4e22fefad645898",
+      "bytes": 822,
+      "action": "retained",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "source": "tests/workstation.pcm.test.ts",
+      "snapshot": "history/2026-11-05-maintenance/tests/workstation.pcm.test.ts.snapshot.txt",
+      "sha256": "f11c4e91cc9a1d61a31e3d21324a491f424000ea15b901a83521645c3d67c8ca",
+      "bytes": 1543,
+      "action": "retained",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "source": "tests/workstation.phrase-composition-transport.test.ts",
+      "snapshot": "history/2026-11-05-maintenance/tests/workstation.phrase-composition-transport.test.ts.snapshot.txt",
+      "sha256": "e8a52a913609455ce259c3a406489b0a469d7955f090d9e07e8634145be9a260",
+      "bytes": 21067,
+      "action": "retained",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "source": "tests/workstation.phrase-composition-ui.test.ts",
+      "snapshot": "history/2026-11-05-maintenance/tests/workstation.phrase-composition-ui.test.ts.snapshot.txt",
+      "sha256": "3b8e28f31c457c454b9dba32a6d9d1b0a7b49baa4bda26592fc914d59df18ab8",
+      "bytes": 50454,
+      "action": "archived",
+      "reason": "Removed arrangement/phrase/rhythm/welcome UI route; current music-workspace, project-library and music-file checks cover the replacement."
+    },
+    {
+      "source": "tests/workstation.phrase-deletion.test.ts",
+      "snapshot": "history/2026-11-05-maintenance/tests/workstation.phrase-deletion.test.ts.snapshot.txt",
+      "sha256": "cf411269bce119d6b70609e946243c7dc74fadc00f0a882902eb97b24d3f54e1",
+      "bytes": 11274,
+      "action": "retained",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "source": "tests/workstation.phrase-inspector.test.ts",
+      "snapshot": "history/2026-11-05-maintenance/tests/workstation.phrase-inspector.test.ts.snapshot.txt",
+      "sha256": "8e9e08899e1af41c0d30ba817c605f901c131db6dfc234a776f92a0847e7ab8e",
+      "bytes": 17913,
+      "action": "updated",
+      "reason": "Contains still-relevant ownership, file transfer, identity, atomicity and undo guarantees. Preserve active checks despite retired shelf UI; refresh fixtures instead of removing the whole suite."
+    },
+    {
+      "source": "tests/workstation.phrase-library-creation-ui.test.ts",
+      "snapshot": "history/2026-11-05-maintenance/tests/workstation.phrase-library-creation-ui.test.ts.snapshot.txt",
+      "sha256": "fa0ddef604e57d1cf4df406618792c65680cefd0391afd2c61a257ae00d42b7c",
+      "bytes": 8128,
+      "action": "archived",
+      "reason": "Removed arrangement/phrase/rhythm/welcome UI route; current music-workspace, project-library and music-file checks cover the replacement."
+    },
+    {
+      "source": "tests/workstation.phrase-library.test.ts",
+      "snapshot": "history/2026-11-05-maintenance/tests/workstation.phrase-library.test.ts.snapshot.txt",
+      "sha256": "8ee22eb60b863a0d0395bcd3a7fca784b17aa0d72ad477db10ee33a0aa46fc33",
+      "bytes": 16425,
+      "action": "updated",
+      "reason": "Contains still-relevant ownership, file transfer, identity, atomicity and undo guarantees. Preserve active checks despite retired shelf UI; refresh fixtures instead of removing the whole suite."
+    },
+    {
+      "source": "tests/workstation.phrase-master-level.test.ts",
+      "snapshot": "history/2026-11-05-maintenance/tests/workstation.phrase-master-level.test.ts.snapshot.txt",
+      "sha256": "db136a3c0d0ae0f7141df5d34d9b770e773ddc6e8658f78c71d55c7c38113c17",
+      "bytes": 5573,
+      "action": "updated",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "source": "tests/workstation.phrase-note-mix.test.ts",
+      "snapshot": "history/2026-11-05-maintenance/tests/workstation.phrase-note-mix.test.ts.snapshot.txt",
+      "sha256": "61fed922bf4c00eb2b5248648941999831e070f22c259465417dbfbf36e26eaf",
+      "bytes": 17965,
+      "action": "updated",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "source": "tests/workstation.phrase-overview-notes.test.ts",
+      "snapshot": "history/2026-11-05-maintenance/tests/workstation.phrase-overview-notes.test.ts.snapshot.txt",
+      "sha256": "3ccba8831dc54a34aa46fe5691f469262487a4034d0a9fbe9cbc6b25869e3d78",
+      "bytes": 19290,
+      "action": "retained",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "source": "tests/workstation.phrase-section-split.test.ts",
+      "snapshot": "history/2026-11-05-maintenance/tests/workstation.phrase-section-split.test.ts.snapshot.txt",
+      "sha256": "e751eb52824b5eeceef1281c2da212855d54ca60c56c3b9bd62b47aae1153a58",
+      "bytes": 3743,
+      "action": "retained",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "source": "tests/workstation.phrase-shell-save.test.ts",
+      "snapshot": "history/2026-11-05-maintenance/tests/workstation.phrase-shell-save.test.ts.snapshot.txt",
+      "sha256": "e82995723ea75b813f169fa987efff5386f75c8e8b7134f68cf213d5bfd39d37",
+      "bytes": 13549,
+      "action": "updated",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "source": "tests/workstation.phrase-studio-integration.test.ts",
+      "snapshot": "history/2026-11-05-maintenance/tests/workstation.phrase-studio-integration.test.ts.snapshot.txt",
+      "sha256": "ed5d84c3400335284d69f67dc47b72d7e67290788bba67449fb5bf17acdf3e0a",
+      "bytes": 106173,
+      "action": "archived",
+      "reason": "Removed arrangement/phrase/rhythm/welcome UI route; current music-workspace, project-library and music-file checks cover the replacement."
+    },
+    {
+      "source": "tests/workstation.phrase-viewport.test.ts",
+      "snapshot": "history/2026-11-05-maintenance/tests/workstation.phrase-viewport.test.ts.snapshot.txt",
+      "sha256": "182619b48bc8f663c8572a1135299441ab6b92dae065155f8d412889d05f2fe5",
+      "bytes": 2695,
+      "action": "updated",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "source": "tests/workstation.phrase.test.ts",
+      "snapshot": "history/2026-11-05-maintenance/tests/workstation.phrase.test.ts.snapshot.txt",
+      "sha256": "b675b0a57879cbf0a4fab4e496d3ea72c4edc20ef7b1cdaa7c238ebd9053cbbf",
+      "bytes": 53945,
+      "action": "updated",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "source": "tests/workstation.platform.test.ts",
+      "snapshot": "history/2026-11-05-maintenance/tests/workstation.platform.test.ts.snapshot.txt",
+      "sha256": "d45eb94bd8d5330b5fa5342994493aba42b438ee7110f64fe9bdc50dd1cafdab",
+      "bytes": 15693,
+      "action": "retained",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "source": "tests/workstation.playlist-controls.test.ts",
+      "snapshot": "history/2026-11-05-maintenance/tests/workstation.playlist-controls.test.ts.snapshot.txt",
+      "sha256": "0fb466e583527f78ae73e209b9bb9a6820f0cbaf96f140dd4233b190c21027c7",
+      "bytes": 9350,
+      "action": "updated",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "source": "tests/workstation.playlist-domain.test.ts",
+      "snapshot": "history/2026-11-05-maintenance/tests/workstation.playlist-domain.test.ts.snapshot.txt",
+      "sha256": "a04a59bad9309d0951f05ec5d346040d779bb339ef3ead1c121be55671d37229",
+      "bytes": 12062,
+      "action": "updated",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "source": "tests/workstation.playlist-geometry.test.ts",
+      "snapshot": "history/2026-11-05-maintenance/tests/workstation.playlist-geometry.test.ts.snapshot.txt",
+      "sha256": "8ff88b8a3400302a54f29a59fcd7f279136314c9008f717b9e97daa06a4568cc",
+      "bytes": 3867,
+      "action": "retained",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "source": "tests/workstation.playlist-performance.test.ts",
+      "snapshot": "history/2026-11-05-maintenance/tests/workstation.playlist-performance.test.ts.snapshot.txt",
+      "sha256": "c941d55371989c21d2ac5ddc41f2669cf7b4334397e3d80ecb254c1fd2c1edbb",
+      "bytes": 24624,
+      "action": "retained",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "source": "tests/workstation.playlist-refinement-domain.test.ts",
+      "snapshot": "history/2026-11-05-maintenance/tests/workstation.playlist-refinement-domain.test.ts.snapshot.txt",
+      "sha256": "dabbf062c499ac6e642ce857ca6264a17c03c2f5fe8864af03869dfea1cb4fa2",
+      "bytes": 14357,
+      "action": "updated",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "source": "tests/workstation.playlist-refinement-project.test.ts",
+      "snapshot": "history/2026-11-05-maintenance/tests/workstation.playlist-refinement-project.test.ts.snapshot.txt",
+      "sha256": "bb55d19c2339b6f7d2461acb5327c1c500b8db9738158a143541e38430b5bcac",
+      "bytes": 5675,
+      "action": "archived",
+      "reason": "Superseded multi-phrase shelves, synthetic starter palette or import-to-new-project fixtures; current music-document/file, instrument-catalog and GM checks cover the replacement."
+    },
+    {
+      "source": "tests/workstation.playlist-runtime.test.ts",
+      "snapshot": "history/2026-11-05-maintenance/tests/workstation.playlist-runtime.test.ts.snapshot.txt",
+      "sha256": "5e78fbf6a09da08980505db829b525e8d2b2b9e4f5e9a0f69b40ba5e3ca95620",
+      "bytes": 7713,
+      "action": "retained",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "source": "tests/workstation.playlist-transport.test.ts",
+      "snapshot": "history/2026-11-05-maintenance/tests/workstation.playlist-transport.test.ts.snapshot.txt",
+      "sha256": "5eec672791d72a4922e90d45a43c3d7f9934e042a8451822ebe00cfcb899c44f",
+      "bytes": 13123,
+      "action": "retained",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "source": "tests/workstation.playlist-ui.test.ts",
+      "snapshot": "history/2026-11-05-maintenance/tests/workstation.playlist-ui.test.ts.snapshot.txt",
+      "sha256": "2d5dd19da93c1272565e2ce5d37b9c5a0c5bcfb4417ff1e036044cb73ff9e10a",
+      "bytes": 143032,
+      "action": "archived",
+      "reason": "Removed arrangement/phrase/rhythm/welcome UI route; current music-workspace, project-library and music-file checks cover the replacement."
+    },
+    {
+      "source": "tests/workstation.post-production.test.ts",
+      "snapshot": "history/2026-11-05-maintenance/tests/workstation.post-production.test.ts.snapshot.txt",
+      "sha256": "045ada4e616d817618a33fbc04d8aba75acb03c92f54b83102ebab110913c269",
+      "bytes": 9575,
+      "action": "retained",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "source": "tests/workstation.project-detail-flow.test.ts",
+      "snapshot": "history/2026-11-05-maintenance/tests/workstation.project-detail-flow.test.ts.snapshot.txt",
+      "sha256": "67444b9c4202078cc71745422fbaf9d28148b05e6557f6f4a03eef396afcda8a",
+      "bytes": 8907,
+      "action": "retained",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "source": "tests/workstation.project-directories.test.ts",
+      "snapshot": "history/2026-11-05-maintenance/tests/workstation.project-directories.test.ts.snapshot.txt",
+      "sha256": "f1ba7f29bdc5a6a46f4ac4b9ea9bfc8e099a18f281fab42b83c0a5f1c1ea2abe",
+      "bytes": 26922,
+      "action": "retained",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "source": "tests/workstation.project-exit.test.ts",
+      "snapshot": "history/2026-11-05-maintenance/tests/workstation.project-exit.test.ts.snapshot.txt",
+      "sha256": "ce7ef29dd0225a342b265c2a1a487a6afc11c052490dc8c1c2d975a1fb98795a",
+      "bytes": 7125,
+      "action": "retained",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "source": "tests/workstation.project-folders.test.ts",
+      "snapshot": "history/2026-11-05-maintenance/tests/workstation.project-folders.test.ts.snapshot.txt",
+      "sha256": "fe99f0d067977baae2abdac8e7e6fe858782e1ceff36a8cca43ef11337084455",
+      "bytes": 6615,
+      "action": "retained",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "source": "tests/workstation.project-menu.test.ts",
+      "snapshot": "history/2026-11-05-maintenance/tests/workstation.project-menu.test.ts.snapshot.txt",
+      "sha256": "86fe32c114cb67d19fd533182258752c2a870cf477a965732453a9a8758b8441",
+      "bytes": 20721,
+      "action": "updated",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "source": "tests/workstation.project-phrases.test.ts",
+      "snapshot": "history/2026-11-05-maintenance/tests/workstation.project-phrases.test.ts.snapshot.txt",
+      "sha256": "c23f43c3c070ec275ae2c4423705f471f30ca2d7731d6af26178fe18851a42b7",
+      "bytes": 18395,
+      "action": "updated",
+      "reason": "Contains still-relevant ownership, file transfer, identity, atomicity and undo guarantees. Preserve active checks despite retired shelf UI; refresh fixtures instead of removing the whole suite."
+    },
+    {
+      "source": "tests/workstation.project-platform.test.ts",
+      "snapshot": "history/2026-11-05-maintenance/tests/workstation.project-platform.test.ts.snapshot.txt",
+      "sha256": "7dce881030d3df41a333b01db059f9fd77cf1e9f5d6c7f685f7e57840a15dfec",
+      "bytes": 13979,
+      "action": "retained",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "source": "tests/workstation.project-save-as-ui.test.ts",
+      "snapshot": "history/2026-11-05-maintenance/tests/workstation.project-save-as-ui.test.ts.snapshot.txt",
+      "sha256": "241fd00ee70d6965c7f9a3484e01b034a26bf18743f20bfc4ce5f387c45d38b4",
+      "bytes": 7060,
+      "action": "retained",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "source": "tests/workstation.project-scope.test.ts",
+      "snapshot": "history/2026-11-05-maintenance/tests/workstation.project-scope.test.ts.snapshot.txt",
+      "sha256": "f114d69dc835e6a8292c744f965c7fdbd8208f448263d6576060e51c52b0330b",
+      "bytes": 45501,
+      "action": "retained",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "source": "tests/workstation.project-start-ui.test.ts",
+      "snapshot": "history/2026-11-05-maintenance/tests/workstation.project-start-ui.test.ts.snapshot.txt",
+      "sha256": "3a6358067c6d7d830024f958191abd7759a46628d14c4b1114e5973cf3d2641b",
+      "bytes": 9284,
+      "action": "retained",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "source": "tests/workstation.project-timbres.test.ts",
+      "snapshot": "history/2026-11-05-maintenance/tests/workstation.project-timbres.test.ts.snapshot.txt",
+      "sha256": "f79a2fbe13cd408f82f5ac315c18ffd8db4f87c62d5f9864e9e80dd9edd08d2d",
+      "bytes": 49681,
+      "action": "updated",
+      "reason": "Contains still-relevant ownership, file transfer, identity, atomicity and undo guarantees. Preserve active checks despite retired shelf UI; refresh fixtures instead of removing the whole suite."
+    },
+    {
+      "source": "tests/workstation.project-transfer.test.ts",
+      "snapshot": "history/2026-11-05-maintenance/tests/workstation.project-transfer.test.ts.snapshot.txt",
+      "sha256": "917afd9bbee3cb622cfe8390816637dd2e7bc8aac87e29eba45e53bf3b689409",
+      "bytes": 4131,
+      "action": "retained",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "source": "tests/workstation.project.test.ts",
+      "snapshot": "history/2026-11-05-maintenance/tests/workstation.project.test.ts.snapshot.txt",
+      "sha256": "feb8b396fdbd09d469af4a9b2da691e91cbb833b77d188bb20475333ad75072e",
+      "bytes": 18053,
+      "action": "retained",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "source": "tests/workstation.reference-activity.test.ts",
+      "snapshot": "history/2026-11-05-maintenance/tests/workstation.reference-activity.test.ts.snapshot.txt",
+      "sha256": "4a79a0fafa1b323a93d277131bef80935af0bed8a7bb2338dd087e05512ec85c",
+      "bytes": 3641,
+      "action": "retained",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "source": "tests/workstation.reference-save-policy.test.ts",
+      "snapshot": "history/2026-11-05-maintenance/tests/workstation.reference-save-policy.test.ts.snapshot.txt",
+      "sha256": "731f8276c05b4d6ef6c3c8557f66cf48cf294a897994f140594b1bbc9a36a11c",
+      "bytes": 15364,
+      "action": "retained",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "source": "tests/workstation.references.test.ts",
+      "snapshot": "history/2026-11-05-maintenance/tests/workstation.references.test.ts.snapshot.txt",
+      "sha256": "e2b6952db0e39ab6f563af0e49746ad5e46b58e961c8a279c93cd97b440824b5",
+      "bytes": 31313,
+      "action": "updated",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "source": "tests/workstation.rhythm-domain.test.ts",
+      "snapshot": "history/2026-11-05-maintenance/tests/workstation.rhythm-domain.test.ts.snapshot.txt",
+      "sha256": "e501d51a097d35b26a91c687e249fd68b10b173e3111d578845deb4b31566666",
+      "bytes": 17155,
+      "action": "updated",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "source": "tests/workstation.rhythm-workspace.test.ts",
+      "snapshot": "history/2026-11-05-maintenance/tests/workstation.rhythm-workspace.test.ts.snapshot.txt",
+      "sha256": "772db9763f94839dcf37055c8a2a838a1de63efed2d7b78d1d37ab2b7c1fe51c",
+      "bytes": 25417,
+      "action": "archived",
+      "reason": "Removed arrangement/phrase/rhythm/welcome UI route; current music-workspace, project-library and music-file checks cover the replacement."
+    },
+    {
+      "source": "tests/workstation.sample-bank.test.ts",
+      "snapshot": "history/2026-11-05-maintenance/tests/workstation.sample-bank.test.ts.snapshot.txt",
+      "sha256": "32934db52ab120106debc316eaf949ccccd3cdc478e3a9aa615002150d2773fb",
+      "bytes": 11714,
+      "action": "retained",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "source": "tests/workstation.sample-instrument-flow.test.ts",
+      "snapshot": "history/2026-11-05-maintenance/tests/workstation.sample-instrument-flow.test.ts.snapshot.txt",
+      "sha256": "eebb2f3c3bfbcf32ea0d0490994af7d0021982e8f0a44ba8da697e3341539fcc",
+      "bytes": 13087,
+      "action": "retained",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "source": "tests/workstation.sample-instrument.test.ts",
+      "snapshot": "history/2026-11-05-maintenance/tests/workstation.sample-instrument.test.ts.snapshot.txt",
+      "sha256": "8358ca116a29b51803b9c4c9182957c0a7e2e39e6260190aeefddb97ef7edd4e",
+      "bytes": 24364,
+      "action": "updated",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "source": "tests/workstation.sample-platform.test.ts",
+      "snapshot": "history/2026-11-05-maintenance/tests/workstation.sample-platform.test.ts.snapshot.txt",
+      "sha256": "70de3ce594726281b43be4c8458237d63982b79a7e3c82f609a0bf95e6985ac3",
+      "bytes": 11977,
+      "action": "retained",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "source": "tests/workstation.sample-preview.test.ts",
+      "snapshot": "history/2026-11-05-maintenance/tests/workstation.sample-preview.test.ts.snapshot.txt",
+      "sha256": "fa28d2a0f50a1c9513aa98f624d307373cf66b97442bcb7f66e3d8ecc81d2841",
+      "bytes": 1470,
+      "action": "retained",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "source": "tests/workstation.sample-runtime.test.ts",
+      "snapshot": "history/2026-11-05-maintenance/tests/workstation.sample-runtime.test.ts.snapshot.txt",
+      "sha256": "65e68ae25e98de72fad4c4fc2d140765c33106af11903293f7834b83214dfc41",
+      "bytes": 25328,
+      "action": "retained",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "source": "tests/workstation.sampling-capture.test.ts",
+      "snapshot": "history/2026-11-05-maintenance/tests/workstation.sampling-capture.test.ts.snapshot.txt",
+      "sha256": "ce768422686350ce480943e475805165ee06a34ce0bdb106f44b1d3aa5b7d3cb",
+      "bytes": 12067,
+      "action": "retained",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "source": "tests/workstation.sampling.test.ts",
+      "snapshot": "history/2026-11-05-maintenance/tests/workstation.sampling.test.ts.snapshot.txt",
+      "sha256": "6a39963652071104afc2e66192a91f4673ab741ec9f5f992f160a803bed2043a",
+      "bytes": 27243,
+      "action": "retained",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "source": "tests/workstation.song-phrase-audition.test.ts",
+      "snapshot": "history/2026-11-05-maintenance/tests/workstation.song-phrase-audition.test.ts.snapshot.txt",
+      "sha256": "37421a77e4ffd57ff2fe01d23019dc32f925090fd3c09892198bf1cda0feb2f7",
+      "bytes": 8596,
+      "action": "retained",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "source": "tests/workstation.song-save.test.ts",
+      "snapshot": "history/2026-11-05-maintenance/tests/workstation.song-save.test.ts.snapshot.txt",
+      "sha256": "c7b057e543e482feb4952ac780348328f659fb506461d9ae372235910ef2de2e",
+      "bytes": 3889,
+      "action": "retained",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "source": "tests/workstation.song.test.ts",
+      "snapshot": "history/2026-11-05-maintenance/tests/workstation.song.test.ts.snapshot.txt",
+      "sha256": "f693ebce87d7c5d187af757387880076d8b34cd97f523e30563dd7742ab4a5a6",
+      "bytes": 30341,
+      "action": "updated",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "source": "tests/workstation.soundfont.test.ts",
+      "snapshot": "history/2026-11-05-maintenance/tests/workstation.soundfont.test.ts.snapshot.txt",
+      "sha256": "ee54cd95b087ef09cd71b1ed37bd6f2628fd21094b25dab3e33f2cd828d7bf8f",
+      "bytes": 11407,
+      "action": "retained",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "source": "tests/workstation.spectral-timbre.test.ts",
+      "snapshot": "history/2026-11-05-maintenance/tests/workstation.spectral-timbre.test.ts.snapshot.txt",
+      "sha256": "c9d67dc6670254e397111cb99353b57e51ed014fffb7a5af2b5e3f5833ef0b5d",
+      "bytes": 15481,
+      "action": "retained",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "source": "tests/workstation.synthesis-runtime.test.ts",
+      "snapshot": "history/2026-11-05-maintenance/tests/workstation.synthesis-runtime.test.ts.snapshot.txt",
+      "sha256": "b7fda1dae208ddfcd346a9e143c7ef6de2a36a4688a29d8b5fc8bb2b660f4a47",
+      "bytes": 11566,
+      "action": "retained",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "source": "tests/workstation.synthesis.test.ts",
+      "snapshot": "history/2026-11-05-maintenance/tests/workstation.synthesis.test.ts.snapshot.txt",
+      "sha256": "8439fe5638409ad74ea59abc2f6898b5b61545fa5f0d22624d059b3a4e15dc9f",
+      "bytes": 11854,
+      "action": "retained",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "source": "tests/workstation.tap-tempo.test.ts",
+      "snapshot": "history/2026-11-05-maintenance/tests/workstation.tap-tempo.test.ts.snapshot.txt",
+      "sha256": "48a27135861a8a3bbc6c1ea3efc66c8a8bcc8fa19877d5ca627a0e441a250ff2",
+      "bytes": 1708,
+      "action": "retained",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "source": "tests/workstation.tempo-rolls.test.ts",
+      "snapshot": "history/2026-11-05-maintenance/tests/workstation.tempo-rolls.test.ts.snapshot.txt",
+      "sha256": "6a4b3f615126186515f091f09b73ae627290753ffddddb3422237c09ac442397",
+      "bytes": 14557,
+      "action": "retained",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "source": "tests/workstation.timbre-import.test.ts",
+      "snapshot": "history/2026-11-05-maintenance/tests/workstation.timbre-import.test.ts.snapshot.txt",
+      "sha256": "c69ffab048eacf0827aa3657a9079ba4ac930042ce2fd2b02a03c9327caf73ec",
+      "bytes": 9582,
+      "action": "retained",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "source": "tests/workstation.timbre-removal.test.ts",
+      "snapshot": "history/2026-11-05-maintenance/tests/workstation.timbre-removal.test.ts.snapshot.txt",
+      "sha256": "720b7d0103c50809e330b6f44c04009527b5428c253a1ead26d5011aaedb7763",
+      "bytes": 3480,
+      "action": "retained",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "source": "tests/workstation.web-demo.test.ts",
+      "snapshot": "history/2026-11-05-maintenance/tests/workstation.web-demo.test.ts.snapshot.txt",
+      "sha256": "695a8c278c259759932539c35661a971834389fa7255f629f8bac2f492cc9419",
+      "bytes": 6792,
+      "action": "retained",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "source": "tests/workstation.welcome-library.test.ts",
+      "snapshot": "history/2026-11-05-maintenance/tests/workstation.welcome-library.test.ts.snapshot.txt",
+      "sha256": "9f2c529602808865cbe9d3be12db53c396458202d370af7b6082c2b17ed233d0",
+      "bytes": 11224,
+      "action": "archived",
+      "reason": "Removed arrangement/phrase/rhythm/welcome UI route; current music-workspace, project-library and music-file checks cover the replacement."
+    },
+    {
+      "source": "tests/workstation.windowed-runtime.test.ts",
+      "snapshot": "history/2026-11-05-maintenance/tests/workstation.windowed-runtime.test.ts.snapshot.txt",
+      "sha256": "137806765954e3f4d0ca71551a26f7cc888672634a87fb8ffe04541bfa2e86ca",
+      "bytes": 16094,
+      "action": "retained",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "source": "scripts/render-operation-guides.mjs",
+      "snapshot": "history/2026-11-05-maintenance/scripts/render-operation-guides.mjs",
+      "sha256": "05d527fdf7fb99d4c23a8be92dd2c65b12b8f0ad6e5fe47db81e74223247ae90",
+      "bytes": 4132,
+      "action": "retained",
+      "reason": "The current public website still serves its six-page animated image deck; keep its generation tools separate from in-editor hands-on learning."
+    },
+    {
+      "source": "scripts/encode-operation-guides.py",
+      "snapshot": "history/2026-11-05-maintenance/scripts/encode-operation-guides.py",
+      "sha256": "e7de97f3ad1a25befca5bbcf93a7f2e709ba77c4a857774ec68c6a869cc741aa",
+      "bytes": 6682,
+      "action": "retained",
+      "reason": "The current public website still serves its six-page animated image deck; keep its generation tools separate from in-editor hands-on learning."
+    },
+    {
+      "source": "scripts/capture-website-assets.mjs",
+      "snapshot": "history/2026-11-05-maintenance/scripts/capture-website-assets.mjs",
+      "sha256": "cde054695107a67c2d50e5e32ca8df999efc207a6b6fa840e949b11acee354b5",
+      "bytes": 4673,
+      "action": "archived",
+      "reason": "Retired generated tutorials/promotional capture or layout assertions for removed UI; not part of current site build or acceptance."
+    },
+    {
+      "source": "scripts/build-website-assets.mjs",
+      "snapshot": "history/2026-11-05-maintenance/scripts/build-website-assets.mjs",
+      "sha256": "293dc00429601deae77f24e10f78aa50eb5061a7dc816128e377263e8c034e9d",
+      "bytes": 6541,
+      "action": "archived",
+      "reason": "Retired generated tutorials/promotional capture or layout assertions for removed UI; not part of current site build or acceptance."
+    },
+    {
+      "source": "scripts/test-workspace-layout.mjs",
+      "snapshot": "history/2026-11-05-maintenance/scripts/test-workspace-layout.mjs",
+      "sha256": "4ee55cf68c34620bbf0f733013d7485fb7900fe4a1d0580096873ca6bc84dbc7",
+      "bytes": 17284,
+      "action": "archived",
+      "reason": "Retired generated tutorials/promotional capture or layout assertions for removed UI; not part of current site build or acceptance."
+    },
+    {
+      "source": "website/index.html",
+      "snapshot": "history/2026-11-05-maintenance/website/index.html",
+      "sha256": "5f4aca44caa8a32e713488287fe7e5a70f056e36ed12f86142dfbce2fa6e5b4e",
+      "bytes": 5347,
+      "action": "updated",
+      "reason": "Update obsolete all-audiences description to the current user-confirmed rhythm-game music audience and purpose; preserve the active website guide."
+    }
+  ]
+}

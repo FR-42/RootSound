@@ -1,4 +1,5 @@
 import type { ContentRecord, Draft, MaterialLibrary } from '../../contracts/content.ts';
+import { MIN_PITCH_HZ, MAX_PITCH_HZ } from '../../contracts/music-limits.ts';
 import { MAX_MELODY_INPUT_SECONDS, type MelodyAnalysis, type MelodyAnalyzerPort, type MelodyRecognitionInput, type MelodyRecognitionPort, type MelodyRecognitionView } from '../../contracts/melody-recognition.ts';
 import { MAX_PCM_AUDIO_BYTES, type PcmAudio, type SoundSequencePlan } from '../../contracts/sound.ts';
 import { createMaterialLibrary } from '../materials/public.ts';
@@ -52,7 +53,7 @@ function validateAnalysis(value: unknown, input: ReturnType<typeof captureInput>
     const length = finite(note.durationSeconds, 1 / 2048, durationSeconds, '音符持续时间');
     if (startSeconds < previousEnd - epsilon || startSeconds + length > durationSeconds + epsilon) fail('识别音符有重叠、顺序错误或超出原声音结尾。');
     previousEnd = startSeconds + length; voicedSeconds += length;
-    return { startSeconds, durationSeconds: length, frequencyHz: finite(note.frequencyHz, 20, 5000, '识别音高'),
+    return { startSeconds, durationSeconds: length, frequencyHz: finite(note.frequencyHz, MIN_PITCH_HZ, MAX_PITCH_HZ, '识别音高'),
       velocity: finite(note.velocity, 0, 1, '识别力度'), confidence: finite(note.confidence, 0, 1, '识别可信度') };
   });
   const coverage = finite(result.coverage, 0, 1, '旋律覆盖比例');

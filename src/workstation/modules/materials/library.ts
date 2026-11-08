@@ -253,9 +253,22 @@ export function createMaterialLibrary(storage?: MaterialStorage, options?: { pro
     : restore(raw, options?.project?.rootKind);
   projectPolicy?.validateDraftOwnership(state);
   let token = crypto.randomUUID();
+  const serializedSteps = new WeakMap<HistoryStep, string>();
+  function serializeStep(step: HistoryStep): string {
+    let text = serializedSteps.get(step);
+    if (text === undefined) { text = JSON.stringify(step); serializedSteps.set(step, text); }
+    return text;
+  }
+  for (const entry of state.editHistory?.entries ?? []) for (const step of [...entry.past, ...entry.future]) serializeStep(step);
+  function serialize(next: State): string {
+    const text = JSON.stringify({ ...next, editHistory: undefined });
+    if (!next.editHistory) return text;
+    const entries = next.editHistory.entries.map(entry => `{"draftId":${JSON.stringify(entry.draftId)},"past":[${entry.past.map(serializeStep).join(',')}],"future":[${entry.future.map(serializeStep).join(',')}]}`);
+    return `${text.slice(0, -1)},"editHistory":{"version":1,"entries":[${entries.join(',')}]}}`;
+  }
   function commit(next: State, permanent = false): void {
     collectJournals(next);
-    const nextRaw = JSON.stringify(next);
+    const nextRaw = serialize(next);
     try {
       // Another store client may have committed since this instance was opened.
       // Never let an old undo stack replace newer disk content.
@@ -438,8 +451,15 @@ export function createMaterialLibrary(storage?: MaterialStorage, options?: { pro
     commit(next);
     return clone(next.drafts.find(item => item.id === draft.id)!);
   }
+  function copyForDraftEdit(id: string): State {
+    const { editHistory, transactionHistory, ...live } = state;
+    return { ...clone(live),
+      ...(editHistory ? { editHistory: { ...editHistory, entries: editHistory.entries.map(entry => entry.draftId === id
+        ? { ...entry, past: entry.past.slice(), future: entry.future.slice() } : entry) } } : {}),
+      ...(transactionHistory ? { transactionHistory: { ...transactionHistory, entries: transactionHistory.entries.slice() } } : {}) };
+  }
   function updateDraft(id: string, changes: DraftChanges, options?: DraftEditOptions): Draft {
-    const next = clone(state);
+    const next = copyForDraftEdit(id);
     const draft = next.drafts.find(item => item.id === id);
     if (!draft) fail('找不到编辑稿。');
     if (options && !same(draft, options.expected)) fail('编辑稿已发生变化，请重新查看后继续。');
@@ -449,7 +469,7 @@ export function createMaterialLibrary(storage?: MaterialStorage, options?: { pro
     }
     validateFields(fields);
     if (changes.name !== undefined) projectPolicy?.assertDraftName(state, draft, changes.name);
-    if (same(snapshot(draft), snapshot(fields))) return clone(draft);
+    if (draft.name === fields.name && same(draft.dependencies, fields.dependencies) && same(draft.body, fields.body)) return clone(draft);
     if (options?.remember) {
       next.editHistory ??= { version: 1, entries: [] };
       let history = historyFor(next, id);
@@ -466,7 +486,7 @@ export function createMaterialLibrary(storage?: MaterialStorage, options?: { pro
     return clone(next.drafts.find(item => item.id === id)!);
   }
   function travelDraft(id: string, direction: 'undo' | 'redo', expected: Draft): Draft {
-    const next = clone(state);
+    const next = copyForDraftEdit(id);
     const draft = next.drafts.find(item => item.id === id);
     if (!draft) fail('找不到编辑稿。');
     if (!same(draft, expected)) fail('编辑稿已发生变化，请重新查看后继续。');
@@ -662,6 +682,15 @@ export function createMaterialLibrary(storage?: MaterialStorage, options?: { pro
   }
   return {
     createDraft, updateDraft, saveDraft, travelDraft, commitTransaction, currentToken: () => token,
+    readDraftHistoryStep(id, direction) {
+      const history = historyFor(state, id);
+      const step = (direction === 'undo' ? history?.past : history?.future)?.at(-1);
+      return step && clone(step);
+    },
+    readDraftHistoryStatus(id) {
+      const history = historyFor(state, id);
+      return { canUndo: !!history?.past.length, canRedo: !!history?.future.length };
+    },
     readDraftHistory(id) {
       const history = historyFor(state, id);
       const plain = (step: HistoryStep): DraftSnapshot => ({ name: step.name, dependencies: step.dependencies, body: step.body,

@@ -14,11 +14,13 @@ export function recordPerformanceEntry(phrase: PhraseEditorPort, noteId: string,
 
 function noteIds(view: PhraseView): Set<string> { return new Set(view.body?.parts.flatMap(part => part.notes.map(note => note.id))); }
 function moveHistory(phrase: PhraseEditorPort, redo: boolean): number | undefined {
-  const before = phrase.read();
+  const drafts = histories.get(phrase);
+  const before = drafts?.size ? phrase.read() : undefined;
   if (redo) phrase.redo(); else phrase.undo();
+  if (!before?.draft) return;
+  const entries = drafts?.get(before.draft.id); if (!entries) return;
   const after = phrase.read();
-  if (!before.draft || before.draft.id !== after.draft?.id || !after.body) return;
-  const entries = histories.get(phrase)?.get(before.draft.id); if (!entries) return;
+  if (before.draft.id !== after.draft?.id || !after.body) return;
   const previous = noteIds(before), next = noteIds(after);
   const changed = [...(redo ? next : previous)].filter(id => !(redo ? previous : next).has(id));
   if (changed.length !== 1) return;

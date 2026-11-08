@@ -25,7 +25,7 @@ test('legacy phrase bodies keep their exact shape and unity gain while explicit 
   const original = f.playback.planForSaved(f.voice.id, { frequencyHz: 220, holdSeconds: 1, velocity: .7 });
   assert.deepEqual(f.phrase.previewPlan().events[0]!.sound, original);
   for (const value of [0, .25, 1]) assert.equal(readPhraseBody({ ...before, masterLevel: value }).masterLevel, value);
-  for (const value of [-.01, 1.01, NaN, Infinity, '0.5', null]) assert.throws(() => readPhraseBody({ ...before, masterLevel: value }), /乐句音量/);
+  for (const value of [-.01, 1.01, NaN, Infinity, '0.5', null]) assert.throws(() => readPhraseBody({ ...before, masterLevel: value }), /音乐音量/);
   assert.deepEqual(f.phrase.read().body, before);
 });
 
@@ -42,7 +42,7 @@ test('phrase gain is durable, undoable and atomic without changing notes or timb
   const reopened = createMaterialLibrary(f.storage); const editor = createPhraseEditor(reopened, createTimbrePlayback(reopened));
   assert.equal(editor.read().body!.masterLevel, .4);
   const token = f.library.currentToken(); const view = f.phrase.read(); const past = f.library.readDraftHistory(draft.id);
-  for (const value of [-1, 2, NaN]) assert.throws(() => f.phrase.setMasterLevel(value), /乐句音量/);
+  for (const value of [-1, 2, NaN]) assert.throws(() => f.phrase.setMasterLevel(value), /音乐音量/);
   f.fail(); assert.throws(() => f.phrase.setMasterLevel(.6), /test write failed/);
   assert.equal(f.library.currentToken(), token); assert.deepEqual(f.phrase.read(), view);
   assert.deepEqual(f.library.readDraftHistory(draft.id), past);

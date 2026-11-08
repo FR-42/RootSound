@@ -1,3 +1,4 @@
+import type {TimedMidiExpressionLane} from '../../contracts/midi-expression.ts';
 import type { ContentRecord, Draft, MaterialLibrary } from '../../contracts/content.ts';
 import type { PhrasePlaybackPort } from '../../contracts/phrase.ts';
 import { phraseDurationSeconds } from '../../contracts/phrase-time.ts';
@@ -6,6 +7,7 @@ import type { SoundSequencePlan } from '../../contracts/sound.ts';
 import type { PostProductionPort, PostProductionSettings } from '../../contracts/post-production.ts';
 import type { ReferenceAdapter } from '../../contracts/references.ts';
 import { MAX_SEQUENCE_EVENTS, MAX_SEQUENCE_SECONDS } from '../../contracts/playback-limits.ts';
+import { MIN_TEMPO_BPM, MAX_TEMPO_BPM } from '../../contracts/music-limits.ts';
 
 export type { SongBody, SongClip, SongEditorPort, SongPlaybackPort, SongTempoMode, SongTrack, SongView } from '../../contracts/song.ts';
 export { songGridTempoAt, songGridSegments } from './grid.ts';
@@ -91,7 +93,7 @@ export function readSongBody(value: unknown): SongBody {
   const body = object(value, '歌曲');
   fields(body, ['model', 'version', 'timeUnit', 'tempoBpm', 'tempoMode', 'gridTempoBpm', 'gridTempoChanges', 'gridOffsetSeconds', 'masterLevel', 'hiddenPhraseIds', 'phraseShelfOrder', 'timbreLibraryOrder', 'melodyTimbresSeeded', 'timbreCatalogVersion', 'lengthBeats', 'tracks', 'postProduction'], '歌曲');
   if (body.model !== 'phrase-arrangement' || body.version !== 1 || body.timeUnit !== 'beat') throw new Error('暂不支持这份歌曲的格式或版本。原内容已保留。');
-  const tempoBpm = finite(body.tempoBpm, '歌曲速度', 40, 240);
+  const tempoBpm = finite(body.tempoBpm, '歌曲速度', MIN_TEMPO_BPM, MAX_TEMPO_BPM);
   const tempoMode = mode(body.tempoMode);
   const lengthBeats = finite(body.lengthBeats, '歌曲长度', 16, MAX_LENGTH);
   const hiddenPhraseIds = body.hiddenPhraseIds === undefined ? undefined : (() => {
@@ -121,7 +123,7 @@ export function readSongBody(value: unknown): SongBody {
       const atSeconds = finite(change.atSeconds, '背景速度分段位置', 0, 1e6);
       if (atSeconds <= previous) throw new Error('背景速度分段需要按时间排列且不能重叠。');
       previous = atSeconds;
-      return { atSeconds, tempoBpm: finite(change.tempoBpm, '背景网格速度', 40, 240) };
+      return { atSeconds, tempoBpm: finite(change.tempoBpm, '背景网格速度', MIN_TEMPO_BPM, MAX_TEMPO_BPM) };
     });
   })();
   const ids = new Set<string>();
@@ -147,7 +149,7 @@ export function readSongBody(value: unknown): SongBody {
       ...(track.panOffset === undefined ? {} : { panOffset: finite(track.panOffset, '行声像偏移', -1, 1) }) };
   });
   return { model: 'phrase-arrangement', version: 1, timeUnit: 'beat', tempoBpm, tempoMode, lengthBeats, tracks,
-    ...(body.gridTempoBpm === undefined ? {} : { gridTempoBpm: finite(body.gridTempoBpm, '背景网格速度', 40, 240) }),
+    ...(body.gridTempoBpm === undefined ? {} : { gridTempoBpm: finite(body.gridTempoBpm, '背景网格速度', MIN_TEMPO_BPM, MAX_TEMPO_BPM) }),
     ...(gridTempoChanges === undefined ? {} : { gridTempoChanges }),
     ...(body.gridOffsetSeconds === undefined ? {} : { gridOffsetSeconds: finite(body.gridOffsetSeconds, '背景网格偏移', -1e6, 1e6) }),
     ...(body.masterLevel === undefined ? {} : { masterLevel: finite(body.masterLevel, '总音量', 0, 1) }),
@@ -195,6 +197,7 @@ function compileSong(body: SongBody, phrases: PhrasePlaybackPort, allowSilence =
   const secondsPerBeat = 60 / body.tempoBpm;
   const hasSolo = body.tracks.some(track => track.solo);
   const events: Array<SoundSequencePlan['events'][number]> = [];
+  const midiExpression:TimedMidiExpressionLane[]=[];
   const phraseHasNotes = new Map<string, boolean>();
   const phrasePlans = new Map<string, SoundSequencePlan>();
   let durationSeconds = extent(body, phrases) * secondsPerBeat;
@@ -218,8 +221,9 @@ function compileSong(body: SongBody, phrases: PhrasePlaybackPort, allowSilence =
       }
       const offset = clip.startBeat * secondsPerBeat;
       durationSeconds = Math.max(durationSeconds, offset + plan.durationSeconds);
+      for(const lane of plan.midiExpression??[])midiExpression.push({id:`${clip.id}:${lane.id}`,events:lane.events.map(event=>({...event,atSeconds:event.atSeconds+offset}))});
       for (const event of plan.events) events.push({ atSeconds: offset + event.atSeconds,
-        sound: { ...event.sound, level: event.sound.level * track.level * (clip.level ?? 1) * (body.masterLevel ?? 1) },
+        sound: { ...event.sound, ...(event.sound.kind==='sample'&&event.sound.soundFont?.midiChannelId?{soundFont:{...event.sound.soundFont,midiChannelId:`${clip.id}:${event.sound.soundFont.midiChannelId}`}}:{}),level: event.sound.level * track.level * (clip.level ?? 1) * (body.masterLevel ?? 1) },
         pan: Math.max(-1, Math.min(1, (event.pan ?? 0) + (clip.pan ?? track.pan) + (track.panOffset ?? 0))) });
       if (events.length > MAX_SEQUENCE_EVENTS) throw new Error(`这首歌曲超过当前 ${MAX_SEQUENCE_EVENTS} 个发声音符的试听范围，请缩短编排。`);
     }
@@ -227,7 +231,7 @@ function compileSong(body: SongBody, phrases: PhrasePlaybackPort, allowSilence =
   if (!events.length && !allowSilence) throw new Error('先放入有音符的音乐，并开启至少一条轨道，再听整首歌吧。');
   if (durationSeconds > MAX_SEQUENCE_SECONDS) throw new Error('当前歌曲试听与导出支持最长 10 分钟，请缩短编排。');
   events.sort((a, b) => a.atSeconds - b.atSeconds);
-  const plan: SoundSequencePlan = { kind: 'sequence', version: 1, durationSeconds, events };
+  const plan: SoundSequencePlan = { kind: 'sequence', version: 1, durationSeconds, events, ...(midiExpression.length?{midiExpression}:{}) };
   if (!body.postProduction) return plan;
   if (!postProduction) throw new Error('这首歌曲需要连接后期处理模块，原稿已保留。');
   return postProduction.apply(plan, body.postProduction);
@@ -293,6 +297,7 @@ export function createSongEditor(library: MaterialLibrary, phrases: PhrasePlayba
     library.travelDraft(draft.id, direction, draft);
   }
   const api: SongEditorPort = {
+    readDraft: () => active ? library.readDraft(active) : undefined,
     read() {
       const preserved = active ? library.readDraft(active) : undefined; let state: ReturnType<typeof current> | undefined; let problem: string | undefined;
       if (active) try { state = current(); } catch (error) { problem = error instanceof Error ? error.message : String(error); }
@@ -332,7 +337,7 @@ export function createSongEditor(library: MaterialLibrary, phrases: PhrasePlayba
     rename(name) { const { draft, body } = current(); write({ name: text(name.trim(), '歌曲名称'), dependencies: draft.dependencies, body }); },
     setTempo(tempoBpm) { modify(body => { body.tempoBpm = tempoBpm; }); },
     setGridTempo(tempoBpm, fromSeconds = 0) {
-      finite(tempoBpm, '背景网格速度', 40, 240); finite(fromSeconds, '背景速度分段位置', 0, 1e6);
+      finite(tempoBpm, '背景网格速度', MIN_TEMPO_BPM, MAX_TEMPO_BPM); finite(fromSeconds, '背景速度分段位置', 0, 1e6);
       modify(body => {
         if (fromSeconds === 0) {
           body.gridTempoBpm = tempoBpm;

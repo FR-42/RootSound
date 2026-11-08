@@ -46,16 +46,16 @@ public sealed class NativeProjectDirectories
     public string CreateCopy(string name, string parentPath, string libraryText) => Run(() =>
         JsonSerializer.Serialize(new { status = "created", project = manager.CreateCopy(name, parentPath, libraryText) }));
 
+    public string CreateDetached(string name, string parentPath, string libraryText) => Run(() =>
+        JsonSerializer.Serialize(new { status = "created", project = manager.CreateDetached(name, parentPath, libraryText) }));
+
     public string Open() => Run(() =>
     {
         string? path = chooseProject();
         if (path is null) return Cancelled();
-        if (NativeMidiFiles.IsMidiPath(path))
+        if (NativeDocumentFiles.Format(path) is not null)
         {
-            byte[] bytes = NativeMidiFiles.ReadBytes(path);
-            // Selection is only a read: the application validates and converts
-            // the complete MIDI before it creates or activates a new project.
-            return JsonSerializer.Serialize(new { status = "midi", name = Path.GetFileName(path), base64 = Convert.ToBase64String(bytes) });
+            return SourceResult(manager.ReadDocumentFile(path));
         }
         return JsonSerializer.Serialize(new { status = "opened", project = manager.Open(path) });
     });
@@ -63,8 +63,19 @@ public sealed class NativeProjectDirectories
     public string List() => Run(() =>
         JsonSerializer.Serialize(new { status = "listed", projects = manager.List() }));
 
-    public string OpenKnown(string path) => Run(() =>
-        JsonSerializer.Serialize(new { status = "opened", project = manager.OpenKnown(path) }));
+    public string Browse(string path = "") => Run(() =>
+        JsonSerializer.Serialize(new { status = "browsed", page = manager.Browse(path) }));
+
+    public string OpenKnown(string path) => Run(() => NativeDocumentFiles.Format(path) is not null
+        ? SourceResult(manager.ReadDocumentFile(path, known: true))
+        : JsonSerializer.Serialize(new { status = "opened", project = manager.OpenKnown(path) }));
+
+    public string OpenDocument(string path, string token, string libraryText) => Run(() =>
+        JsonSerializer.Serialize(new { status = "opened", project = manager.OpenDocument(path, token, libraryText) }));
+    public string ReadDocument() => Run(() => manager.ReadDocument() is { } source ? SourceResult(source) : "{\"status\":\"none\"}");
+    public string PrepareDocumentSave(string base64) => Run(() => { manager.PrepareDocumentSave(base64); return "{\"status\":\"ready\"}"; });
+    private static string SourceResult(EditableSourceData source) => JsonSerializer.Serialize(new { status = "document", source.Name, source.Path,
+        source.Format, source.Base64, source.Token, source.LibraryText }, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
 
     public string Delete(string path, string expectedId) => Run(() =>
     {
@@ -111,8 +122,8 @@ public sealed class NativeProjectDirectories
     {
         using var dialog = new OpenFileDialog
         {
-            Title = "打开歌曲项目或 MIDI",
-            Filter = "歌曲项目或 MIDI (*.rootsound;*.mid;*.midi)|*.rootsound;*.mid;*.midi|RootSound 歌曲项目 (*.rootsound)|*.rootsound|MIDI 文件 (*.mid;*.midi)|*.mid;*.midi|旧版项目说明 (project.json)|project.json",
+            Title = "打开音乐文件",
+            Filter = "可编辑音乐 (*.rootsound;*.mid;*.midi;*.smf;*.kar;*.rmi;*.musicxml;*.xml;*.mxl;*.rsproject)|*.rootsound;*.mid;*.midi;*.smf;*.kar;*.rmi;*.musicxml;*.xml;*.mxl;*.rsproject|简乐工程 (*.rootsound;*.rsproject)|*.rootsound;*.rsproject|MIDI (*.mid;*.midi;*.smf;*.kar;*.rmi)|*.mid;*.midi;*.smf;*.kar;*.rmi|MusicXML (*.musicxml;*.xml;*.mxl)|*.musicxml;*.xml;*.mxl|旧版项目说明 (project.json)|project.json",
             InitialDirectory = Directory.Exists(manager.DefaultLocation) ? manager.DefaultLocation : Path.GetDirectoryName(manager.DefaultLocation),
             CheckFileExists = true, Multiselect = false,
         };

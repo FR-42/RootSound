@@ -13,15 +13,27 @@ export function createMelodyNoteIndex(body: PhraseBody, parts: readonly PhrasePa
     entries.push(entry); byId.set(note.id, entry);
   }
   entries.sort((a, b) => a.start - b.start);
-  const maximumEnds: number[] = []; let maximum = -Infinity;
-  for (const entry of entries) { maximum = Math.max(maximum, entry.end); maximumEnds.push(maximum); }
-  return { byId, visible(start: number, end: number): IndexedMelodyNote[] {
+  // A prefix maximum cannot skip short notes after one very long sustain.
+  // Store maxima per subtree so an overlap query can prune those ranges too.
+  let size = 1; while (size < entries.length) size *= 2;
+  const maximumEnds = new Float64Array(size * 2).fill(-Infinity);
+  for (let i = 0; i < entries.length; i++) maximumEnds[size + i] = entries[i]!.end;
+  for (let i = size - 1; i > 0; i--) maximumEnds[i] = Math.max(maximumEnds[i * 2]!, maximumEnds[i * 2 + 1]!);
+  return { byId, startingBetween(start: number, end: number): IndexedMelodyNote[] {
     let low = 0, high = entries.length;
-    while (low < high) { const mid = (low + high) >>> 1; if (maximumEnds[mid]! < start) low = mid + 1; else high = mid; }
+    while (low < high) { const mid = (low + high) >>> 1; if (entries[mid]!.start < start) low = mid + 1; else high = mid; }
     const result: IndexedMelodyNote[] = [];
-    for (let index = low; index < entries.length && entries[index]!.start <= end; index++) {
-      if (entries[index]!.end >= start) result.push(entries[index]!);
+    for (let i = low; i < entries.length && entries[i]!.start <= end; i++) result.push(entries[i]!);
+    return result;
+  }, visible(start: number, end: number): IndexedMelodyNote[] {
+    const result: IndexedMelodyNote[] = [];
+    function visit(node: number, left: number, right: number): void {
+      if (left >= entries.length || maximumEnds[node]! < start || entries[left]!.start > end) return;
+      if (right - left === 1) { result.push(entries[left]!); return; }
+      const middle = (left + right) >>> 1;
+      visit(node * 2, left, middle); visit(node * 2 + 1, middle, right);
     }
+    visit(1, 0, size);
     return result;
   } };
 }

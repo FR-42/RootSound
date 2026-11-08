@@ -3,6 +3,7 @@ import {test} from 'node:test';
 import {readFileSync} from 'node:fs';
 import {BasicSoundBank,GeneratorTypes,SpessaSynthProcessor,Modulator,ModulatorSource} from 'spessasynth_core';
 import {loadSoundFont,SoundFontStream,type FontEvent} from '../src/workstation/modules/sound-runtime/soundfont-engine.ts';
+import { createFontScheduleEditor } from '../src/workstation/modules/sound-runtime/soundfont-schedule.ts';
 import {createSampleBankAudio} from '../src/workstation/modules/timbre/sample-bank.ts';
 import {createMaterialLibrary} from '../src/workstation/modules/materials/public.ts';
 import {readPreview} from '../src/workstation/modules/sound-runtime/plan.ts';
@@ -17,6 +18,19 @@ function render(source:ReturnType<typeof loadSoundFont>,events:FontEvent[],secon
 }
 const energy=(audio:Float32Array)=>audio.reduce((n,x)=>n+x*x,0);
 
+test('complete MIDI pitch edges produce finite nonzero audio in the installed sampled instruments',async()=>{
+  const fetcher=(async()=>new Response(readFileSync('public/instruments/generaluser-gs-2.0.3/manifest.json'))) as typeof fetch;
+  const full=createSampleBankAudio(createMaterialLibrary(),undefined,fetcher,{soundFont:true});
+  for(const program of [0,48,73])for(const key of [0,127]){
+    const body={model:'sample-bank',version:1,bank:'generaluser-gs-2.0.3',instrument:`gm-${program}`,attackSeconds:0,releaseSeconds:.03,level:.7} as const;
+    const note={frequencyHz:440*2**((key-69)/12),holdSeconds:.25,velocity:100/127};await full.prepare(body,[note]);
+    const font=full.plan(body,note).soundFont!;assert(Math.abs(font.key+font.cents/100-key)<1e-8);
+    const source=event({font}),output=render(bank,[source],.4);
+    assert(output.left.every(Number.isFinite)&&output.right.every(Number.isFinite));
+    assert(energy(output.left)+energy(output.right)>1e-15,`silent GM ${program} at key ${key}`);output.stream.dispose();
+  }
+});
+
 test('RootSound note mapping matches the complete reference engine sample for sample',async()=>{
   const input=event();const actual=render(bank,[input]);
   const reference=new SpessaSynthProcessor(48000,{effectsEnabled:true,eventsEnabled:false});reference.soundBankManager.addSoundBank(bank,'reference');await reference.ready;
@@ -25,6 +39,53 @@ test('RootSound note mapping matches the complete reference engine sample for sa
   for(let offset=0;offset<left.length;){if(offset===12000)reference.noteOff(0,69);const count=Math.min(128,left.length-offset,offset<12000?12000-offset:128);reference.process(left,right,offset,count);offset+=count;}
   assert.deepEqual(actual.left,left);assert.deepEqual(actual.right,right);assert(energy(left)>0);
   actual.stream.dispose();reference.soundBankManager.deleteSoundBank('reference');reference.destroy();
+});
+
+test('moving a future note preserves the current SoundFont voice and its release sample for sample', () => {
+  const held = event({ holdSeconds: .30 });
+  const upcoming = event({ atSeconds: .50, font: { ...held.font, key: 77 } });
+  const moved = { ...upcoming, atSeconds: .75 };
+  const stream = new SoundFontStream(bank, 48000, [held, upcoming]);
+  const reference = new SoundFontStream(bank, 48000, [held, moved]);
+  const actual = new Float32Array(48000), expected = new Float32Array(48000);
+  const right = new Float32Array(48000), referenceRight = new Float32Array(48000);
+  try {
+    const cutover = 6144;
+    stream.process(actual, right, 0, cutover);
+    reference.process(expected, referenceRight, 0, cutover);
+    const edit = createFontScheduleEditor([held, upcoming], []);
+    assert.equal(edit([{ ...held, atSeconds: held.atSeconds + 1e-12 }, upcoming], []), undefined);
+    const patch = edit([held, moved], [])!;
+    assert.equal(patch.removed.length, 1);
+    assert.equal(patch.added.length, 2);
+    stream.patchSchedule(patch);
+    stream.process(actual, right, cutover);
+    reference.process(expected, referenceRight, cutover);
+    assert(energy(actual.subarray(cutover)) > 0);
+    assert.deepEqual(actual, expected);
+    assert.deepEqual(right, referenceRight);
+  } finally { stream.dispose(); reference.dispose(); }
+});
+
+test('resizing keeps the current SoundFont note ringing and changes the next note release', () => {
+  const held = event({ holdSeconds: .30 });
+  const upcoming = event({ atSeconds: .50, font: { ...held.font, key: 77 } });
+  const longer = { ...upcoming, holdSeconds: .42 };
+  const stream = new SoundFontStream(bank, 48000, [held, upcoming]);
+  const reference = new SoundFontStream(bank, 48000, [held, longer]);
+  const actual = new Float32Array(48000), expected = new Float32Array(48000);
+  const right = new Float32Array(48000), referenceRight = new Float32Array(48000);
+  try {
+    const cutover = 6144;
+    stream.process(actual, right, 0, cutover);
+    reference.process(expected, referenceRight, 0, cutover);
+    const edit = createFontScheduleEditor([held, upcoming], []);
+    stream.patchSchedule(edit([{ ...held, holdSeconds: .70 }, longer], [])!);
+    stream.process(actual, right, cutover);
+    reference.process(expected, referenceRight, cutover);
+    assert.deepEqual(actual, expected);
+    assert.deepEqual(right, referenceRight);
+  } finally { stream.dispose(); reference.dispose(); }
 });
 
 test('SoundFont filter, modulation envelope and pitch LFO affect rendered PCM',()=>{

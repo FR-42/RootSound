@@ -1,3 +1,4 @@
+import type {TimedMidiExpressionLane} from '../../contracts/midi-expression.ts';
 import {loadSoundFont,SoundFontStream,type FontEvent} from './soundfont-engine.ts';
 
 declare const sampleRate:number;
@@ -13,17 +14,18 @@ class FontProcessor extends AudioWorkletProcessor {
   #start=Infinity;
   #stop=Infinity;
   #ended=false;
-  constructor(options:{processorOptions:{bank?:ArrayBuffer;events?:FontEvent[]}}) {
+  constructor(options:{processorOptions:{bank?:ArrayBuffer;events?:FontEvent[];midiExpression?:TimedMidiExpressionLane[]}}) {
     super();
     try {
       if(options.processorOptions.bank){bank=loadSoundFont(options.processorOptions.bank);this.port.postMessage({type:'ready'});}
       else {
         if(!bank)throw Error('完整 SoundFont 音源尚未加载。');
-        this.#stream=new SoundFontStream(bank,sampleRate,options.processorOptions.events!);
+        this.#stream=new SoundFontStream(bank,sampleRate,options.processorOptions.events!,options.processorOptions.midiExpression);
       }
       this.port.onmessage=event=>{
         const value=event.data;
         if(value.type==='start'){this.#stream!.seek(value.position);this.#start=value.at;this.port.postMessage({type:'scheduled'});}
+        if(value.type==='patch-schedule')this.#stream!.patchSchedule(value.patch);
         if(value.type==='stop')this.#stop=value.at;
         if(value.type==='dispose'){this.#ended=true;this.#stream?.dispose();this.#stream=undefined;}
       };

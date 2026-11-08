@@ -1,0 +1,37 @@
+import assert from 'node:assert/strict';
+import { test } from 'node:test';
+import { createInitialProjectLibrary } from '../src/workstation/app/project-setup.ts';
+import { openMusicDocument, commitMusicDocument } from '../src/workstation/app/music-document.ts';
+import { removeProjectTimbre, listProjectTimbres, ensureProjectMelodyTimbres } from '../src/workstation/app/project-timbres.ts';
+import { createMaterialLibrary } from '../src/workstation/modules/materials/public.ts';
+import { createTimbrePlayback, createTimbreReferenceAdapter } from '../src/workstation/modules/timbre/public.ts';
+import { createPhraseEditor, createPhrasePlayback, createPhraseReferenceAdapter, readPhraseBody } from '../src/workstation/modules/phrase/public.ts';
+import { createSongEditor, createSongReferenceAdapter } from '../src/workstation/modules/song/public.ts';
+import { createSampleReferenceAdapter } from '../src/workstation/modules/sampling/public.ts';
+import { musicClockVoice } from './music-clock-fixture.ts';
+
+function fixture(){let text=createInitialProjectLibrary('移除测试');
+  const library=createMaterialLibrary({read:()=>text,write:value=>{text=value;}},{project:{rootKind:'rootsound.song',adapters:[createTimbreReferenceAdapter(),createPhraseReferenceAdapter(),createSongReferenceAdapter(),createSampleReferenceAdapter()]}});
+  const tones=createTimbrePlayback(library,undefined,undefined,musicClockVoice),phrase=createPhraseEditor(library,tones);
+  const song=createSongEditor(library,createPhrasePlayback(library,tones),{defaultTempoMode:'source'});openMusicDocument(library,song,phrase);
+  return {library,phrase,song,text:()=>text};
+}
+test('library removal really removes an unused default and does not reseed it',()=>{
+  const f=fixture(),root=f.song.read().draft!.id,tone=listProjectTimbres(f.library,root)[0]!;
+  removeProjectTimbre(f.library,root,tone.id);assert.equal(f.library.readContentInfo(tone.id),undefined);
+  assert.equal(listProjectTimbres(f.library,root).length,174);assert.equal(ensureProjectMelodyTimbres(f.library,root).length,174);
+});
+test('removing an already added sound preserves its notes silently and allows reassignment',()=>{
+  const f=fixture(),root=f.song.read().draft!.id,tone=listProjectTimbres(f.library,root)[0]!;
+  const part=f.phrase.addPart(tone.id);f.phrase.addNote(part,{startBeat:2,durationBeats:1,frequencyHz:440,velocity:.7});
+  const note=structuredClone(f.phrase.read().body!.parts[0]!.notes[0]!);
+  commitMusicDocument(f.library,f.song,f.phrase);removeProjectTimbre(f.library,root,tone.id);
+  const current=f.phrase.read().body!.parts[0]!;assert(current.unassigned);assert.deepEqual(current.notes[0],note);
+  assert.equal(f.phrase.previewPlan(undefined,{allowSilence:true}).events.length,0);
+  assert.equal(listProjectTimbres(f.library,root).length,174);assert.equal(f.library.readContentInfo(tone.id),undefined);
+  assert(!listProjectTimbres(f.library,root).some(item=>item.name==='未定义音色'));
+  const saved=f.library.readContent(f.phrase.read().draft!.sourceId!)!;assert(readPhraseBody(saved.body).parts[0]!.unassigned);
+  const replacement=listProjectTimbres(f.library,root)[0]!;f.phrase.setPartTimbre(part,replacement.id);
+  assert.equal(f.phrase.previewPlan().events.length,1);assert.equal(f.phrase.read().body!.parts[0]!.notes[0]!.id,note.id);
+  f.phrase.undo();assert(f.phrase.read().body!.parts[0]!.unassigned);assert.equal(f.library.readContentInfo(tone.id),undefined);
+});

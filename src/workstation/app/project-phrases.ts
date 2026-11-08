@@ -1,6 +1,7 @@
 import type { ContentRecord, Draft, MaterialLibrary, SaveResult } from '../contracts/content.ts';
 import type { SongClipRef } from '../contracts/song.ts';
 import { phraseDurationSeconds } from '../contracts/phrase-time.ts';
+import { MIN_TEMPO_BPM, MAX_TEMPO_BPM } from '../contracts/music-limits.ts';
 import { createMaterialLibrary, createReferenceEditing, countUsagePositions } from '../modules/materials/public.ts';
 import { createTimbreEditor, createTimbrePlayback, createTimbreReferenceAdapter } from '../modules/timbre/public.ts';
 import { createPhraseEditor, createPhrasePlayback, createPhraseReferenceAdapter, readPhraseBody } from '../modules/phrase/public.ts';
@@ -65,7 +66,7 @@ function prepareProjectPhrase(library: MaterialLibrary, songDraftId: string, tim
   const expectedToken = library.currentToken();
   const { draft: song, view, scope } = currentSong(library, songDraftId);
   const initialTempo = tempoBpm ?? songGridTempoAt(readSongBody(song.body), 0);
-  if (!Number.isFinite(initialTempo) || initialTempo < 40 || initialTempo > 240) throw new Error('新音乐速度必须在 40 至 240 之间。');
+  if (!Number.isFinite(initialTempo) || initialTempo < MIN_TEMPO_BPM || initialTempo > MAX_TEMPO_BPM) throw new Error(`新音乐速度必须在 ${MIN_TEMPO_BPM} 至 ${MAX_TEMPO_BPM} 之间。`);
   const local = [...library.listContentInfo().filter(item => library.projectScopeOf?.({ type: 'content', id: item.id }) === scope),
     ...library.listDrafts().filter(item => library.projectScopeOf?.({ type: 'draft', id: item.id }) === scope),
     ...view.contents, ...view.drafts];

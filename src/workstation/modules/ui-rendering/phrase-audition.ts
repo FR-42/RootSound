@@ -8,11 +8,11 @@ export function createPhraseAudition(
   sound: Pick<SoundRuntimePort, 'audition' | 'cancelAudition'>,
   currentPart: () => string | undefined,
   onError: (message: string) => void,
-): { request(frequencyHz: number, holdSeconds?: number, velocity?: number, ready?: void | Promise<void>, level?: number): Promise<void>; requestKeyboard(frequencyHz: number): Promise<void>; requestTimbre(id: string): Promise<void>; sync(snapshot?: Pick<PhraseView, 'draft' | 'body'>): void; cancel(): void } {
+): { request(frequencyHz: number, holdSeconds?: number, velocity?: number, ready?: void | Promise<void>, level?: number, partId?: string): Promise<void>; requestKeyboard(frequencyHz: number): Promise<void>; requestTimbre(id: string): Promise<void>; sync(snapshot?: Pick<PhraseView, 'draft' | 'body'>): void; cancel(): void } {
   let generation = 0;
   let scope = '';
-  function currentScope(view: Pick<PhraseView, 'draft' | 'body'> = phrase.read()): string {
-    const part = view.body?.parts.find(item => item.id === currentPart());
+  function currentScope(view: Pick<PhraseView, 'draft' | 'body'> = phrase.read(), partId = currentPart()): string {
+    const part = view.body?.parts.find(item => item.id === partId);
     return view.draft && part && !part.unassigned ? JSON.stringify([view.draft.id, part.id, part.timbreId]) : '';
   }
   function cancel(): void { generation++; sound.cancelAudition(); }
@@ -31,20 +31,26 @@ export function createPhraseAudition(
           onError(`试音暂不可用：${error instanceof Error ? error.message : String(error)}`);
       }
     },
-    async request(frequencyHz, holdSeconds = 0.35, velocity = 0.75, ready, level = 1) {
-      cancel(); scope = currentScope();
-      const selected = currentPart(); if (!selected || !scope) return;
-      const request = generation; const expected = scope;
+    async request(frequencyHz, holdSeconds = 0.35, velocity = 0.75, ready, level = 1, partId = currentPart()) {
+      cancel(); const initial = phrase.read(); scope = currentScope(initial);
+      const expected = currentScope(initial, partId);
+      if (!partId || !expected) return;
+      const request = generation; const expectedSelection = scope;
+      const stillCurrent = () => {
+        if (generation !== request) return false;
+        const view = phrase.read();
+        return currentScope(view) === expectedSelection && currentScope(view, partId) === expected;
+      };
       try {
-        const preparation = phrase.previewNotePlan(selected, { frequencyHz,
+        const preparation = phrase.previewNotePlan(partId, { frequencyHz,
           holdSeconds: Math.max(0.01, Math.min(0.75, holdSeconds)), velocity });
         // Observe both promises immediately; a rejected transport barrier must
         // not become unhandled while a sampled tone is still being prepared.
         const plan = ready === undefined ? await preparation : (await Promise.all([preparation, ready]))[0];
-        if (generation !== request || currentScope() !== expected) return;
+        if (!stillCurrent()) return;
         await sound.audition(level === 1 ? plan : { ...plan, level: plan.level * level });
       } catch (error) {
-        if (generation === request && currentScope() === expected) {
+        if (stillCurrent()) {
           onError(`试音暂不可用：${error instanceof Error ? error.message : String(error)}`);
         }
       }

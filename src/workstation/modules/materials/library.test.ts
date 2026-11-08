@@ -640,3 +640,22 @@ test('missing, mismatched or damaged composite journals reject loading without a
     assert.equal(writes, 0);
   }
 });
+
+
+test('lightweight history status is independent and failed branches retain cached durable history', () => {
+  const f = historyFixture(); f.edit('one'); f.edit('two');
+  f.library.travelDraft(f.draft.id, 'undo', f.library.readDraft(f.draft.id)!);
+  const status = f.library.readDraftHistoryStatus!(f.draft.id);
+  assert.deepEqual(status, { canUndo: true, canRedo: true });
+  status.canRedo = false;
+  assert.equal(f.library.readDraftHistoryStatus!(f.draft.id).canRedo, true);
+  const before = f.raw(), history = f.library.readDraftHistory(f.draft.id);
+  f.fail(true); assert.throws(() => f.edit('failed branch'), /写入失败/);
+  assert.equal(f.raw(), before); assert.deepEqual(f.library.readDraftHistory(f.draft.id), history);
+  f.fail(false); f.edit('new branch');
+  const reopened = createMaterialLibrary(f.storage);
+  assert.deepEqual(reopened.readDraftHistoryStatus!(f.draft.id), { canUndo: true, canRedo: false });
+  assert.equal(reopened.readDraft(f.draft.id)!.name, 'new branch');
+  reopened.travelDraft(f.draft.id, 'undo', reopened.readDraft(f.draft.id)!);
+  assert.equal(reopened.readDraft(f.draft.id)!.name, 'one');
+});

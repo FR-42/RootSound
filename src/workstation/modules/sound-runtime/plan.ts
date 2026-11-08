@@ -1,3 +1,4 @@
+import {readMidiExpressionMessage,MAX_MIDI_EXPRESSION_EVENTS,type TimedMidiExpressionLane} from '../../contracts/midi-expression.ts';
 import type { BasicWaveform, PcmAudio, SampleSoundPlan, SoundPlan } from '../../contracts/sound.ts';
 import type { OutputProcessingPlan } from '../../contracts/post-production.ts';
 import { pcmShape, readPcmSnapshot, samePcm, type PcmSnapshot } from './pcm.ts';
@@ -23,6 +24,7 @@ export interface ScheduledPreview {
   readonly normalization: number;
   readonly sequence: boolean;
   readonly samples: readonly SampleSourceSnapshot[];
+  readonly midiExpression?: readonly TimedMidiExpressionLane[];
   readonly output?: OutputProcessingPlan;
   readonly transport?: { readonly positionSeconds: number; readonly rate: number };
   /** Piecewise head clock, retained even when an edit temporarily removes every note. */
@@ -67,11 +69,19 @@ function readPlan(value: unknown, readSample: (value: unknown) => SampleSourceSn
     const common = readControls(plan);
     let soundFont:SampleSoundPlan['soundFont'];
     if(plan.soundFont!==undefined) {
-      const font=object(plan.soundFont,'SoundFont 音符');fields(font,['bank','program','key','velocity','cents','drums'],'SoundFont 音符');
+      const font=object(plan.soundFont,'SoundFont 音符');fields(font,['bank','program','key','velocity','cents','drums','midiChannelId','midiOnOrder','midiOffOrder','sostenutoSeconds','soundingSeconds'],'SoundFont 音符');
       if(font.bank!=='generaluser-gs-2.0.3'||typeof font.drums!=='boolean')throw new Error('SoundFont 音源无效。');
       const program=number(font.program,'音源编号',0,127),key=number(font.key,'音源琴键',0,127),velocity=number(font.velocity,'音源力度',0,127);
       if(![program,key,velocity].every(Number.isInteger))throw new Error('SoundFont 编号必须是整数。');
       soundFont={bank:font.bank,program,key,velocity,cents:number(font.cents,'音源调音',-12700,12700),drums:font.drums};
+      if(font.midiChannelId!==undefined){
+        if(typeof font.midiChannelId!=='string'||!font.midiChannelId||font.midiChannelId.length>4096)throw new Error('MIDI 演奏通道无效。');
+        soundFont={...soundFont,midiChannelId:font.midiChannelId,
+          ...(font.midiOnOrder===undefined?{}:{midiOnOrder:number(font.midiOnOrder,'MIDI 按键顺序',0,Number.MAX_SAFE_INTEGER)}),
+          ...(font.midiOffOrder===undefined?{}:{midiOffOrder:number(font.midiOffOrder,'MIDI 松键顺序',0,Number.MAX_SAFE_INTEGER)}),
+          sostenutoSeconds:number(font.sostenutoSeconds,'保持音踏板时长',.0001,MAX_SEQUENCE_SECONDS),
+          soundingSeconds:number(font.soundingSeconds,'踏板发声时长',.0001,MAX_SEQUENCE_SECONDS)};
+      }
     }
     return { kind: 'sample', version: 1, source, startSeconds, endSeconds,
       playbackRate: number(plan.playbackRate, '采样播放倍率', 1 / 256, 256), ...common, ...(loop ? { loop } : {}),
@@ -133,7 +143,7 @@ function readControls(plan: Record<string, unknown>): Pick<SoundPlan, 'envelope'
 }
 
 export function noteDuration(sound: ScheduledSound): number {
-  const envelope = sound.note.holdSeconds + sound.envelope.releaseSeconds;
+  const envelope = Math.max(sound.note.holdSeconds,sound.kind==='sample'?sound.soundFont?.soundingSeconds??0:0) + sound.envelope.releaseSeconds;
   return sound.kind === 'sample' && !sound.loop && !sound.soundFont ? Math.min(envelope, (sound.endSeconds - sound.startSeconds) / sound.playbackRate) : envelope;
 }
 
@@ -172,7 +182,7 @@ function sourceReader(previous?: ScheduledPreview): { read(value: unknown): Samp
 
 /** Only small note parameters and complete-source digests enter live-edit comparisons. */
 export function previewFingerprint(preview: ScheduledPreview): string {
-  return JSON.stringify({ durationSeconds: preview.durationSeconds, normalization: preview.normalization, sequence: preview.sequence, output: preview.output,
+  return JSON.stringify({ durationSeconds: preview.durationSeconds, normalization: preview.normalization, sequence: preview.sequence, output: preview.output, midiExpression:preview.midiExpression,
     events: preview.events.map(event => ({ ...event, sound: event.sound.kind === 'sample' ? { ...event.sound, source: event.sound.source.key } : event.sound })) });
 }
 
@@ -230,7 +240,7 @@ export function readPreview(value: unknown, options: { allowEmptySequence?: bool
     };
   }
   if (input.version !== 1) throw new Error('当前声音运行仅支持第 1 版音乐试听计划。');
-  fields(input, ['kind', 'version', 'durationSeconds', 'events', 'output', 'transport'], '音乐试听计划');
+  fields(input, ['kind', 'version', 'durationSeconds', 'events', 'output', 'transport', 'midiExpression'], '音乐试听计划');
   let output: OutputProcessingPlan | undefined;
   if (input.output !== undefined) {
     const settings = object(input.output, '输出处理'); fields(settings, ['level', 'fadeInSeconds', 'fadeOutSeconds'], '输出处理');
@@ -255,6 +265,28 @@ export function readPreview(value: unknown, options: { allowEmptySequence?: bool
       transportClock.push({ ...transport, elapsedSeconds: elapsed });
     }
   }
+  function clock(songAtSeconds:number):number {
+    if(!transport)return songAtSeconds;
+    let segment=transportClock![0]!;
+    for(let i=transportClock!.length-1;i>=0;i--)if(transportClock![i]!.positionSeconds<=songAtSeconds){segment=transportClock![i]!;break;}
+    return segment.elapsedSeconds+(songAtSeconds-segment.positionSeconds)/segment.rate;
+  }
+  let eventCount=0;const laneIds=new Set<string>();
+  const midiExpression:TimedMidiExpressionLane[]|undefined=input.midiExpression===undefined?undefined:(()=>{
+    if(!Array.isArray(input.midiExpression)||input.midiExpression.length>2048)throw new Error('MIDI 演奏通道无效。');
+    return input.midiExpression.map(raw=>{
+      const lane=object(raw,'MIDI 演奏通道');fields(lane,['id','events'],'MIDI 演奏通道');
+      if(typeof lane.id!=='string'||!lane.id||laneIds.has(lane.id)||!Array.isArray(lane.events))throw new Error('MIDI 演奏通道无效。');
+      laneIds.add(lane.id);
+      const events=lane.events.map(raw=>{
+        if(++eventCount>MAX_MIDI_EXPRESSION_EVENTS+4096)throw new Error('MIDI 演奏事件超出范围。');
+        const item=object(raw,'MIDI 演奏事件');fields(item,['type','controller','key','value','atSeconds','order'],'MIDI 演奏事件');
+        return {...readMidiExpressionMessage(item),atSeconds:clock(number(item.atSeconds,'演奏事件时间',0,duration)),
+          ...(item.order===undefined?{}:{order:number(item.order,'MIDI 事件顺序',0,Number.MAX_SAFE_INTEGER)})};
+      });
+      return {id:lane.id,events};
+    });
+  })();
   const boundaries: { time: number; amplitude: number; sources: number }[] = [];
   const expanded=Array.from(input.events).flatMap((raw:unknown)=>{
     const event=object(raw,'音乐音符');
@@ -310,7 +342,8 @@ export function readPreview(value: unknown, options: { allowEmptySequence?: bool
     if (upcomingSources > MAX_LOOKAHEAD_SOURCES) throw new Error('音符过于密集：任意 0.35 秒内最多支持 4096 个波形声源，请减少极短音符。');
   }
   if(scheduled.some(event=>event.sound.kind==='sample'&&event.sound.soundFont))durationSeconds+=3;
-  return { events: scheduled, durationSeconds, normalization: 1 / peak, sequence: true, samples: sampleReader.sources, ...(output ? { output } : {}), ...(transport ? { transport, transportClock } : {}) };
+  for(const event of scheduled)if(event.sound.kind==='sample'&&event.sound.soundFont?.midiChannelId&&!laneIds.has(event.sound.soundFont.midiChannelId))throw new Error('音符的演奏通道不存在。');
+  return { ...(midiExpression?{midiExpression}:{}), events: scheduled, durationSeconds, normalization: 1 / peak, sequence: true, samples: sampleReader.sources, ...(output ? { output } : {}), ...(transport ? { transport, transportClock } : {}) };
 }
 
 

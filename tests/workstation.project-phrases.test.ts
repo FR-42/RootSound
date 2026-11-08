@@ -42,7 +42,7 @@ test('a new empty reusable phrase enters the current shelf in one write without 
   assert.deepEqual(f.song.read().draft, song); assert.deepEqual(f.library.readDraftHistory(f.songId), history);
   assert.equal(f.song.read().draft!.sourceId, undefined, 'creating a shelf item does not silently save the song');
   const record = f.phrases.readSaved(created.id).content; const body = readPhraseBody(record.body);
-  assert.equal(record.name, '乐句 1'); assert.equal(body.parts.length, 1); assert.deepEqual(body.parts[0]!.notes, []);
+  assert.equal(record.name, '音乐 1'); assert.equal(body.parts.length, 1); assert.deepEqual(body.parts[0]!.notes, []);
   assert.equal(body.lengthBeats, 16, 'new project phrases span four bars without changing old phrase defaults');
   const draft = f.library.readDraft(created.draftId)!;
   assert.equal(draft.sourceId, record.id); assert.equal(draft.name, record.name); assert.deepEqual(draft.body, record.body);
@@ -81,22 +81,22 @@ test('writing notes, saving, placing and erasing an instance keep the reusable p
 test('two new phrases use distinct names and voices while another song can start its own numbering', () => {
   const f = fixture(); const first = createProjectPhrase(f.library, f.songId); const second = createProjectPhrase(f.library, f.songId);
   const one = f.phrases.readSaved(first.id); const two = f.phrases.readSaved(second.id);
-  assert.deepEqual([one.content.name, two.content.name], ['乐句 1', '乐句 2']);
+  assert.deepEqual([one.content.name, two.content.name], ['音乐 1', '音乐 2']);
   assert.notEqual(one.body.parts[0]!.timbreId, two.body.parts[0]!.timbreId);
-  assert.equal(f.library.readContent(one.body.parts[0]!.timbreId)!.name, '乐句 1 音色');
-  assert.equal(f.library.readContent(two.body.parts[0]!.timbreId)!.name, '乐句 2 音色');
+  assert.equal(f.library.readContent(one.body.parts[0]!.timbreId)!.name, '音乐 1 音色');
+  assert.equal(f.library.readContent(two.body.parts[0]!.timbreId)!.name, '音乐 2 音色');
   f.song.create(); const otherId = f.song.read().draft!.id;
-  const other = createProjectPhrase(f.library, otherId); assert.equal(f.library.readContent(other.id)!.name, '乐句 1');
+  const other = createProjectPhrase(f.library, otherId); assert.equal(f.library.readContent(other.id)!.name, '音乐 1');
   const raw = f.raw(); assert.throws(() => retainProjectPhrases(f.library, f.songId, [other.id]), /不属于当前歌曲/); assert.equal(f.raw(), raw);
   assert.deepEqual(f.assets.read().current.filter(item => item.kind === 'rootsound.phrase').map(item => item.id).sort(), [first.id, second.id].sort());
 });
 
 test('retaining current sources keeps erased phrases on the shelf without listing all historical custody', () => {
-  const f = fixture(); const publicRecord = publicPhrase(f.library, '乐句 1'); const track = f.song.read().body!.tracks[0]!.id;
+  const f = fixture(); const publicRecord = publicPhrase(f.library, '音乐 1'); const track = f.song.read().body!.tracks[0]!.id;
   const firstClip = f.song.addClip(track, publicRecord.id, 0); const adoptedId = f.song.read().body!.tracks[0]!.clips[0]!.phraseId;
   f.song.removeClip(track, firstClip); assert(!f.assets.read().current.some(item => item.id === adoptedId));
   assert(f.library.readContent(adoptedId), 'history retains the old graph without putting it in the current shelf');
-  const next = createProjectPhrase(f.library, f.songId); assert.equal(f.library.readContent(next.id)!.name, '乐句 2', 'retained local names remain reserved');
+  const next = createProjectPhrase(f.library, f.songId); assert.equal(f.library.readContent(next.id)!.name, '音乐 2', 'retained local names remain reserved');
   assert(!f.assets.read().current.some(item => item.id === adoptedId));
   const secondClip = f.song.addClip(track, publicRecord.id, 4); const currentId = f.song.read().body!.tracks[0]!.clips[0]!.phraseId;
   const music = f.song.read().draft!; const history = f.library.readDraftHistory(f.songId);
@@ -154,7 +154,7 @@ test('only new phrases inherit the arrangement grid tempo, accepting the display
   assert.equal(f.phrases.readSaved(copied.id).body.tempoBpm, 212, 'save-as retains the copied music tempo');
   assert.equal(f.phrases.readSaved(original.id).body.tempoBpm, 153, 'existing phrases are not retimed');
   const raw = f.raw(), token = f.library.currentToken();
-  for (const tempo of [NaN, Infinity, 39, 241]) assert.throws(() => createProjectPhrase(f.library, f.songId, undefined, tempo), /速度必须/);
+  for (const tempo of [NaN, Infinity, .99, 1001]) assert.throws(() => createProjectPhrase(f.library, f.songId, undefined, tempo), /速度必须/);
   assert.equal(f.raw(), raw); assert.equal(f.library.currentToken(), token);
   const reopened = createMaterialLibrary(f.storage, f.policy);
   const playback = createPhrasePlayback(reopened, createTimbrePlayback(reopened));

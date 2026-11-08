@@ -23,3 +23,13 @@ test('bad or unavailable local context cannot prevent music opening', () => {
   const port=createMusicWorkspaceState({getItem(){throw new Error('blocked');},setItem(){throw new Error('blocked');}},'p');
   assert.equal(port.read(),undefined);assert.doesNotThrow(()=>port.write(state));assert.deepEqual(port.read(),state);
 });
+test('extending the pitch range retains old visible pitches and does not shift them again on reopen',()=>{
+  for(const orientation of [undefined,'vertical'] as const){
+    let text=JSON.stringify({version:1,...state,orientation});
+    const storage={getItem:()=>text,setItem(_key:string,value:string){text=value;}};
+    const first=createMusicWorkspaceState(storage,'old'),value=first.read()!;
+    assert.equal(value.viewport.top,state.viewport.top+16*state.viewport.rowHeight);
+    assert.deepEqual(value.selection,state.selection);assert.equal(value.playheadSeconds,state.playheadSeconds);
+    first.write(value);assert.deepEqual(createMusicWorkspaceState(storage,'old').read(),value);
+  }
+});

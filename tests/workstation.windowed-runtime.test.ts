@@ -38,7 +38,10 @@ function sequence(count: number, spacing = .02): SoundSequencePlan {
 for (const count of [5267, 12000]) test(`${count} notes play through every beginning, middle and ending event with bounded live nodes`, async () => fixture(async () => {
   const timers = new Timers(); const runtime = createBrowserSoundRuntime();
   try {
-    const input = sequence(count, .005); const session = await runtime.preview(input); const context = audio();
+    await runtime.activate?.();
+    const context = audio();
+    const outputGains = new Set(context.gains);
+    const input = sequence(count, .005); const session = await runtime.preview(input);
     assert(context.oscillators.length < 100, 'start must not allocate the whole song');
     let maximum = 0;
     const totalTicks = Math.ceil(input.durationSeconds / .025);
@@ -52,8 +55,10 @@ for (const count of [5267, 12000]) test(`${count} notes play through every begin
     assert.equal(timers.pending.size, 0, 'trailing silence needs no replenishment timer');
     context.clocks[0]!.end();
     assert(context.oscillators.every(node => node.disconnected));
-    assert(context.gains.every(node => node.disconnected));
+    assert(context.gains.every(node => outputGains.has(node) || node.disconnected));
     close(runtime.position(session.id), session.durationSeconds!);
+    await runtime.dispose();
+    assert(context.gains.every(node => node.disconnected));
   } finally { await runtime.dispose(); assert.equal(timers.pending.size, 0); timers.restore(); }
 }));
 
@@ -166,11 +171,17 @@ test('a later rolling allocation failure ends once and clears partial and previo
   const timers = new Timers(); const runtime = createBrowserSoundRuntime();
   try {
     const failures: string[] = []; runtime.subscribe(event => { if (event.type === 'session' && event.session.status === 'failed') failures.push(event.session.id); });
-    const session = await runtime.preview(sequence(5267)); const context = audio();
+    await runtime.activate?.();
+    const context = audio();
+    const outputGains = new Set(context.gains);
+    const session = await runtime.preview(sequence(5267));
     context.failAfterOscillators = context.oscillators.length + 2;
     timers.tick(100, wall => { context.currentTime = session.startedAtSeconds + wall / 1000; });
     assert.deepEqual(failures, [session.id]); assert.equal(timers.pending.size, 0);
-    assert(context.oscillators.every(node => node.disconnected)); assert(context.gains.every(node => node.disconnected));
+    assert(context.oscillators.every(node => node.disconnected));
+    assert(context.gains.every(node => outputGains.has(node) || node.disconnected));
+    await runtime.dispose();
+    assert(context.gains.every(node => node.disconnected));
   } finally { await runtime.dispose(); timers.restore(); }
 }));
 

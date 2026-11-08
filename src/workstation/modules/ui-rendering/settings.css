@@ -1,0 +1,14 @@
+.learning-heading { display:flex; align-items:center; justify-content:space-between; gap:24px; margin-bottom:24px; }
+.learning-heading h2 { margin:0; }
+.learning-heading button { border:0; background:none; font-size:24px; padding:0 6px; }
+.learning-feature { display:flex; align-items:center; gap:10px; font-size:15px; }
+.learning-feature input { accent-color:#506e85; width:17px; height:17px; }
+.learning-setting-note { color:#697580; font-size:13px; margin:10px 0 0; }
+.learning-settings,.learning-feature-gate { color-scheme:light; max-width:calc(100vw - 32px); border:1px solid #c9d3dc; border-radius:10px; padding:24px; background:#fff; color:#263746; }
+.learning-settings::backdrop,.learning-feature-gate::backdrop { background:#263b4d33; }
+.learning-feature-gate h2 { margin:0 0 16px; font-size:18px; font-weight:600; }
+.learning-feature-gate p { font-size:13px; line-height:1.7; margin:0 0 24px; }
+.learning-feature-gate .dialog-actions { display:flex; justify-content:flex-end; gap:10px; }
+.learning-feature-gate button { border:1px solid #c9d3dc; border-radius:6px; background:#fff; padding:8px 14px; font-size:13px; }
+.learning-feature-gate button.primary { color:#fff; background:#506f87; border-color:#506f87; }
+.welcome-settings { position:absolute; bottom:22px; right:24px; border:0; color:#72808a; background:none; font-size:13px; }

@@ -1,4 +1,5 @@
 import type { OutputProcessingPlan } from './post-production.ts';
+import type { TimedMidiExpressionLane } from './midi-expression.ts';
 
 /** Shared, serializable input for the first sound execution capability. */
 export type BasicWaveform = 'sine' | 'triangle' | 'sawtooth' | 'square' | 'noise';
@@ -64,7 +65,9 @@ export interface SampleSoundPlan {
   readonly layerReferenceLevel?: number;
   /** Complete installed SoundFont recipe; PCM is streamed by the global renderer. */
   readonly soundFont?: { readonly bank: 'generaluser-gs-2.0.3'; readonly program: number; readonly key: number;
-    readonly velocity: number; readonly cents: number; readonly drums: boolean };
+    readonly velocity: number; readonly cents: number; readonly drums: boolean;
+    readonly midiChannelId?: string; readonly midiOnOrder?: number; readonly midiOffOrder?: number;
+    readonly sostenutoSeconds?: number; readonly soundingSeconds?: number };
 }
 export type PlayableNotePlan = SoundPlan | SampleSoundPlan;
 
@@ -78,6 +81,7 @@ export interface SoundSequencePlan {
   readonly transport?: { readonly positionSeconds: number; readonly rate: number };
   /** Final-mix processing. Fades include the final note's release tail. */
   readonly output?: OutputProcessingPlan;
+  readonly midiExpression?: readonly TimedMidiExpressionLane[];
   readonly events: readonly {
     readonly atSeconds: number;
     readonly sound: PlayableNotePlan;
@@ -144,7 +148,7 @@ export interface SoundRuntimePort {
    * plan may complete immediately after the brief transition to silence.
    * An empty sequence silences the music while its timeline keeps advancing.
    */
-  update(sessionId: string, plan: PlayableNotePlan | SoundSequencePlan): PlaybackSession | undefined;
+  update(sessionId: string, plan: PlayableNotePlan | SoundSequencePlan, options?: { preserveSounding?: boolean; elapsedSeconds?: number }): PlaybackSession | undefined;
   /** Optional sequence transport: freeze source ages without suspending the shared device. */
   pause?(sessionId: string): PlaybackSession | undefined;
   /** Continue the paused sequence at its retained source ages, optionally applying edits. */

@@ -10,6 +10,9 @@
   <ItemGroup>
     <Compile Include="../RootSound.Desktop/AtomicTextStore.cs" Link="Core/AtomicTextStore.cs" />
     <Compile Include="../RootSound.Desktop/ProjectDirectoryManager.cs" Link="Core/ProjectDirectoryManager.cs" />
+    <Compile Include="../RootSound.Desktop/ProjectLibraryBrowser.cs" Link="Core/ProjectLibraryBrowser.cs" />
+    <Compile Include="../RootSound.Desktop/EditableDocuments.cs" Link="Core/EditableDocuments.cs" />
+    <Compile Include="../RootSound.Desktop/NativeMidiFiles.cs" Link="Core/NativeMidiFiles.cs" />
     <Compile Include="../RootSound.Desktop/ProjectTimbreMirror.cs" Link="Core/ProjectTimbreMirror.cs" />
     <Compile Include="../RootSound.Desktop/SessionPayloadStore.cs" Link="Core/SessionPayloadStore.cs" />
     <Compile Include="../RootSound.Desktop/StreamingWorkspaceCodec.cs" Link="Core/StreamingWorkspaceCodec.cs" />

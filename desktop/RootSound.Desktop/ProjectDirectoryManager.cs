@@ -10,7 +10,8 @@ namespace RootSound.Desktop;
 public sealed record ProjectDirectoryInfo(
     [property: JsonPropertyName("id")] string Id,
     [property: JsonPropertyName("name")] string Name,
-    [property: JsonPropertyName("path")] string Path);
+    [property: JsonPropertyName("path")] string Path,
+    [property: JsonPropertyName("format"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Format = null);
 
 public sealed record ProjectLibrarySnapshot(
     [property: JsonPropertyName("project")] ProjectDirectoryInfo Project,
@@ -18,7 +19,7 @@ public sealed record ProjectLibrarySnapshot(
     [property: JsonPropertyName("token")] string Token);
 
 /// <summary>One running session starts empty and owns at most one independent on-disk project.</summary>
-public sealed class ProjectDirectoryManager : IDisposable
+public sealed partial class ProjectDirectoryManager : IDisposable
 {
     private static readonly UTF8Encoding Utf8 = new(false, true);
     private readonly object gate = new();
@@ -172,7 +173,10 @@ public sealed class ProjectDirectoryManager : IDisposable
     /// <summary>An explicit Save As may activate a saved copy without saving the original draft.</summary>
     public ProjectDirectoryInfo CreateCopy(string name, string parentPath, string libraryText) => CreateCore(name, parentPath, libraryText, true);
 
-    private ProjectDirectoryInfo CreateCore(string name, string parentPath, string libraryText, bool copy)
+    /// <summary>Save a separate practice score; the user's active file and draft remain untouched.</summary>
+    public ProjectDirectoryInfo CreateDetached(string name, string parentPath, string libraryText) => CreateCore(name, parentPath, libraryText, true, false);
+
+    private ProjectDirectoryInfo CreateCore(string name, string parentPath, string libraryText, bool copy, bool activate = true)
     {
         lock (gate)
         {
@@ -210,6 +214,7 @@ public sealed class ProjectDirectoryManager : IDisposable
                 beforeCommit?.Invoke(target);
                 File.Move(staging, target); // A racing destination is never overwritten.
                 ownsStaging = false;
+                if (!activate) return new ProjectDirectoryInfo(id, name, target);
                 try { return ActivateFile(target, synchronizeTimbres: true); }
                 catch (Exception error)
                 {
@@ -235,7 +240,8 @@ public sealed class ProjectDirectoryManager : IDisposable
         {
             ThrowIfDisposed();
             if (current is null || activeStore is null) throw new IOException("先创建或打开一个歌曲项目，再保存。");
-            string nextName = string.IsNullOrEmpty(name) ? current.Name : ValidateName(name);
+            string nextName = string.IsNullOrEmpty(name) || sourceDocument is not null && name == current.Name ? current.Name : ValidateName(name);
+            if (sourceDocument is not null) return SaveDocument(nextName);
             var nextProject = current with { Name = nextName };
             if (fileEnvelope is not null)
             {
@@ -306,6 +312,7 @@ public sealed class ProjectDirectoryManager : IDisposable
             loadingCompleted = false;
             observedManifestHash = null;
             fileEnvelope = null;
+            sourceDocument = null; preparedDocumentBytes = null; preparedDocumentSnapshot = null;
             scope = Guid.NewGuid().ToString("N");
         }
     }
@@ -353,7 +360,7 @@ public sealed class ProjectDirectoryManager : IDisposable
                 AttributesToSkip = FileAttributes.ReparsePoint, MatchCasing = MatchCasing.CaseInsensitive };
             foreach (string path in Directory.EnumerateFiles(DefaultLocation, "*.rootsound", scan))
             {
-                try { if (IsKnownProjectPath(path)) projects.Add(ReadEnvelope(path).Project); }
+                try { if (IsKnownProjectPath(path)) projects.Add(ReadListedProject(path)); }
                 catch (IOException) { } catch (UnauthorizedAccessException) { } catch (InvalidDataException) { }
             }
             foreach (string path in Directory.EnumerateDirectories(DefaultLocation))
@@ -836,6 +843,7 @@ public sealed class ProjectDirectoryManager : IDisposable
             activeStore = candidate; candidate = null;
             payloads = nextPayloads; nextPayloads = null;
             timbreSongDraftId = null; current = parsed.Project; fileEnvelope = parsed.Envelope;
+            sourceDocument = null; preparedDocumentBytes = null; preparedDocumentSnapshot = null;
             currentSnapshot = committedSnapshot = savedSnapshot = parsed.Library; loadingCompleted = false;
             observedManifestHash = null; memory = null; scope = Guid.NewGuid().ToString("N");
             if (!reuse) previous?.Dispose();
@@ -909,6 +917,7 @@ public sealed class ProjectDirectoryManager : IDisposable
             activeStore = candidate;
             candidate = null;
             current = project; timbreSongDraftId = null;
+            sourceDocument = null; preparedDocumentBytes = null; preparedDocumentSnapshot = null;
             observedManifestHash = SHA256.HashData(manifest);
             fileEnvelope = null;
             currentSnapshot = committedSnapshot = text;

@@ -37,7 +37,7 @@ internal sealed class MainWindow : Form
         preparingClose = true;
         try
         {
-            var preparation = await PrepareWindowClose();
+            var preparation = await PrepareWindowClose("check");
             if (!preparation.Ready) throw new IOException(preparation.Message ?? "当前编辑还未准备好，请稍后再关闭。");
             bool dirty = projects.HasUnsavedChanges || !preparation.CanSave;
             DialogResult choice = dirty ? MessageBox.Show(this,
@@ -46,8 +46,9 @@ internal sealed class MainWindow : Form
             if (choice == DialogResult.Cancel) return;
             if (choice == DialogResult.Yes)
             {
-                if (!preparation.CanSave) throw new IOException(preparation.SaveMessage ?? "请先完成或放弃正在编辑的音乐，再保存歌曲。");
-                projects.Save(preparation.Name);
+                var save = await PrepareWindowClose("save");
+                if (!save.Ready || !save.CanSave) throw new IOException(save.SaveMessage ?? save.Message ?? "请先完成或放弃正在编辑的音乐，再保存歌曲。");
+                projects.Save(save.Name);
             }
             projects.Exit("discard");
             closeAccepted = true; Close();
@@ -59,7 +60,7 @@ internal sealed class MainWindow : Form
         finally { preparingClose = false; }
     }
 
-    private async Task<ClosePreparation> PrepareWindowClose()
+    private async Task<ClosePreparation> PrepareWindowClose(string mode)
     {
         if (projects.Current is null) return new(true, null, true, null, null);
         var core = view.CoreWebView2 ?? throw new IOException("界面仍在准备中，请稍后再试。");
@@ -67,7 +68,7 @@ internal sealed class MainWindow : Form
         // ExecuteScriptAsync does not await a JavaScript Promise. Keep this
         // handshake scoped to one request and poll its completed JSON result.
         string request = JsonSerializer.Serialize(id);
-        await core.ExecuteScriptAsync("(() => { const id = " + request + "; globalThis.__rootSoundCloseHandshake = { id, result: null }; Promise.resolve().then(() => { if (typeof globalThis.__rootSoundPrepareClose !== 'function') throw new Error('界面仍在准备中，请稍后再试。'); return globalThis.__rootSoundPrepareClose(); }).then(result => { if (globalThis.__rootSoundCloseHandshake?.id === id) globalThis.__rootSoundCloseHandshake.result = result; }, error => { if (globalThis.__rootSoundCloseHandshake?.id === id) globalThis.__rootSoundCloseHandshake.result = { ready: false, message: error?.message ?? String(error) }; }); })()");
+        await core.ExecuteScriptAsync("(() => { const id = " + request + "; globalThis.__rootSoundCloseHandshake = { id, result: null }; Promise.resolve().then(() => { if (typeof globalThis.__rootSoundPrepareClose !== 'function') throw new Error('界面仍在准备中，请稍后再试。'); return globalThis.__rootSoundPrepareClose(" + JsonSerializer.Serialize(mode) + "); }).then(result => { if (globalThis.__rootSoundCloseHandshake?.id === id) globalThis.__rootSoundCloseHandshake.result = result; }, error => { if (globalThis.__rootSoundCloseHandshake?.id === id) globalThis.__rootSoundCloseHandshake.result = { ready: false, message: error?.message ?? String(error) }; }); })()");
         var deadline = DateTime.UtcNow.AddSeconds(30);
         while (DateTime.UtcNow < deadline)
         {
@@ -117,7 +118,7 @@ internal sealed class MainWindow : Form
             core.AddWebResourceRequestedFilter("*", CoreWebView2WebResourceContext.All, CoreWebView2WebResourceRequestSourceKinds.All);
             core.WebResourceRequested += (_, e) =>
             {
-                var resource = resources.Open(e.Request.Uri, e.Request.Method);
+                var resource = resources.Open(e.Request.Uri, e.Request.Method, e.Request.Headers.Contains("Range") ? e.Request.Headers.GetHeader("Range") : null);
                 e.Response = environment.CreateWebResourceResponse(resource.Content, resource.StatusCode, resource.Reason, resource.Headers);
             };
             core.Navigate(Origin + "/index.html");

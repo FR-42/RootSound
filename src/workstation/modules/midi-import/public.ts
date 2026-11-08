@@ -35,7 +35,7 @@ class Reader {
  * Running status is cancelled by metadata/SysEx as required by the SMF specification.
  * Rendering limitations are reported, never represented as equivalent original audio.
  */
-export function parseMidi(bytes: Uint8Array): MidiDocument {
+export function parseMidi(bytes: Uint8Array, options: { allowEmpty?: boolean; captureExpression?: boolean } = {}): MidiDocument {
   if (!(bytes instanceof Uint8Array) || bytes.byteLength < 14) return fail('请选择完整的 .mid 或 .midi 文件。');
   if (bytes.byteLength > MIDI_LIMITS.bytes) return fail('文件超过当前 10 MiB 的导入范围。');
   const reader = new Reader(bytes), warnings = new Set<string>();
@@ -141,6 +141,8 @@ export function parseMidi(bytes: Uint8Array): MidiDocument {
   const durationSeconds = tickSeconds(endTick);
   if (!Number.isFinite(durationSeconds) || durationSeconds > MIDI_LIMITS.durationSeconds) return fail('时长超过当前两小时的导入范围。');
   const channels = new Map<number, Channel>(), notes: MidiNote[] = [];
+  const expression: NonNullable<MidiDocument['expression']> = [];
+  let eventOrder = 0;
   let noteCount = 0, zeroLength = false, zeroLengthDrum = false, missingOff = false;
   const channelFor = (port: number, channel: number): Channel => {
     const key = port * 16 + channel; let state = channels.get(key);
@@ -153,28 +155,41 @@ export function parseMidi(bytes: Uint8Array): MidiDocument {
       if (tick === note.startTick && note.channel === 9) zeroLengthDrum = true;
       else { zeroLength = true; return; }
     }
-    notes.push({ ...note, endTick: tick, startBeat: note.startTick / division, endBeat: tick / division,
+    notes.push({ ...note, ...(options.captureExpression ? { keyEndTick: note.keyEndTick ?? tick,
+      keyEndBeat: (note.keyEndTick ?? tick) / division, keyEndSeconds: tickSeconds(note.keyEndTick ?? tick) } : {}), endTick: tick, startBeat: note.startTick / division, endBeat: tick / division,
       startSeconds: tickSeconds(note.startTick), endSeconds: tickSeconds(tick) });
   };
   const releaseSustain = (state: Channel, tick: number): void => { for (const note of state.sustained) finish(note, tick); state.sustained = []; };
   const releaseKey = (state: Channel, pitch: number, tick: number): void => {
     const queue = state.keys.get(pitch), note = queue?.notes[queue.head++];
     if (!note) return;
+    if (options.captureExpression) { note.keyEndTick = tick; note.offOrder = eventOrder; }
     if (queue!.head === queue!.notes.length) state.keys.delete(pitch);
     if (state.pedal) state.sustained.push(note); else finish(note, tick);
   };
   const releaseKeys = (state: Channel, tick: number): void => {
     for (const queue of state.keys.values()) for (let index = queue.head; index < queue.notes.length; index++) {
-      const note = queue.notes[index]!; if (state.pedal) state.sustained.push(note); else finish(note, tick);
+      const note = queue.notes[index]!;
+      if (options.captureExpression) { note.keyEndTick ??= tick; note.offOrder ??= eventOrder; }
+      if (state.pedal) state.sustained.push(note); else finish(note, tick);
     }
     state.keys.clear();
   };
   for (const event of events) {
+    eventOrder++;
     if (event.kind !== 'channel') continue;
     const channel = event.status & 15, state = channelFor(event.port, channel), kind = event.status >> 4;
+    if (options.captureExpression) {
+      const position = { port: event.port, channel, beat: event.tick / division, order: eventOrder };
+      if (kind === 11 && ![0, 32].includes(event.first)) expression.push({ ...position, type: 'controller', controller: event.first, value: event.second });
+      else if (kind === 14) expression.push({ ...position, type: 'pitch-bend', value: event.first + event.second * 128 });
+      else if (kind === 13) expression.push({ ...position, type: 'channel-pressure', value: event.first });
+      else if (kind === 10) expression.push({ ...position, type: 'poly-pressure', key: event.first, value: event.second });
+    }
     if (kind === 9 && event.second > 0) {
       if (++noteCount > MIDI_LIMITS.notes) return fail('音符过多，当前最多支持 50000 个 MIDI 音符。');
       const note: PendingNote = { trackIndex: event.trackIndex, channel, program: state.program, pitch: event.first,
+        ...(options.captureExpression ? { port: event.port, onOrder: eventOrder } : {}),
         velocity: event.second / 127, level: state.volume / 127 * (state.expression / 127),
         pan: state.pan <= 64 ? (state.pan - 64) / 64 : (state.pan - 64) / 63, startTick: event.tick };
       const queue = state.keys.get(event.first) ?? { notes: [], head: 0 }; queue.notes.push(note); state.keys.set(event.first, queue);
@@ -184,7 +199,7 @@ export function parseMidi(bytes: Uint8Array): MidiDocument {
       const controller = event.first, value = event.second;
       if ([7, 10, 11].includes(controller)) {
         const key = controller === 7 ? 'volume' : controller === 10 ? 'pan' : 'expression';
-        if (state[key] !== value && hasSounding(state)) warnings.add('演奏中的音量、表情和声像变化仅保留在音符起点，连续变化尚未还原。');
+        if (!options.captureExpression && state[key] !== value && hasSounding(state)) warnings.add('演奏中的音量、表情和声像变化仅保留在音符起点，连续变化尚未还原。');
         state[key] = value;
       } else if (controller === 64) {
         const down = value >= 64; if (!down && state.pedal) releaseSustain(state, event.tick); state.pedal = down;
@@ -192,15 +207,15 @@ export function parseMidi(bytes: Uint8Array): MidiDocument {
         for (const queue of state.keys.values()) for (let index = queue.head; index < queue.notes.length; index++) finish(queue.notes[index]!, event.tick);
         state.keys.clear(); releaseSustain(state, event.tick);
       } else if (controller === 121) {
-        if (hasSounding(state) && state.expression !== 127) warnings.add('演奏中的音量、表情和声像变化仅保留在音符起点，连续变化尚未还原。');
+        if (!options.captureExpression && hasSounding(state) && state.expression !== 127) warnings.add('演奏中的音量、表情和声像变化仅保留在音符起点，连续变化尚未还原。');
         releaseSustain(state, event.tick); state.pedal = false; state.expression = 127;
       } else if (controller === 123 || controller >= 124 && controller <= 127) {
         releaseKeys(state, event.tick);
-        if (controller !== 123) warnings.add('MIDI 的单音、复音及设备通道模式已按普通音符演奏处理。');
+        if (!options.captureExpression && controller !== 123) warnings.add('MIDI 的单音、复音及设备通道模式已按普通音符演奏处理。');
       } else if ((controller === 0 || controller === 32) && value !== 0) warnings.add('自定义音色库编号尚未还原，已使用通用乐器编号匹配替代音色。');
-      else if (![0, 32, 122].includes(controller) && value !== 0) warnings.add('部分连续控制器（调制、效果等）尚未还原，可在工程中重新调整。');
-    } else if (kind === 14 && (event.first !== 0 || event.second !== 64)) warnings.add('弯音变化尚未还原，导入音符保持原始音高。');
-    else if ((kind === 10 && event.second !== 0) || (kind === 13 && event.first !== 0)) warnings.add('触后压力变化尚未还原。');
+      else if (!options.captureExpression && ![0, 32, 122].includes(controller) && value !== 0) warnings.add('部分连续控制器（调制、效果等）尚未还原，可在工程中重新调整。');
+    } else if (!options.captureExpression && kind === 14 && (event.first !== 0 || event.second !== 64)) warnings.add('弯音变化尚未还原，导入音符保持原始音高。');
+    else if (!options.captureExpression && ((kind === 10 && event.second !== 0) || (kind === 13 && event.first !== 0))) warnings.add('触后压力变化尚未还原。');
   }
   for (const state of channels.values()) {
     for (const queue of state.keys.values()) for (let index = queue.head; index < queue.notes.length; index++) { finish(queue.notes[index]!, endTick); missingOff = true; }
@@ -210,9 +225,9 @@ export function parseMidi(bytes: Uint8Array): MidiDocument {
   if (zeroLength) warnings.add('长度为零的音符已忽略。');
   if (zeroLengthDrum) warnings.add('部分打击乐音符的起止时间相同，已保留击发点。');
   if (missingOff) warnings.add('部分音符缺少结束事件，已在文件末尾结束。');
-  if (!notes.length) return fail('文件没有可导入的有效音符。');
+  if (!notes.length && !options.allowEmpty) return fail('文件没有可导入的有效音符。');
   notes.sort((left, right) => left.startTick - right.startTick || left.trackIndex - right.trackIndex || left.channel - right.channel || left.pitch - right.pitch);
   const tempos: MidiTempo[] = clock.map(item => ({ tick: item.tick, beat: item.tick / division, seconds: item.seconds, bpm: 60_000_000 / item.microseconds }));
   return { format, division, initialTempoBpm: tempos[0]!.bpm, durationSeconds, durationBeats: endTick / division,
-    tracks, tempos, timeSignatures, notes, warnings: [...warnings] };
+    tracks, tempos, timeSignatures, notes, warnings: [...warnings], ...(options.captureExpression ? { expression } : {}) };
 }

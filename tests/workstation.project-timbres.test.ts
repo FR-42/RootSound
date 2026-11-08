@@ -11,11 +11,15 @@ import { createSongEditor, createSongReferenceAdapter, readSongBody } from '../s
 import { createSampleAudio, createSampleReferenceAdapter } from '../src/workstation/modules/sampling/public.ts';
 import { decodePcmWav, encodeBase64, encodeFloatWav } from '../src/workstation/modules/sampling/audio.ts';
 
-const STARTER_NAMES = ['钢琴', '长笛', '底鼓', '踢', '弦乐', '小号', '吉他'];
+import { createSampleBankAudio } from '../src/workstation/modules/timbre/sample-bank.ts';
+import { readFileSync } from 'node:fs';
+import { defaultInstrumentInfo } from '../src/workstation/modules/timbre/instrument-catalog.ts';
+const STARTER_NAMES = prepareMelodyTimbres().map(record => record.name);
+const playbackFor = (library: Parameters<typeof createTimbrePlayback>[0]) => createTimbrePlayback(library, undefined, undefined, createSampleBankAudio(library, undefined, (async url => new Response(new Uint8Array(readFileSync(`public${String(url)}`)))) as typeof fetch, { soundFont: true }));
 
 test('only untouched bundled tone identities skip a removal warning; created, imported and edited copies require it', () => {
   const preset = prepareMelodyTimbres()[0]!;
-  const starter = { ...preset, id: 'rootsound.melody.piano.v1:this-song' };
+  const starter = { ...preset, id: `${preset.id}:this-song` };
   assert.equal(requiresTimbreDeleteConfirmation(starter), false);
   assert.equal(requiresTimbreDeleteConfirmation(preset), true, 'an imported copy with the same sound has a fresh identity');
   assert.equal(requiresTimbreDeleteConfirmation({ ...starter, name: '我的钢琴' }), true);
@@ -32,7 +36,7 @@ function fixture() {
   const storage = { read: () => raw, write(value: string) { if (fail) throw new Error('测试磁盘拒绝写入'); raw = value; writes++; } };
   const adapters = [createTimbreReferenceAdapter(), createPhraseReferenceAdapter(), createSongReferenceAdapter(), createSampleReferenceAdapter()];
   const policy = { project: { rootKind: 'rootsound.song', adapters } };
-  const library = createMaterialLibrary(storage, policy); const playback = createTimbrePlayback(library);
+  const library = createMaterialLibrary(storage, policy); const playback = playbackFor(library);
   const phrase = createPhraseEditor(library, playback); const phrases = createPhrasePlayback(library, playback);
   const song = createSongEditor(library, phrases, { defaultTempoMode: 'source' }); song.create();
   const songId = song.read().draft!.id;
@@ -43,32 +47,15 @@ function voice(f: ReturnType<typeof fixture>, name: string): ContentRecord {
   const editor = createTimbreEditor(f.library); editor.rename(name); return saved(editor.save('new'));
 }
 
-test('melody starters are independent validated local synthesis patches with struck and sustained envelopes', () => {
-  const first = prepareMelodyTimbres(); const second = prepareMelodyTimbres();
-  assert.deepEqual(first.map(record => record.name), STARTER_NAMES);
-  assert.notEqual(first[0]!.id, second[0]!.id); assert.notEqual(first[1]!.id, second[1]!.id);
-  const library = createMaterialLibrary();
-  assert.equal(library.commitTransaction({ expectedToken: library.currentToken(), label: 'test voices', createContents: first }).status, 'committed');
-  const bodies = first.map(record => readEditableTimbreBody(record.body));
-  assert(bodies.every(body => body.model === 'synthesizer'));
-  if (bodies[0]!.model !== 'synthesizer' || bodies[1]!.model !== 'synthesizer') throw new Error('Expected synth');
-  assert(bodies[0]!.attackSeconds < bodies[1]!.attackSeconds); assert(bodies[0]!.sustain < .1); assert(bodies[1]!.sustain > .8);
-  assert(bodies[1]!.sources.some(source => source.waveform === 'noise'));
-  const byName = new Map(first.map(record => [record.name, readEditableTimbreBody(record.body)]));
-  const bassDrum=byName.get('底鼓')!, kick=byName.get('踢')!, strings=byName.get('弦乐')!, guitar=byName.get('吉他')!;
-  if(bassDrum.model!=='synthesizer'||kick.model!=='synthesizer'||strings.model!=='synthesizer'||guitar.model!=='synthesizer')throw new Error('Expected synth starters');
-  assert.equal(bassDrum.sustain,0);assert.equal(kick.sustain,0);assert(bassDrum.sources.some(source=>source.semitones===-24));
-  assert(kick.pitch.semitones>bassDrum.pitch.semitones);assert(kick.pitch.seconds<bassDrum.pitch.seconds);
-  assert(strings.sources.some(source=>source.detuneCents<0)&&strings.sources.some(source=>source.detuneCents>0));
-  assert(strings.attackSeconds>guitar.attackSeconds);assert(strings.sustain>.7);assert(guitar.sustain<.05);
-  assert.equal(new Set(first.map(record=>JSON.stringify(record.body))).size,7);
-  const playback = createTimbrePlayback(library);
-  for (const record of first) {
-    assert.deepEqual(record.dependencies, []);
-    const plan = playback.planForSaved(record.id, { frequencyHz: 440, holdSeconds: 1, velocity: .8 });
-    assert.equal(plan.kind, 'basic-synth'); assert.equal(plan.note.frequencyHz, 440); assert.equal(plan.note.holdSeconds, 1);
-    assert.equal(plan.envelope.sustain, readEditableTimbreBody(record.body).model === 'synthesizer' ? (record.body as { sustain: number }).sustain : undefined);
-  }
+test('installed starters are isolated GM recording definitions with complete program and drum coverage', () => {
+  const first = prepareMelodyTimbres(), second = prepareMelodyTimbres();
+  assert.equal(first.length, 175); assert.equal(new Set(first.map(record => record.id)).size, 175);
+  first[0]!.name = 'caller edit'; assert.equal(second[0]!.name, '钢琴');
+  const bodies = second.map(record => readEditableTimbreBody(record.body));
+  assert(bodies.every(body => body.model === 'sample-bank' && body.bank === 'generaluser-gs-2.0.3'));
+  assert.equal(bodies.filter(body => defaultInstrumentInfo('', body)?.drum !== undefined).length, 47);
+  assert.equal(bodies.filter(body => defaultInstrumentInfo('', body)?.program !== undefined).length, 128);
+  assert(second.every(record => record.dependencies.length === 0));
 });
 
 test('new project files already own the complete palette and Save As retains customized starter identities', () => {
@@ -76,13 +63,13 @@ test('new project files already own the complete palette and Save As retains cus
   const adapters=[createTimbreReferenceAdapter(),createPhraseReferenceAdapter(),createSongReferenceAdapter(),createSampleReferenceAdapter()];
   const policy={project:{rootKind:'rootsound.song',adapters}};
   const library=createMaterialLibrary({read:()=>raw,write:value=>{raw=value;}},policy);
-  const song=createSongEditor(library,createPhrasePlayback(library,createTimbrePlayback(library)),{defaultTempoMode:'source'});
+  const song=createSongEditor(library,createPhrasePlayback(library,playbackFor(library)),{defaultTempoMode:'source'});
   const songId=song.read().draft!.id, tones=listProjectTimbres(library,songId);
-  assert.deepEqual(new Set(tones.map(record=>record.name)),new Set(STARTER_NAMES));assert.equal(library.listDrafts().length,1);
+  assert.deepEqual(new Set(tones.map(record=>record.name)),new Set(STARTER_NAMES));assert.equal(library.listDrafts().length,2);
   const scope=library.projectScopeOf!({type:'draft',id:songId});assert(tones.every(record=>library.projectScopeOf!({type:'content',id:record.id})===scope));
   const packed=createProjectPackages(library,adapters,{rootKind:'rootsound.song'}).exportDraft(songId);
-  const file=JSON.parse(packed.text);assert.equal(file.memberIds.length,7);assert.equal(file.contents.filter((record:ContentRecord)=>record.kind==='rootsound.timbre').length,7);
-  const guitar=tones.find(record=>record.name==='吉他')!;const editor=createTimbreEditor(library);editor.open(guitar.id);editor.rename('我的吉他');editor.setLevel(.2);saved(editor.save('overwrite'));
+  const file=JSON.parse(packed.text);assert.equal(file.memberIds.length,176);assert.equal(file.contents.filter((record:ContentRecord)=>record.kind==='rootsound.timbre').length,175);
+  const guitar=tones.find(record=>record.name==='尼龙吉他')!;const editor=createTimbreEditor(library);editor.open(guitar.id);editor.rename('我的吉他');editor.setLevel(.2);saved(editor.save('overwrite'));
   const copy=createProjectCopyLibrary(raw,'歌曲副本',songId);
   const reopened=createMaterialLibrary({read:()=>copy,write(){throw new Error('unexpected duplicate seed');}},policy);
   const token=reopened.currentToken(), voices=ensureProjectMelodyTimbres(reopened,songId);
@@ -95,7 +82,7 @@ test('opening the current song library seeds all starter voices in one write and
   assert.deepEqual(listProjectTimbres(f.library, f.songId), []);
   const seeded = ensureProjectMelodyTimbres(f.library, f.songId); assert.equal(f.writes(), writes + 1);
   assert.deepEqual(new Set(seeded.map(record => record.name)), new Set(STARTER_NAMES));
-  assert.deepEqual(f.song.read().draft, { ...song, body: { ...readSongBody(song.body), melodyTimbresSeeded: true } });
+  assert.deepEqual(f.song.read().draft, { ...song, body: { ...readSongBody(song.body), melodyTimbresSeeded: true, timbreCatalogVersion: 2, timbreLibraryOrder: seeded.map(record => record.id) } });
   assert.deepEqual(f.library.readDraftHistory(f.songId), past, 'one-time palette setup does not add a user undo step');
   const token = f.library.currentToken(); ensureProjectMelodyTimbres(f.library, f.songId); assert.equal(f.library.currentToken(), token);
   const editor = createTimbreEditor(f.library); editor.open(seeded[0]!.id); editor.rename('我改过名的声音'); editor.setLevel(.2); saved(editor.save('overwrite'));
@@ -153,7 +140,7 @@ test('adding the first real voice replaces only the generated empty part, preser
   assert.equal(f.library.currentToken(), token, 'reselecting an existing voice does not add a duplicate or history');
   f.phrase.undo(); assert.deepEqual(f.phrase.read().draft, before); f.phrase.redo();
   assert.equal(f.phrase.read().body!.parts[0]!.id, part);
-  const reopened = createMaterialLibrary(f.storage, f.policy); const editor = createPhraseEditor(reopened, createTimbrePlayback(reopened)); editor.openDraft(before.id);
+  const reopened = createMaterialLibrary(f.storage, f.policy); const editor = createPhraseEditor(reopened, playbackFor(reopened)); editor.openDraft(before.id);
   editor.undo(); assert.deepEqual(editor.read().body, body); editor.redo(); assert.equal(editor.read().body!.parts[0]!.id, part);
 });
 
@@ -196,7 +183,7 @@ test('project packaging keeps all starters local and graph-ID remapping does not
   const imported = createProjectPackages(target, f.adapters, { rootKind: 'rootsound.song' }).importProject(output.text);
   assert.equal(imported.status, 'imported'); if (imported.status !== 'imported') throw new Error('Expected import');
   const before = target.currentToken(); const voices = ensureProjectMelodyTimbres(target, imported.draft.id);
-  assert.equal(target.currentToken(), before); assert.equal(voices.length, 7);
+  assert.equal(target.currentToken(), before); assert.equal(voices.length, 175);
   assert(voices.every(record => !original.some(item => item.id === record.id)));
   assert(voices.every(record => target.projectScopeOf!({ type: 'content', id: record.id }) === target.projectScopeOf!({ type: 'draft', id: imported.draft.id })));
 });
@@ -239,20 +226,21 @@ test('fresh Melody note families can share a tone while one-family replacement p
   assert.throws(()=>f.phrase.setPartTimbre(first,foreign.id),/当前歌曲音色库/);assert.throws(()=>createProjectPhraseNoteGroup(f.library,f.songId,created.draftId,foreign.id),/当前歌曲音色库/);assert.equal(f.raw(),beforeForeign);
 });
 
-test('independent same-tone families and a replacement survive phrase save and portable song import', () => {
+test('independent same-tone families and a replacement survive phrase save and portable song import', async () => {
   const f=fixture(),tones=ensureProjectMelodyTimbres(f.library,f.songId),piano=tones.find(voice=>voice.name==='钢琴')!,flute=tones.find(voice=>voice.name==='长笛')!;
   const created=createProjectPhrase(f.library,f.songId);f.phrase.openDraft(created.draftId);
   const first=createProjectPhraseNoteGroup(f.library,f.songId,created.draftId,piano.id),second=createProjectPhraseNoteGroup(f.library,f.songId,created.draftId,piano.id);
   f.phrase.addNote(first,{startBeat:1,durationBeats:.5,durationSeconds:.37,frequencyHz:440,velocity:.7,level:.5,pan:-.2});
   f.phrase.addNote(second,{startBeat:2,durationBeats:1,durationSeconds:.8,frequencyHz:330,velocity:.8,level:.6,pan:.3});f.phrase.setPartTimbre(first,flute.id);
   const expected=structuredClone(f.phrase.read().body!),phrase=saved(f.phrase.save('overwrite'));f.song.addClip(f.song.read().body!.tracks[0]!.id,phrase.id,0);
+  await f.song.preparePreview();
   const expectedPlan=f.song.previewPlan(),output=createProjectPackages(f.library,f.adapters,{rootKind:'rootsound.song'}).exportDraft(f.songId),target=createMaterialLibrary(undefined,f.policy);
   const imported=createProjectPackages(target,f.adapters,{rootKind:'rootsound.song'}).importProject(output.text);assert.equal(imported.status,'imported');if(imported.status!=='imported')throw new Error('Expected import');
   const restored=target.listContent().filter(record=>record.kind==='rootsound.phrase').map(record=>readPhraseBody(record.body)).find(body=>body.parts.some(part=>part.id===first))!;
   assert.deepEqual(restored.parts.map(part=>part.id),[first,second]);assert.deepEqual(restored.parts.map(part=>part.notes),expected.parts.map(part=>part.notes));
   assert.deepEqual(restored.parts.map(part=>target.readContent(part.timbreId)!.name),['长笛','钢琴']);
-  const song=createSongEditor(target,createPhrasePlayback(target,createTimbrePlayback(target)),{defaultTempoMode:'source'});song.openDraft(imported.draft.id);assert.deepEqual(song.previewPlan(),expectedPlan);
-  assert.equal(listProjectTimbres(target,imported.draft.id).length,7);
+  const song=createSongEditor(target,createPhrasePlayback(target,playbackFor(target)),{defaultTempoMode:'source'});song.openDraft(imported.draft.id);await song.preparePreview();assert.deepEqual(song.previewPlan(),expectedPlan);
+  assert.equal(listProjectTimbres(target,imported.draft.id).length,175);
 });
 
 test('app replacement accepts legacy rhythm families without changing their identity, section, notes or unrelated families', () => {
@@ -299,7 +287,7 @@ test('all-section tone removal is one atomic reversible operation and department
   const after = f.phrase.read().body!; assert.deepEqual(after.parts, beforeBody.parts.filter(part => part.id === other));
   assert.deepEqual(f.phrase.read().draft!.dependencies, [flute.id]); assert(listProjectTimbres(f.library, f.songId).some(record => record.id === piano.id));
   f.phrase.undo(); assert.deepEqual(f.phrase.read().draft, before); f.phrase.redo(); assert.deepEqual(f.phrase.read().body, after);
-  const reopened = createMaterialLibrary(f.storage, f.policy); const editor = createPhraseEditor(reopened, createTimbrePlayback(reopened)); editor.openDraft(created.draftId);
+  const reopened = createMaterialLibrary(f.storage, f.policy); const editor = createPhraseEditor(reopened, playbackFor(reopened)); editor.openDraft(created.draftId);
   editor.undo(); assert.deepEqual(editor.read().body, beforeBody);
   removeProjectPhraseTimbre(reopened, f.songId, created.draftId, piano.id);
   assert.deepEqual(editor.read().body!.parts.map(part => part.id), [rhythm, other]); editor.undo();
@@ -337,20 +325,20 @@ test('unused starters can be removed in one undoable edit and never reseed after
   assert.equal(f.writes(), afterOpenWrites + 1); assert(afterOpenWrites > writes);
   assert.equal(f.library.readContent(tone.id), undefined); assert.equal(f.library.readDraft(cleanDraft), undefined);
   assert.equal(f.library.readDraftHistory(f.songId).past.length, past.past.length + 1);
-  const token = f.library.currentToken(); assert.equal(ensureProjectMelodyTimbres(f.library, f.songId).length, 6); assert.equal(f.library.currentToken(), token);
+  const token = f.library.currentToken(); assert.equal(ensureProjectMelodyTimbres(f.library, f.songId).length, 174); assert.equal(f.library.currentToken(), token);
   f.song.undo(); assert.deepEqual(f.song.read().draft, before); assert.deepEqual(f.library.readContent(tone.id), tone);
-  assert(f.library.readDraft(cleanDraft)); assert.equal(listProjectTimbres(f.library, f.songId).length, 7);
+  assert(f.library.readDraft(cleanDraft)); assert.equal(listProjectTimbres(f.library, f.songId).length, 175);
   f.song.redo(); assert.equal(f.library.readContent(tone.id), undefined);
   const reopened = createMaterialLibrary(f.storage, f.policy), coldToken = reopened.currentToken();
-  assert.equal(ensureProjectMelodyTimbres(reopened, f.songId).length, 6); assert.equal(reopened.currentToken(), coldToken);
+  assert.equal(ensureProjectMelodyTimbres(reopened, f.songId).length, 174); assert.equal(reopened.currentToken(), coldToken);
   const exported = createProjectPackages(reopened, f.adapters, { rootKind: 'rootsound.song' }).exportDraft(f.songId);
   assert(!JSON.parse(exported.text).contents.some((record: ContentRecord) => record.id === tone.id));
   const copied = createProjectCopyLibrary(f.raw()!, '副本', f.songId), copy = createMaterialLibrary({ read: () => copied, write() { throw new Error('unexpected reseed'); } }, f.policy);
-  assert.equal(ensureProjectMelodyTimbres(copy, f.songId).length, 6);
+  assert.equal(ensureProjectMelodyTimbres(copy, f.songId).length, 174);
   const target = createMaterialLibrary(undefined, f.policy), result = createProjectPackages(target, f.adapters, { rootKind: 'rootsound.song' }).importProject(exported.text);
   assert.equal(result.status, 'imported'); if (result.status !== 'imported') throw new Error('Expected import');
-  const importedToken = target.currentToken(); assert.equal(ensureProjectMelodyTimbres(target, result.draft.id).length, 6); assert.equal(target.currentToken(), importedToken);
-  const coldSong = createSongEditor(reopened, createPhrasePlayback(reopened, createTimbrePlayback(reopened)), { defaultTempoMode: 'source' });
+  const importedToken = target.currentToken(); assert.equal(ensureProjectMelodyTimbres(target, result.draft.id).length, 174); assert.equal(target.currentToken(), importedToken);
+  const coldSong = createSongEditor(reopened, createPhrasePlayback(reopened, playbackFor(reopened)), { defaultTempoMode: 'source' });
   coldSong.openDraft(f.songId); coldSong.undo(); assert(reopened.readContent(tone.id)); coldSong.redo(); assert.equal(reopened.readContent(tone.id), undefined);
 });
 
@@ -389,7 +377,7 @@ test('song-wide tone order survives rename, undo, cold open and graph-ID remappi
   assert.deepEqual(importedBody.phraseShelfOrder, currentBody.phraseShelfOrder!.map(id => byName.get(f.library.readContent(id)!.name)));
   assert.deepEqual(importedBody.hiddenPhraseIds, [byName.get(f.library.readContent(one.id)!.name)]);
   f.song.create(); const otherId = f.song.read().draft!.id; const other = ensureProjectMelodyTimbres(f.library, otherId);
-  assert(other.every(record => !ordered.includes(record.id))); assert.deepEqual(readSongBody(f.library.readDraft(otherId)!.body).timbreLibraryOrder, undefined);
+  assert(other.every(record => !ordered.includes(record.id))); assert.deepEqual(readSongBody(f.library.readDraft(otherId)!.body).timbreLibraryOrder, other.map(record => record.id));
 });
 
 test('unused deletion refuses every saved or working phrase use, other departments and ordinary undo dependencies', () => {
@@ -444,7 +432,7 @@ test('library setup, reorder and unused deletion preserve active nested occurren
   assert.deepEqual((f.library.readDraft(parent.draftId)!.editingContext as { route: unknown[] }).route[0], f.library.readContent(original.id));
   assert(references.locations(parent.draftId).locations.length > 0);
   f.song.undo(); assert(references.locations(parent.draftId).locations.length > 0); f.song.redo();
-  const unused = tones.find(record => record.id !== moving.id)!;
+  const unused = tones.find(record => record.id !== moving.id && record.id !== f.phrase.read().body!.parts[0]!.timbreId)!;
   assert.equal(tryRemoveUnusedProjectTimbre(f.library, f.songId, unused.id), true);
   f.song.undo(); assert(references.locations(parent.draftId).locations.length > 0); f.song.redo();
   assert.equal(references.apply(child.draftId).status, 'applied');

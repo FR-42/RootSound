@@ -13,6 +13,11 @@ dist/
 /release/
 /data/
 /timbres/
+/project/*
+!/project/演示项目/
+/project/演示项目/**
+!/project/演示项目/**/
+!/project/演示项目/**/*.rootsound
 /experiments/
 /RootSound.*.tmp
 /release/

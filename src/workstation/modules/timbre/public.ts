@@ -1,4 +1,5 @@
 import { createSampleBankAudio, type SampleBankAudio } from './sample-bank.ts';
+import { MIN_PITCH_HZ, MAX_PITCH_HZ } from '../../contracts/music-limits.ts';
 import { readSampleBankBody } from './sample-bank-model.ts';
 import type { ContentRecord, Draft, JsonValue, MaterialLibrary, SaveConfirmation } from '../../contracts/content.ts';
 import type { ReferenceAdapter } from '../../contracts/references.ts';
@@ -124,7 +125,7 @@ export function readSampleTimbreBody(value: JsonValue): SampleTimbreBody {
   const finite = (input: JsonValue | undefined, minimum: number, maximum: number): input is number => typeof input === 'number' && Number.isFinite(input) && input >= minimum && input <= maximum;
   if (value.model !== 'sample-instrument' || value.version !== 1 && value.version !== 2 || typeof value.sampleId !== 'string' || !value.sampleId.trim()
     || !finite(value.startSeconds, 0, 120) || !finite(value.endSeconds, 0, 120) || value.endSeconds <= value.startSeconds
-    || !finite(value.rootFrequencyHz, 20, 5000) || !finite(value.attackSeconds, 0, 2) || !finite(value.releaseSeconds, 0.01, 4) || !finite(value.level, 0, 1)) throw new Error('采样音色的范围、原始音高或包络无效。');
+    || !finite(value.rootFrequencyHz, MIN_PITCH_HZ, MAX_PITCH_HZ) || !finite(value.attackSeconds, 0, 2) || !finite(value.releaseSeconds, 0.01, 4) || !finite(value.level, 0, 1)) throw new Error('采样音色的范围、原始音高或包络无效。');
   let loop: SampleTimbreBody['loop'];
   if (value.version === 2) {
     const input = value.loop;
@@ -163,7 +164,7 @@ function createReader(library: MaterialLibrary) {
 /** Timbre algorithms remain here; the runtime releases short notes along their actual attack. */
 function validateNote(note: SoundPlan['note']): void {
   if (!note || Object.keys(note).some(key => !['frequencyHz', 'holdSeconds', 'velocity'].includes(key))
-    || !Number.isFinite(note.frequencyHz) || note.frequencyHz < 1 || note.frequencyHz > 10000
+    || !Number.isFinite(note.frequencyHz) || note.frequencyHz < 1 || note.frequencyHz > 20000
     || !Number.isFinite(note.holdSeconds) || note.holdSeconds <= 0 || note.holdSeconds > 120
     || !Number.isFinite(note.velocity) || note.velocity < 0 || note.velocity > 1) {
     throw new Error('这个音符的音高、时长或力度超出当前声音支持的范围。');

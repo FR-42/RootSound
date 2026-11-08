@@ -1,13 +1,15 @@
 import type { PhraseEditorPort, PhraseSection, PhraseView } from '../../contracts/phrase.ts';
 import { phraseStepsPerBeat } from '../../contracts/phrase.ts';
 import { phraseDurationSeconds } from '../../contracts/phrase-time.ts';
+import { MIN_TEMPO_BPM, MAX_TEMPO_BPM } from '../../contracts/music-limits.ts';
 import type { SoundRuntimePort } from '../../contracts/sound.ts';
 import type { MusicWorkspaceStatePort } from '../../contracts/workspace.ts';
+import type { LearningAction } from '../../contracts/guidance.ts';
 import { createPhraseCompositionTransport } from './phrase-composition-transport.ts';
 import { mountMelodyWorkspace } from './melody-workspace.ts';
 import { attachConsoleHorizontalWheel } from './console-scroll.ts';
 import { undoPhraseEdit } from './phrase-performance-history.ts';
-import { clampMelodyView, melodyClamp, melodyScale, melodyTimeAt, zoomMelody, type MelodyView } from './melody-geometry.ts';
+import { clampMelodyView, formatPlayheadTime, melodyClamp, melodyScale, melodyTimeAt, zoomMelody, type MelodyView } from './melody-geometry.ts';
 import type { PhraseEditorViewport } from './phrase-editor-viewport.ts';
 import { centerTop, mountPhraseOverviewNotes } from './phrase-overview-notes.ts';
 import { clampPhraseSplit, defaultPhraseSplit, phraseSplitBounds } from './phrase-section-split.ts';
@@ -29,6 +31,7 @@ function icon(kind: 'play' | 'pause' | 'stop' | 'tempo'): SVGSVGElement {
     tempo: 'M9 3h6l5 18H4zM12 6v10m-3-4 7-5M8 18h8' }[kind]);
   path.setAttribute('fill', ['play', 'pause', 'stop'].includes(kind) ? 'currentColor' : 'none'); path.setAttribute('stroke', 'currentColor'); path.setAttribute('stroke-width', '1.5'); path.setAttribute('stroke-linejoin', 'round'); svg.append(path); return svg;
 }
+type FileActionResult = void | 'saved' | 'download-started' | 'cancelled';
 
 /** A bounded shared canvas is the phrase workspace; notes remain owned by the phrase domain. */
 export function mountPhraseComposition(root: HTMLElement, options: {
@@ -36,13 +39,20 @@ export function mountPhraseComposition(root: HTMLElement, options: {
   initialView?: PhraseView;
   directMusic?: boolean;
   workspaceState?: MusicWorkspaceStatePort;
-  onExport?(): void;
-  onSave?(): void | Promise<void>; onSaveAs?(): void | Promise<void>; onExit?(): void | Promise<void>;
+  onExport?(): void | Promise<void>;
+  onSettings?(): void;
+  readMultipleTempoRolls?(): boolean;
+  onLearningAction?(action: LearningAction): void;
+  readLessonInput?: Parameters<typeof mountMelodyWorkspace>[1]['readLessonInput'];
+  readLessonToolbar?(): boolean;
+  onPlaybackAdvance?(): void;
+  frameNotesOnMount?: boolean;
+  onSave?(): FileActionResult | Promise<FileActionResult>; onSaveAs?(): void | Promise<void>; onExit?(): void | Promise<void>;
+  readUnsavedChanges?(): Promise<boolean>;
   onRename?(name: string): void | Promise<void>;
   readPerformanceMode?(): boolean;
   initialSection?: 'overview' | PhraseSection;
   onSectionChange?(section: 'overview' | PhraseSection): void;
-  onPrepareMelody?(): void | Promise<void>;
   listTimbres?(): { id: string; name: string; requiresDeleteConfirmation?: boolean }[];
   onAddTimbre?(id: string, section: PhraseSection): string;
   onImportTimbre?(): Promise<boolean>;
@@ -50,7 +60,7 @@ export function mountPhraseComposition(root: HTMLElement, options: {
   onChangeNoteGroupTimbre?(partId: string, timbreId: string): void;
   onRemoveTimbre?(id: string, section: PhraseSection | 'all'): void;
   onReorderTimbres?(id: string, targetIndex: number): void;
-}): { dispose(): void; refresh(): void; notify(message: string, error?: boolean): void; flush(): Promise<void> } {
+}): { dispose(): void; refresh(): void; notify(message: string, error?: boolean): void; flush(): Promise<void>; frameNotes(reserveEndSpace?: boolean): void; previewTempoRate(value?: number): void } {
   const { phrase, sound } = options;
   let disposed = false; let current = options.initialView ?? phrase.read(); let draftId = current.draft?.id;
   let view: MelodyView = { leftSeconds: 0, zoom: current.body ? 8 / (current.body.lengthBeats * 60 / current.body.tempoBpm) : 1, rowHeight: 24 };
@@ -69,22 +79,25 @@ export function mountPhraseComposition(root: HTMLElement, options: {
   let previewBody: Parameters<PhraseEditorPort['previewPlan']>[0];
   let playbackFamilyId: string | undefined;
   let state = { playing: false, preparing: false, position: 0, rate: 1 };
-  let playButton: HTMLButtonElement; let clock: HTMLElement; let viewport: HTMLElement; let ruler: HTMLElement;
+  let spaceAction: 'pause-space' | 'resume-space' | undefined;
+  let playButton: HTMLButtonElement; let viewport: HTMLElement; let ruler: HTMLElement;
   let playhead: HTMLElement; let handle: HTMLButtonElement; let notice: HTMLElement; let title: HTMLElement;
   let tempoInput: HTMLInputElement;
   let subdivisionSelect: HTMLSelectElement; let subdivisionButton: HTMLButtonElement;
   let titleInput: HTMLInputElement | undefined; let titleCommit: Promise<boolean> | undefined;
+  let unsavedRequest = 0;
   let tapTempoDialog: ReturnType<typeof showTapTempo> | undefined;
   let masterPreview: number | undefined; let masterPointer: number | undefined;
   const fileButtons: HTMLButtonElement[] = [];
   let gesture: { kind: 'head' | 'pan' | 'split'; id: number; capture: HTMLElement; lastX: number; lastY: number; section: PhraseSection; startRatio?: number; startTops?: Record<PhraseSection, number> } | undefined;
+  let headPreview: number | undefined;
   const tempo = () => current.body?.tempoBpm ?? 120;
   const length = () => current.body?.lengthBeats ?? 16;
   const duration = () => current.body ? phraseDurationSeconds(current.body) : 8;
   const timelineWidth = () => Math.max(1, viewport.clientWidth);
   const gridTempo = tempo;
   function report(message: string, error = false): void {
-    if (disposed || !notice) return;
+    if (disposed || !notice || !error) return;
     notice.textContent = message; notice.hidden = !message; notice.classList.toggle('is-error', error);
     window.clearTimeout(noticeTimer); noticeTimer = window.setTimeout(() => { if (!disposed) notice.hidden = true; }, error ? 7000 : 3200);
   }
@@ -94,7 +107,6 @@ export function mountPhraseComposition(root: HTMLElement, options: {
       if (body && playbackFamilyId) body = { ...body, parts: body.parts.filter(part => part.id === playbackFamilyId) };
       // Creation includes every family, including notes stored in the former
       // rhythm section. Keeping their original markers avoids rewriting music.
-      if (body && masterPreview !== undefined) body = { ...body, masterLevel: masterPreview };
       return body;
   }
   async function preparePlayback(): Promise<void> {
@@ -108,9 +120,23 @@ export function mountPhraseComposition(root: HTMLElement, options: {
   }
   const transport = createPhraseCompositionTransport({ runtime: sound, tempoBpm: tempo, lengthBeats: length, durationSeconds: duration, readBody: playbackBody,
     prepare: preparePlayback, readPlan: () => phrase.previewPlan(playbackBody(), { allowSilence: true }),
-    onChange(next) { state = next; updatePlayback(); }, onError: error => report(error instanceof Error ? error.message : String(error), true) });
+    onChange(next) {
+      const wasPlaying = state.playing; state = next; updatePlayback();
+      if (next.playing && !wasPlaying) { options.onLearningAction?.('play'); if (spaceAction === 'resume-space') options.onLearningAction?.('resume-space'); spaceAction = undefined; }
+      if (!next.playing && wasPlaying && spaceAction === 'pause-space') { spaceAction = undefined; options.onLearningAction?.('pause-space'); }
+    }, onError: error => { spaceAction = undefined; report(error instanceof Error ? error.message : String(error), true); } });
 
   function updateTitle(): void { if (!titleInput && title) title.textContent = current.draft?.name ?? '音乐'; }
+  async function updateUnsavedMarker(): Promise<void> {
+    if (!options.readUnsavedChanges) return;
+    const request = ++unsavedRequest;
+    try {
+      const unsaved = await options.readUnsavedChanges();
+      if (!disposed && request === unsavedRequest) unsavedMarker.hidden = !unsaved;
+    } catch {
+      // A failed status read cannot confirm that the latest changes were saved.
+    }
+  }
   function sync(snapshot?: PhraseView): void {
     current = snapshot ?? phrase.read();
     if (draftId !== current.draft?.id) {
@@ -124,20 +150,21 @@ export function mountPhraseComposition(root: HTMLElement, options: {
       }
     }
     updateTitle();
-    if (document.activeElement !== tempoInput) tempoInput.value = String(gridTempo());
+    void updateUnsavedMarker();
+    if (document.activeElement !== tempoInput) tempoInput.value = String(Math.round(gridTempo()));
     if (document.activeElement !== subdivisionSelect) subdivisionSelect.value = String(phraseStepsPerBeat(current.body));
-    subdivisionButton.textContent = `${phraseStepsPerBeat(current.body)}格`;
+    subdivisionButton.textContent = `${phraseStepsPerBeat(current.body)} 份`;
     syncConsole();
     for (const button of fileButtons) button.disabled = busy || !current.draft;
     if (playButton) playButton.disabled = busy || !current.body;
     tempoInput.disabled = busy || !current.body;
     subdivisionSelect.disabled = subdivisionButton.disabled = busy || !current.body;
   }
-  function positionHead(): void {
+  function positionHead(): number | undefined {
     if (disposed || !viewport) return;
-    const seconds = transport.position();
-    const ms = Math.round(seconds * 1000); clock.textContent = `${Math.floor(ms / 60000).toString().padStart(2, '0')}:${Math.floor(ms / 1000 % 60).toString().padStart(2, '0')}.${(ms % 1000).toString().padStart(3, '0')}`;
-    if (sectionEditor) { sectionEditor.setPlayhead(seconds, state.playing); return; }
+    const seconds = headPreview ?? transport.position();
+    if (clock) clock.textContent = formatPlayheadTime(seconds);
+    if (sectionEditor) { sectionEditor.setPlayhead(seconds, state.playing); return seconds; }
     const beat = Math.max(0, Math.min(length(), seconds * tempo() / 60));
     const width = headWidth; const x = (Math.max(0, Math.min(duration(), seconds)) - view.leftSeconds) * melodyScale(view, width, duration());
     playhead.hidden = x < 0 || x > width; handle.hidden = playhead.hidden;
@@ -145,6 +172,7 @@ export function mountPhraseComposition(root: HTMLElement, options: {
     handle.setAttribute('aria-valuenow', String(beat)); handle.setAttribute('aria-valuemax', String(length())); handle.title = `${Number(beat.toFixed(3))} 拍`;
     viewport.dataset.leftBeat = String(view.leftSeconds * tempo() / 60); viewport.dataset.zoom = String(view.zoom * duration() / 8);
     viewport.dataset.leftSeconds = String(view.leftSeconds); viewport.dataset.visibleSeconds = String(8 / view.zoom);
+    return seconds;
   }
   function updatePlayback(): void {
     if (!playButton || disposed) return;
@@ -152,13 +180,19 @@ export function mountPhraseComposition(root: HTMLElement, options: {
     playButton.setAttribute('aria-label', state.preparing ? '取消播放准备' : state.playing ? '暂停' : '播放');
     cancelAnimationFrame(frame); positionHead(); if (state.playing) frame = requestAnimationFrame(tick);
   }
-  function tick(): void { if (!disposed) { positionHead(); if (state.playing) frame = requestAnimationFrame(tick); } }
+  function tick(): void {
+    if (disposed) return;
+    const seconds = positionHead();
+    if (!state.playing) return;
+    if (seconds !== undefined && seconds > state.position) options.onPlaybackAdvance?.();
+    frame = requestAnimationFrame(tick);
+  }
   function refresh(): void { if (disposed) return; sync(); view = clampMelodyView(view, duration()); sectionEditor?.refresh(current); if (!sectionEditor) paintOverview(); positionHead(); transport.refresh(); }
-  function changedInEditor(snapshot?: PhraseView): void {
+  function changedInEditor(snapshot?: PhraseView, preserveSounding = false): void {
     if (disposed) return;
     // The detailed editor has already refreshed its own notes and selection.
     // Reuse that view for the header instead of reading and repainting it again.
-    sync(snapshot); view = clampMelodyView(view, duration()); if (!sectionEditor) paintOverview(); positionHead(); transport.refresh();
+    sync(snapshot); view = clampMelodyView(view, duration()); if (!sectionEditor) paintOverview(); positionHead(); transport.refresh(preserveSounding);
   }
   function commitMaster(): void {
     if (masterPreview === undefined || !current.body) return;
@@ -176,7 +210,7 @@ export function mountPhraseComposition(root: HTMLElement, options: {
         if (!next) throw new Error('音乐名称不能为空。');
         if (next !== current.draft?.name) { if (options.onRename) await options.onRename(next); else phrase.rename(next); }
         titleInput = undefined;
-        if (!disposed) { current = phrase.read(); updateTitle(); syncConsole(); }
+        if (!disposed) { current = phrase.read(); updateTitle(); syncConsole(); void updateUnsavedMarker(); }
         return true;
       } catch (error) { report(error instanceof Error ? error.message : String(error), true); return false; }
       finally { titleCommit = undefined; }
@@ -184,22 +218,22 @@ export function mountPhraseComposition(root: HTMLElement, options: {
     titleCommit = commit;
     return titleCommit;
   }
-  async function execute(callback: (() => void | Promise<void>) | undefined, saved = false, keepView = false): Promise<void> {
+  async function execute(callback: (() => FileActionResult | Promise<FileActionResult>) | undefined, keepView = false): Promise<void> {
     if (busy || disposed || !callback) return;
     busy = true; sync(); finishGesture();
-    try { if (!await commitTitle()) return; sectionEditor?.flush(); commitMaster(); if (disposed) return; keepDraftViewport = keepView; await callback(); if (!disposed) { refresh(); if (saved) report('已保存'); } }
+    try { if (!await commitTitle()) return; sectionEditor?.flush(); commitMaster(); if (disposed) return; keepDraftViewport = keepView; await callback(); if (!disposed) refresh(); }
     catch (error) { report(error instanceof Error ? error.message : String(error), true); }
     finally { busy = false; if (!disposed) sync(); keepDraftViewport = false; }
   }
   function localX(event: Pick<PointerEvent, 'clientX'>): number { return event.clientX - viewport.getBoundingClientRect().left; }
-  function seek(x: number): void { transport.seek(melodyTimeAt(view, headWidth, duration(), x)); positionHead(); }
+  function previewHead(x: number): void { headPreview = melodyTimeAt(view, headWidth, duration(), x); positionHead(); }
   function startGesture(event: PointerEvent, kind: 'head' | 'pan'): void {
     if (disposed || busy || event.button !== 0 || !current.body || (event.target as HTMLElement)?.closest?.('.phrase-composition-console')) return;
     event.preventDefault(); finishGesture(); viewport.focus({ preventScroll: true });
     const capture = kind === 'head' ? ruler : viewport;
     overviewSection = 'melody';
     gesture = { kind, id: event.pointerId, capture, lastX: event.clientX, lastY: event.clientY, section: overviewSection };
-    capture.setPointerCapture?.(event.pointerId); if (kind === 'head') seek(localX(event)); else viewport.classList.add('is-panning');
+    capture.setPointerCapture?.(event.pointerId); if (kind === 'head') previewHead(localX(event)); else viewport.classList.add('is-panning');
   }
   function move(event: PointerEvent): void {
     if (!gesture || gesture.id !== event.pointerId || disposed) return;
@@ -208,7 +242,7 @@ export function mountPhraseComposition(root: HTMLElement, options: {
       const height = viewport.clientHeight;
       if (height > 0) splitRatio = clampPhraseSplit(clampPhraseSplit(splitRatio, height) + (event.clientY - gesture.lastY) / height, height);
       gesture.lastY = event.clientY; scheduleOverview();
-    } else if (gesture.kind === 'head') seek(localX(event));
+    } else if (gesture.kind === 'head') previewHead(localX(event));
     else {
       view = clampMelodyView({ ...view, leftSeconds: view.leftSeconds + (gesture.lastX - event.clientX) / melodyScale(view, headWidth, duration()) }, duration());
       const vertical = sectionViews[gesture.section]; vertical.top += gesture.lastY - event.clientY;
@@ -219,6 +253,11 @@ export function mountPhraseComposition(root: HTMLElement, options: {
     const previous = gesture; gesture = undefined; viewport?.classList.remove('is-panning');
     main?.classList.remove('is-resizing-split');
     if (previous?.capture.hasPointerCapture?.(previous.id)) previous.capture.releasePointerCapture(previous.id);
+    if (previous?.kind === 'head') {
+      const seconds = headPreview; headPreview = undefined;
+      if (commit && seconds !== undefined) void transport.seek(seconds);
+      positionHead();
+    }
     if (previous?.kind === 'split') {
       if (!commit) {
         splitRatio = previous.startRatio ?? .5;
@@ -246,8 +285,9 @@ export function mountPhraseComposition(root: HTMLElement, options: {
     scheduleOverview();
   }
   const key = (event: KeyboardEvent) => {
+    if (options.readLessonToolbar?.() === false) return;
     if (disposed || root.querySelector('dialog[open]')) return;
-    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') { event.preventDefault(); if (!event.repeat && !busy) void execute(event.shiftKey ? options.onSaveAs : options.onSave, true, !event.shiftKey); return; }
+    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') { event.preventDefault(); if (!event.repeat && !busy) void execute(event.shiftKey ? options.onSaveAs : options.onSave, !event.shiftKey); return; }
     if (busy) return;
     if (event.key === 'Escape' && gesture?.kind === 'split') { event.preventDefault(); event.stopPropagation(); finishGesture(false); return; }
     const rangeUndo = event.key === 'Backspace' && event.target instanceof HTMLInputElement && event.target.type === 'range';
@@ -274,13 +314,20 @@ export function mountPhraseComposition(root: HTMLElement, options: {
     }
     if (event.code === 'Space' || event.key === ' ') {
       if (!event.ctrlKey && !event.metaKey && !event.altKey && sectionEditor?.isStepInputActive()) return;
-      event.preventDefault(); if (!event.repeat && current.body) void transport.toggle();
+      event.preventDefault(); if (!event.repeat && current.body) { spaceAction = state.playing ? 'pause-space' : 'resume-space'; void transport.toggle(); }
     }
   };
 
   const page = node('div', 'song-studio phrase-composition-studio');
   const topbar = node('header', 'song-topbar');
   title = node('div', 'song-project-name'); title.title = '双击修改名称';
+  const unsavedMarker = node('span', 'song-project-unsaved', '*');
+  unsavedMarker.hidden = true;
+  unsavedMarker.title = '有未保存的改动';
+  unsavedMarker.setAttribute('role', 'img');
+  unsavedMarker.setAttribute('aria-label', '有未保存的改动');
+  const titleGroup = node('div', 'phrase-composition-title');
+  titleGroup.append(title, unsavedMarker);
   title.addEventListener('dblclick', () => {
     if (disposed || busy || titleInput || !current.draft) return;
     const field = node('input', 'song-project-name-input'); field.type = 'text'; field.maxLength = 80; field.value = current.draft.name;
@@ -293,17 +340,18 @@ export function mountPhraseComposition(root: HTMLElement, options: {
     field.focus(); field.select();
   });
   const controls = node('div', 'song-transport');
-  const stopButton = action('', 'song-icon-button song-stop', () => { if (!disposed) { finishGesture(); transport.stop(); } });
+  const stopButton = action('', 'song-icon-button song-stop', () => { if (!disposed) { finishGesture(); spaceAction = undefined; transport.stop(); options.onLearningAction?.('reset'); } });
   stopButton.setAttribute('aria-label', '停止并回到开头'); stopButton.title = '停止并回到开头'; stopButton.append(icon('stop'));
   playButton = action('', 'song-icon-button song-play', () => { if (!disposed && !busy && current.body) void transport.toggle(); });
-  clock = node('output', 'song-clock', '00:00.000'); clock.setAttribute('aria-label', '当前时间');
+  const clock = options.directMusic ? undefined : node('output', 'song-clock', '00:00.000');
+  clock?.setAttribute('aria-label', '当前时间');
   const bpm = node('div', 'song-popover'); const bpmButton = action('', 'song-icon-button', () => {}); bpmButton.setAttribute('aria-label', '速度 BPM'); bpmButton.append(icon('tempo'));
   const bpmPanel = node('div', 'song-popover-panel song-tempo-panel'); const bpmLabel = node('label', '', 'BPM');
-  tempoInput = node('input'); tempoInput.type = 'number'; tempoInput.min = '40'; tempoInput.max = '240'; tempoInput.step = '1'; tempoInput.setAttribute('aria-label', 'BPM');
+  tempoInput = node('input'); tempoInput.type = 'number'; tempoInput.min = String(MIN_TEMPO_BPM); tempoInput.max = String(MAX_TEMPO_BPM); tempoInput.step = '1'; tempoInput.setAttribute('aria-label', 'BPM');
   tempoInput.addEventListener('change', () => {
     if (disposed || busy || !current.body) return;
-    try { const value = Number(tempoInput.value); if (!Number.isFinite(value) || value < 40 || value > 240) throw new Error('BPM 需在 40 至 240 之间。'); sectionEditor?.flush(); phrase.setTempo(value, { preserveNoteDurations: false }); refresh(); }
-    catch (error) { tempoInput.value = String(tempo()); report(error instanceof Error ? error.message : String(error), true); }
+    try { const value = Number(tempoInput.value); if (!Number.isFinite(value) || value < MIN_TEMPO_BPM || value > MAX_TEMPO_BPM) throw new Error(`BPM 需在 ${MIN_TEMPO_BPM} 至 ${MAX_TEMPO_BPM} 之间。`); sectionEditor?.flush(); phrase.setTempo(value, { preserveNoteDurations: false }); refresh(); }
+    catch (error) { tempoInput.value = String(Math.round(tempo())); report(error instanceof Error ? error.message : String(error), true); }
   });
   const tapTempo = action('敲击定速', 'song-tap-tempo', () => { void execute(() => {
     if(tapTempoDialog)return;
@@ -314,11 +362,11 @@ export function mountPhraseComposition(root: HTMLElement, options: {
   }); });
   bpmLabel.append(tempoInput); bpmPanel.append(bpmLabel,tapTempo); bpm.append(bpmButton, bpmPanel);
   const subdivision = node('div', 'song-popover');
-  subdivisionButton = action('4格', 'song-icon-button phrase-grid-button', () => {});
-  subdivisionButton.setAttribute('aria-label', '设置每拍格数'); subdivisionButton.title = '每拍格数';
-  const subdivisionPanel = node('div', 'song-popover-panel phrase-grid-panel'); const subdivisionLabel = node('label', '', '每拍格数');
-  subdivisionSelect = node('select', 'phrase-grid-select'); subdivisionSelect.setAttribute('aria-label', '每拍格数');
-  for (let count = 2; count <= 9; count++) { const option = node('option', '', String(count)); option.value = String(count); subdivisionSelect.append(option); }
+  subdivisionButton = action('4 份', 'song-icon-button phrase-grid-button', () => {});
+  subdivisionButton.setAttribute('aria-label', '设置每拍细分'); subdivisionButton.title = '每拍细分';
+  const subdivisionPanel = node('div', 'song-popover-panel phrase-grid-panel'); const subdivisionLabel = node('label', '', '每拍细分');
+  subdivisionSelect = node('select', 'phrase-grid-select'); subdivisionSelect.setAttribute('aria-label', '每拍细分');
+  for (let count = 2; count <= 9; count++) { const option = node('option', '', `${count} 份`); option.value = String(count); subdivisionSelect.append(option); }
   subdivisionSelect.addEventListener('change', () => {
     if (disposed || busy || !current.body) return;
     const value = Number(subdivisionSelect.value);
@@ -327,18 +375,20 @@ export function mountPhraseComposition(root: HTMLElement, options: {
   });
   subdivisionLabel.append(subdivisionSelect); subdivisionPanel.append(subdivisionLabel); subdivision.append(subdivisionButton, subdivisionPanel);
   const volumeCommit = () => { if (disposed || busy) return; try { commitMaster(); } catch (error) { masterPreview = undefined; report(error instanceof Error ? error.message : String(error), true); sync(); } };
-  controls.append(stopButton, playButton, clock, ...(options.directMusic ? [] : [bpm, subdivision]));
+  controls.append(stopButton, playButton);
+  if (clock) controls.append(clock, bpm, subdivision);
   mountOutputVolume(controls, () => sound);
   const files = node('div', 'song-file-actions');
-  if (options.onExport) files.append(action('导出音频', 'song-save', () => { void execute(options.onExport); }));
-  const save = action('保存', 'song-save', () => { void execute(options.onSave, true, true); }); files.append(save); fileButtons.push(save);
+  if (options.onExport) files.append(action('导出音频', 'song-save song-export-audio', () => { void execute(options.onExport); }));
+  if (options.onSettings) files.append(action('设置', 'song-save song-settings', () => { void execute(options.onSettings); }));
+  const save = action('保存', 'song-save song-save-project', () => { void execute(options.onSave, true); }); files.append(save); fileButtons.push(save);
   if (options.onExit) { const exit = action('退出', 'song-exit', () => { void execute(options.onExit); }); files.append(exit); fileButtons.push(exit); }
   const identity = node('div', 'phrase-composition-identity');
   const back = action('‹', 'song-icon-button phrase-melody-back', () => { void execute(showOverview); });
   back.title = '返回音乐'; back.setAttribute('aria-label', '返回音乐'); back.hidden = true;
   const sectionLabel = node('span', 'phrase-composition-section-label', '创作'); sectionLabel.hidden = true;
-  if (options.directMusic) identity.append(title);
-  else identity.append(back, title, node('span', 'song-project-kind', '音乐'), sectionLabel);
+  if (options.directMusic) identity.append(titleGroup);
+  else identity.append(back, titleGroup, node('span', 'song-project-kind', '音乐'), sectionLabel);
   topbar.append(identity, controls, files);
   const main = node('main', 'phrase-composition-main'); const sectionControls = node('aside', 'phrase-composition-controls');
   const openCreation = action('创作', 'phrase-composition-control phrase-composition-open-creation', () => { void execute(() => showSection('melody')); });
@@ -372,7 +422,7 @@ export function mountPhraseComposition(root: HTMLElement, options: {
   function syncConsole(): void {
     const body = current.body; const level = masterPreview ?? body?.masterLevel ?? 1;
     consoleName.textContent = current.draft?.name ?? '音乐';
-    consoleFields.get('BPM')!.textContent = body ? String(body.tempoBpm) : '—';
+    consoleFields.get('BPM')!.textContent = body ? String(Math.round(body.tempoBpm)) : '—';
     consoleFields.get('时长')!.textContent = body ? `${Number(duration().toFixed(3))} 秒` : '—';
     consoleFields.get('小节')!.textContent = body ? String(Number((body.lengthBeats / 4).toFixed(3))) : '—';
     consoleFields.get('音符')!.textContent = String(body?.parts.reduce((count, part) => count + part.notes.length, 0) ?? 0);
@@ -383,7 +433,7 @@ export function mountPhraseComposition(root: HTMLElement, options: {
   consoleVolume.addEventListener('pointerdown', event => { if (!disposed && !busy) masterPointer = event.pointerId; });
   consoleVolume.addEventListener('input', () => {
     if (disposed || busy || !current.body) return; const value = Number(consoleVolume.value); if (!Number.isFinite(value)) return;
-    masterPreview = Math.max(0, Math.min(1, value)); syncConsole(); transport.refresh();
+    masterPreview = Math.max(0, Math.min(1, value)); syncConsole();
   });
   consoleVolume.addEventListener('change', volumeCommit); consoleVolume.addEventListener('blur', volumeCommit);
   const melodyNotes = node('div', 'phrase-composition-notes'); melodySection.append(melodyNotes);
@@ -470,11 +520,9 @@ export function mountPhraseComposition(root: HTMLElement, options: {
     view = { leftSeconds: next.leftSeconds, zoom: next.zoom, rowHeight: 24 };
     sectionViews[section] = { top: next.top, rowHeight: next.rowHeight, initialized: true };
   }
-  async function showSection(_section: PhraseSection): Promise<void> {
+  async function showSection(_section: PhraseSection, initial?: PhraseView): Promise<void> {
     if (sectionEditor || disposed) return;
-    await options.onPrepareMelody?.();
-    if (disposed) return;
-    current = phrase.read();
+    current = initial ?? phrase.read();
     if (!detailViewInitialized) {
       const restored = options.workspaceState?.read();
       if (restored) await transport.seek(restored.playheadSeconds);
@@ -484,7 +532,9 @@ export function mountPhraseComposition(root: HTMLElement, options: {
     main.hidden = true; melodyRegion.hidden = false;
     activeSection = 'melody';
     try { sectionEditor = mountMelodyWorkspace(melodyRegion, { phrase, sound, initialView: current, gridBpm: gridTempo, readPerformanceMode: options.readPerformanceMode, includeAllSections: true,
+      readMultipleTempoRolls: options.readMultipleTempoRolls, onLearningAction: options.onLearningAction, readLessonInput: options.readLessonInput,
       orientation: options.directMusic ? 'vertical' : 'horizontal',
+      showPlayheadTime: options.directMusic,
       workspaceState: options.workspaceState,
       initialViewport: !options.directMusic || detailViewInitialized ? { leftSeconds: view.leftSeconds, zoom: view.zoom, top: sectionViews.melody.top, rowHeight: sectionViews.melody.rowHeight } : undefined,
       onViewportChange: next => rememberViewport('melody', next),
@@ -497,12 +547,13 @@ export function mountPhraseComposition(root: HTMLElement, options: {
       onCreateNoteGroup: options.onCreateNoteGroup,
       onChangeNoteGroupTimbre: options.onChangeNoteGroupTimbre,
       onChange: changedInEditor,
-      onPreview(body) { if (disposed) return; previewBody = body; transport.refresh(); },
-      onPlaybackFamilyChange(id) { if (disposed) return; playbackFamilyId = id; transport.refresh(); },
+      onPreview(body) { if (disposed || body === previewBody) return; previewBody = body; transport.refresh(); },
+      onPlaybackFamilyChange(id) { if (disposed) return; playbackFamilyId = id; transport.refresh(id === undefined); },
       readPlayhead: () => transport.position(),
       readIsPlaying: () => state.playing || state.preparing,
       onSeek(seconds) { const ready = transport.seek(seconds); positionHead(); return ready; },
     }); } catch (error) { activeSection = undefined; main.hidden = false; melodyRegion.hidden = true; melodyRegion.replaceChildren(); throw error; }
+    if (options.frameNotesOnMount) sectionEditor.frameNotes();
     sectionLabel.textContent = '创作';
     back.hidden = sectionLabel.hidden = !!options.directMusic;
     options.onSectionChange?.('melody'); positionHead(); transport.refresh();
@@ -515,7 +566,7 @@ export function mountPhraseComposition(root: HTMLElement, options: {
     back.hidden = sectionLabel.hidden = true; options.onSectionChange?.('overview'); paintOverview(); transport.refresh();
   }
   ruler.addEventListener('pointerdown', event => startGesture(event, 'head')); viewport.addEventListener('pointerdown', event => startGesture(event, 'pan'));
-  const lostCapture = (event: PointerEvent) => { if (gesture?.id === event.pointerId) finishGesture(); };
+  const lostCapture = (event: PointerEvent) => { if (gesture?.id === event.pointerId) finishGesture(gesture.kind !== 'head'); };
   ruler.addEventListener('lostpointercapture', lostCapture); viewport.addEventListener('lostpointercapture', lostCapture);
   divider.addEventListener('lostpointercapture', lostCapture);
   viewport.addEventListener('wheel', wheel, { passive: false }); ruler.addEventListener('wheel', wheel, { passive: false });
@@ -530,14 +581,14 @@ export function mountPhraseComposition(root: HTMLElement, options: {
     // Initial mounting is read-only setup, not a file action. Avoid execute's
     // repeated full-score reads, save flushing and second editor repaint.
     busy = true; sync(current);
-    void showSection(initialSection).catch(error => report(error instanceof Error ? error.message : String(error), true))
+    void showSection(initialSection, current).catch(error => report(error instanceof Error ? error.message : String(error), true))
       .finally(() => { if (!disposed) { busy = false; sync(current); } });
   }
   return { dispose() {
-    if (disposed) return; finishGesture(); disposed = true; tapTempoDialog?.dispose(); sectionEditor?.dispose(); sectionEditor = undefined; melodyOverview.dispose(); removeConsoleWheel(); transport.dispose(); observer?.disconnect(); cancelAnimationFrame(frame); cancelAnimationFrame(overviewFrame); overviewFrame = 0; window.clearTimeout(noticeTimer);
+    if (disposed) return; finishGesture(false); disposed = true; tapTempoDialog?.dispose(); sectionEditor?.dispose(); sectionEditor = undefined; melodyOverview.dispose(); removeConsoleWheel(); transport.dispose(); observer?.disconnect(); cancelAnimationFrame(frame); cancelAnimationFrame(overviewFrame); overviewFrame = 0; window.clearTimeout(noticeTimer);
     document.removeEventListener('pointermove', move); document.removeEventListener('pointerup', up); document.removeEventListener('pointercancel', cancel); document.removeEventListener('keydown', key);
     window.removeEventListener('resize', resize);
-  }, refresh, notify: report, async flush() {
+  }, refresh, notify: report, frameNotes(reserveEndSpace) { sectionEditor?.frameNotes(reserveEndSpace); }, previewTempoRate(value) { sectionEditor?.previewTempoRate(value); }, async flush() {
     if (disposed) throw new Error('当前音乐页面已关闭。');
     if (busy) throw new Error('正在处理音乐，请稍候再试。');
     if (!await commitTitle()) throw new Error('请先完成音乐名称。');

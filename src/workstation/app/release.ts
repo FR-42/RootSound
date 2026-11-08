@@ -1,23 +1,25 @@
 /** Public desktop entry: only the current project library and music canvas. */
 import { createMaterialLibrary } from '../modules/materials/public.ts';
 import { createBrowserSoundRuntime } from '../modules/sound-runtime/public.ts';
-import { createTimbreEditor, createTimbrePlayback, createTimbreReferenceAdapter, createSpectralAudio } from '../modules/timbre/public.ts';
+import { createTimbrePlayback, createTimbreReferenceAdapter, createSpectralAudio } from '../modules/timbre/public.ts';
 import { createSampleBankAudio } from '../modules/timbre/sample-bank.ts';
 import { createPhraseEditor, createPhrasePlayback, createPhraseReferenceAdapter } from '../modules/phrase/public.ts';
 import { createSongEditor, createSongReferenceAdapter } from '../modules/song/public.ts';
 import { createSampleAudio, createBrowserSampleDecoder, createSampleReferenceAdapter } from '../modules/sampling/public.ts';
-import { mountStudio, showMidiImportNotice } from '../modules/ui-rendering/public.ts';
+import { mountStudio, confirmFormatSave } from '../modules/ui-rendering/public.ts';
 import { createDesktopPlatform } from './platform/desktop.ts';
 import { createWorkspacePreferences } from './platform/preferences.ts';
+import { createMusicGuideDocument } from './music-guide-document.ts';
+import { createLearningSettings } from './platform/learning-settings.ts';
 import { createMusicWorkspaceState } from './platform/music-workspace-state.ts';
 import { createProjectSetup, projectName } from './project-setup.ts';
 import { openMusicDocument, commitMusicDocument } from './music-document.ts';
-import { ensureProjectMelodyTimbres, listProjectTimbres, addProjectPhraseTimbre, createProjectPhraseNoteGroup, changeProjectPhraseNoteGroupTimbre,
+import { prepareProjectMelodyTimbres, listProjectTimbres, addProjectPhraseTimbre, createProjectPhraseNoteGroup, changeProjectPhraseNoteGroupTimbre,
   removeProjectTimbre, reorderProjectTimbres, requiresTimbreDeleteConfirmation } from './project-timbres.ts';
-import { rememberMidiImportNotice, takeMidiImportNotice } from './platform/midi-notice.ts';
 import { readTimbreImport } from './timbre-file-import.ts';
 import { importProjectTimbre } from './project-timbre-import.ts';
 import { createProjectClosePreparation } from './project-close.ts';
+import { stageMaterialStorage } from './material-library-session.ts';
 
 const root = document.getElementById('app')!, runtime = createBrowserSoundRuntime();
 async function start() {
@@ -25,36 +27,66 @@ async function start() {
     const platform = createDesktopPlatform(), directories = platform.projectDirectories;
     if (!directories) throw new Error('未连接音乐工程服务。');
     const state = await directories.read();
-    const library = createMaterialLibrary(platform.storage, { project: { rootKind: 'rootsound.song',
+    const staged = state.current ? stageMaterialStorage(platform.storage) : undefined;
+    const library = createMaterialLibrary(staged?.storage, { project: { rootKind: 'rootsound.song',
       adapters: [createTimbreReferenceAdapter(), createPhraseReferenceAdapter(), createSongReferenceAdapter(), createSampleReferenceAdapter()] } });
     const sampleAudio = createSampleAudio(library, createBrowserSampleDecoder(), platform.samplePayloads);
     const bank = createSampleBankAudio(library, sampleAudio), spectral = createSpectralAudio();
-    const tones = createTimbrePlayback(library, sampleAudio, spectral, bank), timbre = createTimbreEditor(library, sampleAudio, spectral, bank);
+    const tones = createTimbrePlayback(library, sampleAudio, spectral, bank);
     const phrase = createPhraseEditor(library, tones);
     // The song adapter is retained solely as the .rootsound compatibility boundary.
     // The former arrangement UI and its workspace are not mounted or imported.
     const song = createSongEditor(library, createPhrasePlayback(library, tones), { defaultTempoMode: 'source', initialTrackCount: 1 });
-    if (state.current) { openMusicDocument(library, song, phrase, state.current.name); await directories.finishLoading?.(); }
+    const songId = state.current && openMusicDocument(library, song, phrase, state.current.name);
+    if (state.current) {
+      if (!songId) throw new Error('工程缺少可编辑的歌曲。');
+      prepareProjectMelodyTimbres(library, songId);
+      if (state.current.format) commitMusicDocument(library, song, phrase);
+      staged!.publish();
+      await directories.finishLoading?.();
+    }
+    const sourceFormat = state.current?.format;
+    let fileSession: ReturnType<typeof import('./music-file.ts')['createMusicFileSession']> | undefined;
+    async function prepareFile(target: 'source' | 'rootsound' = 'source') {
+      if (!songId) return;
+      if (sourceFormat && target === 'source' && !fileSession) {
+        const sourceFile = await directories!.readDocument?.();
+        if (!sourceFile?.libraryText) throw new Error('无法读取原始音乐，请重新打开后保存。');
+        const { createMusicFileSession } = await import('./music-file.ts');
+        const view = phrase.read();
+        fileSession = createMusicFileSession(sourceFile.format, sourceFile.bytes, library, view.body!, view.draft!.name, sourceFile.libraryText);
+      }
+      if (!sourceFormat || target === 'rootsound') {
+        if (target === 'rootsound' || (await directories!.read()).hasUnsavedChanges)
+          await bank.materialize(phrase.read().body?.parts.filter(part => !part.unassigned).map(part => part.timbreId) ?? []);
+      }
+      commitMusicDocument(library, song, phrase);
+      if (fileSession && target === 'source') {
+        const result = fileSession.serialize(library, phrase.read().body!, song.read().draft!.name, platform.storage.read()!);
+        if (!await confirmFormatSave(root, result.warnings)) throw new Error('已取消保存，原文件未改动。');
+        if (!directories!.prepareDocumentSave) throw new Error('请重新打开更新后的简乐。');
+        await directories!.prepareDocumentSave(result.bytes);
+      }
+    }
     const preferences = createWorkspacePreferences(localStorage);
-    const projectId = () => { const id = song.read().draft?.id; if (!id) throw new Error('先打开一个音乐项目。'); return id; };
-    const studio = mountStudio(root, { timbre, phrase, song, sound: runtime, hasPrevious: !!state.current,
-      projectName: state.current?.name, doubleClickIntervalMs: state.doubleClickIntervalMs, preferences,
+    const learning = createLearningSettings(localStorage);
+    const projectId = () => { if (!songId) throw new Error('先打开一个音乐项目。'); return songId; };
+    const studio = mountStudio(root, { phrase, song, sound: runtime, hasPrevious: !!state.current,
+      projectName: state.current?.name, doubleClickIntervalMs: state.doubleClickIntervalMs, preferences, learning,
       workspaceState: state.current ? createMusicWorkspaceState(localStorage, state.current.id) : undefined,
+      musicGuide: { createDocument: createMusicGuideDocument, createSound: createBrowserSoundRuntime },
       initialEntry: state.current ? 'song' : 'welcome', audioFiles: platform.audioFiles,
-      projectSetup: createProjectSetup(directories, notice => {
+      projectSetup: createProjectSetup(directories, () => {
         runtime.stopAll();
-        if (notice) rememberMidiImportNotice(sessionStorage, notice);
         location.reload();
       }, {
         read() { const value = platform.storage.read(); if (value === null) throw new Error('当前没有项目。'); return value; },
-        songDraftId: () => song.read().draft!.id, name: () => song.read().draft!.name,
-        async prepareSave() {
+        songDraftId: projectId, name: () => song.readDraft()!.name,
+        async prepareSave(target) {
           await studio.prepareClose({ allowProjectDialog: true });
-          await bank.materialize(phrase.read().body?.parts.filter(part => !part.unassigned).map(part => part.timbreId) ?? []);
-          commitMusicDocument(library, song, phrase);
+          await prepareFile(target);
         },
       }),
-      onPrepareMelody() { ensureProjectMelodyTimbres(library, projectId()); },
       projectTimbres() { return listProjectTimbres(library, projectId()).map(record => ({ id: record.id, name: record.name,
         requiresDeleteConfirmation: requiresTimbreDeleteConfirmation(record, library.listDrafts()) })); },
       async onImportTimbre() {
@@ -69,28 +101,15 @@ async function start() {
       onAddPhraseTimbre: (id, section) => addProjectPhraseTimbre(library, projectId(), phrase.read().draft!.id, id, section),
       onCreateNoteGroup: id => createProjectPhraseNoteGroup(library, projectId(), phrase.read().draft!.id, id),
       onChangeNoteGroupTimbre: (part, tone) => changeProjectPhraseNoteGroupTimbre(library, projectId(), phrase.read().draft!.id, part, tone),
-      onRemovePhraseTimbre: id => {
-        removeProjectTimbre(library, projectId(), id);
-        try { timbre.read(); } catch {
-          const remaining = listProjectTimbres(library, projectId());
-          if (remaining.length) timbre.open(remaining[0]!.id); else timbre.create();
-        }
-      },
+      onRemovePhraseTimbre: id => removeProjectTimbre(library, projectId(), id),
       onReorderTimbres: (id, index) => reorderProjectTimbres(library, projectId(), id, index),
       onRenameProject: name => { song.rename(projectName(name)); },
     });
     const prepareClose = createProjectClosePreparation({ flush: () => studio.prepareClose(),
-      async assertSaveReady() {
-        if (song.read().draft) {
-          if ((await directories.read()).hasUnsavedChanges) await bank.materialize(phrase.read().body?.parts.filter(part => !part.unassigned).map(part => part.timbreId) ?? []);
-          commitMusicDocument(library, song, phrase);
-        }
-      }, name: () => song.read().draft?.name });
+      prepareSave: () => prepareFile(), name: () => song.readDraft()?.name });
     const closeHost = globalThis as typeof globalThis & { __rootSoundPrepareClose?: typeof prepareClose };
     closeHost.__rootSoundPrepareClose = prepareClose;
-    const notice = takeMidiImportNotice(sessionStorage, state.current?.id);
-    const imported = notice ? showMidiImportNotice(root, notice) : undefined;
-    window.addEventListener('pagehide', () => { delete closeHost.__rootSoundPrepareClose; imported?.dispose(); studio.dispose(); void runtime.dispose(); });
+    window.addEventListener('pagehide', () => { delete closeHost.__rootSoundPrepareClose; studio.dispose(); void runtime.dispose(); });
   } catch (error) {
     const message = document.createElement('main'); message.className = 'startup-error';
     const title = document.createElement('h1'); title.textContent = '暂时无法打开 RootSound';

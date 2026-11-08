@@ -1,6 +1,7 @@
 import { phraseStepsPerBeat, type PhraseBody } from './phrase.ts';
+import { MAX_PHRASE_BEATS } from './phrase-limits.ts';
 
-export type PhraseTempoSpan = { id?: string; startBeat: number; endBeat: number; startSeconds: number; endSeconds: number; tempoBpm: number };
+export type PhraseTempoSpan = { id?: string; startBeat: number; endBeat: number; startSeconds: number; endSeconds: number; tempoBpm: number; gridOffsetBeats?: number };
 const clocks = new WeakMap<PhraseBody, PhraseTempoSpan[]>();
 /** All departments use the same beat/second boundary, including variable tempo. */
 export function phraseTempoSpans(body: PhraseBody): readonly PhraseTempoSpan[] {
@@ -13,6 +14,23 @@ export function phraseTempoSpans(body: PhraseBody): readonly PhraseTempoSpan[] {
     return { ...point, endBeat, startSeconds, endSeconds: seconds };
   });
   clocks.set(body, spans); return spans;
+}
+export function phraseTempoBoundary(body: PhraseBody, id: string) {
+  const spans = phraseTempoSpans(body);
+  const index = spans.findIndex(span => span.id === id);
+  if (index < 1) throw new Error('这个BPM卷帘已不存在。');
+  const upper = spans[index - 1]!, lower = spans[index]!;
+  const ratio = lower.tempoBpm / upper.tempoBpm;
+  const beatShiftPerBeat = 1 - ratio;
+  // Leave each adjacent roll at least one beat, or its existing size for a short import.
+  let minimum = upper.startBeat + Math.min(1, upper.endBeat - upper.startBeat);
+  let maximum = lower.startBeat + (lower.endBeat - lower.startBeat - Math.min(1, lower.endBeat - lower.startBeat)) / ratio;
+  if (beatShiftPerBeat !== 0) {
+    const limit = lower.startBeat + (MAX_PHRASE_BEATS - body.lengthBeats) / beatShiftPerBeat;
+    if (beatShiftPerBeat < 0) minimum = Math.max(minimum, limit);
+    else maximum = Math.min(maximum, limit);
+  }
+  return { index, upper, lower, ratio, beatShiftPerBeat, minimum, maximum };
 }
 function find(body: PhraseBody, position: number, field: 'startBeat' | 'startSeconds'): PhraseTempoSpan {
   const spans = phraseTempoSpans(body); let low = 0, high = spans.length;

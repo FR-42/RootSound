@@ -92,6 +92,7 @@ export function createWebDemoModel(input?: string, fallbackName = '我的音乐'
   enforceLimits = true;
   return {
     library, score, song, bank, palette: uniquePalette, replaced,
+    readLibrary: () => text!,
     subscribeEdit(listener: () => void) { onEdit = listener; },
     addGroup(id: string) {
       if (!uniquePalette.some(tone => tone.id === id)) throw new Error('请选择网页版音色库里的音色。');

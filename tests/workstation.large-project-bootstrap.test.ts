@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import type { ContentRecord, Draft, MaterialTransactionResult } from '../src/workstation/contracts/content.ts';
 import { createMaterialLibrary } from '../src/workstation/modules/materials/public.ts';
-import { openMaterialSession } from '../src/workstation/app/material-library-session.ts';
+import { openMaterialSession, stageMaterialStorage } from '../src/workstation/app/material-library-session.ts';
 import { createDesktopSamplePayloads } from '../src/workstation/app/platform/sample-payloads.ts';
 import { createSampleAudio, readSampleBody, resolveSampleBytes } from '../src/workstation/modules/sampling/public.ts';
 import { decodePcmWav, encodeFloatWav } from '../src/workstation/modules/sampling/audio.ts';
@@ -111,6 +111,30 @@ test('bootstrap observes the first storage read once and retains ordinary extern
   let emptyReads = 0;
   const empty = openMaterialSession({ read() { emptyReads++; return null; }, write() { throw new Error('Unexpected bootstrap write'); } });
   assert.equal(emptyReads, 1); assert.equal(empty.hasPrevious, false); assert.deepEqual(empty.library.listContentInfo(), []);
+});
+
+test('startup batches working snapshots and detects a concurrent replacement before publication', () => {
+  let raw = fixture().raw();
+  const writes: string[] = [];
+  const storage = { read: () => raw, write(value: string) { raw = value; writes.push(value); } };
+  const staged = stageMaterialStorage(storage);
+  const library = createMaterialLibrary(staged.storage);
+  const draft = library.listDrafts()[0]!;
+  library.updateDraft(draft.id, { name: 'first setup' });
+  library.updateDraft(draft.id, { name: 'second setup' });
+  assert.equal(writes.length, 0);
+  staged.publish();
+  staged.publish();
+  assert.equal(writes.length, 1);
+  assert.equal(createMaterialLibrary(storage).readDraft(draft.id)!.name, 'second setup');
+  library.updateDraft(draft.id, { name: 'user edit' });
+  assert.equal(writes.length, 2);
+  const conflict = stageMaterialStorage(storage);
+  conflict.storage.write('stale');
+  raw = 'replaced';
+  assert.throws(() => conflict.publish(), /加载时发生了变化/);
+  assert.equal(raw, 'replaced');
+  assert.equal(writes.length, 2);
 });
 
 const token = `rootsound-payload:${'a'.repeat(32)}:${'b'.repeat(64)}`;

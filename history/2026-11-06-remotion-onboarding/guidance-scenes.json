@@ -1,0 +1,18 @@
+{
+  "fps": 30,
+  "transitionFrames": 18,
+  "basics": [
+    { "id": "overture", "name": "序曲", "title": "声音，开始有了形状。", "caption": "从听见，到亲手写下。", "frames": 150, "label": "SEE THE SOUND" },
+    { "id": "draw", "name": "写下", "title": "一笔，就是一个声音。", "caption": "左侧 ＋ 选择音色，在空白处向下拖动。", "frames": 240, "label": "MAKE A MARK", "clip": "add-voice" },
+    { "id": "edit", "name": "改变", "title": "移动它，听见变化。", "caption": "拖动中间改变位置，拖动底边改变长短。", "frames": 240, "label": "SHAPE A NOTE", "clip": "editing" },
+    { "id": "voices", "name": "颜色", "title": "给旋律，另一种颜色。", "caption": "不同音符组，可以使用不同音色。", "frames": 180, "label": "COLOUR THE MUSIC" },
+    { "id": "space", "name": "视野", "title": "给灵感，留一点空间。", "caption": "右键空白处取消选择后拖动画面；Ctrl / ⌘ + 滚轮缩放。", "frames": 270, "label": "ROOM TO EXPLORE", "clip": "zoom" },
+    { "id": "begin", "name": "开始", "title": "接下来，是你的音乐。", "caption": "自由试试，不用完成任务，也不用保存练习。", "frames": 150, "label": "YOUR TURN" }
+  ],
+  "tempo-rolls": [
+    { "id": "pace", "name": "速度", "title": "换一种步伐。", "caption": "点击左侧 BPM 调整速度，也可以按空格敲击定速。", "frames": 330, "label": "CHANGE THE PACE", "clip": "bpm" },
+    { "id": "grid", "name": "格数", "title": "节奏，有了新的参照。", "caption": "每拍格数只改变参考线，已有音符不会移动。", "frames": 210, "label": "FEEL THE DIVISION", "clip": "cells" },
+    { "id": "extend", "name": "分段", "title": "让音乐，继续生长。", "caption": "下拉底边延长卷帘；下方 ＋ 新增一段，再单独设置 BPM。", "frames": 210, "label": "LET IT GROW", "clip": "extend" },
+    { "id": "begin", "name": "开始", "title": "变化，交给你决定。", "caption": "想看哪一段，随时回来。", "frames": 120, "label": "YOUR TURN" }
+  ]
+}

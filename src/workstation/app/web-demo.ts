@@ -1,7 +1,9 @@
 import { createWebDemoModel, WEB_MAX_FILE_BYTES } from './web-demo-model.ts';
 import { createWebExampleModel } from './web-demo-example.ts';
 import starterExample from '../../../website/examples/starter.json';
-import { createMidiProjectLibrary } from './midi-project.ts';
+import { musicFileFormat } from './music-interchange-model.ts';
+import { commitMusicDocument } from './music-document.ts';
+import { confirmFormatSave, showFeatureGate, showLearningSettings, needsTempoRolls } from '../modules/ui-rendering/public.ts';
 import { mountMelodyWorkspace } from '../modules/ui-rendering/melody-workspace.ts';
 import { mountOutputVolume } from '../modules/ui-rendering/output-volume.ts';
 import { createPhraseCompositionTransport } from '../modules/ui-rendering/phrase-composition-transport.ts';
@@ -9,6 +11,7 @@ import { createBrowserSoundRuntime } from '../modules/sound-runtime/public.ts';
 import { phraseDurationSeconds, phraseBeatSeconds, phraseHeldSeconds } from '../contracts/phrase-time.ts';
 import type { PhraseBody } from '../contracts/phrase.ts';
 import type { PlaylistTransportState } from '../modules/ui-rendering/playlist-transport.ts';
+import { createLearningSettings } from './platform/learning-settings.ts';
 import './web-demo.css';
 
 const app = document.querySelector<HTMLElement>('#app')!;
@@ -24,19 +27,22 @@ app.innerHTML = `<section class="web-studio" aria-label="简乐在线编曲">
       <button class="web-undo" title="撤销（Ctrl/⌘ Z）" aria-label="撤销">↶</button>
       <button class="web-redo" title="重做（Ctrl/⌘ Shift Z）" aria-label="重做">↷</button>
       <button class="web-new" title="新建空白音乐">新建</button>
-      <button class="web-open" title="打开工程或 MIDI">打开</button>
+      <button class="web-open" title="打开简乐、MIDI 或 MusicXML">打开</button>
+      <button class="web-settings">设置</button>
       <button class="web-save" title="下载可在桌面版继续编辑的工程">下载工程</button>
       <button class="web-export" title="导出 WAV 音频">导出音频</button>
     </div>
   </header>
   <div class="web-workspace"></div>
   <footer class="web-footer"><p class="web-status" role="status" aria-live="polite">选一个音符组，在空白处点按或拖动，即可写音符。</p><span class="web-limit">8 音色 · 最多 16 小节</span><button class="web-help" aria-label="使用帮助">?</button></footer>
-  <input class="web-file" type="file" accept=".mid,.midi,.rootsound,.rsproject" hidden>
+  <input class="web-file" type="file" accept=".mid,.midi,.smf,.kar,.rmi,.musicxml,.xml,.mxl,.rootsound,.rsproject" hidden>
 </section>`;
 const q = <T extends HTMLElement = HTMLElement>(selector: string) => app.querySelector<T>(selector)!;
 const name = q<HTMLInputElement>('.web-name'), play = q<HTMLButtonElement>('.web-play');
 const status = q('.web-status'), file = q<HTMLInputElement>('.web-file');
 let model = createWebExampleModel(starterExample);
+let fileSession: ReturnType<typeof import('./music-file.ts')['createMusicFileSession']> | undefined;
+let sourceExtension = '';
 let runtime = webSound();
 const volume = mountOutputVolume(q('.web-transport'), () => runtime);
 let editor: ReturnType<typeof mountMelodyWorkspace> | undefined;
@@ -45,6 +51,13 @@ let state: PlaylistTransportState = { playing: false, preparing: false, position
 let temporary: PhraseBody | undefined, family: string | undefined;
 let dirty = false, busy = false, frame = 0, disposed = false;
 let showStarter = true;
+const learning = createLearningSettings(localStorage);
+
+q('.web-settings').addEventListener('click', () => {
+  if (busy) return;
+  showLearningSettings(app, learning, { requiresTempoRolls: needsTempoRolls(model.score.read().body),
+    onChange: () => editor?.refresh() });
+});
 
 function webSound() {
   const sound = createBrowserSoundRuntime();
@@ -52,7 +65,7 @@ function webSound() {
   return { ...sound, async audition(plan: Parameters<typeof sound.audition>[0]) {
     if (parent !== window) parent.postMessage({ type: 'jianle:editor-playing' }, location.origin);
     const id = ++request; report('正在准备声音，首次试听需要加载音色…');
-    try { await sound.audition(plan); if (id === request) report('右键删除音符；选中音符后滚轮可调整时长。'); }
+    try { await sound.audition(plan); if (id === request) report('右键删除音符，按住右键拖动可连续擦除。悬停音符时按 Alt 并滚动可微调时长。'); }
     catch (error) { if (id === request) report(error); throw error; }
   }, cancelAudition() { request++; sound.cancelAudition(); } };
 }
@@ -116,14 +129,15 @@ function mount() {
   editor = mountMelodyWorkspace(q('.web-workspace'), {
     phrase: model.score, sound: runtime, orientation: 'vertical', includeAllSections: true,
     initialViewport: starterViewport(),
+    readMultipleTempoRolls: () => learning.read().multipleTempoRolls,
     initialSelection: !model.score.read().body!.parts.some(part => part.notes.length) && model.score.read().body!.parts[0]
       ? { partId: model.score.read().body!.parts[0]!.id } : undefined,
     gridBpm: () => model.score.read().body!.tempoBpm,
-    onChange: () => { temporary = undefined; transport?.refresh(); refreshButtons(); },
-    onPreview(body) { temporary = body; transport?.refresh(); },
+    onChange: (_view, preserveSounding) => { temporary = undefined; transport?.refresh(preserveSounding); refreshButtons(); },
+    onPreview(body) { if (temporary === body) return; temporary = body; transport?.refresh(); },
     onSeek: seconds => transport!.seek(seconds),
     readPlayhead: () => transport?.position() ?? 0, readIsPlaying: () => state.playing,
-    onPlaybackFamilyChange(id) { family = id; transport?.refresh(); },
+    onPlaybackFamilyChange(id) { family = id; transport?.refresh(id === undefined); },
     listTimbres: () => model.palette,
     onAddTimbre: id => model.addGroup(id), onCreateNoteGroup: id => model.addGroup(id),
     onChangeNoteGroupTimbre: (partId, id) => model.changeTone(partId, id),
@@ -173,11 +187,22 @@ q('.web-stop').addEventListener('click', () => transport?.stop());
 q('.web-undo').addEventListener('click', () => { try { editor?.flush(); model.score.undo(); refreshMusic(); } catch (error) { report(error); } });
 q('.web-redo').addEventListener('click', () => { try { editor?.flush(); model.score.redo(); refreshMusic(); } catch (error) { report(error); } });
 q('.web-save').addEventListener('click', () => void exclusive(async () => {
+  if (fileSession) {
+    commitMusicDocument(model.library, model.song, model.score);
+    const result = fileSession.serialize(model.library, model.score.read().body!, model.score.read().draft!.name, model.readLibrary());
+    if (!await confirmFormatSave(app, result.warnings)) { report('已取消保存。'); return; }
+    download(new Uint8Array(result.bytes).buffer, `${model.score.read().draft!.name}${sourceExtension}`, 'application/octet-stream');
+    dirty = false; report('已下载原格式文件；浏览器不会自动覆盖本机原文件。'); return;
+  }
   report('正在准备工程…');
   const text = await model.save();
   download(text, `${model.score.read().draft!.name}.rootsound`, 'application/json');
   dirty = false; report('已发起工程下载，可在简乐桌面版中继续编辑。');
 }));
+const saveNative = () => void exclusive(async () => {
+  const text = await model.save(); download(text, `${model.score.read().draft!.name}.rootsound`, 'application/json');
+  report('已发起 .rootsound 工程下载。');
+});
 q('.web-export').addEventListener('click', () => void exclusive(async () => {
   if (!model.score.read().body!.parts.some(part => !part.unassigned && part.notes.length)) throw new Error('先写几个音符，再导出音频。');
   report('正在导出音频…');
@@ -194,24 +219,35 @@ file.addEventListener('change', () => {
   void exclusive(async () => {
     if (chosen.size > WEB_MAX_FILE_BYTES) throw new Error('网页版支持 16 MiB 以内的文件，更大的工程请使用桌面版。');
     report('正在打开…');
-    const bytes = new Uint8Array(await chosen.arrayBuffer()), midi = /\.midi?$/i.test(chosen.name);
-    const name = chosen.name.replace(/\.(?:mid|midi|rootsound|rsproject)$/i, '').slice(0, 80) || '我的音乐';
-    const imported = midi ? createMidiProjectLibrary(bytes, name) : undefined;
+    const bytes = new Uint8Array(await chosen.arrayBuffer()), format = musicFileFormat(chosen.name);
+    const { readMusicFile, createMusicFileSession } = await import('./music-file.ts');
+    const name = chosen.name.replace(/\.[^.]+$/u, '').slice(0, 80) || '我的音乐';
+    const imported = format ? readMusicFile(bytes, chosen.name, format) : undefined;
     const text = imported?.libraryText ?? new TextDecoder('utf-8', { fatal: true }).decode(bytes);
     // Candidate validation happens before the current document can be replaced.
     const next = createWebDemoModel(text, name);
     next.rename(name);
     if (dirty && !await confirmDiscard('打开另一首音乐？')) { report('已取消打开。'); return; }
+    if (needsTempoRolls(next.score.read().body) && !learning.read().multipleTempoRolls) {
+      const accepted = await new Promise<boolean>(resolve => showFeatureGate(app, {
+        onEnable() { learning.setMultipleTempoRolls(true); resolve(true); }, onCancel() { resolve(false); },
+      }));
+      if (!accepted) { report('已取消打开，当前音乐保留。'); return; }
+    }
     const replacements = next.replaced;
     await replace(next);
-    dirty = midi || replacements > 0;
+    fileSession = format ? createMusicFileSession(format, bytes, next.library, next.score.read().body!, next.score.read().draft!.name) : undefined;
+    sourceExtension = chosen.name.slice(chosen.name.lastIndexOf('.'));
+    q('.web-save').textContent = fileSession ? '下载原格式' : '下载工程';
+    dirty = replacements > 0;
     report(replacements ? `已打开；${replacements} 个音符组已匹配为网页版音色，音符保持不变。`
-      : midi ? 'MIDI 已导入，可继续编辑并下载工程。' : '工程已打开。');
+      : format ? '音乐已打开，保存时下载原格式文件。' : '工程已打开。');
   });
 });
 q('.web-new').addEventListener('click', () => void exclusive(async () => {
   if (dirty && !await confirmDiscard('新建空白音乐？')) return;
   await replace(createWebDemoModel()); report('选一个音符组，在空白处点按或拖动，即可写音符。');
+  fileSession = undefined; sourceExtension = ''; q('.web-save').textContent = '下载工程';
 }));
 
 function confirmDiscard(title: string): Promise<boolean> {
@@ -237,7 +273,7 @@ name.addEventListener('blur', () => {
 name.addEventListener('keydown', event => { if (event.key === 'Enter') name.blur(); if (event.key === 'Escape') { name.value = model.score.read().draft!.name; name.blur(); } });
 q('.web-help').addEventListener('click', () => {
   const dialog = document.createElement('dialog'); dialog.className = 'web-dialog';
-  dialog.innerHTML = `<h2>在线编曲</h2><p>左侧 + 选择音色。选中音符组后，点击或拖动画布写音符；拖动音符移动位置，拖动尾端改变长度，右键删除。</p><p>滚轮上下移动，Shift 左右移动，Ctrl 缩放。悬停选中音符时，滚轮微调时长。选中音符组时只播放这一组；右键空白处取消选中，可听完整音乐。</p><p>左侧 BPM 数字可调整速度和敲击定速；下方 + 新建速度段，拖动段边界调整长度。网页版总长最多 64 拍。</p><p>每次打开先载入示例。请使用“下载工程”保存自己的修改；刷新后会回到示例。打开按钮支持 MIDI 和小型工程；超出音色范围时会使用网页版音色替代。</p><p>音色为 GeneralUser GS 2.0.3 的裁剪版本，保留原始录音及播放规则。<a href="instruments/generaluser-gs-2.0.3/LICENSE.txt" target="_blank" rel="noopener">音源许可与来源说明</a> · <a href="instruments/generaluser-gs-2.0.3/spessasynth_core-LICENSE.txt" target="_blank" rel="noopener">播放内核许可</a></p><form method="dialog"><button>知道了</button></form>`;
+  dialog.innerHTML = `<h2>在线编曲</h2><p>左侧 + 选择音色。选中左侧音符组后，点击或拖动空白处写音符。未选中音符组时，拖动空白处移动卷帘。拖动音符移动位置，拖动底边改变时长。</p><p>滚轮上下移动，Shift 左右移动，Ctrl 缩放。悬停音符时按 Alt 并滚动可微调时长。选中音符组时只播放这一组，其他组变暗。右键点空白处取消选中，右键点音符删除它。按住右键拖动可擦除扫过的音符，整次拖动可一次撤销。</p><p>左侧 BPM 数字可调整速度和敲击定速；在设置里启用“分段调整速度”后，下方 + 可新建速度段，拖动段边界调整长度。网页版总长最多 64 拍。</p><p>每次打开先载入示例。请使用“下载工程”保存自己的修改；刷新后会回到示例。打开按钮支持 MIDI 和小型工程；超出音色范围时会使用网页版音色替代。</p><p>音色为 GeneralUser GS 2.0.3 的裁剪版本，保留原始录音及播放规则。<a href="instruments/generaluser-gs-2.0.3/LICENSE.txt" target="_blank" rel="noopener">音源许可与来源说明</a> · <a href="instruments/generaluser-gs-2.0.3/spessasynth_core-LICENSE.txt" target="_blank" rel="noopener">播放内核许可</a></p><form method="dialog"><button>知道了</button></form>`;
   dialog.addEventListener('close', () => dialog.remove(), { once: true }); app.append(dialog); dialog.showModal();
 });
 
@@ -250,7 +286,11 @@ document.addEventListener('keydown', event => {
   if (event.code === 'Space' && !target.closest('button')) {
     event.preventDefault(); void runtime.activate?.().then(() => transport?.toggle()).catch(report);
   }
-  if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') { event.preventDefault(); q<HTMLButtonElement>('.web-save').click(); }
+  if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') {
+    event.preventDefault();
+    if (event.shiftKey && fileSession) saveNative();
+    else q<HTMLButtonElement>('.web-save').click();
+  }
 });
 window.addEventListener('beforeunload', event => { editor?.flush(); if (dirty) { event.preventDefault(); event.returnValue = ''; } });
 window.addEventListener('message', event => {
@@ -260,4 +300,6 @@ window.addEventListener('message', event => {
 });
 window.addEventListener('pagehide', () => { disposed = true; cancelAnimationFrame(frame); editor?.dispose(); transport?.dispose(); void runtime.dispose(); });
 
-try { mount(); report('示例已载入，可以直接播放或编辑。'); } catch (error) { report(error); }
+try {
+  mount(); report('示例已载入，可以直接播放或编辑。');
+} catch (error) { report(error); }

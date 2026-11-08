@@ -13,7 +13,12 @@ import type { SamplingPort } from '../../contracts/sampling.ts';
 import type { MelodyRecognitionPort } from '../../contracts/melody-recognition.ts';
 import type { WorkspaceId, WorkspacePreferencesPort, MusicWorkspaceStatePort } from '../../contracts/workspace.ts';
 import type { ReferenceEditingPort } from '../../contracts/references.ts';
+import type { LearningSettingsPort } from '../../contracts/guidance.ts';
+import { showLearningSettings, showFeatureGate } from './settings.ts';
+import { needsTempoRolls } from './guidance-flow.ts';
 import { mountPhraseComposition } from './phrase-composition.ts';
+import { mountMusicGuide, type MusicGuideFactory } from './music-guide.ts';
+import { createProjectWelcome } from './project-welcome.ts';
 import { mountProjectStart } from './project-start.ts';
 import { mountProjectLibrary } from './project-library.ts';
 import { showProjectSaveAs } from './project-save-as.ts';
@@ -21,10 +26,12 @@ import { showProjectExit } from './project-exit.ts';
 import { showAudioExport } from './audio-export.ts';
 import './studio.css';
 import './theme.css';
-export { showMidiImportNotice } from './midi-import-notice.ts';
+export { confirmFormatSave } from './format-save-warning.ts';
+export type { MusicGuideDocument } from './music-guide.ts';
+export { showLearningSettings, showFeatureGate, needsTempoRolls };
 
 export interface StudioOptions {
-  timbre: TimbreEditorPort;
+  timbre?: TimbreEditorPort;
   sound: SoundRuntimePort;
   hasPrevious: boolean;
   files?: SoundFilesPort;
@@ -38,7 +45,6 @@ export interface StudioOptions {
   onCopyPhrase?(): void;
   onSavePhraseDraft?(draftId: string, mode: 'new' | 'overwrite'): SaveResult;
   onDiscardPhraseDraft?(draftId: string): void;
-  onPrepareMelody?(): void | Promise<void>;
   projectTimbres?(): Array<{ id: string; name: string; requiresDeleteConfirmation?: boolean }>;
   onImportTimbre?(): Promise<boolean>;
   onAddPhraseTimbre?(id: string, section?: PhraseSection): string;
@@ -60,6 +66,8 @@ export interface StudioOptions {
   sampling?: SamplingPort;
   recognition?: MelodyRecognitionPort;
   preferences?: WorkspacePreferencesPort;
+  learning?: LearningSettingsPort;
+  musicGuide?: MusicGuideFactory;
   workspaceState?: MusicWorkspaceStatePort;
   references?: ReferenceEditingPort;
   previewContent?(contentId: string, signal?: AbortSignal): Promise<PlaybackSession>;
@@ -78,12 +86,28 @@ export function mountStudio(root: HTMLElement, options: StudioOptions): { dispos
   let editor: ReturnType<typeof mountPhraseComposition> | undefined;
   let page: { dispose(): void } | undefined;
   function leave(): void { editor?.dispose(); editor = undefined; page?.dispose(); page = undefined; options.sound.stopAll(); }
+  function settings(inMusic: boolean): void {
+    if (!options.learning) return;
+    showLearningSettings(root, options.learning, {
+      requiresTempoRolls: inMusic && needsTempoRolls(options.phrase?.read().body),
+      onChange: () => editor?.refresh(),
+    });
+  }
   function showWelcome(): void {
     leave();
-    const welcome = element('main', 'welcome'); welcome.append(element('div', 'wordmark', 'RootSound'));
-    const invitation = element('section', 'invitation'); invitation.append(element('h1', '', '你好，你想创作什么？'));
-    const actions = element('div', 'welcome-actions'); const start = element('button', 'primary', '开始'); start.type = 'button';
-    actions.append(start); invitation.append(actions); welcome.append(invitation); root.replaceChildren(welcome);
+    const { page: welcome, start } = createProjectWelcome(); root.replaceChildren(welcome);
+    if (options.musicGuide) {
+      const guide = element('button', 'music-guide-launch', '操作引导'); guide.type = 'button';
+      guide.addEventListener('click', () => {
+        leave();
+        page = mountMusicGuide(root, options.musicGuide!, showWelcome);
+      });
+      welcome.append(guide);
+    }
+    if (options.learning) {
+      const button = element('button', 'welcome-settings', '设置'); button.type = 'button';
+      button.addEventListener('click', () => settings(false)); welcome.append(button);
+    }
     const library = mountProjectLibrary(root, start, options.projectSetup ?? { list: async () => [], open: async () => { throw new Error('请使用桌面版打开音乐项目。'); } }, () => {
       leave(); page = mountProjectStart(root, options.projectSetup, () => options.sound.stopAll(), showWelcome);
     }, options.doubleClickIntervalMs);
@@ -93,17 +117,30 @@ export function mountStudio(root: HTMLElement, options: StudioOptions): { dispos
     leave();
     const initialView = options.phrase?.read();
     if (!initialView?.draft) { showWelcome(); return; }
+    if (options.learning && needsTempoRolls(initialView.body) && !options.learning.read().multipleTempoRolls) {
+      showWelcome();
+      showFeatureGate(root, {
+        onEnable() {
+          options.learning!.setMultipleTempoRolls(true);
+          showMusic();
+        },
+        async onCancel() { if (options.projectSetup?.exit) await options.projectSetup.exit('discard'); else showWelcome(); },
+      });
+      return;
+    }
     const phrase = options.phrase!;
     editor = mountPhraseComposition(root, { phrase, initialView, sound: options.sound, directMusic: true,
       workspaceState: options.workspaceState,
+      readMultipleTempoRolls: options.learning ? () => options.learning!.read().multipleTempoRolls : undefined,
+      onSettings: options.learning ? () => settings(true) : undefined,
       // Retired mode cannot reactivate from a previously saved preference.
       readPerformanceMode: () => false,
-      onPrepareMelody: options.onPrepareMelody,
       listTimbres: options.projectTimbres, onImportTimbre: options.onImportTimbre,
       onAddTimbre: options.onAddPhraseTimbre, onCreateNoteGroup: options.onCreateNoteGroup,
       onChangeNoteGroupTimbre: options.onChangeNoteGroupTimbre,
       onRemoveTimbre: options.onRemovePhraseTimbre, onReorderTimbres: options.onReorderTimbres,
       onRename(name) { options.onRenameProject?.(name); phrase.rename(name); },
+      readUnsavedChanges: options.projectSetup?.hasUnsavedChanges ? () => options.projectSetup!.hasUnsavedChanges!() : undefined,
       async onSave() { if (options.projectSetup?.save) await options.projectSetup.save(); },
       onSaveAs: options.projectSetup?.saveAs ? () => showProjectSaveAs(root, options.projectSetup!, phrase.read().draft!.name) : undefined,
       onExit: options.projectSetup ? () => showProjectExit(root, options.projectSetup!) : showWelcome,
@@ -111,7 +148,8 @@ export function mountStudio(root: HTMLElement, options: StudioOptions): { dispos
         sound: options.sound, files: options.audioFiles!, prepare: () => phrase.preparePreview(), plan: () => phrase.previewPlan() }) : undefined,
     });
   }
-  if (options.initialEntry && options.initialEntry !== 'welcome') showMusic(); else showWelcome();
+  if (options.initialEntry && options.initialEntry !== 'welcome') showMusic();
+  else showWelcome();
   return { async prepareClose(closeOptions = {}) {
     if (disposed) throw new Error('当前页面已关闭。');
     // Toolbar actions have already flushed their edits before invoking the project service.

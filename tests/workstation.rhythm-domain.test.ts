@@ -5,7 +5,7 @@ import type { PhraseNote, PhraseSection } from '../src/workstation/contracts/phr
 import { createProjectPhrase } from '../src/workstation/app/project-phrases.ts';
 import { addProjectPhraseTimbre, ensureProjectMelodyTimbres, removeProjectPhraseTimbre, listProjectTimbres } from '../src/workstation/app/project-timbres.ts';
 import { createMaterialLibrary, createProjectPackages, createReferenceEditing } from '../src/workstation/modules/materials/public.ts';
-import { createTimbreEditor, createTimbrePlayback, createTimbreReferenceAdapter } from '../src/workstation/modules/timbre/public.ts';
+import { createTimbreEditor, createTimbrePlayback, createTimbreReferenceAdapter, timbrePresets } from '../src/workstation/modules/timbre/public.ts';
 import { createPhraseEditor, createPhrasePlayback, createPhraseReferenceAdapter, readPhraseBody } from '../src/workstation/modules/phrase/public.ts';
 import { createSongEditor, createSongReferenceAdapter } from '../src/workstation/modules/song/public.ts';
 
@@ -26,6 +26,11 @@ function fixture() {
   const songId = song.read().draft!.id; const source = createProjectPhrase(library, songId); phrase.openDraft(source.draftId);
   const tones = ensureProjectMelodyTimbres(library, songId);
   const piano = tones.find(record => record.name === '钢琴')!; const flute = tones.find(record => record.name === '长笛')!;
+  const basic = timbrePresets().find(preset => preset.id === 'plain')!.body;
+  const replacements = [piano, flute].map(record => ({ expected: record, replacement: { ...record, revision: record.revision + 1,
+    body: { ...basic, sustain: record.id === flute.id ? .92 : .7 } } }));
+  const replaced = library.commitTransaction({ expectedToken: library.currentToken(), label: '准备领域测试音色', replaceContents: replacements });
+  assert.equal(replaced.status, 'committed', JSON.stringify(replaced));
   const add = (voice: ContentRecord, section?: PhraseSection) => addProjectPhraseTimbre(library, songId, phrase.read().draft!.id, voice.id, section);
   return { library, storage, adapters, policy, phrase, phrases, song, songId, source, piano, flute, add,
     raw: () => raw, writes: () => writes, fail(value = true) { broken = value; } };

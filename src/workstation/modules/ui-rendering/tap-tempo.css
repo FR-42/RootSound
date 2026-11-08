@@ -1,13 +1,18 @@
 .tap-tempo-dialog { width: min(340px, calc(100vw - 48px)); box-sizing: border-box; padding: 24px; border: 1px solid var(--border); border-radius: 8px; color: var(--text); background: var(--surface); box-shadow: 0 12px 60px #25374c33; }
 .tap-tempo-dialog::backdrop { background: #263b4d40; }
 .tap-tempo-dialog h2 { margin: 0; font-size: 18px; font-weight: 500; }
-.tap-tempo-hint, .tap-tempo-status { color: var(--muted); font-size: 12px; line-height: 1.6; }
-.tap-tempo-display { display: flex; align-items: baseline; justify-content: center; gap: 9px; margin: 20px 0; }
-.tap-tempo-value { font-size: 48px; font-weight: 500; font-variant-numeric: tabular-nums; }
-.tap-tempo-display span { font-size: 12px; color: var(--muted); }
-.tap-tempo-pad { width: 100%; height: 64px; border: 1px solid var(--border); border-radius: 6px; color: var(--text); background: var(--surface); font: inherit; cursor: pointer; transition: background .08s, transform .08s; }
-.tap-tempo-pad.is-tapped { background: var(--surface-raised); transform: scale(.98); }
-.tap-tempo-status { min-height: 38px; text-align: center; }
+.tap-tempo-dialog:has(.tap-tempo-guide-note) { overflow: visible; }
+.tap-tempo-guide-note { position: absolute; left: 50%; bottom: calc(100% + 28px); isolation: isolate; width: max-content; max-width: calc(100vw - 32px); margin: 0; transform: translateX(-50%); color: #31465a; font-size: 15px; font-weight: 600; line-height: 1.4; text-align: center; text-shadow: 0 0 5px #fff; pointer-events: none; }
+.tap-tempo-guide-note { --music-guide-prompt-dark: #425a70; }
+.tap-tempo-guide-note::before { content: ''; position: absolute; z-index: -1; inset: -14px -34px; background: radial-gradient(ellipse closest-side, #fff 60%, #fffffff2 76%, #fff0 100%); }
+.tap-tempo-error { color: var(--muted); font-size: 12px; line-height: 1.6; }
+.tap-tempo-display { display: grid; place-items: center; min-height: 60px; margin: 12px 0 18px; }
+.tap-tempo-value { font-size: 44px; font-weight: 650; font-variant-numeric: tabular-nums; }
+.tap-tempo-value:empty { width: 4ch; height: 5px; background: #17191c; }
+.tap-tempo-pad { display: grid; place-items: center; width: min(100%, 250px); height: 44px; margin: 0 auto 20px; padding: 0; border: 1px solid var(--border); border-bottom-width: 4px; border-radius: 7px; color: var(--muted); background: var(--surface); cursor: pointer; transition: background .08s, transform .08s; }
+.tap-tempo-pad::before { content: ''; width: 38%; height: 6px; border: solid currentColor; border-width: 0 1px 1px; }
+.tap-tempo-pad.is-tapped { background: var(--surface-raised); transform: translateY(2px); }
+.tap-tempo-actions [hidden] { display: none; }
 .tap-tempo-actions { display: flex; justify-content: flex-end; gap: 8px; }
 .tap-tempo-actions button, .song-tap-tempo { padding: 7px 12px; border: 1px solid var(--border); border-radius: 4px; color: var(--text); background: var(--surface); font: inherit; font-size: 12px; cursor: pointer; white-space: nowrap; }
 .tap-tempo-actions .tap-tempo-apply { background: #315c7b; border-color: #315c7b; color: var(--surface); }

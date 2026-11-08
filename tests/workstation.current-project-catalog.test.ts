@@ -58,12 +58,12 @@ test('only the working graph is listed, excluding older saved dependencies, undo
   assert.deepEqual(f.catalog.list().map(item => item.name).sort(), ['木琴', '短句']);
   f.song.openDraft(firstDraft.id);
   f.timbre.create(); f.timbre.rename('新的音色'); const newVoice = saved(f.timbre.save('new'));
-  f.phrase.create(newVoice.id); f.phrase.rename('新的乐句');
+  f.phrase.create(newVoice.id); f.phrase.rename('新的音乐');
   f.phrase.addNote(f.phrase.read().body!.parts[0]!.id, { startBeat: 0, durationBeats: 1, frequencyHz: 330, velocity: .6 });
   const newPhrase = saved(f.phrase.save('new')); const track = f.song.read().body!.tracks[0]!;
   f.song.addClip(track.id, newPhrase.id, 8); f.song.removeClip(track.id, track.clips[0]!.id);
   const before = f.raw(); const current = f.catalog.list();
-  assert.deepEqual(current.map(item => item.name).sort(), ['新的乐句', '新的音色']);
+  assert.deepEqual(current.map(item => item.name).sort(), ['新的音乐', '新的音色']);
   assert(current.every(item => !oldIds.has(item.id) && !foreignIds.has(item.id)));
   assert([...oldIds].every(id => f.library.readContentInfo(id)), 'old contents stay in custody for recovery');
   assert(f.library.listContentInfoForDraft!(firstDraft.id).every(item => !oldIds.has(item.id) && !foreignIds.has(item.id)));
@@ -103,7 +103,7 @@ test('same display names in different dimensions remain separate actual entities
 test('explicit unused project copies retain membership and exact dependencies across v2 files and cold reopen', () => {
   const f = fixture(); f.song.createFromPhrase(f.melody.id, '本曲'); saved(f.song.save('new'));
   const source = f.catalog.list('', 'rootsound.phrase')[0]!;
-  const copy = saved(f.catalog.duplicate(source.id, '备用乐句', source.revision));
+  const copy = saved(f.catalog.duplicate(source.id, '备用音乐', source.revision));
   assert.equal(f.library.projectScopeOf!({ type: 'content', id: copy.id }), f.library.projectScopeOf!({ type: 'draft', id: f.song.read().draft!.id }));
   assert(f.catalog.list().some(item => item.id === copy.id)); assert.deepEqual(copy.dependencies, source.dependencies);
   const raw = f.raw(); const file = f.packages.exportDraft(f.song.read().draft!.id); const envelope = JSON.parse(file.text);
@@ -114,12 +114,12 @@ test('explicit unused project copies retain membership and exact dependencies ac
   assert.equal(imported.status, 'imported', JSON.stringify(imported)); if (imported.status !== 'imported') return;
   const importedView = target.currentProjectView!(imported.draft.id)!;
   assert.equal(importedView.memberIds.length, 1);
-  assert.equal(importedView.contents.find(item => item.id === importedView.memberIds[0])!.name, '备用乐句');
+  assert.equal(importedView.contents.find(item => item.id === importedView.memberIds[0])!.name, '备用音乐');
   assert(importedView.contents.every(item => !f.library.readContentInfo(item.id)));
   const reopened = createMaterialLibrary(f.storage, f.policy);
   assert(reopened.currentProjectView!(f.song.read().draft!.id)!.contents.some(item => item.id === copy.id));
   const track = f.song.read().body!.tracks[0]!; f.song.removeClip(track.id, track.clips[0]!.id);
-  assert.deepEqual(f.catalog.list().map(item => item.name).sort(), ['备用乐句', '木琴']);
+  assert.deepEqual(f.catalog.list().map(item => item.name).sort(), ['备用音乐', '木琴']);
 });
 
 test('project copies reject duplicate names and failed writes without exposing any partial membership', () => {
@@ -158,7 +158,7 @@ test('project files refuse unfinished current source edits, ignore unrelated dra
   const working = f.library.createDraft({ sourceId: voice.id });
   f.library.updateDraft(working.id, { name: '当前尚未保存的音色' });
   const raw = f.raw(); const token = f.library.currentToken(); const writes = f.writes();
-  assert.throws(() => f.packages.exportDraft(song.id), /先完成或取消当前音色、乐句等素材/);
+  assert.throws(() => f.packages.exportDraft(song.id), /先完成或取消当前音色、音乐等素材/);
   assert.equal(f.raw(), raw); assert.equal(f.library.currentToken(), token); assert.equal(f.writes(), writes);
   saved(f.library.saveDraft(working.id, 'overwrite'));
   const file = JSON.parse(f.packages.exportDraft(song.id).text);
@@ -169,15 +169,15 @@ test('project files refuse unfinished current source edits, ignore unrelated dra
 test('unfinished explicit unused members also block project files until their current edit is saved', () => {
   const f = fixture(); f.song.createFromPhrase(f.melody.id, '本曲');
   const source = f.catalog.list('', 'rootsound.phrase')[0]!;
-  const copy = f.catalog.duplicate(source.id, '备用乐句', source.revision);
+  const copy = f.catalog.duplicate(source.id, '备用音乐', source.revision);
   assert.equal(copy.status, 'saved'); if (copy.status !== 'saved') return;
-  f.library.updateDraft(copy.draft.id, { name: '备用乐句的新名称' });
+  f.library.updateDraft(copy.draft.id, { name: '备用音乐的新名称' });
   const raw = f.raw(); const writes = f.writes();
-  assert.throws(() => f.packages.exportDraft(f.song.read().draft!.id), /先完成或取消当前音色、乐句等素材/);
+  assert.throws(() => f.packages.exportDraft(f.song.read().draft!.id), /先完成或取消当前音色、音乐等素材/);
   assert.equal(f.raw(), raw); assert.equal(f.writes(), writes);
   saved(f.library.saveDraft(copy.draft.id, 'overwrite'));
   const file = JSON.parse(f.packages.exportDraft(f.song.read().draft!.id).text);
-  assert.equal(file.version, 2); assert(file.contents.some((item: { name: string }) => item.name === '备用乐句的新名称'));
+  assert.equal(file.version, 2); assert(file.contents.some((item: { name: string }) => item.name === '备用音乐的新名称'));
 });
 
 test('current usage traverses working phrase identities to the song without exposing self, old saves or other songs', () => {

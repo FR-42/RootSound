@@ -21,14 +21,27 @@ test('listening volume works before activation and live without changing transpo
   await runtime.dispose(); assert(mix.disconnected); assert(audio().shapers[0]!.disconnected);
 }));
 
-test('changing volume reroutes an existing sequence and an active key through the same output', async () => fixture(async () => {
-  const runtime=createBrowserSoundRuntime(); const session=await runtime.preview(phrase([{atSeconds:0,sound:plan()}],5));
+test('moving listening volume reuses the output graph while the song and a key are sounding', async () => fixture(async () => {
+  const runtime = createBrowserSoundRuntime();
+  const session = await runtime.preview(phrase([{ atSeconds: 0, sound: plan() }], 5));
   await runtime.audition(plan());
-  const before=audio().gains.length; runtime.setOutputLevel!(1.5);
-  const output=audio().gains[before]!;
+  const output = audio().gains[0]!;
+  const nodes = [...audio().gains], oscillators = [...audio().oscillators];
+  const mainMix = nodes.at(-1)!;
   assert(audio().panners.at(-1)!.connections.includes(output));
-  assert(audio().gains[before-1]!.connections.includes(output));
-  assert.equal(runtime.readOutputLevel!(),1.5); assert(runtime.position(session.id)!>=0);
+  assert(mainMix.connections.includes(output));
+  for (const level of [1.5, 0, 2, 2, .75]) {
+    audio().currentTime += .01;
+    runtime.setOutputLevel!(level);
+  }
+  assert.deepEqual(audio().gains, nodes);
+  assert.deepEqual(audio().oscillators, oscillators);
+  assert(!output.disconnected && !mainMix.disconnected);
+  assert.equal(audio().shapers.length, 1);
+  assert.equal(output.gain.changes.filter(change => change.kind === 'ramp').length, 4);
+  close(output.gain.changes.at(-1)!.time, audio().currentTime + .035);
+  assert.equal(runtime.readOutputLevel!(), .75);
+  assert(runtime.position(session.id)! >= 0);
   await runtime.dispose();
 }));
 
@@ -153,7 +166,7 @@ test('natural completion releases every node and reports one ended session', asy
   assert.equal(audio().oscillators.length, 1);
   audio().oscillators[0]!.end();
   assert(audio().oscillators.every(node => node.disconnected));
-  assert(audio().gains.every(node => node.disconnected));
+  assert(audio().gains.slice(2).every(node => node.disconnected));
   assert.deepEqual(events.filter(event => event.type === 'session').map(event => event.session.status), ['playing', 'ended']);
   await runtime.dispose();
   assert.equal(audio().closeCount, 1);
@@ -197,7 +210,7 @@ test('device suspension terminates playback and publishes a visible failure', as
   audio().suspend();
   assert(events.some(event => event.type === 'session' && event.session.status === 'failed' && event.session.error?.includes('暂停')));
   assert(events.some(event => event.type === 'device' && event.status === 'suspended'));
-  assert(audio().gains.every(node => node.disconnected));
+  assert(audio().gains.slice(2).every(node => node.disconnected));
   await runtime.dispose();
 }));
 
@@ -243,7 +256,7 @@ test('a subscriber can stop immediately without reversing state order for other 
   const session = await runtime.preview(plan());
   assert.deepEqual(states, ['playing', 'stopped']);
   assert.equal(session.status, 'stopped');
-  assert(audio().gains.every(node => node.disconnected));
+  assert(audio().gains.slice(2).every(node => node.disconnected));
   await runtime.dispose();
 }));
 
@@ -304,7 +317,7 @@ test('stopping or disposing a sequence cancels all future notes and its completi
   await runtime.dispose();
   assert(audio().oscillators.every(node => node.stopped && node.disconnected));
   assert(audio().clocks.every(node => node.stopped && node.disconnected));
-  assert(audio().gains.every(node => node.disconnected));
+  assert(audio().gains.slice(2).every(node => node.disconnected));
 }));
 
 test('every sequence event validates before replacing the active preview or allocating nodes', async () => fixture(async () => {
@@ -331,7 +344,7 @@ test('overlapping notes are conservatively normalized while adjacent notes keep 
   const loud = { ...plan(), level: 1, note: { ...plan().note, velocity: 1 } };
   const sequence = phrase([{ atSeconds: 0, sound: loud }, { atSeconds: 0.05, sound: loud }, { atSeconds: 1, sound: loud }]);
   await runtime.preview(sequence);
-  for (const index of [0, 2, 4]) close(audio().gains[index]!.gain.changes.find(change => change.kind === 'ramp')!.value, 0.5);
+  for (const index of [2, 4, 6]) close(audio().gains[index]!.gain.changes.find(change => change.kind === 'ramp')!.value, 0.5);
   const before = audio().gains.length;
   await runtime.preview(phrase([{ atSeconds: 0, sound: loud }, { atSeconds: 0.12, sound: loud }]));
   for (const index of [before, before + 2]) close(audio().gains[index]!.gain.changes.find(change => change.kind === 'ramp')!.value, 1);
@@ -345,7 +358,7 @@ test('a short note releases from its partial attack level without changing its d
   const runtime = createBrowserSoundRuntime();
   const short = { ...plan(), level: 1, note: { ...plan().note, velocity: 1, holdSeconds: 0.002 }, envelope: { attackSeconds: 0.1, releaseSeconds: 0.05 } };
   const session = await runtime.preview(short);
-  const changes = audio().gains[0]!.gain.changes;
+  const changes = audio().gains[2]!.gain.changes;
   assert.deepEqual(changes.map(change => change.kind), ['set', 'ramp', 'set', 'ramp']);
   close(changes[1]!.value, 0.02);
   close(changes[1]!.time, session.startedAtSeconds + 0.002);
@@ -369,7 +382,7 @@ test('device interruption and allocation failure release scheduled notes and the
   await assert.rejects(runtime.preview(sequence), /device allocation failed/);
   assert(audio().oscillators.every(node => node.disconnected));
   assert(audio().clocks.every(node => node.disconnected));
-  assert(audio().gains.every(node => node.disconnected));
+  assert(audio().gains.slice(2).every(node => node.disconnected));
   assert.equal(events.filter(event => event.type === 'session' && event.session.status === 'failed').length, 2);
   await runtime.dispose();
 }));
@@ -414,12 +427,12 @@ test('live edits retain the session clock, join the current envelope and replace
   assert.equal(joined.frequency.changes[0]!.value, 660);
   assert(joined.startTime! > audio().currentTime && joined.startTime! < audio().currentTime + 0.02);
   close(audio().oscillators[4]!.startTime, first.startedAtSeconds + 3.5);
-  const envelope = audio().gains[6]!.gain.changes;
+  const envelope = audio().gains[8]!.gain.changes;
   assert.equal(envelope[0]!.value, 0, 'the replacement fades in rather than clicking');
   close(envelope[1]!.value, 0.5 * (envelope[1]!.time - first.startedAtSeconds) / 2);
   close(envelope[2]!.time, first.startedAtSeconds + 2);
   assert.equal(audio().panners[3]!.pan.changes[0]!.value, 0.75);
-  assert(audio().gains[0]!.gain.changes.some(change => change.kind === 'hold'));
+  assert(audio().gains[2]!.gain.changes.some(change => change.kind === 'hold'));
   assert(audio().oscillators.slice(0, 3).every(node => node.stopTime! < joined.startTime! + 0.01));
   assert(audio().oscillators[2]!.stopTime! <= joined.startTime!, 'removed future notes are cancelled before the transition');
   oldClockEnded?.();
@@ -430,7 +443,7 @@ test('live edits retain the session clock, join the current envelope and replace
   assert(!joined.disconnected);
   await runtime.dispose();
   assert(audio().oscillators.every(node => node.disconnected));
-  assert(audio().gains.every(node => node.disconnected));
+  assert(audio().gains.slice(2).every(node => node.disconnected));
   assert(audio().panners.every(node => node.disconnected));
   assert(audio().clocks.every(node => node.disconnected));
 }));
@@ -445,12 +458,12 @@ test('live edits preserve release progress and accept an immediate transition to
   audio().currentTime = first.startedAtSeconds + 1.5;
   const updated = runtime.update(first.id, { ...sustained, level: 0.4 });
   assert(updated);
-  const envelope = audio().gains[2]!.gain.changes;
+  const envelope = audio().gains[4]!.gain.changes;
   close(envelope[1]!.value, 0.4 * (first.startedAtSeconds + 2 - envelope[1]!.time));
   close(envelope.at(-1)!.time, first.startedAtSeconds + 2);
   const muted = runtime.update(first.id, { ...sustained, level: 0 });
   assert(muted);
-  assert(audio().gains[4]!.gain.changes.every(change => change.value === 0));
+  assert(audio().gains[6]!.gain.changes.every(change => change.value === 0));
   const shortened = runtime.update(first.id, { ...sustained, note: { ...sustained.note, holdSeconds: 0.1 }, envelope: { attackSeconds: 0, releaseSeconds: 0 } });
   assert(shortened);
   assert.equal(audio().oscillators.length, 3, 'a plan ending before the playhead does not retrigger old notes');
@@ -514,7 +527,7 @@ test('repeated live replacements release retiring graphs on the device clock and
   }
   runtime.stop(session.id);
   assert(audio().oscillators.every(node => node.disconnected));
-  assert(audio().gains.every(node => node.disconnected));
+  assert(audio().gains.slice(2).every(node => node.disconnected));
   assert(audio().panners.every(node => node.disconnected));
   assert(audio().clocks.every(node => node.disconnected));
   assert.equal(runtime.update(session.id, plan()), undefined);
@@ -577,7 +590,7 @@ test('short note audition shares the device and preserves the main session clock
   close(audio().oscillators[1]!.frequency.changes[0]!.value, 330); close(runtime.position(main.id), 0.6);
   assert.equal(states.filter(event => event.type === 'session').length, eventCount, 'short notes never become transport sessions');
   const mix = audio().gains.at(-1)!; assert.deepEqual(mix.gain.changes.at(-1), { kind: 'ramp', value: 0.5, time: audio().oscillators[1]!.startTime });
-  const keyEnvelope = audio().gains[2]!; close(keyEnvelope.gain.changes.find(change => change.kind === 'ramp')!.value, plan().level * plan().note.velocity * 0.5);
+  const keyEnvelope = audio().gains[4]!; close(keyEnvelope.gain.changes.find(change => change.kind === 'ramp')!.value, plan().level * plan().note.velocity * 0.5);
   const changed = runtime.update(main.id, phrase([{ atSeconds: 1, sound: plan() }], 5));
   assert.equal(changed?.id, main.id); assert.equal(changed?.startedAtSeconds, main.startedAtSeconds); close(runtime.position(main.id), 0.6);
   audio().oscillators[1]!.end(); assert(audio().oscillators[1]!.disconnected); assert.equal(mix.gain.changes.at(-1)!.value, 1);
@@ -631,7 +644,7 @@ test('live final-output edits keep the song clock and note audition cannot bypas
     ...phrase([{ atSeconds: 0, sound: { ...plan(), note: { ...plan().note, holdSeconds: 4 } } }], 6),
     output: { level: 0.8, fadeInSeconds: 1, fadeOutSeconds: 2 },
   };
-  const session = await runtime.preview(input); const bus = audio().gains[0]!; const panner = audio().panners[0]!;
+  const session = await runtime.preview(input); const bus = audio().gains[2]!; const panner = audio().panners[0]!;
   assert.deepEqual(panner.connections, [bus]);
   audio().currentTime = session.startedAtSeconds + 3; await runtime.audition(plan());
   assert.deepEqual(panner.connections, [bus]); assert.equal(bus.connections.at(-1), audio().gains.at(-1));

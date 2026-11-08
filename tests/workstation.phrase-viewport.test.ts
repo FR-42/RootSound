@@ -39,8 +39,8 @@ test('empty or unusable pitch hints show middle C and adapt focus to the actual 
 
 test('every full-keyboard row has a stable mapping including exact-frequency endpoints', () => {
   keys.forEach((key, index) => assert.equal(phrasePitchRow(key.frequencyHz, keys), index));
-  assert.equal(phrasePitchRow(20, keys), keys.length - 1);
-  assert.equal(phrasePitchRow(5000, keys), 0);
+  assert.equal(phrasePitchRow(keys.at(-1)!.frequencyHz / 2, keys), keys.length - 1);
+  assert.equal(phrasePitchRow(keys[0]!.frequencyHz * 2, keys), 0);
   const custom = 220.123456;
   assert.equal(keys[phrasePitchRow(custom, keys)]!.label, 'A3');
   assert.equal(custom, 220.123456);

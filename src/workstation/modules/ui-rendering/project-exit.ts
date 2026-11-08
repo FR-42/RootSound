@@ -2,7 +2,7 @@ import type { ProjectSetupPort } from '../../contracts/project-directory.ts';
 import './project-exit.css';
 
 /** Return to welcome only after a deliberate save/discard succeeds. */
-export async function showProjectExit(root: HTMLElement, service: ProjectSetupPort): Promise<void> {
+export async function showProjectExit(root: HTMLElement, service: Pick<ProjectSetupPort, 'hasUnsavedChanges' | 'exit'>): Promise<void> {
   if (!service.hasUnsavedChanges || !service.exit) throw new Error('当前窗口尚不支持退出项目，请重新打开 RootSound。');
   if (!await service.hasUnsavedChanges()) { await service.exit('discard'); return; }
 

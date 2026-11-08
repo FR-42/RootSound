@@ -25,7 +25,7 @@ function fixture() {
 }
 function emptyPhrase(f: ReturnType<typeof fixture>): ContentRecord {
   const phrase = createPhraseEditor(f.library, createTimbrePlayback(f.library));
-  phrase.create(f.library.readContent(f.material.id)!.dependencies[0]!); phrase.rename('空乐句'); phrase.setTempo(80); phrase.setLength(16);
+  phrase.create(f.library.readContent(f.material.id)!.dependencies[0]!); phrase.rename('空音乐'); phrase.setTempo(80); phrase.setLength(16);
   return saved(f.library.saveDraft(phrase.read().draft!.id, 'new'));
 }
 
@@ -136,7 +136,7 @@ test('malformed row metadata, sections and batch operations leave storage and hi
   ]) assert.throws(() => f.song.updateClips([valid, invalid] as never));
   for (const changes of [
     [{ atSeconds: 0, tempoBpm: 100 }], [{ atSeconds: 2, tempoBpm: 100 }, { atSeconds: 1, tempoBpm: 100 }],
-    [{ atSeconds: 1, tempoBpm: 100 }, { atSeconds: 1, tempoBpm: 100 }], [{ atSeconds: 1, tempoBpm: 250 }],
+    [{ atSeconds: 1, tempoBpm: 100 }, { atSeconds: 1, tempoBpm: 100 }], [{ atSeconds: 1, tempoBpm: 1001 }],
     [{ atSeconds: 1, tempoBpm: 100, unknown: true }], 'invalid',
   ]) assert.throws(() => readSongBody({ ...before.body!, gridTempoChanges: changes }));
   assert.equal(f.raw(), raw); assert.deepEqual(f.song.read(), before);
@@ -157,7 +157,7 @@ test('a placed empty phrase produces a correctly sized silent song plan, includi
   await f.song.preparePreview();
   const plan = f.song.previewPlan(undefined, { allowSilence: true });
   assert.deepEqual(plan.events, []); assert.equal(plan.durationSeconds, 16, '4s placement plus a 12s source phrase');
-  assert.throws(() => f.song.previewPlan(), /先放入有音符的乐句/);
+  assert.throws(() => f.song.previewPlan(), /先放入有音符的音乐/);
   assert.throws(() => createPhrasePlayback(f.library, createTimbrePlayback(f.library)).planForSaved(empty.id), /先添加几个音符/,
     'direct empty phrase audition keeps its independent guard');
   f.song.updateClip(f.rows[0]!, instance, { level: 0.4, pan: -0.2 });

@@ -1,0 +1,21 @@
+{
+  "renderer": "Remotion",
+  "version": "4.0.541",
+  "source": "tools/guidance-film",
+  "compositions": [
+    {
+      "id": "basics",
+      "frames": 1140,
+      "fps": 30,
+      "width": 1280,
+      "height": 720
+    },
+    {
+      "id": "tempo-rolls",
+      "frames": 816,
+      "fps": 30,
+      "width": 1280,
+      "height": 720
+    }
+  ]
+}

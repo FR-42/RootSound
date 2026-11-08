@@ -109,7 +109,7 @@ test('sample handoff retries reuse an unchanged draft but retain edited drafts a
   if (body.model !== 'sample-instrument') throw new Error('Expected sampled instrument');
   assert.equal(body.rootFrequencyHz, 234.123456789); assert.equal(body.startSeconds, 0.123456789);
   assert.deepEqual(f.library.readContent('sample'), original); assert.throws(() => editor.setCharacter('clear'), /不能切换/);
-  assert.throws(() => editor.setSampleRange(0, 2), /超出原始/); assert.deepEqual(editor.read().draft, changed);
+  assert.throws(() => editor.setSampleRange(0, 2), /超出采样/); assert.deepEqual(editor.read().draft, changed);
   assert.throws(() => editor.exportSound(), /外部依赖/);
 });
 

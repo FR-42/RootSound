@@ -63,7 +63,7 @@
 .song-clip-erasure { position: absolute; pointer-events: none; }
 .song-clip-erasure > span { position: absolute; inset: 0; border: 1px solid var(--border); border-radius: 3px; animation: song-erase .24s linear forwards; }
 @keyframes song-erase { from { inset: 0; opacity: .95; } to { inset: -15px; opacity: 0; } }
-.song-notice { position: absolute; left: 20px; bottom: 20px; max-width: calc(100% - 40px); padding: 8px 12px; border: 1px solid var(--border); border-radius: 5px; background: #f5f8fcf5; color: var(--text); font-size: 12px; z-index: 12; box-shadow: 0 4px 14px #23314018; }
+.song-notice { flex: 0 0 auto; max-height: 20vh; overflow: auto; padding: 6px 12px; color: var(--danger); font-size: 12px; overflow-wrap: anywhere; }
 .song-notice.is-error { color: var(--danger); border-color: var(--border); }
 .song-create { margin: 30px; border: 1px solid var(--border); padding: 10px 18px; background: var(--surface-raised); color: var(--text); border-radius: 5px; }
 .song-clock { min-width: 92px; padding: 5px 7px; margin-right: 4px; border: 1px solid var(--border); border-radius: 4px; background: var(--surface); color: var(--text); font: 12px ui-monospace, monospace; font-variant-numeric: tabular-nums; text-align: center; }

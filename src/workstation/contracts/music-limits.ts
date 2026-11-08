@@ -1,0 +1,9 @@
+/** Shared musical ranges for import, editing and audition. MIDI pitches use A4 = 440 Hz. */
+export const MIN_TEMPO_BPM = 1;
+export const MAX_TEMPO_BPM = 1000;
+export const MIN_MIDI_PITCH = 0;
+export const MAX_MIDI_PITCH = 127;
+export const MIN_PITCH_HZ = 440 * 2 ** ((MIN_MIDI_PITCH - 69) / 12);
+export const MAX_PITCH_HZ = 440 * 2 ** ((MAX_MIDI_PITCH - 69) / 12);
+export const MIN_PITCH_OCTAVE = -1;
+export const MAX_PITCH_OCTAVE = 9;

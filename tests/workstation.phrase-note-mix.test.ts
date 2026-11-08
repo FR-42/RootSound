@@ -157,7 +157,7 @@ test('changing BPM can atomically preserve held seconds while moving note onsets
   editor.openDraft(draftId); assert.deepEqual(editor.previewPlan(), f.phrase.previewPlan());
   const legacy = fixture(); legacy.phrase.addNote(legacy.partId, note()); legacy.phrase.setTempo(240);
   assert.equal(legacy.phrase.previewPlan().events[0]!.sound.note.holdSeconds, .5);
-  assert.equal(Object.hasOwn(legacy.phrase.read().body!.parts[0]!.notes[0]!, 'durationSeconds'), false);
+  assert.equal(legacy.phrase.read().body!.parts[0]!.notes[0]!.durationSeconds, .5);
 });
 
 test('explicit held seconds validate strictly, permit audible tails, and old beat-based resize updates them atomically', () => {

@@ -141,7 +141,7 @@ test('bulk add, move and remove each make one history step and cannot partially 
 
 test('invalid controls, missing references and timeline limits preserve the complete prior state', () => {
   const f = fixture(); const track = start(f); const clip = f.song.addClip(track, f.first.id, 0); const before = f.raw(); const view = f.song.read();
-  for (const tempo of [0, 39, 241, NaN, Infinity]) assert.throws(() => f.song.setTempo(tempo));
+  for (const tempo of [0, .99, 1001, NaN, Infinity]) assert.throws(() => f.song.setTempo(tempo));
   for (const startBeat of [-1, NaN, Infinity, 1020]) assert.throws(() => f.song.moveClip(track, clip, track, startBeat));
   for (const changes of [{ level: 1.1 }, { pan: -2 }, { muted: 1 }, { name: '' }, { future: true }]) assert.throws(() => f.song.updateTrack(track, changes as never));
   for (const length of [0, 15, 1025, NaN]) assert.throws(() => f.song.setLength(length));
@@ -271,7 +271,7 @@ test('preview refuses an unsupported execution size without corrupting or trunca
 });
 
 test('empty songs cannot be saved, and another common-store editor invalidates stale undo history', () => {
-  const f = fixture(); const track = start(f); assert.throws(() => f.song.save('new'), /放入一段乐句/);
+  const f = fixture(); const track = start(f); assert.throws(() => f.song.save('new'), /放入一段音乐/);
   f.song.addClip(track, f.first.id, 0); const draft = f.song.read().draft!; const body = f.song.read().body!; body.tracks[0]!.name = '别处改过的名称';
   f.library.updateDraft(draft.id, { body }); assert.equal(f.song.read().canUndo, false); const before = f.raw(); f.song.undo(); assert.equal(f.raw(), before);
 });

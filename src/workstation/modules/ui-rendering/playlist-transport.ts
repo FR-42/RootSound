@@ -21,7 +21,7 @@ export function createPlaylistTransport(options: {
   setRate(rate: number): void;
   seek(seconds: number): Promise<void>;
   position(): number;
-  refresh(): void;
+  refresh(preserveSounding?: boolean): void;
   dispose(): void;
 } {
   const { runtime } = options;
@@ -29,16 +29,18 @@ export function createPlaylistTransport(options: {
   let id: string | undefined; let anchorPosition = 0; let anchorElapsed = 0;
   let generation = 0; let editGeneration = 0; let disposed = false; let pendingDevice = false;
 
+  function positionAt(elapsed: number): number {
+    return Math.min(duration, Math.max(0, anchorPosition + Math.max(0, elapsed - anchorElapsed) * rate));
+  }
   function position(): number {
     if (!playing || !id) return cursor;
     const elapsed = runtime.position(id) ?? anchorElapsed;
-    return Math.min(duration, Math.max(0, anchorPosition + Math.max(0, elapsed - anchorElapsed) * rate));
+    return positionAt(elapsed);
   }
   function changed(): void {
     if (!disposed) options.onChange({ playing, preparing, rate, position: position() });
   }
-  function planAt(seconds: number, speed = rate): SoundSequencePlan {
-    const source = options.readPlan();
+  function planAt(seconds: number, speed = rate, source = options.readPlan()): SoundSequencePlan {
     const position = Math.max(0, seconds);
     // Explicit seeking is not a restart command. Audition the empty area after
     // the music for a bounded tail, without extending the saved song or export.
@@ -145,15 +147,17 @@ export function createPlaylistTransport(options: {
     // new note: opening that lane cancels any earlier short-note audition.
     return continuePlaying ? toggle() : Promise.resolve();
   }
-  function refresh(): void {
+  function refresh(preserveSounding = false): void {
     const target = id; const request = ++editGeneration;
     if (disposed || !playing || !target) return;
     void (async () => {
       try {
         await options.prepare();
         if (disposed || request !== editGeneration || id !== target || !playing) return;
-        const current = position(); const elapsed = runtime.position(target) ?? anchorElapsed;
-        const session = runtime.update(target, planAt(current));
+        const source = options.readPlan();
+        const elapsed = runtime.position(target) ?? anchorElapsed;
+        const current = positionAt(elapsed);
+        const session = runtime.update(target, planAt(current, rate, source), { preserveSounding, elapsedSeconds: elapsed });
         if (!session) { cursor = current; playing = false; forget(false); }
         else { anchorPosition = current; anchorElapsed = elapsed; }
         changed();

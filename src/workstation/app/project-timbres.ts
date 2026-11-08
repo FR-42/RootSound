@@ -89,9 +89,17 @@ export function listProjectTimbres(library: MaterialLibrary, songDraftId: string
 
 /** Seed independent local starters together; repeated entry never resets edits or names. */
 export function ensureProjectMelodyTimbres(library: MaterialLibrary, songDraftId: string): ContentRecord[] {
-  const expectedToken = library.currentToken(); const { song, view, scope } = currentSong(library, songDraftId);
+  prepareProjectMelodyTimbres(library, songDraftId);
+  return listProjectTimbres(library, songDraftId);
+}
+
+export function prepareProjectMelodyTimbres(library: MaterialLibrary, songDraftId: string): void {
+  const song = library.readDraft(songDraftId);
+  if (!song) throw new Error('先打开一首歌曲，再选择音色。');
   const songBody = readSongBody(song.body);
-  if (songBody.melodyTimbresSeeded && (songBody.timbreCatalogVersion ?? 1) >= instrumentCatalogVersion) return listProjectTimbres(library, songDraftId);
+  if (songBody.melodyTimbresSeeded && (songBody.timbreCatalogVersion ?? 1) >= instrumentCatalogVersion) return;
+  const expectedToken = library.currentToken();
+  const { view, scope } = currentSong(library, songDraftId);
   const current = listProjectTimbres(library, songDraftId);
   const names = new Set([...library.listContentInfo(), ...library.listDrafts()]
     .filter(item => item.kind === 'rootsound.timbre' && library.projectScopeOf?.({ type: 'revision' in item ? 'content' : 'draft', id: item.id }) === scope)
@@ -114,7 +122,6 @@ export function ensureProjectMelodyTimbres(library: MaterialLibrary, songDraftId
     replaceDrafts: songLibraryMetadataChanges(library, song, songBody),
     exactNameIds: created.map(record => record.id), projectMembers: [{ rootId: song.id,
       contentIds: [...new Set([...view.memberIds, ...created.map(record => record.id)])] }] }));
-  return listProjectTimbres(library, songDraftId);
 }
 
 /** One song-wide library order, shared by every phrase and both departments. */

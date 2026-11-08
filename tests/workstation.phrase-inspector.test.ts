@@ -34,7 +34,7 @@ const clipIds = (library: MaterialLibrary, songId: string): string[] => readSong
 test('phrase inspector reads source tempo and musical duration without creating drafts, history or writes', () => {
   const f = fixture(); const before = f.raw(); const token = f.library.currentToken();
   const info = readProjectPhraseInfo(f.library, f.songId, f.made.id);
-  assert.deepEqual(info, { id: f.made.id, name: '乐句 1', tempoBpm: 93, durationSeconds: 8 * 60 / 93 });
+  assert.deepEqual(info, { id: f.made.id, name: '音乐 1', tempoBpm: 93, durationSeconds: 8 * 60 / 93 });
   assert.equal(f.raw(), before); assert.equal(f.library.currentToken(), token);
   const empty = fixture(false); assert.equal(readProjectPhraseInfo(empty.library, empty.songId, empty.made.id).durationSeconds, 8);
 });
@@ -47,7 +47,7 @@ test('renaming a singly used occurrence preserves its identity, sound and placem
   assert.equal(f.library.readContent(f.made.id)!.name, '新的旋律');
   assert.deepEqual(f.library.readContent(f.made.id)!.body, body); assert.deepEqual(f.song.previewPlan(), plan);
   assert.equal(f.library.readDraft(f.made.draftId)!.name, '新的旋律');
-  f.song.undo(); assert.equal(f.library.readContent(f.made.id)!.name, '乐句 1');
+  f.song.undo(); assert.equal(f.library.readContent(f.made.id)!.name, '音乐 1');
   f.song.redo(); assert.equal(f.library.readContent(f.made.id)!.name, '新的旋律');
 });
 
@@ -71,15 +71,15 @@ test('shelf rename explicitly changes shared metadata while keeping all occurren
   assert.equal(renameProjectPhrase(f.library, f.songId, f.made.id, '全部使用的新名称').id, f.made.id);
   assert.deepEqual(clipIds(f.library, f.songId), ids); assert.deepEqual(f.song.previewPlan(), plan);
   assert.equal(f.writes() - writes, 1); assert.equal(readProjectPhraseInfo(f.library, f.songId, f.made.id).name, '全部使用的新名称');
-  f.song.undo(); assert.equal(readProjectPhraseInfo(f.library, f.songId, f.made.id).name, '乐句 1');
+  f.song.undo(); assert.equal(readProjectPhraseInfo(f.library, f.songId, f.made.id).name, '音乐 1');
   f.song.redo(); assert.equal(readProjectPhraseInfo(f.library, f.songId, f.made.id).name, '全部使用的新名称');
 });
 
 test('empty phrases can be renamed; duplicate names and invalid locations do not change any data', () => {
   const f = fixture(false); const second = createProjectPhrase(f.library, f.songId);
-  renameProjectPhrase(f.library, f.songId, f.made.id, '空的乐句');
+  renameProjectPhrase(f.library, f.songId, f.made.id, '空的音乐');
   const raw = f.raw(); const token = f.library.currentToken();
-  assert.throws(() => renameProjectPhrase(f.library, f.songId, second.id, '空的乐句'), /同类|不同名称|重名/);
+  assert.throws(() => renameProjectPhrase(f.library, f.songId, second.id, '空的音乐'), /同类|不同名称|重名/);
   assert.throws(() => renameProjectPhrase(f.library, f.songId, second.id, '   '), /不能为空/);
   assert.throws(() => renameProjectPhrase(f.library, f.songId, second.id, '不存在的位置', { trackId: f.track, clipId: 'missing' }), /位置已改变/);
   assert.equal(f.raw(), raw); assert.equal(f.library.currentToken(), token);
@@ -92,12 +92,12 @@ test('other songs remain isolated and a public starter rename is adopted instead
   assert.throws(() => renameProjectPhrase(f.library, otherId, f.made.id, '跨歌曲'), /不属于/);
   assert.equal(f.raw(), before);
   renameProjectPhrase(f.library, firstSong, f.made.id, '这里的新名字');
-  assert.equal(readProjectPhraseInfo(f.library, otherId, other.id).name, '乐句 1');
-  const publicContent = { ...original, id: crypto.randomUUID(), name: '公共乐句', revision: 1 };
+  assert.equal(readProjectPhraseInfo(f.library, otherId, other.id).name, '音乐 1');
+  const publicContent = { ...original, id: crypto.randomUUID(), name: '公共音乐', revision: 1 };
   const committed = f.library.commitTransaction({ expectedToken: f.library.currentToken(), label: '测试公共起点', createContents: [publicContent] });
   assert.equal(committed.status, 'committed');
-  const renamed = renameProjectPhrase(f.library, otherId, publicContent.id, '采用的乐句');
-  assert.notEqual(renamed.id, publicContent.id); assert.equal(f.library.readContent(publicContent.id)!.name, '公共乐句');
+  const renamed = renameProjectPhrase(f.library, otherId, publicContent.id, '采用的音乐');
+  assert.notEqual(renamed.id, publicContent.id); assert.equal(f.library.readContent(publicContent.id)!.name, '公共音乐');
   assert.notEqual(f.library.readContent(renamed.id)!.dependencies[0], original.dependencies[0]);
   assert.equal(f.library.projectScopeOf!({ type: 'content', id: renamed.id }), f.library.projectScopeOf!({ type: 'draft', id: otherId }));
 });

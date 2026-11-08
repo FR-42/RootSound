@@ -1,0 +1,1365 @@
+{
+  "baseline": "a68f96f7",
+  "date": "2026-11-05",
+  "baselineResults": {
+    "tests": 1302,
+    "pass": 1111,
+    "fail": 191
+  },
+  "baselineScope": "Two source-module tests, all then-current top-level tests/*.test.ts and tests/*.test.mjs.",
+  "currentDefaultResults": {
+    "tests": 1069,
+    "pass": 1068,
+    "fail": 1
+  },
+  "currentReleaseResults": {
+    "tests": 4,
+    "pass": 4,
+    "fail": 0
+  },
+  "note": "Updated cases may have new names. Maintained-and-refreshed means the current case/fixture was updated, not that an unchanged old assertion passed. All current default cases pass except the explicitly reported remaining failure; archived cases are not counted as fixed.",
+  "baselineFailures": [
+    {
+      "test": "tests\\\\workstation.boundaries.test.ts",
+      "file": "tests/workstation.boundaries.test.ts",
+      "originalFailure": "'test failed'",
+      "disposition": "maintained-and-refreshed",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "test": "all offline directions retain original note identities, physical precision and timing in real phrase playback",
+      "file": "tests/workstation.co-creation-generation.test.ts",
+      "originalFailure": "|-",
+      "disposition": "archived-replaced-workflow",
+      "reason": "Offline co-creation prototype has no current release entry; retain source and historical checks without treating it as current product acceptance."
+    },
+    {
+      "test": "reference slots distinguish source from current while deduplicating identical phrase dependencies",
+      "file": "tests/workstation.co-creation.test.ts",
+      "originalFailure": "|-",
+      "disposition": "archived-replaced-workflow",
+      "reason": "Offline co-creation prototype has no current release entry; retain source and historical checks without treating it as current product acceptance."
+    },
+    {
+      "test": "unsupported sound ownership in a proposed starting phrase is rejected before a new journey is written",
+      "file": "tests/workstation.co-creation.test.ts",
+      "originalFailure": "|-",
+      "disposition": "archived-replaced-workflow",
+      "reason": "Offline co-creation prototype has no current release entry; retain source and historical checks without treating it as current product acceptance."
+    },
+    {
+      "test": "project files refuse unfinished current source edits, ignore unrelated drafts, and export after completion",
+      "file": "tests/workstation.current-project-catalog.test.ts",
+      "originalFailure": "|-",
+      "disposition": "maintained-and-refreshed",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "test": "unfinished explicit unused members also block project files until their current edit is saved",
+      "file": "tests/workstation.current-project-catalog.test.ts",
+      "originalFailure": "|-",
+      "disposition": "maintained-and-refreshed",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "test": "typing all twelve mapped keys creates a chromatic run and advances the head once per note",
+      "file": "tests/workstation.melody-key-entry-ui.test.ts",
+      "originalFailure": "'cancelAnimationFrame is not defined'",
+      "disposition": "maintained-and-refreshed",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "test": "Space inserts one rest, repeated keydown does not flood notes or advance the head",
+      "file": "tests/workstation.melody-key-entry-ui.test.ts",
+      "originalFailure": "'cancelAnimationFrame is not defined'",
+      "disposition": "maintained-and-refreshed",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "test": "Z and X select bounded octaves and unsupported edge pitches never move the head",
+      "file": "tests/workstation.melody-key-entry-ui.test.ts",
+      "originalFailure": "'cancelAnimationFrame is not defined'",
+      "disposition": "maintained-and-refreshed",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "test": "the final valid cell accepts a note, later notes stop while a rest can reach the exact end",
+      "file": "tests/workstation.melody-key-entry-ui.test.ts",
+      "originalFailure": "'cancelAnimationFrame is not defined'",
+      "disposition": "maintained-and-refreshed",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "test": "keyboard entry reads the authoritative cursor instead of the last painted head",
+      "file": "tests/workstation.melody-key-entry-ui.test.ts",
+      "originalFailure": "'cancelAnimationFrame is not defined'",
+      "disposition": "maintained-and-refreshed",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "test": "editable targets, composition, modifiers and modal dialogs never enter notes",
+      "file": "tests/workstation.melody-key-entry-ui.test.ts",
+      "originalFailure": "'cancelAnimationFrame is not defined'",
+      "disposition": "maintained-and-refreshed",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "test": "note selection and rhythm keep their existing editing keys without activating note entry",
+      "file": "tests/workstation.melody-key-entry-ui.test.ts",
+      "originalFailure": "'cancelAnimationFrame is not defined'",
+      "disposition": "maintained-and-refreshed",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "test": "write failures do not advance or leave tone entry and a successful retry still works",
+      "file": "tests/workstation.melody-key-entry-ui.test.ts",
+      "originalFailure": "'cancelAnimationFrame is not defined'",
+      "disposition": "maintained-and-refreshed",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "test": "a high-tempo one-cell note can be moved from its centre and resized from its narrow right edge",
+      "file": "tests/workstation.melody-key-entry-ui.test.ts",
+      "originalFailure": "'cancelAnimationFrame is not defined'",
+      "disposition": "maintained-and-refreshed",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "test": "Backspace undoes edits instead of deleting a selected note and keeps a valid typing context",
+      "file": "tests/workstation.melody-key-entry-ui.test.ts",
+      "originalFailure": "'cancelAnimationFrame is not defined'",
+      "disposition": "maintained-and-refreshed",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "test": "a mouse-created note is selected and arms continuous typing, but a manual existing-note pick exits it",
+      "file": "tests/workstation.melody-key-entry-ui.test.ts",
+      "originalFailure": "'cancelAnimationFrame is not defined'",
+      "disposition": "maintained-and-refreshed",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "test": "right-clicking blank space clears selection and typing without adding an undo entry in either department",
+      "file": "tests/workstation.melody-key-entry-ui.test.ts",
+      "originalFailure": "'cancelAnimationFrame is not defined'",
+      "disposition": "maintained-and-refreshed",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "test": "the console belongs to the right editor while the tone shelf remains a separate full-height column",
+      "file": "tests/workstation.melody-key-entry-ui.test.ts",
+      "originalFailure": "'cancelAnimationFrame is not defined'",
+      "disposition": "maintained-and-refreshed",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "test": "zooming a newly generated short note keeps its drawn span within its actual grid cell",
+      "file": "tests/workstation.melody-key-entry-ui.test.ts",
+      "originalFailure": "'cancelAnimationFrame is not defined'",
+      "disposition": "maintained-and-refreshed",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "test": "right-dragging from blank space still erases crossed notes and supports Undo in both departments",
+      "file": "tests/workstation.melody-key-entry-ui.test.ts",
+      "originalFailure": "'cancelAnimationFrame is not defined'",
+      "disposition": "maintained-and-refreshed",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "test": "Backspace ignores editing fields and a failed undo preserves the selected note and history",
+      "file": "tests/workstation.melody-key-entry-ui.test.ts",
+      "originalFailure": "'cancelAnimationFrame is not defined'",
+      "disposition": "maintained-and-refreshed",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "test": "a blank click auditions once when released in either department and a cancelled press stays silent",
+      "file": "tests/workstation.melody-key-entry-ui.test.ts",
+      "originalFailure": "'cancelAnimationFrame is not defined'",
+      "disposition": "maintained-and-refreshed",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "test": "a typed note waits for the moving transport to settle before its single audition",
+      "file": "tests/workstation.melody-key-entry-ui.test.ts",
+      "originalFailure": "'cancelAnimationFrame is not defined'",
+      "disposition": "maintained-and-refreshed",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "test": "entry-range row edges follow octave changes and row resizing, then clear with blank deselection",
+      "file": "tests/workstation.melody-key-entry-ui.test.ts",
+      "originalFailure": "'cancelAnimationFrame is not defined'",
+      "disposition": "maintained-and-refreshed",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "test": "performance mode is opt-in and can be changed without recreating the editor",
+      "file": "tests/workstation.melody-key-entry-ui.test.ts",
+      "originalFailure": "'cancelAnimationFrame is not defined'",
+      "disposition": "maintained-and-refreshed",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "test": "changing performance octave centers its highlighted range inside the visible pitch roll",
+      "file": "tests/workstation.melody-key-entry-ui.test.ts",
+      "originalFailure": "'cancelAnimationFrame is not defined'",
+      "disposition": "maintained-and-refreshed",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "test": "undo and redo restore the cursor of typed notes while ordinary edits and mouse notes leave it alone",
+      "file": "tests/workstation.melody-key-entry-ui.test.ts",
+      "originalFailure": "'cancelAnimationFrame is not defined'",
+      "disposition": "maintained-and-refreshed",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "test": "arrows pan both rolls and Ctrl arrows zoom their view without altering notes or the cursor",
+      "file": "tests/workstation.melody-key-entry-ui.test.ts",
+      "originalFailure": "'cancelAnimationFrame is not defined'",
+      "disposition": "maintained-and-refreshed",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "test": "the plus column extends either roll one measure, reveals editable late cells and can be undone",
+      "file": "tests/workstation.melody-key-entry-ui.test.ts",
+      "originalFailure": "'cancelAnimationFrame is not defined'",
+      "disposition": "maintained-and-refreshed",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "test": "rhythm unchecking leaves undefined silent notes and rechecking restores the same note identities",
+      "file": "tests/workstation.melody-key-entry-ui.test.ts",
+      "originalFailure": "'cancelAnimationFrame is not defined'",
+      "disposition": "maintained-and-refreshed",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "test": "library and shelf play buttons audition independently and closing cancels a pending library preview",
+      "file": "tests/workstation.melody-key-entry-ui.test.ts",
+      "originalFailure": "'cancelAnimationFrame is not defined'",
+      "disposition": "maintained-and-refreshed",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "test": "dropping a library tone into the icon removes its last use and notes, retains the asset and allows Undo",
+      "file": "tests/workstation.melody-key-entry-ui.test.ts",
+      "originalFailure": "'cancelAnimationFrame is not defined'",
+      "disposition": "maintained-and-refreshed",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "test": "two deliberate Delete presses or a console double-click clear all tone notes, single actions and repeats do not",
+      "file": "tests/workstation.melody-key-entry-ui.test.ts",
+      "originalFailure": "'cancelAnimationFrame is not defined'",
+      "disposition": "maintained-and-refreshed",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "test": "the roll exposes the whole continuous keyboard, a four-cell grid and a compact local tone library",
+      "file": "tests/workstation.melody-workspace.test.ts",
+      "originalFailure": "|-",
+      "disposition": "maintained-and-refreshed",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "test": "unified creation selects and edits legacy rhythm notes using ordinary pitch and mix controls while retaining their family",
+      "file": "tests/workstation.melody-workspace.test.ts",
+      "originalFailure": "\"Cannot read properties of undefined (reading 'classList')\"",
+      "disposition": "maintained-and-refreshed",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "test": "unified creation can replace a legacy rhythm family voice, clear its notes and create new Melody families independently",
+      "file": "tests/workstation.melody-workspace.test.ts",
+      "originalFailure": "|-",
+      "disposition": "maintained-and-refreshed",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "test": "clicking a cell creates one physical-duration note on release, auditions it and can be cancelled",
+      "file": "tests/workstation.melody-workspace.test.ts",
+      "originalFailure": "|-",
+      "disposition": "maintained-and-refreshed",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "test": "note dragging moves continuously, settles on a quarter beat and stores only one undoable change",
+      "file": "tests/workstation.melody-workspace.test.ts",
+      "originalFailure": "|-",
+      "disposition": "maintained-and-refreshed",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "test": "right drag erases complete note hitboxes across dimmed tones in one transaction",
+      "file": "tests/workstation.melody-workspace.test.ts",
+      "originalFailure": "|-",
+      "disposition": "maintained-and-refreshed",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "test": "duration fields preview physical width immediately and pointer-up commits sliders once",
+      "file": "tests/workstation.melody-workspace.test.ts",
+      "originalFailure": "|-",
+      "disposition": "maintained-and-refreshed",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "test": "duration wheel reads the freshly flushed note and supports legacy rhythm families in unified Creation",
+      "file": "tests/workstation.melody-workspace.test.ts",
+      "originalFailure": "|-",
+      "disposition": "maintained-and-refreshed",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "test": "the right edge resizes seconds continuously and a cancelled mix returns to the saved note",
+      "file": "tests/workstation.melody-workspace.test.ts",
+      "originalFailure": "|-",
+      "disposition": "maintained-and-refreshed",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "test": "single A/D moves one cell and a 150ms pair moves one beat from the original start",
+      "file": "tests/workstation.melody-workspace.test.ts",
+      "originalFailure": "|-",
+      "disposition": "maintained-and-refreshed",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "test": "tempo moves note onset and beat lines without stretching explicit seconds; the extra area is non-placeable",
+      "file": "tests/workstation.melody-workspace.test.ts",
+      "originalFailure": "|-",
+      "disposition": "maintained-and-refreshed",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "test": "eight distinct tones get distinct colors and customized autogenerated names stay visible",
+      "file": "tests/workstation.melody-workspace.test.ts",
+      "originalFailure": "|-",
+      "disposition": "maintained-and-refreshed",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "test": "audio-clock head frames never read the project, inspect layout or rewrite notes",
+      "file": "tests/workstation.melody-workspace.test.ts",
+      "originalFailure": "|-",
+      "disposition": "maintained-and-refreshed",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "test": "dense roll dragging only redraws the active note and bounds layout reads independently of note count",
+      "file": "tests/workstation.melody-workspace.test.ts",
+      "originalFailure": "|-",
+      "disposition": "maintained-and-refreshed",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "test": "a selected total-note family draws a continuous anchored ghost and commits one grid-sized note only on release",
+      "file": "tests/workstation.melody-workspace.test.ts",
+      "originalFailure": "|-",
+      "disposition": "maintained-and-refreshed",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "test": "subdivision 2 controls drawn starts, held cells, fields, nudges and typed entries without stretching old notes",
+      "file": "tests/workstation.melody-workspace.test.ts",
+      "originalFailure": "|-",
+      "disposition": "maintained-and-refreshed",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "test": "subdivision 3 controls drawn starts, held cells, fields, nudges and typed entries without stretching old notes",
+      "file": "tests/workstation.melody-workspace.test.ts",
+      "originalFailure": "|-",
+      "disposition": "maintained-and-refreshed",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "test": "subdivision 9 controls drawn starts, held cells, fields, nudges and typed entries without stretching old notes",
+      "file": "tests/workstation.melody-workspace.test.ts",
+      "originalFailure": "|-",
+      "disposition": "maintained-and-refreshed",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "test": "fractional phrase tail at subdivision 2 accepts only full cells and retains grid-aligned last starts",
+      "file": "tests/workstation.melody-workspace.test.ts",
+      "originalFailure": "|-",
+      "disposition": "maintained-and-refreshed",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "test": "fractional phrase tail at subdivision 3 accepts only full cells and retains grid-aligned last starts",
+      "file": "tests/workstation.melody-workspace.test.ts",
+      "originalFailure": "|-",
+      "disposition": "maintained-and-refreshed",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "test": "fractional phrase tail at subdivision 9 accepts only full cells and retains grid-aligned last starts",
+      "file": "tests/workstation.melody-workspace.test.ts",
+      "originalFailure": "|-",
+      "disposition": "maintained-and-refreshed",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "test": "a phrase shorter than its chosen subdivision rejects new drawing without altering existing notes",
+      "file": "tests/workstation.melody-workspace.test.ts",
+      "originalFailure": "|-",
+      "disposition": "maintained-and-refreshed",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "test": "multi-track MIDI becomes an independent editable project with exact tempo-crossing note times and useful percussion",
+      "file": "tests/workstation.midi-project.test.ts",
+      "originalFailure": "'这个乐器没有可播放的采样。'",
+      "disposition": "archived-replaced-workflow",
+      "reason": "Superseded multi-phrase shelves, synthetic starter palette or import-to-new-project fixtures; current music-document/file, instrument-catalog and GM checks cover the replacement."
+    },
+    {
+      "test": "only genuine tempo changes split a source lane while all note positions and channel controls remain exact",
+      "file": "tests/workstation.midi-project.test.ts",
+      "originalFailure": "'这个乐器没有可播放的采样。'",
+      "disposition": "archived-replaced-workflow",
+      "reason": "Superseded multi-phrase shelves, synthetic starter palette or import-to-new-project fixtures; current music-document/file, instrument-catalog and GM checks cover the replacement."
+    },
+    {
+      "test": "expanded tempo uses the actual source BPM without coordinate folding",
+      "file": "tests/workstation.midi-project.test.ts",
+      "originalFailure": "'这个乐器没有可播放的采样。'",
+      "disposition": "archived-replaced-workflow",
+      "reason": "Superseded multi-phrase shelves, synthetic starter palette or import-to-new-project fixtures; current music-document/file, instrument-catalog and GM checks cover the replacement."
+    },
+    {
+      "test": "a long sparse MIDI keeps its timeline without overflowing internal song coordinates",
+      "file": "tests/workstation.midi-project.test.ts",
+      "originalFailure": "'这个乐器没有可播放的采样。'",
+      "disposition": "archived-replaced-workflow",
+      "reason": "Superseded multi-phrase shelves, synthetic starter palette or import-to-new-project fixtures; current music-document/file, instrument-catalog and GM checks cover the replacement."
+    },
+    {
+      "test": "same-tick drum strikes retain their exact positions with an explicit one-shot gate",
+      "file": "tests/workstation.midi-project.test.ts",
+      "originalFailure": "'这个乐器没有可播放的采样。'",
+      "disposition": "archived-replaced-workflow",
+      "reason": "Superseded multi-phrase shelves, synthetic starter palette or import-to-new-project fixtures; current music-document/file, instrument-catalog and GM checks cover the replacement."
+    },
+    {
+      "test": "5267 MIDI notes survive editable conversion, portable save and cold reopening without truncation",
+      "file": "tests/workstation.midi-project.test.ts",
+      "originalFailure": "'这个乐器没有可播放的采样。'",
+      "disposition": "archived-replaced-workflow",
+      "reason": "Superseded multi-phrase shelves, synthetic starter palette or import-to-new-project fixtures; current music-document/file, instrument-catalog and GM checks cover the replacement."
+    },
+    {
+      "test": "20000 MIDI notes survive editable conversion, portable save and cold reopening without truncation",
+      "file": "tests/workstation.midi-project.test.ts",
+      "originalFailure": "'这个乐器没有可播放的采样。'",
+      "disposition": "archived-replaced-workflow",
+      "reason": "Superseded multi-phrase shelves, synthetic starter palette or import-to-new-project fixtures; current music-document/file, instrument-catalog and GM checks cover the replacement."
+    },
+    {
+      "test": "a continuous lane retains leading and trailing rests without four-bar or repeated-tempo fragmentation",
+      "file": "tests/workstation.midi-project.test.ts",
+      "originalFailure": "'这个乐器没有可播放的采样。'",
+      "disposition": "archived-replaced-workflow",
+      "reason": "Superseded multi-phrase shelves, synthetic starter palette or import-to-new-project fixtures; current music-document/file, instrument-catalog and GM checks cover the replacement."
+    },
+    {
+      "test": "only the true 1024-beat boundary splits a long lane and boundary-crossing notes keep their full held seconds",
+      "file": "tests/workstation.midi-project.test.ts",
+      "originalFailure": "'这个乐器没有可播放的采样。'",
+      "disposition": "archived-replaced-workflow",
+      "reason": "Superseded multi-phrase shelves, synthetic starter palette or import-to-new-project fixtures; current music-document/file, instrument-catalog and GM checks cover the replacement."
+    },
+    {
+      "test": "a single MIDI lane can fill the shared 50000-note phrase budget without density splitting",
+      "file": "tests/workstation.midi-project.test.ts",
+      "originalFailure": "'这个乐器没有可播放的采样。'",
+      "disposition": "archived-replaced-workflow",
+      "reason": "Superseded multi-phrase shelves, synthetic starter palette or import-to-new-project fixtures; current music-document/file, instrument-catalog and GM checks cover the replacement."
+    },
+    {
+      "test": "phrase shell keeps one read-only creation preview above its phrase console and compact topbar",
+      "file": "tests/workstation.phrase-composition-ui.test.ts",
+      "originalFailure": "|-",
+      "disposition": "archived-replaced-workflow",
+      "reason": "Removed arrangement/phrase/rhythm/welcome UI route; current music-workspace, project-library and music-file checks cover the replacement."
+    },
+    {
+      "test": "empty phrases run a silent four-bar clock, and the topbar plays, pauses and resumes at normal speed",
+      "file": "tests/workstation.phrase-composition-ui.test.ts",
+      "originalFailure": "|-",
+      "disposition": "archived-replaced-workflow",
+      "reason": "Removed arrangement/phrase/rhythm/welcome UI route; current music-workspace, project-library and music-file checks cover the replacement."
+    },
+    {
+      "test": "saving and Ctrl-S share one pending action, surface failure and remain usable for retries",
+      "file": "tests/workstation.phrase-composition-ui.test.ts",
+      "originalFailure": "|-",
+      "disposition": "archived-replaced-workflow",
+      "reason": "Removed arrangement/phrase/rhythm/welcome UI route; current music-workspace, project-library and music-file checks cover the replacement."
+    },
+    {
+      "test": "saving a continued draft keeps the same zoom, head and playing or paused state",
+      "file": "tests/workstation.phrase-composition-ui.test.ts",
+      "originalFailure": "|-",
+      "disposition": "archived-replaced-workflow",
+      "reason": "Removed arrangement/phrase/rhythm/welcome UI route; current music-workspace, project-library and music-file checks cover the replacement."
+    },
+    {
+      "test": "double-click title editing needs no dialog and save commits the pending name before its callback",
+      "file": "tests/workstation.phrase-composition-ui.test.ts",
+      "originalFailure": "|-",
+      "disposition": "archived-replaced-workflow",
+      "reason": "Removed arrangement/phrase/rhythm/welcome UI route; current music-workspace, project-library and music-file checks cover the replacement."
+    },
+    {
+      "test": "invalid names and failed asynchronous renames block save, save-as and exit until corrected",
+      "file": "tests/workstation.phrase-composition-ui.test.ts",
+      "originalFailure": "|-",
+      "disposition": "archived-replaced-workflow",
+      "reason": "Removed arrangement/phrase/rhythm/welcome UI route; current music-workspace, project-library and music-file checks cover the replacement."
+    },
+    {
+      "test": "BPM preserves the beat position and volume gestures preview without repeated history writes",
+      "file": "tests/workstation.phrase-composition-ui.test.ts",
+      "originalFailure": "|-",
+      "disposition": "archived-replaced-workflow",
+      "reason": "Removed arrangement/phrase/rhythm/welcome UI route; current music-workspace, project-library and music-file checks cover the replacement."
+    },
+    {
+      "test": "overview reads the saved full phrase length for playback, head endpoints and extension undo",
+      "file": "tests/workstation.phrase-composition-ui.test.ts",
+      "originalFailure": "|-",
+      "disposition": "archived-replaced-workflow",
+      "reason": "Removed arrangement/phrase/rhythm/welcome UI route; current music-workspace, project-library and music-file checks cover the replacement."
+    },
+    {
+      "test": "phrase inspector reads source tempo and musical duration without creating drafts, history or writes",
+      "file": "tests/workstation.phrase-inspector.test.ts",
+      "originalFailure": "|-",
+      "disposition": "maintained-and-refreshed",
+      "reason": "Contains still-relevant ownership, file transfer, identity, atomicity and undo guarantees. Preserve active checks despite retired shelf UI; refresh fixtures instead of removing the whole suite."
+    },
+    {
+      "test": "renaming a singly used occurrence preserves its identity, sound and placement, and undoes as one durable change",
+      "file": "tests/workstation.phrase-inspector.test.ts",
+      "originalFailure": "|-",
+      "disposition": "maintained-and-refreshed",
+      "reason": "Contains still-relevant ownership, file transfer, identity, atomicity and undo guarantees. Preserve active checks despite retired shelf UI; refresh fixtures instead of removing the whole suite."
+    },
+    {
+      "test": "shelf rename explicitly changes shared metadata while keeping all occurrence identities and notes",
+      "file": "tests/workstation.phrase-inspector.test.ts",
+      "originalFailure": "|-",
+      "disposition": "maintained-and-refreshed",
+      "reason": "Contains still-relevant ownership, file transfer, identity, atomicity and undo guarantees. Preserve active checks despite retired shelf UI; refresh fixtures instead of removing the whole suite."
+    },
+    {
+      "test": "other songs remain isolated and a public starter rename is adopted instead of overwritten",
+      "file": "tests/workstation.phrase-inspector.test.ts",
+      "originalFailure": "|-",
+      "disposition": "maintained-and-refreshed",
+      "reason": "Contains still-relevant ownership, file transfer, identity, atomicity and undo guarantees. Preserve active checks despite retired shelf UI; refresh fixtures instead of removing the whole suite."
+    },
+    {
+      "test": "phrase editor New delegates creation to the current project and immediately renders the returned draft",
+      "file": "tests/workstation.phrase-library-creation-ui.test.ts",
+      "originalFailure": "'Missing 新建乐句'",
+      "disposition": "archived-replaced-workflow",
+      "reason": "Removed arrangement/phrase/rhythm/welcome UI route; current music-workspace, project-library and music-file checks cover the replacement."
+    },
+    {
+      "test": "phrase catalog keeps saved metadata through draft rename, undo and redo until an explicit save",
+      "file": "tests/workstation.phrase-library.test.ts",
+      "originalFailure": "|-",
+      "disposition": "maintained-and-refreshed",
+      "reason": "Contains still-relevant ownership, file transfer, identity, atomicity and undo guarantees. Preserve active checks despite retired shelf UI; refresh fixtures instead of removing the whole suite."
+    },
+    {
+      "test": "dirty editors contribute one library identity and reference forks remain distinct reusable phrases",
+      "file": "tests/workstation.phrase-library.test.ts",
+      "originalFailure": "|-",
+      "disposition": "maintained-and-refreshed",
+      "reason": "Contains still-relevant ownership, file transfer, identity, atomicity and undo guarantees. Preserve active checks despite retired shelf UI; refresh fixtures instead of removing the whole suite."
+    },
+    {
+      "test": "song format validates shelf metadata and preserves older songs without creating hidden entries",
+      "file": "tests/workstation.phrase-library.test.ts",
+      "originalFailure": "|-",
+      "disposition": "maintained-and-refreshed",
+      "reason": "Contains still-relevant ownership, file transfer, identity, atomicity and undo guarantees. Preserve active checks despite retired shelf UI; refresh fixtures instead of removing the whole suite."
+    },
+    {
+      "test": "legacy phrase bodies keep their exact shape and unity gain while explicit gain validates narrowly",
+      "file": "tests/workstation.phrase-master-level.test.ts",
+      "originalFailure": "|-",
+      "disposition": "maintained-and-refreshed",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "test": "phrase gain is durable, undoable and atomic without changing notes or timbres",
+      "file": "tests/workstation.phrase-master-level.test.ts",
+      "originalFailure": "|-",
+      "disposition": "maintained-and-refreshed",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "test": "changing BPM can atomically preserve held seconds while moving note onsets and retaining legacy one-argument behavior",
+      "file": "tests/workstation.phrase-note-mix.test.ts",
+      "originalFailure": "|-",
+      "disposition": "maintained-and-refreshed",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "test": "save-as copies the current long edit into this song atomically without rewriting its original or clipping notes",
+      "file": "tests/workstation.phrase-shell-save.test.ts",
+      "originalFailure": "|-",
+      "disposition": "maintained-and-refreshed",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "test": "double-clicking a hidden project phrase in the library opens its editable original through the real studio route",
+      "file": "tests/workstation.phrase-studio-integration.test.ts",
+      "originalFailure": "'Expected .song-new-phrase'",
+      "disposition": "archived-replaced-workflow",
+      "reason": "Removed arrangement/phrase/rhythm/welcome UI route; current music-workspace, project-library and music-file checks cover the replacement."
+    },
+    {
+      "test": "mountStudio routes occurrence editing through the new shell, saves in place twice and exits to an exportable song",
+      "file": "tests/workstation.phrase-studio-integration.test.ts",
+      "originalFailure": "|-",
+      "disposition": "archived-replaced-workflow",
+      "reason": "Removed arrangement/phrase/rhythm/welcome UI route; current music-workspace, project-library and music-file checks cover the replacement."
+    },
+    {
+      "test": "a dirty exit asks first, Cancel keeps the scratch work, and Discard restores saved music before returning",
+      "file": "tests/workstation.phrase-studio-integration.test.ts",
+      "originalFailure": "|-",
+      "disposition": "archived-replaced-workflow",
+      "reason": "Removed arrangement/phrase/rhythm/welcome UI route; current music-workspace, project-library and music-file checks cover the replacement."
+    },
+    {
+      "test": "exiting a clean parent asks about nested tone scratch work and Discard removes it without applying it",
+      "file": "tests/workstation.phrase-studio-integration.test.ts",
+      "originalFailure": "|-",
+      "disposition": "archived-replaced-workflow",
+      "reason": "Removed arrangement/phrase/rhythm/welcome UI route; current music-workspace, project-library and music-file checks cover the replacement."
+    },
+    {
+      "test": "new production phrases stay drafts until explicit Save and discarding another draft leaves no library item",
+      "file": "tests/workstation.phrase-studio-integration.test.ts",
+      "originalFailure": "'Expected .song-new-phrase'",
+      "disposition": "archived-replaced-workflow",
+      "reason": "Removed arrangement/phrase/rhythm/welcome UI route; current music-workspace, project-library and music-file checks cover the replacement."
+    },
+    {
+      "test": "saving on phrase exit explicitly applies the edited occurrence and closes its clean continuation",
+      "file": "tests/workstation.phrase-studio-integration.test.ts",
+      "originalFailure": "|-",
+      "disposition": "archived-replaced-workflow",
+      "reason": "Removed arrangement/phrase/rhythm/welcome UI route; current music-workspace, project-library and music-file checks cover the replacement."
+    },
+    {
+      "test": "window-close preparation flushes scratch work without saving and permits only actual project-level dialogs when requested",
+      "file": "tests/workstation.phrase-studio-integration.test.ts",
+      "originalFailure": "'Expected .song-project-name-input'",
+      "disposition": "archived-replaced-workflow",
+      "reason": "Removed arrangement/phrase/rhythm/welcome UI route; current music-workspace, project-library and music-file checks cover the replacement."
+    },
+    {
+      "test": "save-as after an occurrence save clears its obsolete clean continuation and the copied phrase can leave and export",
+      "file": "tests/workstation.phrase-studio-integration.test.ts",
+      "originalFailure": "|-",
+      "disposition": "archived-replaced-workflow",
+      "reason": "Removed arrangement/phrase/rhythm/welcome UI route; current music-workspace, project-library and music-file checks cover the replacement."
+    },
+    {
+      "test": "a saved copy remains in the library when cleanup fails, while the original stays reachable for retry",
+      "file": "tests/workstation.phrase-studio-integration.test.ts",
+      "originalFailure": "|-",
+      "disposition": "archived-replaced-workflow",
+      "reason": "Removed arrangement/phrase/rhythm/welcome UI route; current music-workspace, project-library and music-file checks cover the replacement."
+    },
+    {
+      "test": "Save As publishes an unpublished phrase and removes the old scratch draft before song Save",
+      "file": "tests/workstation.phrase-studio-integration.test.ts",
+      "originalFailure": "'Expected .song-new-phrase'",
+      "disposition": "archived-replaced-workflow",
+      "reason": "Removed arrangement/phrase/rhythm/welcome UI route; current music-workspace, project-library and music-file checks cover the replacement."
+    },
+    {
+      "test": "Save As of a dirty saved phrase restores the original scratch fields without changing its saved source",
+      "file": "tests/workstation.phrase-studio-integration.test.ts",
+      "originalFailure": "|-",
+      "disposition": "archived-replaced-workflow",
+      "reason": "Removed arrangement/phrase/rhythm/welcome UI route; current music-workspace, project-library and music-file checks cover the replacement."
+    },
+    {
+      "test": "failed Save As keeps unpublished scratch work active and does not run discard",
+      "file": "tests/workstation.phrase-studio-integration.test.ts",
+      "originalFailure": "'Expected .song-new-phrase'",
+      "disposition": "archived-replaced-workflow",
+      "reason": "Removed arrangement/phrase/rhythm/welcome UI route; current music-workspace, project-library and music-file checks cover the replacement."
+    },
+    {
+      "test": "failed cleanup after unpublished Save As returns to the original draft so it can be discarded",
+      "file": "tests/workstation.phrase-studio-integration.test.ts",
+      "originalFailure": "'Expected .song-new-phrase'",
+      "disposition": "archived-replaced-workflow",
+      "reason": "Removed arrangement/phrase/rhythm/welcome UI route; current music-workspace, project-library and music-file checks cover the replacement."
+    },
+    {
+      "test": "production melody creation, detailed mix, held duration, Save and BPM edit return to a portable editable song",
+      "file": "tests/workstation.phrase-studio-integration.test.ts",
+      "originalFailure": "|-",
+      "disposition": "archived-replaced-workflow",
+      "reason": "Removed arrangement/phrase/rhythm/welcome UI route; current music-workspace, project-library and music-file checks cover the replacement."
+    },
+    {
+      "test": "production Save As keeps the melody section open and repeated entry does not duplicate the local voice library",
+      "file": "tests/workstation.phrase-studio-integration.test.ts",
+      "originalFailure": "|-",
+      "disposition": "archived-replaced-workflow",
+      "reason": "Removed arrangement/phrase/rhythm/welcome UI route; current music-workspace, project-library and music-file checks cover the replacement."
+    },
+    {
+      "test": "melody seek shares the header clock and an uncommitted note mix updates live playback before Save flushes it",
+      "file": "tests/workstation.phrase-studio-integration.test.ts",
+      "originalFailure": "|-",
+      "disposition": "archived-replaced-workflow",
+      "reason": "Removed arrangement/phrase/rhythm/welcome UI route; current music-workspace, project-library and music-file checks cover the replacement."
+    },
+    {
+      "test": "legacy rhythm families remain separately editable alongside melody in unified creation and travel through the same song",
+      "file": "tests/workstation.phrase-studio-integration.test.ts",
+      "originalFailure": "|-",
+      "disposition": "archived-replaced-workflow",
+      "reason": "Removed arrangement/phrase/rhythm/welcome UI route; current music-workspace, project-library and music-file checks cover the replacement."
+    },
+    {
+      "test": "legacy rhythm Save As retains its stored tag inside unified creation and the shared header clock",
+      "file": "tests/workstation.phrase-studio-integration.test.ts",
+      "originalFailure": "|-",
+      "disposition": "archived-replaced-workflow",
+      "reason": "Removed arrangement/phrase/rhythm/welcome UI route; current music-workspace, project-library and music-file checks cover the replacement."
+    },
+    {
+      "test": "production melody typing writes one cell at a time, preserves rests and travels through safe save and project import",
+      "file": "tests/workstation.phrase-studio-integration.test.ts",
+      "originalFailure": "|-",
+      "disposition": "archived-replaced-workflow",
+      "reason": "Removed arrangement/phrase/rhythm/welcome UI route; current music-workspace, project-library and music-file checks cover the replacement."
+    },
+    {
+      "test": "production keyboard entry guards input and modifiers while legacy families share performance and transport",
+      "file": "tests/workstation.phrase-studio-integration.test.ts",
+      "originalFailure": "|-",
+      "disposition": "archived-replaced-workflow",
+      "reason": "Removed arrangement/phrase/rhythm/welcome UI route; current music-workspace, project-library and music-file checks cover the replacement."
+    },
+    {
+      "test": "double-clicking a song shelf phrase opens that source with an independent phrase type label",
+      "file": "tests/workstation.phrase-studio-integration.test.ts",
+      "originalFailure": "|-",
+      "disposition": "archived-replaced-workflow",
+      "reason": "Removed arrangement/phrase/rhythm/welcome UI route; current music-workspace, project-library and music-file checks cover the replacement."
+    },
+    {
+      "test": "newly typed notes stay selected for right-column controls while Backspace undoes edits and right blank exits entry",
+      "file": "tests/workstation.phrase-studio-integration.test.ts",
+      "originalFailure": "|-",
+      "disposition": "archived-replaced-workflow",
+      "reason": "Removed arrangement/phrase/rhythm/welcome UI route; current music-workspace, project-library and music-file checks cover the replacement."
+    },
+    {
+      "test": "legacy rhythm note controls use the unified pitch-aware console and right blank clears selection without deletion",
+      "file": "tests/workstation.phrase-studio-integration.test.ts",
+      "originalFailure": "|-",
+      "disposition": "archived-replaced-workflow",
+      "reason": "Removed arrangement/phrase/rhythm/welcome UI route; current music-workspace, project-library and music-file checks cover the replacement."
+    },
+    {
+      "test": "production song Backspace undoes mix edits and right blank clears clip, row and shelf selections",
+      "file": "tests/workstation.phrase-studio-integration.test.ts",
+      "originalFailure": "'Expected .song-scroll'",
+      "disposition": "archived-replaced-workflow",
+      "reason": "Removed arrangement/phrase/rhythm/welcome UI route; current music-workspace, project-library and music-file checks cover the replacement."
+    },
+    {
+      "test": "unified creation keeps all legacy voices in the live schedule through entry, mix, tempo edits and resume",
+      "file": "tests/workstation.phrase-studio-integration.test.ts",
+      "originalFailure": "|-",
+      "disposition": "archived-replaced-workflow",
+      "reason": "Removed arrangement/phrase/rhythm/welcome UI route; current music-workspace, project-library and music-file checks cover the replacement."
+    },
+    {
+      "test": "an empty unified creation keeps the silent phrase clock when returning to overview without content edits",
+      "file": "tests/workstation.phrase-studio-integration.test.ts",
+      "originalFailure": "\"Cannot read properties of undefined (reading 'events')\"",
+      "disposition": "archived-replaced-workflow",
+      "reason": "Removed arrangement/phrase/rhythm/welcome UI route; current music-workspace, project-library and music-file checks cover the replacement."
+    },
+    {
+      "test": "the production tone library removes an unused starter for the whole song and keeps it removed after reentry and transfer",
+      "file": "tests/workstation.phrase-studio-integration.test.ts",
+      "originalFailure": "|-",
+      "disposition": "archived-replaced-workflow",
+      "reason": "Removed arrangement/phrase/rhythm/welcome UI route; current music-workspace, project-library and music-file checks cover the replacement."
+    },
+    {
+      "test": "production tone-card reordering persists across unified-creation reentry without preventing occurrence save",
+      "file": "tests/workstation.phrase-studio-integration.test.ts",
+      "originalFailure": "|-",
+      "disposition": "archived-replaced-workflow",
+      "reason": "Removed arrangement/phrase/rhythm/welcome UI route; current music-workspace, project-library and music-file checks cover the replacement."
+    },
+    {
+      "test": "production imported-tone removal waits for confirmation and Cancel leaves the library and phrase untouched",
+      "file": "tests/workstation.phrase-studio-integration.test.ts",
+      "originalFailure": "|-",
+      "disposition": "archived-replaced-workflow",
+      "reason": "Removed arrangement/phrase/rhythm/welcome UI route; current music-workspace, project-library and music-file checks cover the replacement."
+    },
+    {
+      "test": "production header cell resolution survives unified-creation reentry, phrase save and full project import",
+      "file": "tests/workstation.phrase-studio-integration.test.ts",
+      "originalFailure": "|-",
+      "disposition": "archived-replaced-workflow",
+      "reason": "Removed arrangement/phrase/rhythm/welcome UI route; current music-workspace, project-library and music-file checks cover the replacement."
+    },
+    {
+      "test": "bar extension remains available while editing a legacy family and survives song save and project import",
+      "file": "tests/workstation.phrase-studio-integration.test.ts",
+      "originalFailure": "|-",
+      "disposition": "archived-replaced-workflow",
+      "reason": "Removed arrangement/phrase/rhythm/welcome UI route; current music-workspace, project-library and music-file checks cover the replacement."
+    },
+    {
+      "test": "performance is disabled by default and enabling it through the shared settings page takes effect in place",
+      "file": "tests/workstation.phrase-studio-integration.test.ts",
+      "originalFailure": "|-",
+      "disposition": "archived-replaced-workflow",
+      "reason": "Removed arrangement/phrase/rhythm/welcome UI route; current music-workspace, project-library and music-file checks cover the replacement."
+    },
+    {
+      "test": "an undefined legacy rhythm family uses the single-choice replacement library without losing notes or identity",
+      "file": "tests/workstation.phrase-studio-integration.test.ts",
+      "originalFailure": "|-",
+      "disposition": "archived-replaced-workflow",
+      "reason": "Removed arrangement/phrase/rhythm/welcome UI route; current music-workspace, project-library and music-file checks cover the replacement."
+    },
+    {
+      "test": "production tone previews do not select library cards, add parts or mutate note assignments",
+      "file": "tests/workstation.phrase-studio-integration.test.ts",
+      "originalFailure": "|-",
+      "disposition": "archived-replaced-workflow",
+      "reason": "Removed arrangement/phrase/rhythm/welcome UI route; current music-workspace, project-library and music-file checks cover the replacement."
+    },
+    {
+      "test": "production tone trash removes all unified phrase uses atomically, keeps the project asset and supports undo and portable save",
+      "file": "tests/workstation.phrase-studio-integration.test.ts",
+      "originalFailure": "|-",
+      "disposition": "archived-replaced-workflow",
+      "reason": "Removed arrangement/phrase/rhythm/welcome UI route; current music-workspace, project-library and music-file checks cover the replacement."
+    },
+    {
+      "test": "double Delete on a selected production tone clears its notes in one undo without deleting the tone or other section",
+      "file": "tests/workstation.phrase-studio-integration.test.ts",
+      "originalFailure": "|-",
+      "disposition": "archived-replaced-workflow",
+      "reason": "Removed arrangement/phrase/rhythm/welcome UI route; current music-workspace, project-library and music-file checks cover the replacement."
+    },
+    {
+      "test": "Melody plus creates independent total-note families even when choosing an already-used tone",
+      "file": "tests/workstation.phrase-studio-integration.test.ts",
+      "originalFailure": "|-",
+      "disposition": "archived-replaced-workflow",
+      "reason": "Removed arrangement/phrase/rhythm/welcome UI route; current music-workspace, project-library and music-file checks cover the replacement."
+    },
+    {
+      "test": "changing one total-note family tone keeps its notes and sibling families through Undo, save and portable import",
+      "file": "tests/workstation.phrase-studio-integration.test.ts",
+      "originalFailure": "|-",
+      "disposition": "archived-replaced-workflow",
+      "reason": "Removed arrangement/phrase/rhythm/welcome UI route; current music-workspace, project-library and music-file checks cover the replacement."
+    },
+    {
+      "test": "an existing undefined total-note family can pick a new tone and failed replacement keeps the picker and data intact",
+      "file": "tests/workstation.phrase-studio-integration.test.ts",
+      "originalFailure": "|-",
+      "disposition": "archived-replaced-workflow",
+      "reason": "Removed arrangement/phrase/rhythm/welcome UI route; current music-workspace, project-library and music-file checks cover the replacement."
+    },
+    {
+      "test": "changing an existing family retains its formerly implicit tone as a project library asset",
+      "file": "tests/workstation.phrase-studio-integration.test.ts",
+      "originalFailure": "'Expected .melody-change-timbre'",
+      "disposition": "archived-replaced-workflow",
+      "reason": "Removed arrangement/phrase/rhythm/welcome UI route; current music-workspace, project-library and music-file checks cover the replacement."
+    },
+    {
+      "test": "unified overview previews preserve melody and legacy rhythm identities through editing, replacement and deletion",
+      "file": "tests/workstation.phrase-studio-integration.test.ts",
+      "originalFailure": "|-",
+      "disposition": "archived-replaced-workflow",
+      "reason": "Removed arrangement/phrase/rhythm/welcome UI route; current music-workspace, project-library and music-file checks cover the replacement."
+    },
+    {
+      "test": "overview and unified detailed creation retain time and vertical navigation, with one running head and inert console gestures",
+      "file": "tests/workstation.phrase-studio-integration.test.ts",
+      "originalFailure": "'Expected .phrase-melody-back'",
+      "disposition": "archived-replaced-workflow",
+      "reason": "Removed arrangement/phrase/rhythm/welcome UI route; current music-workspace, project-library and music-file checks cover the replacement."
+    },
+    {
+      "test": "a detailed-editor change shares one fresh phrase view with its header instead of rereading and repainting the editor",
+      "file": "tests/workstation.phrase-studio-integration.test.ts",
+      "originalFailure": "|-",
+      "disposition": "archived-replaced-workflow",
+      "reason": "Removed arrangement/phrase/rhythm/welcome UI route; current music-workspace, project-library and music-file checks cover the replacement."
+    },
+    {
+      "test": "every full-keyboard row has a stable mapping including exact-frequency endpoints",
+      "file": "tests/workstation.phrase-viewport.test.ts",
+      "originalFailure": "|-",
+      "disposition": "maintained-and-refreshed",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "test": "a phrase references several saved sounds once and translates beats and overlaps into an execution sequence",
+      "file": "tests/workstation.phrase.test.ts",
+      "originalFailure": "|-",
+      "disposition": "maintained-and-refreshed",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "test": "a sampled voice can audition before the phrase has notes and prepares only its selected source",
+      "file": "tests/workstation.phrase.test.ts",
+      "originalFailure": "|-",
+      "disposition": "maintained-and-refreshed",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "test": "off-grid timing and arbitrary physical pitch survive edits, save, reopening, and short-note compilation exactly",
+      "file": "tests/workstation.phrase.test.ts",
+      "originalFailure": "|-",
+      "disposition": "maintained-and-refreshed",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "test": "length changes reject cutting notes and invalid controls preserve the full current state",
+      "file": "tests/workstation.phrase.test.ts",
+      "originalFailure": "|-",
+      "disposition": "maintained-and-refreshed",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "test": "the current editor caps parts, total notes and draft history without discarding older stored content",
+      "file": "tests/workstation.phrase.test.ts",
+      "originalFailure": "'Missing expected exception.'",
+      "disposition": "maintained-and-refreshed",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "test": "reading and setting the same fractional length use the same floating-point boundary tolerance",
+      "file": "tests/workstation.phrase.test.ts",
+      "originalFailure": "|-",
+      "disposition": "maintained-and-refreshed",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "test": "saved phrase playback is read-only, uses saved identity and only changes tempo when explicitly requested",
+      "file": "tests/workstation.phrase.test.ts",
+      "originalFailure": "|-",
+      "disposition": "maintained-and-refreshed",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "test": "shelf reorder is a single durable nonmusical edit and survives restart, undo and a full project copy",
+      "file": "tests/workstation.playlist-controls.test.ts",
+      "originalFailure": "|-",
+      "disposition": "maintained-and-refreshed",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "test": "solo and mute reject missing rows and cannot partially change a failing store; shelf order schema stays optional and strict",
+      "file": "tests/workstation.playlist-controls.test.ts",
+      "originalFailure": "|-",
+      "disposition": "maintained-and-refreshed",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "test": "new controls strictly reject invalid values and unknown fields without writing or altering history",
+      "file": "tests/workstation.playlist-domain.test.ts",
+      "originalFailure": "'Missing expected exception.'",
+      "disposition": "maintained-and-refreshed",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "test": "malformed row metadata, sections and batch operations leave storage and history untouched",
+      "file": "tests/workstation.playlist-refinement-domain.test.ts",
+      "originalFailure": "'Missing expected exception.'",
+      "disposition": "maintained-and-refreshed",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "test": "a placed empty phrase produces a correctly sized silent song plan, including after save and reopen",
+      "file": "tests/workstation.playlist-refinement-domain.test.ts",
+      "originalFailure": "|-",
+      "disposition": "maintained-and-refreshed",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "test": "save-as and reopen preserve row order/color, per-instance mix and cursor-based grid sections independently",
+      "file": "tests/workstation.playlist-refinement-project.test.ts",
+      "originalFailure": "\"Cannot read properties of undefined (reading 'id')\"",
+      "disposition": "archived-replaced-workflow",
+      "reason": "Superseded multi-phrase shelves, synthetic starter palette or import-to-new-project fixtures; current music-document/file, instrument-catalog and GM checks cover the replacement."
+    },
+    {
+      "test": "portable project interchange retains visual tempo boundaries and row controls without changing phrase timing",
+      "file": "tests/workstation.playlist-refinement-project.test.ts",
+      "originalFailure": "\"Cannot read properties of undefined (reading 'id')\"",
+      "disposition": "archived-replaced-workflow",
+      "reason": "Superseded multi-phrase shelves, synthetic starter palette or import-to-new-project fixtures; current music-document/file, instrument-catalog and GM checks cover the replacement."
+    },
+    {
+      "test": "deleting every row leaves a saveable project that reopens and can add a row again",
+      "file": "tests/workstation.playlist-refinement-project.test.ts",
+      "originalFailure": "\"Cannot read properties of undefined (reading 'id')\"",
+      "disposition": "archived-replaced-workflow",
+      "reason": "Superseded multi-phrase shelves, synthetic starter palette or import-to-new-project fixtures; current music-document/file, instrument-catalog and GM checks cover the replacement."
+    },
+    {
+      "test": "the shelf plus opens this song phrase library; only the library plus enters phrase creation",
+      "file": "tests/workstation.playlist-ui.test.ts",
+      "originalFailure": "|-",
+      "disposition": "archived-replaced-workflow",
+      "reason": "Removed arrangement/phrase/rhythm/welcome UI route; current music-workspace, project-library and music-file checks cover the replacement."
+    },
+    {
+      "test": "shelf trash hides only its reusable card, and the library restores its exact identity and every existing use",
+      "file": "tests/workstation.playlist-ui.test.ts",
+      "originalFailure": "|-",
+      "disposition": "archived-replaced-workflow",
+      "reason": "Removed arrangement/phrase/rhythm/welcome UI route; current music-workspace, project-library and music-file checks cover the replacement."
+    },
+    {
+      "test": "save commits and validates the BPM field and shares one pending command with Save As",
+      "file": "tests/workstation.playlist-ui.test.ts",
+      "originalFailure": "|-",
+      "disposition": "archived-replaced-workflow",
+      "reason": "Removed arrangement/phrase/rhythm/welcome UI route; current music-workspace, project-library and music-file checks cover the replacement."
+    },
+    {
+      "test": "canceling a populated row swipe restores the earlier clip selection and leaves music and ongoing playback untouched",
+      "file": "tests/workstation.playlist-ui.test.ts",
+      "originalFailure": "|-",
+      "disposition": "archived-replaced-workflow",
+      "reason": "Removed arrangement/phrase/rhythm/welcome UI route; current music-workspace, project-library and music-file checks cover the replacement."
+    },
+    {
+      "test": "an empty phrase shelf covers the playlist and highlights its create tile",
+      "file": "tests/workstation.playlist-ui.test.ts",
+      "originalFailure": "|-",
+      "disposition": "archived-replaced-workflow",
+      "reason": "Removed arrangement/phrase/rhythm/welcome UI route; current music-workspace, project-library and music-file checks cover the replacement."
+    },
+    {
+      "test": "song library keeps new/import in its toolbar and files in the row list",
+      "file": "tests/workstation.project-menu.test.ts",
+      "originalFailure": "|-",
+      "disposition": "maintained-and-refreshed",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "test": "a failed listing keeps creation and custom-file opening available and a failed open can retry",
+      "file": "tests/workstation.project-menu.test.ts",
+      "originalFailure": "|-",
+      "disposition": "maintained-and-refreshed",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "test": "disposal ignores a late project listing and pending opens cannot overlap",
+      "file": "tests/workstation.project-menu.test.ts",
+      "originalFailure": "|-",
+      "disposition": "maintained-and-refreshed",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "test": "a new empty reusable phrase enters the current shelf in one write without changing the song or its history",
+      "file": "tests/workstation.project-phrases.test.ts",
+      "originalFailure": "|-",
+      "disposition": "maintained-and-refreshed",
+      "reason": "Contains still-relevant ownership, file transfer, identity, atomicity and undo guarantees. Preserve active checks despite retired shelf UI; refresh fixtures instead of removing the whole suite."
+    },
+    {
+      "test": "two new phrases use distinct names and voices while another song can start its own numbering",
+      "file": "tests/workstation.project-phrases.test.ts",
+      "originalFailure": "|-",
+      "disposition": "maintained-and-refreshed",
+      "reason": "Contains still-relevant ownership, file transfer, identity, atomicity and undo guarantees. Preserve active checks despite retired shelf UI; refresh fixtures instead of removing the whole suite."
+    },
+    {
+      "test": "retaining current sources keeps erased phrases on the shelf without listing all historical custody",
+      "file": "tests/workstation.project-phrases.test.ts",
+      "originalFailure": "|-",
+      "disposition": "maintained-and-refreshed",
+      "reason": "Contains still-relevant ownership, file transfer, identity, atomicity and undo guarantees. Preserve active checks despite retired shelf UI; refresh fixtures instead of removing the whole suite."
+    },
+    {
+      "test": "only new phrases inherit the arrangement grid tempo, accepting the displayed section tempo explicitly",
+      "file": "tests/workstation.project-phrases.test.ts",
+      "originalFailure": "'Missing expected exception.'",
+      "disposition": "maintained-and-refreshed",
+      "reason": "Contains still-relevant ownership, file transfer, identity, atomicity and undo guarantees. Preserve active checks despite retired shelf UI; refresh fixtures instead of removing the whole suite."
+    },
+    {
+      "test": "only untouched bundled tone identities skip a removal warning; created, imported and edited copies require it",
+      "file": "tests/workstation.project-timbres.test.ts",
+      "originalFailure": "|-",
+      "disposition": "maintained-and-refreshed",
+      "reason": "Contains still-relevant ownership, file transfer, identity, atomicity and undo guarantees. Preserve active checks despite retired shelf UI; refresh fixtures instead of removing the whole suite."
+    },
+    {
+      "test": "melody starters are independent validated local synthesis patches with struck and sustained envelopes",
+      "file": "tests/workstation.project-timbres.test.ts",
+      "originalFailure": "|-",
+      "disposition": "maintained-and-refreshed",
+      "reason": "Contains still-relevant ownership, file transfer, identity, atomicity and undo guarantees. Preserve active checks despite retired shelf UI; refresh fixtures instead of removing the whole suite."
+    },
+    {
+      "test": "new project files already own the complete palette and Save As retains customized starter identities",
+      "file": "tests/workstation.project-timbres.test.ts",
+      "originalFailure": "|-",
+      "disposition": "maintained-and-refreshed",
+      "reason": "Contains still-relevant ownership, file transfer, identity, atomicity and undo guarantees. Preserve active checks despite retired shelf UI; refresh fixtures instead of removing the whole suite."
+    },
+    {
+      "test": "opening the current song library seeds all starter voices in one write and reopening never duplicates or resets them",
+      "file": "tests/workstation.project-timbres.test.ts",
+      "originalFailure": "|-",
+      "disposition": "maintained-and-refreshed",
+      "reason": "Contains still-relevant ownership, file transfer, identity, atomicity and undo guarantees. Preserve active checks despite retired shelf UI; refresh fixtures instead of removing the whole suite."
+    },
+    {
+      "test": "fresh tone picker hides only the untouched empty scaffold while preserving its source and any customization",
+      "file": "tests/workstation.project-timbres.test.ts",
+      "originalFailure": "|-",
+      "disposition": "maintained-and-refreshed",
+      "reason": "Contains still-relevant ownership, file transfer, identity, atomicity and undo guarantees. Preserve active checks despite retired shelf UI; refresh fixtures instead of removing the whole suite."
+    },
+    {
+      "test": "starter names avoid current-song collisions while separate songs own independent equal-named voices",
+      "file": "tests/workstation.project-timbres.test.ts",
+      "originalFailure": "|-",
+      "disposition": "maintained-and-refreshed",
+      "reason": "Contains still-relevant ownership, file transfer, identity, atomicity and undo guarantees. Preserve active checks despite retired shelf UI; refresh fixtures instead of removing the whole suite."
+    },
+    {
+      "test": "project packaging keeps all starters local and graph-ID remapping does not seed duplicate copies",
+      "file": "tests/workstation.project-timbres.test.ts",
+      "originalFailure": "|-",
+      "disposition": "maintained-and-refreshed",
+      "reason": "Contains still-relevant ownership, file transfer, identity, atomicity and undo guarantees. Preserve active checks despite retired shelf UI; refresh fixtures instead of removing the whole suite."
+    },
+    {
+      "test": "independent same-tone families and a replacement survive phrase save and portable song import",
+      "file": "tests/workstation.project-timbres.test.ts",
+      "originalFailure": "'这个乐器没有可播放的采样。'",
+      "disposition": "maintained-and-refreshed",
+      "reason": "Contains still-relevant ownership, file transfer, identity, atomicity and undo guarantees. Preserve active checks despite retired shelf UI; refresh fixtures instead of removing the whole suite."
+    },
+    {
+      "test": "unused starters can be removed in one undoable edit and never reseed after cold open or portable Save As",
+      "file": "tests/workstation.project-timbres.test.ts",
+      "originalFailure": "|-",
+      "disposition": "maintained-and-refreshed",
+      "reason": "Contains still-relevant ownership, file transfer, identity, atomicity and undo guarantees. Preserve active checks despite retired shelf UI; refresh fixtures instead of removing the whole suite."
+    },
+    {
+      "test": "song-wide tone order survives rename, undo, cold open and graph-ID remapping including unused members",
+      "file": "tests/workstation.project-timbres.test.ts",
+      "originalFailure": "|-",
+      "disposition": "maintained-and-refreshed",
+      "reason": "Contains still-relevant ownership, file transfer, identity, atomicity and undo guarantees. Preserve active checks despite retired shelf UI; refresh fixtures instead of removing the whole suite."
+    },
+    {
+      "test": "library setup, reorder and unused deletion preserve active nested occurrence saves and independent note undo",
+      "file": "tests/workstation.project-timbres.test.ts",
+      "originalFailure": "|-",
+      "disposition": "maintained-and-refreshed",
+      "reason": "Contains still-relevant ownership, file transfer, identity, atomicity and undo guarantees. Preserve active checks despite retired shelf UI; refresh fixtures instead of removing the whole suite."
+    },
+    {
+      "test": "adapter replacements reject unknown slots and retain exact dependencies for partial repeated references",
+      "file": "tests/workstation.references.test.ts",
+      "originalFailure": "|-",
+      "disposition": "maintained-and-refreshed",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "test": "cross-row transfer keeps note identity, pitch, seconds and mix in one undoable durable write",
+      "file": "tests/workstation.rhythm-domain.test.ts",
+      "originalFailure": "'这个乐器没有可播放的采样。'",
+      "disposition": "maintained-and-refreshed",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "test": "melody and rhythm compile together and retain section membership through occurrence edits and portable transfer",
+      "file": "tests/workstation.rhythm-domain.test.ts",
+      "originalFailure": "'这个乐器没有可播放的采样。'",
+      "disposition": "maintained-and-refreshed",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "test": "unassigned tone uses stay silent and preserve notes and origin through portable project transfer",
+      "file": "tests/workstation.rhythm-domain.test.ts",
+      "originalFailure": "'这个乐器没有可播放的采样。'",
+      "disposition": "maintained-and-refreshed",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "test": "tone library audition rejects another song and never adds tone uses or history",
+      "file": "tests/workstation.rhythm-domain.test.ts",
+      "originalFailure": "'Failed to parse URL from /instruments/generaluser-gs-2.0.3/manifest.json'",
+      "disposition": "maintained-and-refreshed",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "test": "selecting a rhythm tone draws an anchored continuous step with no audio or write until release",
+      "file": "tests/workstation.rhythm-workspace.test.ts",
+      "originalFailure": "'cancelAnimationFrame is not defined'",
+      "disposition": "archived-replaced-workflow",
+      "reason": "Removed arrangement/phrase/rhythm/welcome UI route; current music-workspace, project-library and music-file checks cover the replacement."
+    },
+    {
+      "test": "cancelled rhythm drawing preserves family selection and leaves all existing melody and rhythm notes intact",
+      "file": "tests/workstation.rhythm-workspace.test.ts",
+      "originalFailure": "'cancelAnimationFrame is not defined'",
+      "disposition": "archived-replaced-workflow",
+      "reason": "Removed arrangement/phrase/rhythm/welcome UI route; current music-workspace, project-library and music-file checks cover the replacement."
+    },
+    {
+      "test": "rhythm has broad one-to-one tone rows and no pitch keyboard or pitch console",
+      "file": "tests/workstation.rhythm-workspace.test.ts",
+      "originalFailure": "'cancelAnimationFrame is not defined'",
+      "disposition": "archived-replaced-workflow",
+      "reason": "Removed arrangement/phrase/rhythm/welcome UI route; current music-workspace, project-library and music-file checks cover the replacement."
+    },
+    {
+      "test": "tone row controls follow shared vertical scroll and horizontal zoom retains broad row heights",
+      "file": "tests/workstation.rhythm-workspace.test.ts",
+      "originalFailure": "'cancelAnimationFrame is not defined'",
+      "disposition": "archived-replaced-workflow",
+      "reason": "Removed arrangement/phrase/rhythm/welcome UI route; current music-workspace, project-library and music-file checks cover the replacement."
+    },
+    {
+      "test": "rhythm restores its own vertical viewport and diagonal blank panning changes no notes or audio",
+      "file": "tests/workstation.rhythm-workspace.test.ts",
+      "originalFailure": "'cancelAnimationFrame is not defined'",
+      "disposition": "archived-replaced-workflow",
+      "reason": "Removed arrangement/phrase/rhythm/welcome UI route; current music-workspace, project-library and music-file checks cover the replacement."
+    },
+    {
+      "test": "clicking a step commits its clicked tone row on release and leaves melody intact",
+      "file": "tests/workstation.rhythm-workspace.test.ts",
+      "originalFailure": "'cancelAnimationFrame is not defined'",
+      "disposition": "archived-replaced-workflow",
+      "reason": "Removed arrangement/phrase/rhythm/welcome UI route; current music-workspace, project-library and music-file checks cover the replacement."
+    },
+    {
+      "test": "middle-button selected-tone rhythm blank drag pans without a provisional step or sound, while a click still writes once",
+      "file": "tests/workstation.rhythm-workspace.test.ts",
+      "originalFailure": "'cancelAnimationFrame is not defined'",
+      "disposition": "archived-replaced-workflow",
+      "reason": "Removed arrangement/phrase/rhythm/welcome UI route; current music-workspace, project-library and music-file checks cover the replacement."
+    },
+    {
+      "test": "continuous cross-row dragging transfers tone and preserves pitch, identity and one-step undo",
+      "file": "tests/workstation.rhythm-workspace.test.ts",
+      "originalFailure": "'cancelAnimationFrame is not defined'",
+      "disposition": "archived-replaced-workflow",
+      "reason": "Removed arrangement/phrase/rhythm/welcome UI route; current music-workspace, project-library and music-file checks cover the replacement."
+    },
+    {
+      "test": "right erasing in rhythm only removes rhythm hitboxes including dimmed rows",
+      "file": "tests/workstation.rhythm-workspace.test.ts",
+      "originalFailure": "'cancelAnimationFrame is not defined'",
+      "disposition": "archived-replaced-workflow",
+      "reason": "Removed arrangement/phrase/rhythm/welcome UI route; current music-workspace, project-library and music-file checks cover the replacement."
+    },
+    {
+      "test": "rhythm console and shortcuts alter only selected note mix and time and flush surfaces transfer failures",
+      "file": "tests/workstation.rhythm-workspace.test.ts",
+      "originalFailure": "'cancelAnimationFrame is not defined'",
+      "disposition": "archived-replaced-workflow",
+      "reason": "Removed arrangement/phrase/rhythm/welcome UI route; current music-workspace, project-library and music-file checks cover the replacement."
+    },
+    {
+      "test": "melody opening excludes rhythm rows and its erase cannot delete rhythm data",
+      "file": "tests/workstation.rhythm-workspace.test.ts",
+      "originalFailure": "'cancelAnimationFrame is not defined'",
+      "disposition": "archived-replaced-workflow",
+      "reason": "Removed arrangement/phrase/rhythm/welcome UI route; current music-workspace, project-library and music-file checks cover the replacement."
+    },
+    {
+      "test": "shortcuts and Delete flush a cross-row drag before reading its new note and voice",
+      "file": "tests/workstation.rhythm-workspace.test.ts",
+      "originalFailure": "'cancelAnimationFrame is not defined'",
+      "disposition": "archived-replaced-workflow",
+      "reason": "Removed arrangement/phrase/rhythm/welcome UI route; current music-workspace, project-library and music-file checks cover the replacement."
+    },
+    {
+      "test": "rhythm tone controls use label-wheel axes while the step canvas retains the original mapping",
+      "file": "tests/workstation.rhythm-workspace.test.ts",
+      "originalFailure": "'cancelAnimationFrame is not defined'",
+      "disposition": "archived-replaced-workflow",
+      "reason": "Removed arrangement/phrase/rhythm/welcome UI route; current music-workspace, project-library and music-file checks cover the replacement."
+    },
+    {
+      "test": "sample handoff retries reuse an unchanged draft but retain edited drafts and never alter the original sample",
+      "file": "tests/workstation.sample-instrument.test.ts",
+      "originalFailure": "|-",
+      "disposition": "maintained-and-refreshed",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "test": "invalid controls, missing references and timeline limits preserve the complete prior state",
+      "file": "tests/workstation.song.test.ts",
+      "originalFailure": "'Missing expected exception.'",
+      "disposition": "maintained-and-refreshed",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "test": "empty songs cannot be saved, and another common-store editor invalidates stale undo history",
+      "file": "tests/workstation.song.test.ts",
+      "originalFailure": "|-",
+      "disposition": "maintained-and-refreshed",
+      "reason": "Reviewed against current release entry, confirmed decisions and present test contracts; original preserved here."
+    },
+    {
+      "test": "known song tiles use their exact file and only the folder tile requests a custom file picker",
+      "file": "tests/workstation.welcome-library.test.ts",
+      "originalFailure": "'Expected an application control.'",
+      "disposition": "archived-replaced-workflow",
+      "reason": "Removed arrangement/phrase/rhythm/welcome UI route; current music-workspace, project-library and music-file checks cover the replacement."
+    },
+    {
+      "test": "the welcome folder tile follows the real MIDI bridge, conversion and new-project path",
+      "file": "tests/workstation.welcome-library.test.ts",
+      "originalFailure": "'Expected an application control.'",
+      "disposition": "archived-replaced-workflow",
+      "reason": "Removed arrangement/phrase/rhythm/welcome UI route; current music-workspace, project-library and music-file checks cover the replacement."
+    }
+  ],
+  "remainingFailure": {
+    "file": "tests/workstation.playlist-controls.test.ts",
+    "test": "shelf reorder is a single durable nonmusical edit and survives restart, undo and a full project copy",
+    "reason": "New full-plan comparison after adapting the old shelf metadata expectation exposes existing conversion of a 12-second legacy plan into an 8-second one; all sound events match. Kept active and failing."
+  }
+}

@@ -13,6 +13,7 @@ export function createPhraseCompositionTransport(options: {
   lengthBeats?(): number;
   durationSeconds?(): number;
   readBody?(): PhraseBody | undefined;
+  readMidiEffects?(): boolean;
   runtime: SoundRuntimePort;
   onChange(state: PlaylistTransportState): void;
   onError(error: unknown): void;
@@ -25,7 +26,7 @@ export function createPhraseCompositionTransport(options: {
   let manualTail = false;
   // Recompute on edits/transport actions, never scan thousands of notes per frame.
   let bounds: ReturnType<typeof phraseAuditionExtent> | undefined;
-  const refreshExtent = () => { const body = options.readBody?.(); bounds = body ? phraseAuditionExtent(body) : undefined; };
+  const refreshExtent = () => { const body = options.readBody?.(); bounds = body ? phraseAuditionExtent(body, options.readMidiEffects?.()) : undefined; };
   const extent = () => bounds;
   refreshExtent();
   const fullDuration = () => options.durationSeconds?.() ?? (options.lengthBeats?.() ?? PHRASE_COMPOSITION_BEATS) * 60 / tempo;
@@ -48,7 +49,6 @@ export function createPhraseCompositionTransport(options: {
     }, Math.max(1, remaining * 1000 / state.rate));
   }
   function readPlan(): SoundSequencePlan {
-    refreshExtent();
     const source = options.readPlan();
     const limit = duration();
     const events: SoundSequencePlan['events'][number][] = [];
@@ -62,7 +62,7 @@ export function createPhraseCompositionTransport(options: {
         ? original : { ...original, note: { ...original.note, holdSeconds }, envelope: { ...original.envelope, releaseSeconds } };
       events.push({ ...event, sound });
     }
-    return { ...source, durationSeconds: limit, events };
+    return { ...source, durationSeconds: limit, events, ...(source.midiExpression ? {midiExpression:source.midiExpression.map(lane=>({id:lane.id,events:lane.events.filter(event=>event.atSeconds<=limit)}))}: {}) };
   }
   const base = createPlaylistTransport({ ...options, readPlan, onChange(next) {
     if (!next.playing && !next.preparing && next.position === 0) manualTail = false;
@@ -97,13 +97,14 @@ export function createPhraseCompositionTransport(options: {
     stop,
     setRate(rate) {
       if (disposed) return;
+      refreshExtent();
       if (Number.isFinite(rate) && rate >= .25 && rate <= 4) requestedRate = rate;
       base.setRate(rate);
       requestedRate = state.rate;
     },
     seek,
     position,
-    refresh() {
+    refresh(preserveSounding) {
       if (disposed) return;
       refreshExtent();
       if (bounds && state.playing && base.position() >= duration() - 1e-8) { stop(); return; }
@@ -113,7 +114,7 @@ export function createPhraseCompositionTransport(options: {
         tempo = nextTempo;
         void base.seek(beat * 60 / tempo);
       } else if (base.position() > duration() && !manualTail) void base.seek(duration());
-      else { base.refresh(); scheduleEnd(); }
+      else { base.refresh(preserveSounding); scheduleEnd(); }
     },
     dispose() { if (disposed) return; disposed = true; clearEnd(); base.dispose(); },
   };
