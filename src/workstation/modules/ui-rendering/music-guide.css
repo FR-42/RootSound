@@ -42,7 +42,7 @@
 .music-guide-copy p { margin: 0; }
 .music-guide-copy p + p { margin-top: .28em; }
 .music-guide[data-step="10"] .music-guide-copy p + p { color: #62778c; }
-.music-guide-copy .music-guide-prompt, .tap-tempo-guide-note.music-guide-prompt { color: #666; }
+.music-guide-copy .music-guide-prompt, .tap-tempo-guide-note.music-guide-prompt { color: #666; text-shadow: none; }
 .music-guide-copy .music-guide-prompt {
   position: relative;
   isolation: isolate;
@@ -60,8 +60,8 @@
   filter: blur(.38em);
 }
 @keyframes music-guide-breathe {
-  0%, 100% { color: #666; text-shadow: 0 0 2px #fff, 0 0 5px #fff9; }
-  50% { color: #fff; text-shadow: 0 0 2px #253b52, 0 0 5px #253b52a0; }
+  0%, 100% { color: #666; }
+  50% { color: #fff; }
 }
 @keyframes music-guide-prompt-glow {
   0%, 100% { background-color: #fff; }

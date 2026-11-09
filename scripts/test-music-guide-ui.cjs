@@ -189,6 +189,7 @@ async function runTest() {
   assert.equal(glow.animationDuration, '2.5s');
   assert.match(glow.filter, /blur/);
   assert.equal(await style(spacePrompt, 'animationDuration'), '2.5s');
+  assert.equal(await style(spacePrompt, 'textShadow'), 'none');
   await key('Enter');
   assert.equal(await currentStep(), 3);
   const firstHead = await transform('.melody-playhead');
@@ -401,6 +402,7 @@ async function runTest() {
   assert.equal(await visible('.tap-tempo-hint'), false);
   assert.equal(await js('document.querySelector(".tap-tempo-guide-note").textContent'), '有节奏地敲击空格键吧。');
   assert.equal(await style('.tap-tempo-guide-note', 'animationName'), breathe);
+  assert.equal(await style('.tap-tempo-guide-note', 'textShadow'), 'none');
   const noteAbove = await geometry('.tap-tempo-guide-note');
   assert((await geometry('.tap-tempo-dialog')).y - (noteAbove.y + noteAbove.h) >= 26);
   assert.match(await js('getComputedStyle(document.querySelector(".tap-tempo-guide-note"), "::before").filter'), /blur/);
