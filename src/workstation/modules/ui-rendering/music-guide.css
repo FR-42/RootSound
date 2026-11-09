@@ -65,11 +65,11 @@
 }
 @keyframes music-guide-prompt-glow {
   0%, 100% { background-color: #fff; }
-  50% { background-color: #4d80b2; }
+  50% { background-color: #87ceeb; }
 }
 @media (prefers-reduced-motion: no-preference) {
   .music-guide-prompt {
-    --music-guide-prompt-cycle: 1.9s;
+    --music-guide-prompt-cycle: 2.5s;
     animation: music-guide-breathe var(--music-guide-prompt-cycle) ease-in-out infinite;
   }
   .music-guide-prompt::before { animation: music-guide-prompt-glow var(--music-guide-prompt-cycle) ease-in-out infinite; }

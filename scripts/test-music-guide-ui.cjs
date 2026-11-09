@@ -186,9 +186,9 @@ async function runTest() {
     return { animationName, animationDuration, filter };
   }, spacePrompt);
   assert.equal(glow.animationName, 'music-guide-prompt-glow');
-  assert.equal(glow.animationDuration, '1.9s');
+  assert.equal(glow.animationDuration, '2.5s');
   assert.match(glow.filter, /blur/);
-  assert.equal(await style(spacePrompt, 'animationDuration'), '1.9s');
+  assert.equal(await style(spacePrompt, 'animationDuration'), '2.5s');
   await key('Enter');
   assert.equal(await currentStep(), 3);
   const firstHead = await transform('.melody-playhead');
@@ -501,7 +501,7 @@ async function runTest() {
   assert(gray > 0 && gray < 255);
   const middle = `rgb(${gray}, ${gray}, ${gray})`;
   const white = 'rgb(255, 255, 255)';
-  const blue = 'rgb(77, 128, 178)';
+  const blue = 'rgb(135, 206, 235)';
   const midBackground = cycle[1][2];
   assert.notEqual(midBackground, white);
   assert.notEqual(midBackground, blue);
