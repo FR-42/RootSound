@@ -65,7 +65,7 @@ const ready = selector => wait(() => visible(selector), selector);
 async function expectCue(startedAt, description) {
   await ready('.music-guide-enter');
   const elapsed = Date.now() - startedAt;
-  assert(elapsed >= 1300 && elapsed < 2300, description + ' (' + elapsed + ' ms)');
+  assert(elapsed >= 375 && elapsed < 1100, description + ' (' + elapsed + ' ms)');
 }
 const step = number => ready('.music-guide[data-step="' + number + '"] .music-guide-words');
 const notes = () => js('document.querySelectorAll(".melody-note").length');
@@ -125,17 +125,20 @@ async function runTest() {
   const midpoint = await js('({x:innerWidth/2,y:innerHeight/2})');
   assert(Math.abs(firstWord.x + firstWord.w / 2 - midpoint.x) < 2);
   assert(Math.abs(firstWord.y + firstWord.h / 2 - midpoint.y) < 2);
-  await expectCue(firstShownAt, 'the canvas scene waits 1.5 seconds');
+  await expectCue(firstShownAt, 'the canvas scene waits 0.5 seconds');
   assert.equal(await currentStep(), 1);
   await wait(() => js('Number(getComputedStyle(document.querySelector(".music-guide-word")).opacity) === .18'), 'title fades to a visible watermark');
-  assert.equal(await js('document.querySelector(".music-guide-enter").textContent'), 'Enter');
-  await delay(750);
-  const edgeLight = await js('(() => { const style = getComputedStyle(document.querySelector(".music-guide-enter"), "::before"); return { background: style.backgroundImage, opacity: style.opacity }; })()');
+  assert.equal(await js('document.querySelector(".music-guide-enter").textContent'), '下一幕');
+  const edgeLight = await js('(() => { const style = getComputedStyle(document.querySelector(".music-guide"), "::after"); return { background: style.backgroundImage, opacity: style.opacity, mask: style.maskImage }; })()');
   assert.match(edgeLight.background, /linear-gradient/);
   assert.equal(edgeLight.opacity, '1');
+  assert.equal(edgeLight.mask, 'none');
   for (const selector of ['.melody-note', '.melody-keys', '.melody-pitch-row', '.melody-grid-line', '.melody-playhead', '.melody-playhead-time', '.melody-shelf', '.song-topbar']) assert.equal(await visible(selector), false, selector);
   const cue = await geometry('.music-guide-enter');
-  await gesture([[cue.x + cue.w / 2, cue.y + cue.h / 2]]);
+  assert.equal(cue.y, 0);
+  assert.equal(cue.h, midpoint.y * 2);
+  assert.equal(cue.x + cue.w, midpoint.x * 2);
+  await gesture([[cue.x + cue.w / 2, cue.y + cue.h * .12]]);
   await step(2);
   const secondShownAt = Date.now();
   assert.equal(await notes(), 6);
@@ -161,7 +164,7 @@ async function runTest() {
   assert.equal(await notes(), 6);
 
   stage = 'playhead and keys';
-  await expectCue(secondShownAt, 'the notes scene waits 1.5 seconds');
+  await expectCue(secondShownAt, 'the notes scene waits 0.5 seconds');
   await next();
   await step(3);
   assert.equal(await visible('.melody-roll-end'), false);
@@ -178,6 +181,13 @@ async function runTest() {
   const darkPrompt = 'rgb(25, 44, 64)';
   const breathe = 'music-guide-breathe';
   assert.equal(await style(spacePrompt, 'animationName'), breathe);
+  const glow = await call(selector => {
+    const { animationName, backgroundImage, maskImage } = getComputedStyle(document.querySelector(selector), '::before');
+    return { animationName, backgroundImage, maskImage };
+  }, spacePrompt);
+  assert.equal(glow.animationName, 'music-guide-prompt-glow');
+  assert.match(glow.backgroundImage, /linear-gradient/);
+  assert.match(glow.maskImage, /linear-gradient/);
   await key('Enter');
   assert.equal(await currentStep(), 3);
   const firstHead = await transform('.melody-playhead');
@@ -201,7 +211,7 @@ async function runTest() {
   await key('Enter');
   assert.equal(await currentStep(), 3);
   assert.equal(await visible('.music-guide-enter'), false);
-  await expectCue(movingSince, 'the playhead cue waits 1.5 seconds from the first movement');
+  await expectCue(movingSince, 'the playhead cue waits 0.5 seconds from the first movement');
   const movingTime = await geometry(headTime);
   assert(movingTime.y + movingTime.h < (await geometry('.melody-playhead')).y);
   const pitchBeforeTimeCheck = await pitchOffset();
@@ -269,7 +279,7 @@ async function runTest() {
   await wait(async () => await playbackLabel() === '暂停' && await readClock() < 1, 'the playback head still seeks in the fourth scene');
   await key(' ', 'Space');
   await wait(async () => await playbackLabel() === '播放', 'Space still pauses in the fourth scene');
-  await expectCue(fourthShownAt, 'the keys scene waits 1.5 seconds');
+  await expectCue(fourthShownAt, 'the keys scene waits 0.5 seconds');
 
   stage = 'tempo and drawing';
   await next();
@@ -345,7 +355,7 @@ async function runTest() {
   assert.deepEqual(await call(() => Array.from(document.querySelectorAll('.music-guide-copy p'), p => p.textContent)), [
     'BPM 值 × 一拍的时长 = 一分钟', '相邻两条横线之间是一拍', '点击左下角数字以改变 BPM',
   ]);
-  await expectCue(tempoClickedAt, 'the first tempo click starts the 1.5-second wait');
+  await expectCue(tempoClickedAt, 'the first tempo click starts the 0.5-second wait');
   const rate = await geometry('.melody-tempo-rate-input');
   const ratePoint = [rate.x + 17, rate.y + rate.h / 2];
   const readRate = () => js('document.querySelector(".melody-tempo-rate-input").value');
@@ -392,7 +402,7 @@ async function runTest() {
   assert.equal(await style('.tap-tempo-guide-note', 'animationName'), breathe);
   const noteAbove = await geometry('.tap-tempo-guide-note');
   assert((await geometry('.tap-tempo-dialog')).y - (noteAbove.y + noteAbove.h) >= 26);
-  assert.match(await js('getComputedStyle(document.querySelector(".tap-tempo-guide-note"), "::before").backgroundImage'), /radial-gradient/);
+  assert.match(await js('getComputedStyle(document.querySelector(".tap-tempo-guide-note"), "::before").backgroundImage'), /linear-gradient/);
   const placeholder = await geometry('.tap-tempo-value');
   assert.equal(placeholder.h, 5);
   assert.equal(await js('getComputedStyle(document.querySelector(".tap-tempo-value")).backgroundColor'), 'rgb(23, 25, 28)');
@@ -529,7 +539,7 @@ async function runTest() {
   assert.equal(await visible('.music-guide-enter'), false);
   await key('Enter');
   assert.equal(await currentStep(), 6);
-  await expectCue(deselectedAt, 'the timbre cue waits 1.5 seconds after deselection');
+  await expectCue(deselectedAt, 'the timbre cue waits 0.5 seconds after deselection');
   assert.deepEqual(await copyLines(), [mutedText]);
 
   stage = 'zoom and detail';
@@ -631,7 +641,7 @@ async function runTest() {
   await key('Backspace');
   assert.equal(await notes(), 7);
   assert.deepEqual(await copyLines(), []);
-  await expectCue(editCompletedAt, 'the edit cue waits 1.5 seconds after undo');
+  await expectCue(editCompletedAt, 'the edit cue waits 0.5 seconds after undo');
   const previousGroups = await js('document.querySelectorAll(".melody-note-family").length');
   await click('.melody-add-tone');
   await ready('.melody-tone-library[open] .melody-library-tone');

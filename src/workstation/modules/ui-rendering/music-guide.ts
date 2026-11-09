@@ -23,7 +23,7 @@ export interface MusicGuideFactory {
   mobileWeb?: boolean;
 }
 
-const enterDelayMs = 1500;
+const enterDelayMs = 500;
 const subdivisionStep = 8;
 const editStep = 9;
 const noteEditPrompts: ReadonlyArray<readonly [action: LearningAction, text: string]> = [
@@ -92,7 +92,7 @@ export function mountMusicGuide(root: HTMLElement, factory: MusicGuideFactory, o
   const host = element('div', 'music-guide-host');
   const words = element('section', 'music-guide-words');
   words.hidden = true; words.setAttribute('aria-live', 'polite'); words.setAttribute('aria-atomic', 'true');
-  const enterCue = button('music-guide-enter', 'Enter', () => { if (!enterCue.hidden) advance(); });
+  const enterCue = button('music-guide-enter', '下一幕', () => { if (!enterCue.hidden) advance(); });
   enterCue.hidden = true;
   const touchControls = element('div', 'music-guide-touch');
   const touchPlay = button('music-guide-touch-play', '播放 / 暂停', () => host.querySelector<HTMLButtonElement>('.song-play')?.click());
