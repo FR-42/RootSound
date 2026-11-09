@@ -182,14 +182,13 @@ async function runTest() {
   const breathe = 'music-guide-breathe';
   assert.equal(await style(spacePrompt, 'animationName'), breathe);
   const glow = await call(selector => {
-    const { animationName, animationDuration, backgroundImage, maskImage } = getComputedStyle(document.querySelector(selector), '::before');
-    return { animationName, animationDuration, backgroundImage, maskImage };
+    const { animationName, animationDuration, filter } = getComputedStyle(document.querySelector(selector), '::before');
+    return { animationName, animationDuration, filter };
   }, spacePrompt);
   assert.equal(glow.animationName, 'music-guide-prompt-glow');
-  assert.equal(glow.animationDuration, '2.4s');
-  assert.match(glow.backgroundImage, /linear-gradient/);
-  assert.match(glow.maskImage, /linear-gradient/);
-  assert.equal(await style(spacePrompt, 'animationDuration'), '2.4s');
+  assert.equal(glow.animationDuration, '1.6s');
+  assert.match(glow.filter, /blur/);
+  assert.equal(await style(spacePrompt, 'animationDuration'), '1.6s');
   await key('Enter');
   assert.equal(await currentStep(), 3);
   const firstHead = await transform('.melody-playhead');
@@ -404,7 +403,7 @@ async function runTest() {
   assert.equal(await style('.tap-tempo-guide-note', 'animationName'), breathe);
   const noteAbove = await geometry('.tap-tempo-guide-note');
   assert((await geometry('.tap-tempo-dialog')).y - (noteAbove.y + noteAbove.h) >= 26);
-  assert.match(await js('getComputedStyle(document.querySelector(".tap-tempo-guide-note"), "::before").backgroundImage'), /linear-gradient/);
+  assert.match(await js('getComputedStyle(document.querySelector(".tap-tempo-guide-note"), "::before").filter'), /blur/);
   const placeholder = await geometry('.tap-tempo-value');
   assert.equal(placeholder.h, 5);
   assert.equal(await js('getComputedStyle(document.querySelector(".tap-tempo-value")).backgroundColor'), 'rgb(23, 25, 28)');
@@ -487,21 +486,27 @@ async function runTest() {
     && getComputedStyle(node).opacity === '1'), cards));
   const cycle = await call(selector => {
     const node = document.querySelector(selector);
-    const [animation] = node.getAnimations();
-    const originalTime = animation.currentTime;
-    const { duration } = animation.effect.getComputedTiming();
+    const animations = node.getAnimations({ subtree: true });
+    const originalTimes = animations.map(animation => animation.currentTime);
+    const { duration } = animations[0].effect.getComputedTiming();
     const samples = [0, .25, .5, .75, 1].map(fraction => {
-      animation.currentTime = duration * fraction;
+      for (const animation of animations) animation.currentTime = duration * fraction;
       const { color, opacity } = getComputedStyle(node);
-      return [color, opacity];
+      return [color, opacity, getComputedStyle(node, '::before').backgroundColor];
     });
-    animation.currentTime = originalTime;
+    animations.forEach((animation, index) => { animation.currentTime = originalTimes[index]; });
     return samples;
   }, selectPrompt);
   const gray = Number.parseInt(cycle[1][0].slice(4), 10);
   assert(gray > 0 && gray < 255);
   const middle = `rgb(${gray}, ${gray}, ${gray})`;
-  assert.deepEqual(cycle, [['rgb(0, 0, 0)', '1'], [middle, '1'], ['rgb(255, 255, 255)', '1'], [middle, '1'], ['rgb(0, 0, 0)', '1']]);
+  const white = 'rgb(255, 255, 255)';
+  const blue = 'rgb(40, 99, 159)';
+  const midBackground = cycle[1][2];
+  assert.notEqual(midBackground, white);
+  assert.notEqual(midBackground, blue);
+  assert.deepEqual(cycle, [['rgb(0, 0, 0)', '1', white], [middle, '1', midBackground], [white, '1', blue],
+    [middle, '1', midBackground], ['rgb(0, 0, 0)', '1', white]]);
   assert.equal(await visible('.music-guide-enter'), false);
   await wait(() => js('!document.querySelector(".music-guide-host [title]")'), 'hover labels suppressed');
   const flute = await geometry('.melody-shelf .melody-tone-entry:nth-child(2) .melody-note-family');

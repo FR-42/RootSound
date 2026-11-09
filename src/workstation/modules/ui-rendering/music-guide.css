@@ -54,23 +54,22 @@
   content: '';
   position: absolute;
   z-index: -1;
-  inset: -.85em -1.7em;
+  inset: -.28em -.95em;
   pointer-events: none;
-  background: linear-gradient(90deg, #8fc2f300, #8fc2f36b 22%, #8fc2f36b 78%, #8fc2f300);
-  mask-image: linear-gradient(transparent, #000 40%, #000 60%, transparent);
-  opacity: .8;
+  background-color: #fff;
+  filter: blur(.38em);
 }
 @keyframes music-guide-breathe {
   0%, 100% { color: #000; text-shadow: 0 0 2px #fff, 0 0 5px #fff9; }
   50% { color: #fff; text-shadow: 0 0 2px #253b52, 0 0 5px #253b52a0; }
 }
 @keyframes music-guide-prompt-glow {
-  0%, 100% { opacity: .85; }
-  50% { opacity: .45; }
+  0%, 100% { background-color: #fff; }
+  50% { background-color: #28639f; }
 }
 @media (prefers-reduced-motion: no-preference) {
   .music-guide-prompt {
-    --music-guide-prompt-cycle: 2.4s;
+    --music-guide-prompt-cycle: 1.6s;
     animation: music-guide-breathe var(--music-guide-prompt-cycle) ease-in-out infinite;
   }
   .music-guide-prompt::before { animation: music-guide-prompt-glow var(--music-guide-prompt-cycle) ease-in-out infinite; }
