@@ -182,12 +182,14 @@ async function runTest() {
   const breathe = 'music-guide-breathe';
   assert.equal(await style(spacePrompt, 'animationName'), breathe);
   const glow = await call(selector => {
-    const { animationName, backgroundImage, maskImage } = getComputedStyle(document.querySelector(selector), '::before');
-    return { animationName, backgroundImage, maskImage };
+    const { animationName, animationDuration, backgroundImage, maskImage } = getComputedStyle(document.querySelector(selector), '::before');
+    return { animationName, animationDuration, backgroundImage, maskImage };
   }, spacePrompt);
   assert.equal(glow.animationName, 'music-guide-prompt-glow');
+  assert.equal(glow.animationDuration, '2.4s');
   assert.match(glow.backgroundImage, /linear-gradient/);
   assert.match(glow.maskImage, /linear-gradient/);
+  assert.equal(await style(spacePrompt, 'animationDuration'), '2.4s');
   await key('Enter');
   assert.equal(await currentStep(), 3);
   const firstHead = await transform('.melody-playhead');
@@ -488,7 +490,7 @@ async function runTest() {
     const [animation] = node.getAnimations();
     const originalTime = animation.currentTime;
     const { duration } = animation.effect.getComputedTiming();
-    const samples = [0, .5, 1].map(fraction => {
+    const samples = [0, .25, .5, .75, 1].map(fraction => {
       animation.currentTime = duration * fraction;
       const { color, opacity } = getComputedStyle(node);
       return [color, opacity];
@@ -496,7 +498,10 @@ async function runTest() {
     animation.currentTime = originalTime;
     return samples;
   }, selectPrompt);
-  assert.deepEqual(cycle, [['rgb(120, 138, 156)', '1'], ['rgb(167, 180, 192)', '1'], ['rgb(120, 138, 156)', '1']]);
+  const gray = Number.parseInt(cycle[1][0].slice(4), 10);
+  assert(gray > 0 && gray < 255);
+  const middle = `rgb(${gray}, ${gray}, ${gray})`;
+  assert.deepEqual(cycle, [['rgb(0, 0, 0)', '1'], [middle, '1'], ['rgb(255, 255, 255)', '1'], [middle, '1'], ['rgb(0, 0, 0)', '1']]);
   assert.equal(await visible('.music-guide-enter'), false);
   await wait(() => js('!document.querySelector(".music-guide-host [title]")'), 'hover labels suppressed');
   const flute = await geometry('.melody-shelf .melody-tone-entry:nth-child(2) .melody-note-family');

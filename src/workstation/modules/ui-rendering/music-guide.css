@@ -28,7 +28,6 @@
   animation: music-guide-fade 3s ease forwards;
 }
 .music-guide-copy {
-  --music-guide-prompt-dark: #334a60;
   grid-row: 3;
   width: min(860px, calc(100vw - 40px));
   color: #192c40;
@@ -38,14 +37,12 @@
   text-shadow: 0 0 3px #fff, 0 0 6px #fff, 0 1px 10px #fff;
 }
 .music-guide[data-step="6"] .music-guide-copy {
-  --music-guide-prompt-dark: #788a9c;
-  --music-guide-prompt-light: #a7b4c0;
   color: #41576d;
 }
 .music-guide-copy p { margin: 0; }
 .music-guide-copy p + p { margin-top: .28em; }
 .music-guide[data-step="10"] .music-guide-copy p + p { color: #62778c; }
-.music-guide-copy .music-guide-prompt, .tap-tempo-guide-note.music-guide-prompt { color: var(--music-guide-prompt-dark); }
+.music-guide-copy .music-guide-prompt, .tap-tempo-guide-note.music-guide-prompt { color: #000; }
 .music-guide-copy .music-guide-prompt {
   position: relative;
   isolation: isolate;
@@ -64,16 +61,19 @@
   opacity: .8;
 }
 @keyframes music-guide-breathe {
-  0%, 100% { color: var(--music-guide-prompt-dark); }
-  50% { color: var(--music-guide-prompt-light, #8394a5); }
+  0%, 100% { color: #000; text-shadow: 0 0 2px #fff, 0 0 5px #fff9; }
+  50% { color: #fff; text-shadow: 0 0 2px #253b52, 0 0 5px #253b52a0; }
 }
 @keyframes music-guide-prompt-glow {
   0%, 100% { opacity: .85; }
   50% { opacity: .45; }
 }
 @media (prefers-reduced-motion: no-preference) {
-  .music-guide-prompt { animation: music-guide-breathe 3.2s ease-in-out infinite; }
-  .music-guide-prompt::before { animation: music-guide-prompt-glow 3.2s ease-in-out infinite; }
+  .music-guide-prompt {
+    --music-guide-prompt-cycle: 2.4s;
+    animation: music-guide-breathe var(--music-guide-prompt-cycle) ease-in-out infinite;
+  }
+  .music-guide-prompt::before { animation: music-guide-prompt-glow var(--music-guide-prompt-cycle) ease-in-out infinite; }
 }
 .music-guide-word.music-guide-tempo-equation { display: flex; align-items: center; animation: none; }
 .music-guide-tempo-tail { display: grid; grid-template-columns: 1fr; animation: music-guide-tempo-reveal .9s ease .9s both; }

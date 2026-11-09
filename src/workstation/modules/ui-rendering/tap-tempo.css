@@ -3,7 +3,6 @@
 .tap-tempo-dialog h2 { margin: 0; font-size: 18px; font-weight: 500; }
 .tap-tempo-dialog:has(.tap-tempo-guide-note) { overflow: visible; }
 .tap-tempo-guide-note { position: absolute; left: 50%; bottom: calc(100% + 28px); isolation: isolate; width: max-content; max-width: calc(100vw - 32px); margin: 0; transform: translateX(-50%); color: #31465a; font-size: 15px; font-weight: 600; line-height: 1.4; text-align: center; text-shadow: 0 0 5px #fff; pointer-events: none; }
-.tap-tempo-guide-note { --music-guide-prompt-dark: #425a70; }
 .tap-tempo-guide-note:not(.music-guide-prompt)::before { content: ''; position: absolute; z-index: -1; inset: -14px -34px; background: radial-gradient(ellipse closest-side, #fff 60%, #fffffff2 76%, #fff0 100%); }
 .tap-tempo-error { color: var(--muted); font-size: 12px; line-height: 1.6; }
 .tap-tempo-display { display: grid; place-items: center; min-height: 60px; margin: 12px 0 18px; }
