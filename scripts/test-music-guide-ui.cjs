@@ -498,15 +498,16 @@ async function runTest() {
     return samples;
   }, selectPrompt);
   const gray = Number.parseInt(cycle[1][0].slice(4), 10);
-  assert(gray > 0 && gray < 255);
+  assert(gray > 102 && gray < 255);
   const middle = `rgb(${gray}, ${gray}, ${gray})`;
   const white = 'rgb(255, 255, 255)';
   const blue = 'rgb(135, 206, 235)';
   const midBackground = cycle[1][2];
   assert.notEqual(midBackground, white);
   assert.notEqual(midBackground, blue);
-  assert.deepEqual(cycle, [['rgb(0, 0, 0)', '1', white], [middle, '1', midBackground], [white, '1', blue],
-    [middle, '1', midBackground], ['rgb(0, 0, 0)', '1', white]]);
+  const dark = 'rgb(102, 102, 102)';
+  assert.deepEqual(cycle, [[dark, '1', white], [middle, '1', midBackground], [white, '1', blue],
+    [middle, '1', midBackground], [dark, '1', white]]);
   assert.equal(await visible('.music-guide-enter'), false);
   await wait(() => js('!document.querySelector(".music-guide-host [title]")'), 'hover labels suppressed');
   const flute = await geometry('.melody-shelf .melody-tone-entry:nth-child(2) .melody-note-family');
