@@ -39,16 +39,13 @@ internal sealed class MainWindow : Form
         {
             var preparation = await PrepareWindowClose("check");
             if (!preparation.Ready) throw new IOException(preparation.Message ?? "当前编辑还未准备好，请稍后再关闭。");
-            bool dirty = projects.HasUnsavedChanges || !preparation.CanSave;
-            DialogResult choice = dirty ? MessageBox.Show(this,
-                "当前还有未保存的草稿。\n\n是：保存并关闭\n否：放弃草稿并关闭\n取消：继续编辑",
-                "关闭 RootSound", MessageBoxButtons.YesNoCancel, MessageBoxIcon.Question, MessageBoxDefaultButton.Button3) : DialogResult.No;
-            if (choice == DialogResult.Cancel) return;
-            if (choice == DialogResult.Yes)
+            if (!preparation.CanSave) throw new IOException(preparation.SaveMessage ?? "当前编辑还未准备好，请稍后再关闭。");
+            if (projects.HasUnsavedChanges)
             {
-                var save = await PrepareWindowClose("save");
-                if (!save.Ready || !save.CanSave) throw new IOException(save.SaveMessage ?? save.Message ?? "请先完成或放弃正在编辑的音乐，再保存歌曲。");
-                projects.Save(save.Name);
+                var choice = await PrepareWindowClose("save");
+                if (choice.Cancelled) return;
+                if (!choice.Ready || !choice.CanSave) throw new IOException(choice.SaveMessage ?? choice.Message ?? "请先完成或放弃正在编辑的音乐，再保存歌曲。");
+                if (!choice.Saved && !choice.Discarded) projects.Save(choice.Name, renameFile: false);
             }
             projects.Exit("discard");
             closeAccepted = true; Close();
@@ -70,9 +67,9 @@ internal sealed class MainWindow : Form
         string request = JsonSerializer.Serialize(id);
         await core.ExecuteScriptAsync("(() => { const id = " + request + "; globalThis.__rootSoundCloseHandshake = { id, result: null }; Promise.resolve().then(() => { if (typeof globalThis.__rootSoundPrepareClose !== 'function') throw new Error('界面仍在准备中，请稍后再试。'); return globalThis.__rootSoundPrepareClose(" + JsonSerializer.Serialize(mode) + "); }).then(result => { if (globalThis.__rootSoundCloseHandshake?.id === id) globalThis.__rootSoundCloseHandshake.result = result; }, error => { if (globalThis.__rootSoundCloseHandshake?.id === id) globalThis.__rootSoundCloseHandshake.result = { ready: false, message: error?.message ?? String(error) }; }); })()");
         var deadline = DateTime.UtcNow.AddSeconds(30);
-        while (DateTime.UtcNow < deadline)
+        while (!IsDisposed && (mode == "save" || DateTime.UtcNow < deadline))
         {
-            await Task.Delay(25);
+            await Task.Delay(mode == "save" ? 100 : 25);
             string json = await core.ExecuteScriptAsync("globalThis.__rootSoundCloseHandshake?.id === " + request + " ? globalThis.__rootSoundCloseHandshake.result : null");
             if (json is "null" or "undefined") continue;
             return ParseClosePreparation(json);
@@ -80,7 +77,7 @@ internal sealed class MainWindow : Form
         throw new IOException("等待当前编辑完成超时，草稿仍在窗口中，请重试。");
     }
 
-    internal sealed record ClosePreparation(bool Ready, string? Name, bool CanSave, string? Message, string? SaveMessage);
+    internal sealed record ClosePreparation(bool Ready, string? Name, bool CanSave, string? Message, string? SaveMessage, bool Saved = false, bool Cancelled = false, bool Discarded = false);
     internal static ClosePreparation ParseClosePreparation(string json)
     {
         using var document = JsonDocument.Parse(json); var root = document.RootElement;
@@ -88,7 +85,8 @@ internal sealed class MainWindow : Form
             throw new IOException("关闭准备返回无效结果，草稿仍保留。");
         string? Text(string key) => root.TryGetProperty(key, out var item) && item.ValueKind == JsonValueKind.String ? item.GetString() : null;
         bool canSave = root.TryGetProperty("canSave", out var value) && value.ValueKind == JsonValueKind.True;
-        return new(ready.GetBoolean(), Text("name"), canSave, Text("message"), Text("saveMessage"));
+        bool Flag(string key) => root.TryGetProperty(key, out var flag) && flag.ValueKind == JsonValueKind.True;
+        return new(ready.GetBoolean(), Text("name"), canSave, Text("message"), Text("saveMessage"), Flag("saved"), Flag("cancelled"), Flag("discarded"));
     }
 
     private async Task InitializeView()

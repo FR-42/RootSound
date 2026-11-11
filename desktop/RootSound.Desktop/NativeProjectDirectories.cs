@@ -66,6 +66,15 @@ public sealed class NativeProjectDirectories
     public string Browse(string path = "") => Run(() =>
         JsonSerializer.Serialize(new { status = "browsed", page = manager.Browse(path) }));
 
+    public string CreateLibraryFolder(string path, string name) => Run(() =>
+    { manager.CreateLibraryFolder(path, name); return "{\"status\":\"ready\"}"; });
+
+    public string RenameLibraryEntry(string path, string name) => Run(() =>
+    { manager.RenameLibraryEntry(path, name); return "{\"status\":\"ready\"}"; });
+
+    public string DeleteLibraryEntry(string path) => Run(() =>
+    { manager.DeleteLibraryEntry(path); return "{\"status\":\"ready\"}"; });
+
     public string OpenKnown(string path) => Run(() => NativeDocumentFiles.Format(path) is not null
         ? SourceResult(manager.ReadDocumentFile(path, known: true))
         : JsonSerializer.Serialize(new { status = "opened", project = manager.OpenKnown(path) }));
@@ -73,7 +82,6 @@ public sealed class NativeProjectDirectories
     public string OpenDocument(string path, string token, string libraryText) => Run(() =>
         JsonSerializer.Serialize(new { status = "opened", project = manager.OpenDocument(path, token, libraryText) }));
     public string ReadDocument() => Run(() => manager.ReadDocument() is { } source ? SourceResult(source) : "{\"status\":\"none\"}");
-    public string PrepareDocumentSave(string base64) => Run(() => { manager.PrepareDocumentSave(base64); return "{\"status\":\"ready\"}"; });
     private static string SourceResult(EditableSourceData source) => JsonSerializer.Serialize(new { status = "document", source.Name, source.Path,
         source.Format, source.Base64, source.Token, source.LibraryText }, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
 
@@ -93,7 +101,7 @@ public sealed class NativeProjectDirectories
         JsonSerializer.Serialize(new { status = "renamed", project = manager.Rename(path, expectedId, name, libraryText, token) }));
 
     public string Save(string name = "") => Run(() =>
-        JsonSerializer.Serialize(new { status = "saved", project = manager.Save(name) }));
+        JsonSerializer.Serialize(new { status = "saved", project = manager.Save(name, renameFile: false) }));
 
     public string FinishLoading() => Run(() =>
     {
@@ -103,7 +111,7 @@ public sealed class NativeProjectDirectories
 
     public string Exit(string mode, string name = "") => Run(() =>
     {
-        manager.Exit(mode, name);
+        manager.Exit(mode, name, renameFile: false);
         return "{\"status\":\"exited\"}";
     });
 

@@ -58,8 +58,7 @@ Earlier wording and source IDs are preserved in [the original record](../history
   separators/counts or recursive-flat discovery. Left/Right and pager buttons wrap; editable inputs keep caret behavior.
 - Open native music, MIDI/RMI, MusicXML/MXL and supported portable projects through one file route.
   Opening MIDI does not automatically create a .rootsound file.
-- Normal Save writes the source format/source directory. Explicit Save As .rootsound creates a complete native
-  project. Preserve untouched external bytes; warn and obtain confirmation for actual representation loss.
+- Save opens the library with the choice to write the original .rootsound file or create a .rootsound copy in the displayed folder. Imported MIDI and other external files can only be saved as .rootsound. The library can create folders and rename or delete entries.
 - Normal editing stays in a draft until explicit Save. Save conflicts must not silently overwrite externally
   changed files. Write validated content atomically. Do not reinstate automatic .bak creation.
 - User confirmation 2026-11-05: conversion may shorten trailing empty time. Preserve all sound events,

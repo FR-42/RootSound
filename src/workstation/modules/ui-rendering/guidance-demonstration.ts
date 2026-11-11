@@ -129,7 +129,7 @@ export function createGuidanceDemonstration(shell: HTMLElement, host: HTMLElemen
       workspaceState: { read: () => workspace, write: value => { workspace = structuredClone(value); } },
       readMultipleTempoRolls: () => advanced,
       listTimbres: practice.listTimbres, onCreateNoteGroup: practice.addGroup, onChangeNoteGroupTimbre: practice.changeTone,
-      onExport() {}, onExit() {}, onLearningAction(value) { shell.dataset.action = value; },
+      onExit() {}, onLearningAction(value) { shell.dataset.action = value; },
     });
     host.inert = true;
   }

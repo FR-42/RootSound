@@ -10,6 +10,9 @@ export interface NativeProjectDirectoriesBridge {
   Open(): Promise<unknown>;
   List?(): Promise<unknown>;
   Browse?(path: string): Promise<unknown>;
+  CreateLibraryFolder?(path: string, name: string): Promise<unknown>;
+  RenameLibraryEntry?(path: string, name: string): Promise<unknown>;
+  DeleteLibraryEntry?(path: string): Promise<unknown>;
   Delete?(path: string, expectedId: string): Promise<unknown>;
   Inspect?(path: string, expectedId: string): Promise<unknown>;
   Rename?(path: string, expectedId: string, name: string, libraryText: string, token: string): Promise<unknown>;
@@ -18,7 +21,6 @@ export interface NativeProjectDirectoriesBridge {
   FinishLoading?(): Promise<unknown>;
   OpenDocument?(path: string, token: string, libraryText: string): Promise<unknown>;
   ReadDocument?(): Promise<unknown>;
-  PrepareDocumentSave?(base64: string): Promise<unknown>;
   Exit?(mode: string, name?: string): Promise<unknown>;
 }
 
@@ -142,6 +144,15 @@ export function createDesktopProjectDirectories(bridge: NativeProjectDirectories
       if (result.status !== 'browsed') return fail();
       return libraryPage(result.page);
     } } : {}),
+    ...(bridge.CreateLibraryFolder ? { async createFolder(path: string, name: string) {
+      if ((await call(() => bridge.CreateLibraryFolder!(path, name))).status !== 'ready') fail();
+    } } : {}),
+    ...(bridge.RenameLibraryEntry ? { async renameEntry(path: string, name: string) {
+      if ((await call(() => bridge.RenameLibraryEntry!(path, name))).status !== 'ready') fail();
+    } } : {}),
+    ...(bridge.DeleteLibraryEntry ? { async removeEntry(path: string) {
+      if ((await call(() => bridge.DeleteLibraryEntry!(path))).status !== 'ready') fail();
+    } } : {}),
     async open(path) {
       if (path !== undefined && (!path.trim() || !bridge.OpenKnown)) return fail('当前窗口尚不支持直接打开这个项目，请重新打开 RootSound。');
       const result = await call(() => path === undefined ? bridge.Open() : bridge.OpenKnown!(path));
@@ -208,11 +219,6 @@ export function createDesktopProjectDirectories(bridge: NativeProjectDirectories
       if (result.status === 'none') return undefined;
       if (result.status !== 'document') return fail();
       return documentSource(result);
-    } } : {}),
-    ...(bridge.PrepareDocumentSave ? { async prepareDocumentSave(bytes: Uint8Array) {
-      let binary = ''; for (let offset = 0; offset < bytes.length; offset += 16384) binary += String.fromCharCode(...bytes.subarray(offset, offset + 16384));
-      const result = await call(() => bridge.PrepareDocumentSave!(btoa(binary)));
-      if (result.status !== 'ready') return fail();
     } } : {}),
     async exit(mode, name) {
       if (mode !== 'save' && mode !== 'discard') return fail('请选择保存退出或直接退出。');

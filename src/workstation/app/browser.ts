@@ -9,7 +9,7 @@ import { createPostProduction } from '../modules/post-production/public.ts';
 import { createProjectAssets } from '../modules/project-assets/public.ts';
 import { createSampling, createSampleAudio, createBrowserSampleDecoder, createBrowserSampleCapture, createSampleReferenceAdapter } from '../modules/sampling/public.ts';
 import { createMelodyRecognition, createBrowserMelodyAnalyzer } from '../modules/melody-recognition/public.ts';
-import { mountStudio, confirmFormatSave } from '../modules/ui-rendering/public.ts';
+import { mountStudio } from '../modules/ui-rendering/public.ts';
 import { createDesktopPlatform, isDesktopOrigin } from './platform/desktop.ts';
 import { createBrowserSoundFiles, createBrowserAudioFiles, createBrowserProjectFiles } from './platform/browser-files.ts';
 import { createWorkspacePreferences } from './platform/preferences.ts';
@@ -74,16 +74,8 @@ try {
     if (directoryState.current.format) commitMusicDocument(library, song, phrase);
     await directories?.finishLoading?.();
   }
-  const sourceFile = directoryState?.current?.format ? await directories?.readDocument?.() : undefined;
-  const fileSession = sourceFile && (await import('./music-file.ts')).createMusicFileSession(sourceFile.format, sourceFile.bytes, library, phrase.read().body!, song.read().draft!.name, sourceFile.libraryText);
-  async function prepareFile(target: 'source' | 'rootsound' = 'source') {
-    if (!song.read().draft) return;
-    commitMusicDocument(library, song, phrase);
-    if (fileSession && target === 'source') {
-      const result = fileSession.serialize(library, phrase.read().body!, song.read().draft!.name, platform.storage.read()!);
-      if (!await confirmFormatSave(root, result.warnings)) throw new Error('已取消保存，原文件未改动。');
-      await directories!.prepareDocumentSave!(result.bytes);
-    }
+  function prepareFile() {
+    if (song.read().draft) commitMusicDocument(library, song, phrase);
   }
   const studio = mountStudio(root, { timbre, phrase, song, sampling, recognition, references,
     learning,
@@ -97,10 +89,10 @@ try {
       read() { const text = platform.storage.read(); if (text === null) throw new Error('当前没有可以另存的项目。'); return text; },
       songDraftId() { const id = song.read().draft?.id; if (!id) throw new Error('当前没有打开的歌曲。'); return id; },
       name() { return song.read().draft?.name ?? directoryState?.current?.name ?? '我的歌曲'; },
-      async prepareSave(target) {
+      async prepareSave() {
         await studio.prepareClose({ allowProjectDialog: true });
         const id = song.read().draft?.id; if (!id) throw new Error('当前没有打开的歌曲。');
-        await prepareFile(target);
+        prepareFile();
       },
     }) : undefined,
     projectTimbres() {
@@ -152,7 +144,7 @@ try {
     initialEntry: directoryState ? directoryState.current ? 'song' : 'welcome' : undefined,
     catalog: createMaterialCatalog(library, { currentProject: () => song.read().draft }), preferences,
     entities: createProjectAssets(library, () => song.read().draft),
-    sound: runtime, hasPrevious, files: platform.files, audioFiles: platform.audioFiles,
+    sound: runtime, hasPrevious, files: platform.files,
     projects, projectFiles: platform.projectFiles,
     async previewContent(contentId, signal) {
       if (signal?.aborted) throw new Error('这次试听已取消。');
@@ -173,7 +165,8 @@ try {
   });
   const prepareClose = createProjectClosePreparation({
     flush: () => studio.prepareClose(),
-    prepareSave: () => prepareFile(),
+    chooseSave: directories?.browse ? studio.saveForClose : undefined,
+    prepareSave: () => { if (directoryState?.current?.format) throw new Error('请先保存为 .rootsound 文件。'); prepareFile(); },
     name: () => song.read().draft?.name,
   });
   const closeHost = globalThis as typeof globalThis & { __rootSoundPrepareClose?: typeof prepareClose };

@@ -3,6 +3,7 @@ import { test } from 'node:test';
 import type { PcmAudio, SampleSoundPlan, SoundPlan, SoundSequencePlan } from '../src/workstation/contracts/sound.ts';
 import { createBrowserSoundRuntime } from '../src/workstation/modules/sound-runtime/public.ts';
 import { previewFingerprint, readPreview } from '../src/workstation/modules/sound-runtime/plan.ts';
+import { emptyResources, WindowedGraph } from '../src/workstation/modules/sound-runtime/windowed.ts';
 
 class Param {
   changes: { kind: 'set' | 'ramp' | 'hold'; value: number; time: number }[] = [];
@@ -172,6 +173,31 @@ test('many uses share one owned snapshot, one device buffer and a compact finger
   assert.ok(audio().samples.every(node => node.disconnected && node.stopped)); await runtime.preview(input);
   assert.equal(audio().buffers.length, 2, 'the released graph must not retain an unused buffer forever'); await runtime.dispose();
 }));
+
+test('windowed playback reuses a recording after its last voice ends', () => {
+  const context = new Context();
+  const device = context as unknown as BaseAudioContext;
+  const input = sample();
+  const preview = readPreview(sequence(input, [0, 1, 2], 3));
+  const window = new WindowedGraph(device, preview, emptyResources(), device.destination);
+  try {
+    const origin = context.currentTime;
+    window.prepare(origin, 0);
+    const first = context.samples[0]!;
+    first.end();
+    assert(first.disconnected);
+    context.currentTime = origin + .75;
+    window.advance(.75);
+    assert.equal(context.buffers.length, 1);
+    assert.equal(context.samples[1]!.buffer, first.buffer);
+    close(context.samples[1]!.startTime, origin + 1);
+  } finally { window.dispose(); }
+  const next = new WindowedGraph(device, preview, emptyResources(), device.destination);
+  try {
+    next.prepare(context.currentTime, 0);
+    assert.equal(context.buffers.length, 2);
+  } finally { next.dispose(); }
+});
 
 test('source identity conflicts and invalid tail samples reject before replacing music', async () => fixture(async () => {
   const runtime = createBrowserSoundRuntime(); const current = await runtime.preview(basic()); const head = sample();

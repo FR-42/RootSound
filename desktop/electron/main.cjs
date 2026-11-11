@@ -14,7 +14,7 @@ let window, host, closeAccepted = false, preparingClose = false, pickerBusy = fa
 const failure = error => JSON.stringify({ status: 'error', message: error.message ?? String(error), ok: false, error: error.message ?? String(error) });
 const cancelled = () => JSON.stringify({ status: 'cancelled' });
 const syncMethods = new Set(['storage.Read', 'storage.WriteScoped', 'storage.WriteScopedCheckpoint']);
-const projectMethods = new Set(['Read', 'Create', 'CreateCopy', 'CreateDetached', 'List', 'Browse', 'OpenKnown', 'OpenDocument', 'ReadDocument', 'PrepareDocumentSave', 'Delete', 'Inspect', 'Rename', 'Save', 'FinishLoading', 'Exit']);
+const projectMethods = new Set(['Read', 'Create', 'CreateCopy', 'CreateDetached', 'List', 'Browse', 'CreateLibraryFolder', 'RenameLibraryEntry', 'DeleteLibraryEntry', 'OpenKnown', 'OpenDocument', 'ReadDocument', 'Delete', 'Inspect', 'Rename', 'Save', 'FinishLoading', 'Exit']);
 let lastDirectory;
 function trusted(event) {
   return window && event.sender === window.webContents && event.senderFrame === window.webContents.mainFrame
@@ -103,16 +103,12 @@ async function confirmClose(event) {
     if (state.current) {
       const prepared = await window.webContents.executeJavaScript('globalThis.__rootSoundPrepareClose("check")');
       if (!prepared?.ready) throw new Error('当前编辑尚未准备好，请稍后重试。');
-      const dirty = readResponse(await host.call('project.Read')).hasUnsavedChanges || !prepared.canSave;
-      if (dirty) {
-        const selected = await dialog.showMessageBox(window, { type: 'question', title: '关闭 RootSound', message: '保存当前修改吗？',
-          buttons: ['保存并退出', '放弃修改', '取消'], defaultId: 2, cancelId: 2, noLink: true });
-        if (selected.response === 2) return;
-        if (selected.response === 0) {
-          const save = await window.webContents.executeJavaScript('globalThis.__rootSoundPrepareClose("save")');
-          if (!save?.ready || !save.canSave) throw new Error(save?.saveMessage ?? save?.message ?? '当前编辑尚未准备好，请稍后重试。');
-          readResponse(await host.call('project.Save', [save.name ?? '']));
-        }
+      if (!prepared.canSave) throw new Error(prepared.saveMessage ?? '当前编辑尚未准备好，请稍后重试。');
+      if (readResponse(await host.call('project.Read')).hasUnsavedChanges) {
+        const choice = await window.webContents.executeJavaScript('globalThis.__rootSoundPrepareClose("save")');
+        if (choice?.cancelled) return;
+        if (!choice?.ready || !choice.canSave) throw new Error(choice?.saveMessage ?? choice?.message ?? '当前编辑尚未准备好，请稍后重试。');
+        if (!choice.saved && !choice.discarded) readResponse(await host.call('project.Save', [choice.name ?? '']));
       }
       readResponse(await host.call('project.Exit', ['discard', '']));
     }

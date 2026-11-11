@@ -1,9 +1,9 @@
 import type { SoundRuntimePort, PlaybackSession } from '../../contracts/sound.ts';
 import type { SaveResult } from '../../contracts/content.ts';
 import type { TimbreEditorPort } from '../../contracts/timbre.ts';
-import type { SoundFilesPort, AudioFilesPort, ProjectFilesPort } from '../../contracts/files.ts';
+import type { SoundFilesPort, ProjectFilesPort } from '../../contracts/files.ts';
 import type { ProjectPackagesPort } from '../../contracts/project.ts';
-import type { ProjectSetupPort } from '../../contracts/project-directory.ts';
+import type { ProjectSaveChoice, ProjectSetupPort } from '../../contracts/project-directory.ts';
 import type { PhraseEditorPort, PhraseSection } from '../../contracts/phrase.ts';
 import type { SongClipRef, SongEditorPort } from '../../contracts/song.ts';
 import type { MaterialCatalogPort } from '../../contracts/catalog.ts';
@@ -22,9 +22,7 @@ import { mountGuidanceInvitation } from './guidance-invitation.ts';
 import { createProjectWelcome } from './project-welcome.ts';
 import { mountProjectStart } from './project-start.ts';
 import { mountProjectLibrary } from './project-library.ts';
-import { showProjectSaveAs } from './project-save-as.ts';
 import { showProjectExit } from './project-exit.ts';
-import { showAudioExport } from './audio-export.ts';
 import './studio.css';
 import './theme.css';
 export { confirmFormatSave } from './format-save-warning.ts';
@@ -36,7 +34,6 @@ export interface StudioOptions {
   sound: SoundRuntimePort;
   hasPrevious: boolean;
   files?: SoundFilesPort;
-  audioFiles?: AudioFilesPort;
   projectFiles?: ProjectFilesPort;
   projects?: ProjectPackagesPort;
   projectSetup?: ProjectSetupPort;
@@ -85,11 +82,12 @@ function element<K extends keyof HTMLElementTagNameMap>(tag: K, className = '', 
   const node = document.createElement(tag); node.className = className; node.textContent = text; return node;
 }
 /** A project opens directly into its sole editable music score. */
-export function mountStudio(root: HTMLElement, options: StudioOptions): { dispose(): void; openGuide(): Promise<void>; prepareClose(options?: { allowProjectDialog?: boolean }): Promise<void> } {
+export function mountStudio(root: HTMLElement, options: StudioOptions): { dispose(): void; openGuide(): Promise<void>; saveForClose(): Promise<ProjectSaveChoice>; prepareClose(options?: { allowProjectDialog?: boolean }): Promise<void> } {
   let disposed = false, guideOpen = false;
   let frameNotes = options.demo === true;
   let editor: ReturnType<typeof mountPhraseComposition> | undefined;
   let page: { dispose(): void } | undefined;
+  let closeSaveLibrary: ((choice?: ProjectSaveChoice) => void) | undefined;
   function leave(): void { editor?.dispose(); editor = undefined; page?.dispose(); page = undefined; options.sound.stopAll(); }
   function settings(inMusic: boolean): void {
     if (!options.learning && !options.demo) return;
@@ -97,6 +95,25 @@ export function mountStudio(root: HTMLElement, options: StudioOptions): { dispos
       requiresTempoRolls: !options.demo && inMusic && needsTempoRolls(options.phrase?.read().body),
       onChange: () => editor?.refresh(),
       onReplayGuide: options.demo ? () => { void openGuide(); } : undefined,
+    });
+  }
+  async function saveInLibrary(mode: 'edit' | 'exit' | 'close' = 'edit'): Promise<ProjectSaveChoice> {
+    const service = options.projectSetup!;
+    if (!service.readSaveSource || !service.saveAs) { await service.save?.(); return service.save ? 'saved' : 'cancelled'; }
+    const source = await service.readSaveSource();
+    if (disposed || closeSaveLibrary) return 'cancelled';
+    const trigger = root.querySelector<HTMLButtonElement>('.song-save-project') ?? document.createElement('button');
+    return new Promise<ProjectSaveChoice>(resolve => {
+      const library = mountProjectLibrary(root, trigger, service, () => {}, options.doubleClickIntervalMs, {
+        source, name: source?.name ?? options.phrase!.read().draft!.name,
+        original: source && !source.format && /\.rootsound$/iu.test(source.path)
+          ? () => mode === 'exit' ? service.exit!('save') : service.save!() : undefined,
+        discard: mode === 'close' ? async () => {} : mode === 'exit' && service.exit ? () => service.exit!('discard') : undefined,
+        copy: (name, path) => service.saveAs!(name, path, mode),
+        finish: choice => closeSaveLibrary?.(choice),
+      });
+      closeSaveLibrary = (choice = 'cancelled') => { closeSaveLibrary = undefined; library.dispose(); resolve(choice); };
+      library.open();
     });
   }
   function showWelcome(): void {
@@ -147,11 +164,10 @@ export function mountStudio(root: HTMLElement, options: StudioOptions): { dispos
       onRemoveTimbre: options.onRemovePhraseTimbre, onReorderTimbres: options.onReorderTimbres,
       onRename(name) { options.onRenameProject?.(name); phrase.rename(name); },
       readUnsavedChanges: options.projectSetup?.hasUnsavedChanges ? () => options.projectSetup!.hasUnsavedChanges!() : undefined,
-      onSave: options.projectSetup?.save ? () => options.projectSetup!.save!() : undefined,
-      onSaveAs: options.projectSetup?.saveAs ? () => showProjectSaveAs(root, options.projectSetup!, phrase.read().draft!.name) : undefined,
-      onExit: options.demo ? undefined : options.projectSetup ? () => showProjectExit(root, options.projectSetup!) : showWelcome,
-      onExport: options.audioFiles ? () => showAudioExport(root, { name: phrase.read().draft!.name,
-        sound: options.sound, files: options.audioFiles!, prepare: () => phrase.preparePreview(), plan: () => phrase.previewPlan() }) : undefined,
+      onSave: options.projectSetup?.save ? async () => { await saveInLibrary(); } : undefined,
+      onSaveAs: options.projectSetup?.saveAs ? async () => { await saveInLibrary(); } : undefined,
+      onExit: options.demo ? undefined : options.projectSetup ? () => showProjectExit(root, options.projectSetup!,
+        options.projectSetup?.readSaveSource ? async () => { await saveInLibrary('exit'); } : undefined) : showWelcome,
     });
     frameNotes = false;
   }
@@ -185,12 +201,12 @@ export function mountStudio(root: HTMLElement, options: StudioOptions): { dispos
     }
     page = mountGuidanceInvitation(root, { onWatch: () => choose(true), onSkip: () => choose(false) });
   } else initialView();
-  return { openGuide, async prepareClose(closeOptions = {}) {
+  return { openGuide, saveForClose: () => saveInLibrary('close'), async prepareClose(closeOptions = {}) {
     if (disposed) throw new Error('当前页面已关闭。');
     // Toolbar actions have already flushed their edits before invoking the project service.
     if (!closeOptions.allowProjectDialog) {
-      if (root.querySelector('dialog[open]')) throw new Error('请先完成当前窗口中的操作。');
+      if (closeSaveLibrary || root.querySelector('dialog[open]')) throw new Error('请先完成当前窗口中的操作。');
       await editor?.flush();
     }
-  }, dispose() { disposed = true; leave(); root.replaceChildren(); } };
+  }, dispose() { disposed = true; closeSaveLibrary?.(); leave(); root.replaceChildren(); } };
 }

@@ -32,14 +32,16 @@ for (string? line; (line = Console.ReadLine()) is not null;)
             "project.CreateDetached" => Pack(new { status = "created", project = manager.CreateDetached(A(0), A(1), A(2)) }),
             "project.List" => Pack(new { status = "listed", projects = manager.List() }),
             "project.Browse" => Pack(new { status = "browsed", page = manager.Browse(A(0)) }),
+            "project.CreateLibraryFolder" => ChangeLibrary(() => manager.CreateLibraryFolder(A(0), A(1))),
+            "project.RenameLibraryEntry" => ChangeLibrary(() => manager.RenameLibraryEntry(A(0), A(1))),
+            "project.DeleteLibraryEntry" => ChangeLibrary(() => manager.DeleteLibraryEntry(A(0))),
             "project.OpenPath" => NativeDocumentFiles.Format(A(0)) is not null ? Source(manager.ReadDocumentFile(A(0))) : Pack(new { status = "opened", project = manager.Open(A(0)) }),
             "project.OpenKnown" => NativeDocumentFiles.Format(A(0)) is not null
                 ? Source(manager.ReadDocumentFile(A(0), known: true))
                 : Pack(new { status = "opened", project = manager.OpenKnown(A(0)) }),
             "project.OpenDocument" => Pack(new { status = "opened", project = manager.OpenDocument(A(0), A(1), A(2)) }),
             "project.ReadDocument" => manager.ReadDocument() is { } source ? Source(source) : "{\"status\":\"none\"}",
-            "project.PrepareDocumentSave" => PrepareDocument(A(0)),
-            "project.Save" => Pack(new { status = "saved", project = manager.Save(A(0)) }),
+            "project.Save" => Pack(new { status = "saved", project = manager.Save(A(0), renameFile: false) }),
             "project.FinishLoading" => FinishLoading(),
             "project.Exit" => ExitProject(A(0), A(1)),
             "project.Inspect" => Inspect(A(0), A(1)),
@@ -60,7 +62,7 @@ return 0;
 
 string Source(EditableSourceData source) => JsonSerializer.Serialize(new { status = "document", source.Name, source.Path, source.Format,
     source.Base64, source.Token, source.LibraryText }, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
-string PrepareDocument(string base64) { manager.PrepareDocumentSave(base64); return "{\"status\":\"ready\"}"; }
+string ChangeLibrary(Action action) { action(); return "{\"status\":\"ready\"}"; }
 
 string ReadStorage()
 {
@@ -73,7 +75,7 @@ string WriteStorage(string value, string scope, bool checkpoint)
     manager.WriteLibrary(value, scope, checkpoint); return "{\"ok\":true}";
 }
 string FinishLoading() { manager.FinishLoading(); return "{\"status\":\"ready\"}"; }
-string ExitProject(string mode, string name) { manager.Exit(mode, name); return "{\"status\":\"exited\"}"; }
+string ExitProject(string mode, string name) { manager.Exit(mode, name, renameFile: false); return "{\"status\":\"exited\"}"; }
 string Delete(string path, string id)
 {
     manager.Delete(path, id); return JsonSerializer.Serialize(new { status = "deleted", warning = manager.LastTimbreCleanupWarning });

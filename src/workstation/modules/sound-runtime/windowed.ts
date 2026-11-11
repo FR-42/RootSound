@@ -1,4 +1,4 @@
-import { allocateGraph, releaseGraph, scheduleGraph, startGraphSource, type GraphResources, type SoundGraph } from './graph.ts';
+import { allocateGraph, createWindowedSampleCache, releaseGraph, scheduleGraph, startGraphSource, type GraphResources, type SoundGraph } from './graph.ts';
 import { noteDuration, type ScheduledPreview } from './plan.ts';
 
 /** Device-clock lookahead; the timer only replenishes it, never supplies note timing. */
@@ -19,6 +19,7 @@ export class WindowedGraph {
   readonly #audio: BaseAudioContext;
   readonly #preview: ScheduledPreview;
   readonly #events: ScheduledPreview['events'];
+  readonly #sampleCache: ReturnType<typeof createWindowedSampleCache>;
   readonly #live = new Set<LiveEvent>();
   #cursor = 0;
   #origin = 0;
@@ -31,6 +32,7 @@ export class WindowedGraph {
   constructor(audio: BaseAudioContext, preview: ScheduledPreview, resources: GraphResources, destination: AudioNode) {
     this.#audio = audio; this.#preview = preview;
     this.#events = [...preview.events].sort((a, b) => a.atSeconds - b.atSeconds);
+    this.#sampleCache = createWindowedSampleCache(audio);
     this.fade = audio.createGain(); resources.gains.push(this.fade);
     // Keep the fader as the outlet so audition ducking can reroute a live stream.
     resources.outputBuses = [this.fade]; this.fade.connect(destination);
@@ -80,6 +82,7 @@ export class WindowedGraph {
       let live: LiveEvent | undefined;
       let remaining = event.sound.kind === 'sample' ? 1 : event.sound.sources.length;
       try {
+        if (event.sound.kind === 'sample') this.#sampleCache.retain(event.sound.source);
         const graph = allocateGraph(this.#audio, { ...this.#preview, output: undefined, events: [event] }, resources, () => {
           if (--remaining === 0 && live) this.#release(live);
         }, this.graph.output?.node ?? this.fade);
@@ -125,6 +128,7 @@ export class WindowedGraph {
     if (this.#disposed) return;
     this.#disposed = true; this.#cancelTimer();
     for (const event of this.#live) this.#release(event);
+    this.#sampleCache.dispose();
   }
 
   #cancelTimer(): void {

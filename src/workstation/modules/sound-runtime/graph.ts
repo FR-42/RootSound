@@ -60,6 +60,38 @@ function leaseBuffer(audio: BaseAudioContext, source: SampleSourceSnapshot): { b
   } };
 }
 
+const WINDOWED_SAMPLE_CACHE_BYTES = 48 * 1024 * 1024;
+
+export function createWindowedSampleCache(audio: BaseAudioContext) {
+  const retained = new Map<SampleSourceSnapshot['audio'], { bytes: number; release(): void }>();
+  let used = 0;
+  return {
+    retain(source: SampleSourceSnapshot): void {
+      const existing = retained.get(source.audio);
+      if (existing) {
+        retained.delete(source.audio);
+        retained.set(source.audio, existing);
+        return;
+      }
+      const bytes = source.audio.channels.length * source.audio.channels[0]!.byteLength;
+      if (bytes > WINDOWED_SAMPLE_CACHE_BYTES) return;
+      while (used + bytes > WINDOWED_SAMPLE_CACHE_BYTES) {
+        const [oldest, entry] = retained.entries().next().value!;
+        retained.delete(oldest);
+        used -= entry.bytes;
+        entry.release();
+      }
+      retained.set(source.audio, { bytes, release: leaseBuffer(audio, source).release });
+      used += bytes;
+    },
+    dispose(): void {
+      for (const entry of retained.values()) entry.release();
+      retained.clear();
+      used = 0;
+    },
+  };
+}
+
 /** One graph builder and one envelope scheduler serve live and offline clocks. */
 export function allocateGraph(audio: BaseAudioContext, preview: ScheduledPreview, resources: GraphResources, ended?: () => void,
   destination: AudioNode = audio.destination): SoundGraph {

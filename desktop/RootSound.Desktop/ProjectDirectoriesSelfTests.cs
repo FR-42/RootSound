@@ -36,6 +36,33 @@ internal static class ProjectDirectoriesSelfTests
             Check(reopened.ReadLibrary().Value == text, "种子完整重开");
         });
 
+        Case("library-mutations", root =>
+        {
+            using var manager = new ProjectDirectoryManager(root);
+            manager.CreateLibraryFolder(manager.DefaultLocation, "Folder");
+            string folder = Path.Combine(manager.DefaultLocation, "Folder");
+            manager.CreateLibraryFolder(folder, "Subfolder");
+            string child = Path.Combine(folder, "Subfolder");
+            string midi = Path.Combine(child, "Source.mid");
+            byte[] bytes = Convert.FromHexString("4D546864000000060000000101E04D54726B0000000400FF2F00");
+            File.WriteAllBytes(midi, bytes);
+            manager.RenameLibraryEntry(midi, "Renamed");
+            string renamed = Path.Combine(child, "Renamed.mid");
+            Check(!File.Exists(midi) && File.ReadAllBytes(renamed).SequenceEqual(bytes), "外部文件改名保留扩展名和字节");
+            var project = manager.Create("Native", child, Library("Native"));
+            manager.FinishLoading();
+            manager.Save("New title", renameFile: false);
+            Check(manager.Current!.Path == project.Path && File.Exists(project.Path), "保存到原文件保留路径");
+            ExpectFailure(() => manager.DeleteLibraryEntry(folder), "不能删除正在编辑的工程所在目录");
+            manager.Exit("discard");
+            manager.RenameLibraryEntry(folder, "Moved");
+            string moved = Path.Combine(manager.DefaultLocation, "Moved");
+            Check(File.Exists(Path.Combine(moved, "Subfolder", "Native.rootsound")), "改名保留目录树");
+            ExpectFailure(() => manager.DeleteLibraryEntry(root), "拒绝库外路径");
+            manager.DeleteLibraryEntry(moved);
+            Check(!Directory.Exists(moved) && !Directory.EnumerateFileSystemEntries(manager.DefaultLocation).Any(), "删除嵌套目录及文件");
+        });
+
         Case("welcome-memory", root =>
         {
             using (var m = new ProjectDirectoryManager(root))
@@ -360,9 +387,8 @@ internal static class ProjectDirectoriesSelfTests
             manager.OpenDocument(path, source.Token, Library("原旋律"));
             manager.FinishLoading();
             manager.WriteLibrary(Library("未保存的旋律"));
-            byte[] edited = Convert.FromHexString("4D546864000000060000000100604D54726B0000000400FF2F00");
-            manager.PrepareDocumentSave(Convert.ToBase64String(edited));
             Check(manager.HasUnsavedChanges, "当前草稿有改动");
+            ExpectFailure(() => manager.Save(), "MIDI 只能另存为简乐工程");
             manager.Exit("discard");
             Check(manager.Current is null && manager.ReadLibrary().Value is null && manager.ReadDocument() is null, "退出清空工作稿");
             Check(File.ReadAllBytes(path).SequenceEqual(original) && File.GetLastWriteTimeUtc(path) == stamp, "直接退出保留原 MIDI 文件");
@@ -996,7 +1022,9 @@ internal static class ProjectDirectoriesSelfTests
             var ready = MainWindow.ParseClosePreparation("{\"ready\":true,\"name\":\"未保存的标题\",\"canSave\":true}");
             Check(ready.Ready && ready.CanSave && ready.Name == "未保存的标题", "保存关闭传递当前标题");
             var pending = MainWindow.ParseClosePreparation("{\"ready\":true,\"canSave\":false,\"saveMessage\":\"先处理音乐\"}");
-            Check(pending.Ready && !pending.CanSave && pending.SaveMessage == "先处理音乐", "仍可选择放弃但不能漏掉音乐保存");
+            Check(pending.Ready && !pending.CanSave && pending.SaveMessage == "先处理音乐", "关闭前显示编辑准备失败的原因");
+            var discard = MainWindow.ParseClosePreparation("{\"ready\":true,\"canSave\":true,\"discarded\":true}");
+            Check(discard.Ready && discard.Discarded && !discard.Saved && !discard.Cancelled, "直接退出有独立的关闭结果");
             Check(!MainWindow.ParseClosePreparation("{\"ready\":false,\"message\":\"仍在提交\"}").Ready, "准备失败不能关窗");
             Check(!MainWindow.ParseClosePreparation("{\"ready\":true}").CanSave, "缺失保存能力按拒绝处理");
             ExpectFailure(() => MainWindow.ParseClosePreparation("{}"), "无效结果不能关窗");

@@ -234,20 +234,20 @@ public sealed partial class ProjectDirectoryManager : IDisposable
         }
     }
 
-    public ProjectDirectoryInfo Save(string? name = null)
+    public ProjectDirectoryInfo Save(string? name = null, bool renameFile = true)
     {
         lock (gate)
         {
             ThrowIfDisposed();
             if (current is null || activeStore is null) throw new IOException("先创建或打开一个歌曲项目，再保存。");
-            string nextName = string.IsNullOrEmpty(name) || sourceDocument is not null && name == current.Name ? current.Name : ValidateName(name);
-            if (sourceDocument is not null) return SaveDocument(nextName);
+            if (sourceDocument is not null) throw new IOException("请保存为 .rootsound 文件。");
+            string nextName = string.IsNullOrEmpty(name) ? current.Name : ValidateName(name);
             var nextProject = current with { Name = nextName };
             if (fileEnvelope is not null)
             {
                 activeStore.VerifyUnchanged();
                 beforeSaveCommit?.Invoke(current.Path);
-                WriteStoredLibrary(currentSnapshot ?? throw new IOException("当前歌曲资料不可用。"), nextName, verifyTimbres: true);
+                WriteStoredLibrary(currentSnapshot ?? throw new IOException("当前歌曲资料不可用。"), nextName, verifyTimbres: true, renameFile: renameFile);
                 current = nextProject with { Path = activeStore.FilePath }; committedSnapshot = savedSnapshot = currentSnapshot; loadingCompleted = true;
                 return current;
             }
@@ -291,7 +291,7 @@ public sealed partial class ProjectDirectoryManager : IDisposable
     }
 
     /// <summary>Leave the current song, restoring its manual checkpoint when requested.</summary>
-    public void Exit(string mode, string? name = null)
+    public void Exit(string mode, string? name = null, bool renameFile = true)
     {
         lock (gate)
         {
@@ -299,7 +299,7 @@ public sealed partial class ProjectDirectoryManager : IDisposable
             if (mode is not "save" and not "discard") throw new ArgumentException("请选择保存退出或直接退出。", nameof(mode));
             if (current is not null && activeStore is not null)
             {
-                if (mode == "save") Save(name);
+                if (mode == "save") Save(name, renameFile);
                 activeStore.Dispose();
             }
             activeStore = null;
@@ -312,7 +312,7 @@ public sealed partial class ProjectDirectoryManager : IDisposable
             loadingCompleted = false;
             observedManifestHash = null;
             fileEnvelope = null;
-            sourceDocument = null; preparedDocumentBytes = null; preparedDocumentSnapshot = null;
+            sourceDocument = null;
             scope = Guid.NewGuid().ToString("N");
         }
     }
@@ -802,12 +802,14 @@ public sealed partial class ProjectDirectoryManager : IDisposable
         catch (DecoderFallbackException error) { throw new InvalidDataException("旧版项目资料不是有效的 UTF-8 文本。", error); }
     }
 
-    private void WriteStoredLibrary(string library, string? name = null, bool verifyTimbres = false)
+    private void WriteStoredLibrary(string library, string? name = null, bool verifyTimbres = false, bool renameFile = true)
     {
         if (fileEnvelope is null) { activeStore!.Write(library); MirrorTimbres(library, verifyTimbres); return; }
         var envelope = (JsonObject)fileEnvelope.DeepClone();
         if (name is not null) envelope["name"] = name;
-        WriteNamedProject(activeStore!, name ?? current!.Name, stream => StreamingWorkspaceCodec.Write(stream, envelope, library, payloads));
+        void Write(Stream stream) => StreamingWorkspaceCodec.Write(stream, envelope, library, payloads);
+        if (renameFile) WriteNamedProject(activeStore!, name ?? current!.Name, Write);
+        else activeStore!.WriteStream(Write);
         // Working/committed snapshots already own the library. Keep only the
         // small envelope metadata so subsequent saves do not clone audio again.
         fileEnvelope = envelope; MirrorTimbres(library, verifyTimbres);
@@ -843,7 +845,7 @@ public sealed partial class ProjectDirectoryManager : IDisposable
             activeStore = candidate; candidate = null;
             payloads = nextPayloads; nextPayloads = null;
             timbreSongDraftId = null; current = parsed.Project; fileEnvelope = parsed.Envelope;
-            sourceDocument = null; preparedDocumentBytes = null; preparedDocumentSnapshot = null;
+            sourceDocument = null;
             currentSnapshot = committedSnapshot = savedSnapshot = parsed.Library; loadingCompleted = false;
             observedManifestHash = null; memory = null; scope = Guid.NewGuid().ToString("N");
             if (!reuse) previous?.Dispose();
@@ -917,7 +919,7 @@ public sealed partial class ProjectDirectoryManager : IDisposable
             activeStore = candidate;
             candidate = null;
             current = project; timbreSongDraftId = null;
-            sourceDocument = null; preparedDocumentBytes = null; preparedDocumentSnapshot = null;
+            sourceDocument = null;
             observedManifestHash = SHA256.HashData(manifest);
             fileEnvelope = null;
             currentSnapshot = committedSnapshot = text;

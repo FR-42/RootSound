@@ -41,7 +41,6 @@ export function mountPhraseComposition(root: HTMLElement, options: {
   initialView?: PhraseView;
   directMusic?: boolean;
   workspaceState?: MusicWorkspaceStatePort;
-  onExport?(): void | Promise<void>;
   onSettings?(): void;
   readMultipleTempoRolls?(): boolean;
   readDrumLanes?(): boolean;
@@ -402,7 +401,6 @@ export function mountPhraseComposition(root: HTMLElement, options: {
   mountOutputVolume(controls, () => sound);
   const files = node('div', 'song-file-actions');
   let mobileTouch = options.mobileTouch;
-  if (options.onExport) files.append(action('导出音频', 'song-save song-export-audio', () => { void execute(options.onExport); }));
   if (options.onSettings) files.append(action('设置', 'song-save song-settings', () => { void execute(options.onSettings); }));
   if (options.mobileWeb) {
     let rightMode = false;

@@ -5,9 +5,8 @@ import { createSampleBankAudio } from '../modules/timbre/sample-bank.ts';
 import { createPhraseEditor, createPhrasePlayback, createPhraseReferenceAdapter } from '../modules/phrase/public.ts';
 import { createSongEditor, createSongReferenceAdapter } from '../modules/song/public.ts';
 import { createSampleAudio, createBrowserSampleDecoder, createSampleReferenceAdapter } from '../modules/sampling/public.ts';
-import { mountStudio, confirmFormatSave } from '../modules/ui-rendering/public.ts';
+import { mountStudio } from '../modules/ui-rendering/public.ts';
 import type { MaterialStorage } from '../contracts/content.ts';
-import type { AudioFilesPort } from '../contracts/files.ts';
 import type { ProjectDirectoriesPort } from '../contracts/project-directory.ts';
 import type { SamplePayloadPort } from '../contracts/sampling.ts';
 import type { TimbreFilesPort } from '../contracts/timbre-files.ts';
@@ -27,7 +26,6 @@ import { stageMaterialStorage } from './material-library-session.ts';
 export interface ReleasePlatform {
   storage: MaterialStorage;
   projectDirectories?: ProjectDirectoriesPort;
-  audioFiles?: AudioFilesPort;
   demoProject?: { id: string; name: string; format?: never; startWithGuide?: boolean; mobileGuide?: boolean };
   timbreFiles: TimbreFilesPort;
   samplePayloads?: SamplePayloadPort;
@@ -69,24 +67,8 @@ export async function mountReleaseStudio(root: HTMLElement, platform: ReleasePla
       staged!.publish();
       await directories?.finishLoading?.();
     }
-    const sourceFormat = current?.format;
-    let fileSession: ReturnType<typeof import('./music-file.ts')['createMusicFileSession']> | undefined;
-    async function prepareFile(target: 'source' | 'rootsound' = 'source') {
-      if (!songId) return;
-      if (sourceFormat && target === 'source' && !fileSession) {
-        const sourceFile = await directories!.readDocument?.();
-        if (!sourceFile?.libraryText) throw new Error('无法读取原始音乐，请重新打开后保存。');
-        const { createMusicFileSession } = await import('./music-file.ts');
-        const view = phrase.read();
-        fileSession = createMusicFileSession(sourceFile.format, sourceFile.bytes, library, view.body!, view.draft!.name, sourceFile.libraryText);
-      }
-      commitMusicDocument(library, song, phrase);
-      if (fileSession && target === 'source') {
-        const result = fileSession.serialize(library, phrase.read().body!, song.read().draft!.name, platform.storage.read()!);
-        if (!await confirmFormatSave(root, result.warnings)) throw new Error('已取消保存，原文件未改动。');
-        if (!directories!.prepareDocumentSave) throw new Error('请重新打开更新后的简乐。');
-        await directories!.prepareDocumentSave(result.bytes);
-      }
+    function prepareFile() {
+      if (songId) commitMusicDocument(library, song, phrase);
     }
     const preferences = createWorkspacePreferences(localStorage);
     const learning = createLearningSettings(localStorage);
@@ -96,7 +78,7 @@ export async function mountReleaseStudio(root: HTMLElement, platform: ReleasePla
       workspaceState: current ? createMusicWorkspaceState(localStorage, current.id) : undefined,
       musicGuide: { createDocument: name => createMusicGuideDocument(name, !!platform.demoProject),
         createSound: createBrowserSoundRuntime, mobileWeb: platform.demoProject?.mobileGuide },
-      initialEntry: current ? 'song' : 'welcome', audioFiles: platform.audioFiles, demo: !!platform.demoProject,
+      initialEntry: current ? 'song' : 'welcome', demo: !!platform.demoProject,
       startWithGuide: platform.demoProject?.startWithGuide,
       onFirstGuideChoice: directories && firstDesktopGuideChoice(localStorage, learning.read().guides.basics.status),
       projectSetup: directories && createProjectSetup(directories, () => {
@@ -105,9 +87,9 @@ export async function mountReleaseStudio(root: HTMLElement, platform: ReleasePla
       }, {
         read() { const value = platform.storage.read(); if (value === null) throw new Error('当前没有项目。'); return value; },
         songDraftId: projectId, name: () => song.readDraft()!.name,
-        async prepareSave(target) {
+        async prepareSave() {
           await studio.prepareClose({ allowProjectDialog: true });
-          await prepareFile(target);
+          prepareFile();
         },
       }),
       projectTimbres() { return listProjectTimbres(library, projectId()).map(record => ({ id: record.id, name: record.name,
@@ -128,8 +110,8 @@ export async function mountReleaseStudio(root: HTMLElement, platform: ReleasePla
       onReorderTimbres: (id, index) => reorderProjectTimbres(library, projectId(), id, index),
       onRenameProject: name => { song.rename(projectName(name)); },
     });
-    const prepareClose = createProjectClosePreparation({ flush: () => studio.prepareClose(),
-      prepareSave: () => prepareFile(), name: () => song.readDraft()?.name });
+    const prepareClose = createProjectClosePreparation({ flush: () => studio.prepareClose(), chooseSave: directories?.browse ? studio.saveForClose : undefined,
+      prepareSave: () => { if (current?.format) throw new Error('请先保存为 .rootsound 文件。'); prepareFile(); }, name: () => song.readDraft()?.name });
     const warmup = platform.demoProject && !platform.demoProject.startWithGuide
       ? requestAnimationFrame(() => { void phrase.preparePreview().catch(() => {}); }) : undefined;
     return { openGuide: studio.openGuide, prepareClose, dispose() {

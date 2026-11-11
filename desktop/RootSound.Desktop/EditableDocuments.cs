@@ -45,8 +45,6 @@ internal static class NativeDocumentFiles
 public sealed partial class ProjectDirectoryManager
 {
     private EditableSourceData? sourceDocument;
-    private byte[]? preparedDocumentBytes;
-    private string? preparedDocumentSnapshot;
 
     public EditableSourceData ReadDocumentFile(string path, bool known = false)
     {
@@ -76,38 +74,9 @@ public sealed partial class ProjectDirectoryManager
             activeStore = candidateOwner.Take(); sourceDocument = selected;
             current = project; currentSnapshot = committedSnapshot = savedSnapshot = libraryText;
             memory = null; fileEnvelope = null; observedManifestHash = null; loadingCompleted = false;
-            preparedDocumentBytes = null; preparedDocumentSnapshot = null;
             timbreSongDraftId = null; timbreFilesState = new("idle", null); scope = Guid.NewGuid().ToString("N");
             return project;
         }
-    }
-    public void PrepareDocumentSave(string base64)
-    {
-        lock (gate)
-        {
-            ThrowIfDisposed(); if (sourceDocument is null) throw new IOException("当前不是外部格式文件。");
-            if (base64.Length > (NativeDocumentFiles.MaximumBytes + 2L) / 3 * 4) throw new IOException("文件内容过大，尚未写入。");
-            byte[] bytes = Convert.FromBase64String(base64); NativeDocumentFiles.Validate(sourceDocument.Path, bytes);
-            preparedDocumentBytes = bytes; preparedDocumentSnapshot = currentSnapshot;
-        }
-    }
-    private ProjectDirectoryInfo SaveDocument(string nextName)
-    {
-        if (preparedDocumentBytes is null || preparedDocumentSnapshot != currentSnapshot) throw new IOException("请先准备当前音乐，再保存原格式。");
-        string target = Path.Combine(Path.GetDirectoryName(current!.Path)!, nextName + Path.GetExtension(current.Path));
-        string previous = activeStore!.FilePath;
-        activeStore.VerifyUnchanged();
-        try
-        {
-            if (!string.Equals(target, previous, StringComparison.Ordinal)) activeStore.MoveTo(target);
-            activeStore.WriteStream(stream => stream.Write(preparedDocumentBytes));
-        }
-        catch { if (activeStore.FilePath != previous) activeStore.MoveTo(previous); throw; }
-        current = current with { Name = nextName, Path = target };
-        sourceDocument = new(Path.GetFileName(target), target, sourceDocument!.Format, Convert.ToBase64String(preparedDocumentBytes),
-            Convert.ToHexString(SHA256.HashData(preparedDocumentBytes)));
-        committedSnapshot = savedSnapshot = currentSnapshot; loadingCompleted = true;
-        return current;
     }
     // Ownership transfers only after parsing and source-fingerprint validation succeeded.
     private sealed class DisposableCandidate(AtomicTextStore value) : IDisposable

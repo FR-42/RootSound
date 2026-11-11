@@ -30,7 +30,7 @@ async function raw(method,args=[]){
   host.stdin.write(JSON.stringify({id:++sequence,method,args})+'\n');return JSON.parse(await reply).result;
 }
 async function call(method,args=[]){return JSON.parse(await raw(method,args));}
-const methods=['Read','Create','CreateCopy','OpenKnown','OpenDocument','ReadDocument','PrepareDocumentSave','FinishLoading','Exit','Save','Browse'];
+const methods=['Read','Create','CreateCopy','OpenKnown','OpenDocument','ReadDocument','FinishLoading','Exit','Save','Browse','CreateLibraryFolder','RenameLibraryEntry','DeleteLibraryEntry'];
 const bridge=Object.fromEntries(methods.map(name=>[name,(...args)=>raw('project.'+name,args)]));
 bridge.ChooseLocation=async()=>JSON.stringify({status:'cancelled'});bridge.Open=async()=>JSON.stringify({status:'cancelled'});
 const port=createDesktopProjectDirectories(bridge);let entered=0;const setup=createProjectSetup(port,()=>entered++);
@@ -51,24 +51,23 @@ try{
     check((await port.read()).hasUnsavedChanges,'memory edit is dirty');
     check((await port.readDocument()).libraryText===source.libraryText,'unsaved edits cannot replace saved baseline on renderer reload');
     check((await fs.readFile(filename)).equals(bytes),'memory edits do not auto-save');
-    await assert.rejects(port.save(),/准备/);checks++;
-    await port.prepareDocumentSave(bytes);
-    const saved=await port.save();check(saved.path===filename,'Save keeps source filename');
-    check((await fs.readFile(filename)).equals(bytes),'source save writes prepared bytes');
-    check(!(await port.read()).hasUnsavedChanges,'explicit source save clears dirty flag');
-    check((await port.readDocument()).libraryText===replacement,'explicit save advances the saved baseline');
+    await assert.rejects(port.save(),/\.rootsound/);checks++;
+    check((await fs.readFile(filename)).equals(bytes),'original file cannot be overwritten');
+    check((await port.read()).hasUnsavedChanges,'blocked source save retains the draft');
     await port.exit('discard');
     await setup.open(filename);check((await port.read()).current.id===current.id,'reopening source retains workspace identity');
     await port.exit('discard');
   }
   const filename=path.join(nested,'Sample.mid');await setup.open(filename);
   const before=await fs.readFile(filename),source=await port.readDocument();
-  await port.prepareDocumentSave(source.bytes);
   await port.createCopy('Native copy',root,readMusicFile(source.bytes,source.name,source.format).libraryText);
   check((await fs.readFile(filename)).equals(before),'Save As does not modify source');
   check((await port.read()).current.path===path.join(root,'Native copy.rootsound'),'explicit Save As creates native project');await port.exit('discard');
-  await setup.open(filename);await port.prepareDocumentSave(midi);await fs.writeFile(filename,Buffer.concat([Buffer.from(midi),Buffer.from([0])]));
-  await assert.rejects(port.save(),/变化|改变|修改/);checks++;check((await fs.readFile(filename)).length===midi.length+1,'external modification is not overwritten');await port.exit('discard');
+  await port.createFolder(root,'Temporary');
+  const temporary=path.join(root,'Temporary');
+  await port.renameEntry(temporary,'Renamed');
+  await port.removeEntry(path.join(root,'Renamed'));
+  check(!(await fs.readdir(root)).includes('Renamed'),'folder operations update physical directories');
   const previous=entered;await assert.rejects(setup.open(path.join(nested,'bad.xml')),/MusicXML/);check(entered===previous,'invalid XML never activates a document');
   check(!(await port.read()).current,'failed conversion leaves previous session unchanged');
   await fs.writeFile(filename,midi);const selected=await port.open(filename);await fs.writeFile(filename,Buffer.concat([Buffer.from(midi),Buffer.from([0])]));

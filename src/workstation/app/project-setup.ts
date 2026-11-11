@@ -87,6 +87,10 @@ export function createProjectSetup(directories: ProjectDirectoriesPort, enter: (
       return directories.list();
     },
     ...(directories.browse ? { browse: (path?: string) => directories.browse!(path) } : {}),
+    ...(directories.createFolder ? { createFolder: (path: string, name: string) => exclusive(() => directories.createFolder!(path, projectName(name))) } : {}),
+    ...(directories.renameEntry ? { renameEntry: (path: string, name: string) => exclusive(() => directories.renameEntry!(path, projectName(name))) } : {}),
+    ...(directories.removeEntry ? { removeEntry: (path: string) => exclusive(() => directories.removeEntry!(path)) } : {}),
+    ...(source && directories.browse ? { async readSaveSource() { return (await directories.read()).current; } } : {}),
     open: path => exclusive(async () => {
       const result = await directories.open(path);
       if (result.status === 'opened') enter();
@@ -127,14 +131,15 @@ export function createProjectSetup(directories: ProjectDirectoriesPort, enter: (
       } else await directories.exit('discard');
       enter();
     }),
-    ...(source ? { saveAs: (input: string, location: string) => exclusive(async () => {
+    ...(source ? { saveAs: (input: string, location: string, mode: 'edit' | 'exit' | 'close' = 'edit') => exclusive(async () => {
       const name = projectName(input);
       if (!location.trim()) throw new Error('请选择项目的存储位置。');
       await source.prepareSave?.('rootsound');
       const text = createProjectCopyLibrary(source.read(), name, source.songDraftId());
       if (directories.createCopy) await directories.createCopy(name, location.trim(), text);
       else await directories.create(name, location.trim(), text);
-      enter();
+      if (mode === 'exit') await directories.exit?.('discard');
+      if (mode !== 'close') enter();
     }) } : {}),
   };
 }

@@ -82,11 +82,149 @@ public sealed partial class ProjectDirectoryManager
         }
     }
 
+    public void CreateLibraryFolder(string path, string name)
+    {
+        lock (gate)
+        {
+            ThrowIfDisposed();
+            string parent = ResolveLibraryFolder(path);
+            if (SamePath(parent, DefaultLocation)) Directory.CreateDirectory(parent);
+            if (!Directory.Exists(parent) || IsKnownProjectPath(parent)) throw new IOException("请选择乐曲库文件夹。");
+            string target = LibraryDestination(parent, name);
+            string staging = Path.Combine(parent, ".rootsound-create-" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(staging);
+            try { Directory.Move(staging, target); }
+            finally { RemoveEmptyDeletionDirectory(staging); }
+        }
+    }
+
+    public void RenameLibraryEntry(string path, string name)
+    {
+        lock (gate)
+        {
+            ThrowIfDisposed();
+            path = RequireLibraryEntry(path);
+            bool folder = Directory.Exists(path);
+            string parent = Path.GetDirectoryName(path)!;
+            string target = LibraryDestination(parent, name, folder ? "" : Path.GetExtension(path), path);
+            if (path == target) return;
+            var entries = folder ? LibraryTree(path) : new[] { path };
+            using var ownership = ClaimLibraryFiles(entries);
+            Action<string, string> move = folder ? Directory.Move : (from, to) => File.Move(from, to);
+            if (SamePath(path, target))
+            {
+                string staging = Path.Combine(parent, ".rootsound-rename-" + Guid.NewGuid().ToString("N"));
+                move(path, staging);
+                try { move(staging, target); }
+                catch { move(staging, path); throw; }
+            }
+            else move(path, target);
+            listingHeaders.Clear();
+        }
+    }
+
+    public void DeleteLibraryEntry(string path)
+    {
+        lock (gate)
+        {
+            ThrowIfDisposed();
+            path = RequireLibraryEntry(path);
+            bool folder = Directory.Exists(path);
+            var entries = folder ? LibraryTree(path) : new[] { path };
+            string[] directories = folder ? entries.Where(Directory.Exists).ToArray() : [];
+            string[] files = entries.Where(File.Exists).ToArray();
+            if (entries.Any(entry => (File.GetAttributes(entry) & FileAttributes.ReadOnly) != 0))
+                throw new IOException("所选内容中有只读文件或目录。");
+            using var ownership = ClaimLibraryFiles(entries);
+            if (!folder)
+            {
+                using var captured = CaptureDeletionFiles(files);
+                captured.VerifyUnchanged();
+                File.Delete(path);
+                return;
+            }
+            string staging = Path.Combine(Path.GetDirectoryName(path)!, ".rootsound-delete-" + Guid.NewGuid().ToString("N"));
+            Directory.Move(path, staging);
+            try
+            {
+                var staged = LibraryTree(staging, allowStagingRoot: true);
+                var expected = entries.Select(entry => Path.GetRelativePath(path, entry)).ToHashSet(StringComparer.Ordinal);
+                if (!expected.SetEquals(staged.Select(entry => Path.GetRelativePath(staging, entry))))
+                    throw new IOException("文件夹内容已变化。");
+                foreach (string file in files) File.Delete(Path.Combine(staging, Path.GetRelativePath(path, file)));
+                foreach (string dir in directories.Reverse())
+                    Directory.Delete(dir == path ? staging : Path.Combine(staging, Path.GetRelativePath(path, dir)));
+            }
+            catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+            {
+                if (Directory.Exists(staging) && !Path.Exists(path)) Directory.Move(staging, path);
+                throw new IOException("未能删除文件夹中的全部内容。", error);
+            }
+            listingHeaders.Clear();
+        }
+    }
+
+    private string RequireLibraryEntry(string path)
+    {
+        path = FullDirectory(path);
+        string parent = ResolveLibraryFolder(Path.GetDirectoryName(path) ?? "");
+        if (SamePath(path, DefaultLocation) || !Path.Exists(path) || IsLink(path)
+            || IsLibraryStagingName(Path.GetFileName(path)) || IsKnownProjectPath(path)
+            || IsKnownProjectPath(parent) || !Directory.Exists(path) && NativeDocumentFiles.Format(path) is null)
+            throw new IOException("请重新选择乐曲库中的文件或文件夹。");
+        if (current is not null && (SamePath(current.Path, path)
+            || current.Path.StartsWith(path + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)))
+            throw new IOException("其中的歌曲正在编辑，请先退出歌曲。");
+        return path;
+    }
+
+    private static string LibraryDestination(string parent, string name, string extension = "", string? original = null)
+    {
+        name = ValidateName(name);
+        if (IsLibraryStagingName(name)) throw new IOException("请使用其他名称。");
+        string target = Path.Combine(parent, name + extension);
+        if (Path.Exists(target) && (original is null || !SamePath(target, original))) throw new IOException("当前目录已有同名文件或文件夹。");
+        return target;
+    }
+
+    private static string[] LibraryTree(string path, bool allowStagingRoot = false)
+    {
+        var entries = new List<string> { path };
+        for (int i = 0; i < entries.Count; i++)
+        {
+            string entry = entries[i];
+            if (IsLink(entry) || (!allowStagingRoot || i != 0) && IsLibraryStagingName(Path.GetFileName(entry)))
+                throw new IOException("文件夹中含有链接或正在处理的文件。");
+            if (Directory.Exists(entry)) entries.AddRange(Directory.EnumerateFileSystemEntries(entry));
+        }
+        return entries.ToArray();
+    }
+
+    private sealed class LibraryFileClaims : IDisposable
+    {
+        internal readonly List<AtomicTextStore> Stores = [];
+        public void Dispose() { foreach (var store in Stores) store.Dispose(); }
+    }
+
+    private static LibraryFileClaims ClaimLibraryFiles(IEnumerable<string> entries)
+    {
+        var claims = new LibraryFileClaims();
+        try
+        {
+            foreach (string entry in entries)
+                if (File.Exists(entry) && (NativeDocumentFiles.Format(entry) is not null || Path.GetExtension(entry).Equals(".rootsound", StringComparison.OrdinalIgnoreCase)))
+                    claims.Stores.Add(AtomicTextStore.ForProjectFile(entry));
+            return claims;
+        }
+        catch { claims.Dispose(); throw; }
+    }
+
     private string ResolveLibraryFolder(string path)
     {
         string folder = string.IsNullOrWhiteSpace(path) ? DefaultLocation : Path.GetFullPath(path);
         string root = Path.TrimEndingDirectorySeparator(DefaultLocation);
-        if (!SamePath(folder, root) && !folder.StartsWith(root + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
+        var comparison = OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
+        if (!string.Equals(Path.TrimEndingDirectorySeparator(folder), root, comparison) && !folder.StartsWith(root + Path.DirectorySeparatorChar, comparison))
             throw new IOException("请在乐曲库目录中浏览。");
         for (string? currentFolder = folder; currentFolder is not null; currentFolder = Path.GetDirectoryName(currentFolder))
         {

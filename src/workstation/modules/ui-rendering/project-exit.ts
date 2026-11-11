@@ -2,9 +2,11 @@ import type { ProjectSetupPort } from '../../contracts/project-directory.ts';
 import './project-exit.css';
 
 /** Return to welcome only after a deliberate save/discard succeeds. */
-export async function showProjectExit(root: HTMLElement, service: Pick<ProjectSetupPort, 'hasUnsavedChanges' | 'exit'>): Promise<void> {
+export async function showProjectExit(root: HTMLElement, service: Pick<ProjectSetupPort, 'hasUnsavedChanges' | 'exit'>,
+  saveInLibrary?: () => Promise<void>): Promise<void> {
   if (!service.hasUnsavedChanges || !service.exit) throw new Error('当前窗口尚不支持退出项目，请重新打开 RootSound。');
   if (!await service.hasUnsavedChanges()) { await service.exit('discard'); return; }
+  if (saveInLibrary) { await saveInLibrary(); return; }
 
   await new Promise<void>(resolve => {
     const dialog = document.createElement('dialog'); dialog.className = 'project-exit-dialog';
@@ -30,7 +32,10 @@ export async function showProjectExit(root: HTMLElement, service: Pick<ProjectSe
     add('保存并退出', 'project-exit-save', () => { void leave('save'); });
     dialog.append(heading, description, error, actions);
     dialog.addEventListener('cancel', event => { if (working) event.preventDefault(); });
-    dialog.addEventListener('close', () => { dialog.remove(); resolve(); }, { once: true });
+    dialog.addEventListener('close', () => {
+      dialog.remove();
+      resolve();
+    }, { once: true });
     root.append(dialog); dialog.showModal();
   });
 }

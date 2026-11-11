@@ -12,7 +12,7 @@ contextBridge.exposeInMainWorld('rootSoundDesktop', {
   // The old independent sound/project editors are not shipped as entry points.
   files: { Open: unavailable, Save: unavailable },
   audioFiles: { Save: (base64, name) => call('audio.Save', base64, name) },
-  projectDirectories: Object.fromEntries(['Read', 'ChooseLocation', 'Create', 'CreateCopy', 'CreateDetached', 'Open', 'List', 'Browse', 'OpenKnown', 'OpenDocument', 'ReadDocument', 'PrepareDocumentSave', 'Delete', 'Inspect', 'Rename', 'Save', 'FinishLoading', 'Exit']
+  projectDirectories: Object.fromEntries(['Read', 'ChooseLocation', 'Create', 'CreateCopy', 'CreateDetached', 'Open', 'List', 'Browse', 'CreateLibraryFolder', 'RenameLibraryEntry', 'DeleteLibraryEntry', 'OpenKnown', 'OpenDocument', 'ReadDocument', 'Delete', 'Inspect', 'Rename', 'Save', 'FinishLoading', 'Exit']
     .map(name => [name, (...args) => call('project.' + name, ...args)])),
   timbreFiles: {
     Open: () => call('timbres.Open'), Sync: id => call('timbres.Sync', id ?? ''), State: () => call('timbres.State'),

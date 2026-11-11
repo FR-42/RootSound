@@ -293,11 +293,11 @@ export function mountMelodyWorkspace(root: HTMLElement, options: {
     if (lastViewport && next.leftSeconds === lastViewport.leftSeconds && next.zoom === lastViewport.zoom && next.top === lastViewport.top && next.rowHeight === lastViewport.rowHeight) return;
     lastViewport = next; options.onViewportChange?.({ ...next });
   }
-  function paintViewport(remember = true): void {
+  function paintViewport(remember = true, updateHead = true): void {
     cancelAnimationFrame(viewportFrame); viewportFrame = 0;
     if (disposed) return;
     if (rhythm) paintShelf();
-    paintGrid(); paintNotes(); paintQuickScroll(); reportViewport(remember);
+    paintGrid(); paintNotes(undefined, updateHead); paintQuickScroll(); reportViewport(remember);
   }
   function scheduleViewport(): void {
     if (!viewportFrame) viewportFrame = requestAnimationFrame(() => paintViewport());
@@ -846,7 +846,7 @@ export function mountMelodyWorkspace(root: HTMLElement, options: {
     if (vertical) afterEnd.style.top = `${Math.max(0, endX)}px`; else afterEnd.style.left = `${Math.max(0, endX)}px`;
     drumEnd.hidden = afterEnd.hidden; drumEnd.style.top = afterEnd.style.top;
   }
-  function paintNotes(onlyNoteId?: string): void {
+  function paintNotes(onlyNoteId?: string, updateHead = true): void {
     const activeEdit = mix ?? (gesture && 'note' in gesture ? gesture : undefined);
     // During one-note gestures the rest of the score does not need copying.
     const value = onlyNoteId ? body() : displayedBody(); const seen = new Set<string>();
@@ -932,7 +932,7 @@ export function mountMelodyWorkspace(root: HTMLElement, options: {
       for (const [id, element] of noteNodes) if (!seen.has(id)) { element.remove(); noteNodes.delete(id); }
       lastSoundingNotes = undefined;
     }
-    positionHead();
+    if (updateHead) positionHead();
   }
   function positionHead(displaySeconds = playheadSeconds): void {
     if (!quick.hidden) paintQuickHint();
@@ -1765,7 +1765,7 @@ export function mountMelodyWorkspace(root: HTMLElement, options: {
       const target = melodyFollowTarget(seconds, view.leftSeconds, span, duration, span * 2 / Math.max(1, headWidth));
       // Following may leave blank space after the ending so the last page also
       // puts the head at the top. Manual navigation retains its normal bounds.
-      if (target !== undefined) { view = { ...view, leftSeconds: target }; browseLastSeconds = target; paintViewport(false); }
+      if (target !== undefined) { view = { ...view, leftSeconds: target }; browseLastSeconds = target; paintViewport(false, false); }
     }
     if (gesture?.kind !== 'head') positionHead(displaySeconds);
     const onsets = playing && noteIndex && (body()?.masterLevel ?? 1) > 0
