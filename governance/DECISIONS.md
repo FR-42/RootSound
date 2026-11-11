@@ -9,8 +9,9 @@ Earlier wording and source IDs are preserved in [the original record](../history
 
 - RootSound is in early development. Once the user confirms a replacement, remove superseded files, assets and builds from the active project. Older song projects do not require backward compatibility or justify keeping superseded resources. Update bundled demo songs to the current format and resources.
 
-- Final purpose: 让音游曲爱好者快速上手做出满意的音乐. Audience: 音游曲及周边曲风爱好者.
-  Low learning/operation burden serves that purpose. The earlier all-people/any-sound goal is superseded.
+- RootSound is a music creation app that helps everyday users get started quickly and get feedback efficiently as they create.
+  Reducing the effort needed to learn and use the app helps users start creating sooner. Potential users include elementary and middle school students,
+  people aged 40 and over, and complete beginners with no music production experience.
 - First make an original passage satisfying, then extend it into a full song through the same workflow.
   The first chosen listening reference is Vulcanus, 0–20 seconds; vocals and background melody matter.
   This is a reference, not permission to claim ownership of that recording or acceptance of old attempts.

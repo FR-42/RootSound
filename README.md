@@ -1,6 +1,6 @@
 # 简乐
 
-面向音游曲及周边曲风爱好者的音乐创作软件，目标是让爱好者快速上手，做出满意的音乐。
+简乐是一款帮助普通人快速上手、在创作中高效获得反馈的音乐创作软件。
 
 [在线体验](https://fr-42.github.io/RootSound/) · [下载 Windows / Mac 版](https://github.com/FR-42/RootSound/releases)
 

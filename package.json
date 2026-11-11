@@ -2,7 +2,7 @@
   "name": "rootsound",
   "private": true,
   "version": "0.1.0",
-  "description": "简乐：让音游曲爱好者快速上手做出满意的音乐",
+  "description": "简乐是一款帮助普通人快速上手、在创作中高效获得反馈的音乐创作软件。",
   "type": "module",
   "scripts": {
     "dev": "vite",
