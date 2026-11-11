@@ -76,10 +76,11 @@ const geometry = selector => call(selector => {
 const transform = selector => call(selector => document.querySelector(selector).style.transform, selector);
 const style = (selector, property) => call((selector, property) => getComputedStyle(document.querySelector(selector))[property], selector, property);
 const send = (type, x, y, extra) => win.webContents.debugger.sendCommand('Input.dispatchMouseEvent', { type, x, y, ...extra });
-async function gesture(points, button = 'left') {
+async function gesture(points, button = 'left', holdMs = 0) {
   const [first, ...rest] = points;
   const buttons = button === 'right' ? 2 : 1;
   await send('mousePressed', ...first, { button, buttons, clickCount: 1 });
+  if (holdMs) await delay(holdMs);
   for (const point of rest) await send('mouseMoved', ...point, { button, buttons });
   await send('mouseReleased', ...(points.at(-1)), { button, buttons: 0, clickCount: 1 });
 }
@@ -471,7 +472,7 @@ async function runTest() {
     return delta > 4 && delta < 72;
   }, 'the left edge slides to make room for the shelf');
   await ready(flyingCards);
-  assert.deepEqual(await cardNames(flyingCards), ['钢琴', '长笛', '弦乐合奏']);
+  assert.deepEqual(await cardNames(flyingCards), ['三角钢琴', '管弦长笛', '独奏小提琴']);
   const titleBox = await geometry('.music-guide-word');
   const rightOfTitle = titleBox.x + titleBox.w;
   assert((await geometry(flyingCards)).x >= rightOfTitle);
@@ -481,7 +482,7 @@ async function runTest() {
   assert(initialPlus.x < 12 && initialPlus.y > titleBox.y + titleBox.h);
   await ready(cards);
   assert((await geometry(cards)).x < 12);
-  assert.deepEqual(await cardNames(cards), ['钢琴', '长笛', '弦乐合奏']);
+  assert.deepEqual(await cardNames(cards), ['三角钢琴', '管弦长笛', '独奏小提琴']);
   assert.deepEqual(await copyLines(), [selectText]);
   assert.equal(await style(selectPrompt, 'animationIterationCount'), 'infinite');
   assert(await call(cards => [...document.querySelectorAll(cards)].every(node => node.getAnimations().length === 0
@@ -514,7 +515,7 @@ async function runTest() {
   await wait(() => js('!document.querySelector(".music-guide-host [title]")'), 'hover labels suppressed');
   const flute = await geometry('.melody-shelf .melody-tone-entry:nth-child(2) .melody-note-family');
   await gesture([[flute.x + flute.w / 2, flute.y + flute.h / 2]]);
-  assert.deepEqual(await cardNames('.melody-note-family.is-selected'), ['长笛']);
+  assert.deepEqual(await cardNames('.melody-note-family.is-selected'), ['管弦长笛']);
   assert(await call(cards => [...document.querySelectorAll(cards)].every(node => getComputedStyle(node).opacity === '1'), cards));
   assert(await visible('.melody-note.is-dim'));
   assert.deepEqual(await copyLines(), [mutedText, drawText]);
@@ -616,7 +617,7 @@ async function runTest() {
   await gesture([editCenter, editTarget, editCenter]);
   await gesture([[drawPoint[0] - 60, drawPoint[1]]], 'right');
   assert.deepEqual(await copyLines(), [moveText]);
-  await gesture([editCenter, editTarget]);
+  await gesture([editCenter, editTarget], 'left', 150);
   const moved = await geometry('.melody-note');
   assert.notEqual(moved.x, beforeEdit.x);
   assert.equal(await notes(), 7);
@@ -639,7 +640,7 @@ async function runTest() {
   const resizeNote = '.melody-note[data-note-id="' + resizeNoteId + '"]';
   const beforeResize = await geometry(resizeNote);
   const resizeX = beforeResize.x + beforeResize.w / 2;
-  await gesture([[resizeX, beforeResize.y + beforeResize.h - 2], [resizeX, beforeResize.y + beforeResize.h + 20]]);
+  await gesture([[resizeX, beforeResize.y + beforeResize.h - 2], [resizeX, beforeResize.y + beforeResize.h + 20]], 'left', 150);
   const resized = await geometry(resizeNote);
   assert(resized.h > beforeResize.h);
   assert.deepEqual(await copyLines(), [undoText]);
@@ -669,7 +670,7 @@ async function runTest() {
   await step(10);
   assert(await visible('.song-topbar'));
   assert.equal(await js('document.querySelector(".song-topbar .song-clock") === null'), true);
-  assert.deepEqual(await copyLines(), ['顶栏是核心控制区', '左上角是乐曲名，双击可修改']);
+  assert.deepEqual(await copyLines(), ['顶栏是核心控制区', '左上角是乐曲名，双击可修改', '在设置中开启「多卷帘」，可为不同卷帘设置 BPM']);
   assert.equal(await style('.music-guide-copy p:first-child', 'color'), darkPrompt);
   assert.equal(await style('.music-guide-copy p:last-child', 'color'), 'rgb(98, 119, 140)');
   await key('Enter');
