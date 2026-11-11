@@ -62,11 +62,16 @@ export function createSampleBankAudio(_library:MaterialLibrary, samples?:SampleA
         selectBankZones(body.zones!, frequency(body, note), note.velocity).map(zone => zone.sampleId)))]);
       return;
     }
-    const zones = await regions(body);
+    const zones = preparedRegions.get(body.instrument) ?? await regions(body);
     preparedRegions.set(body.instrument, zones);
     const needed = new Map(notes.flatMap(note =>
       selectBankZones(zones, frequency(body, note), note.velocity).map(zone => [zone.asset, zone] as const)));
-    for (const [id, zone] of needed) readySources.set(id, await source(zone, body.bank));
+    const pending = [...needed].filter(([id]) => !readySources.has(id));
+    for (let index = 0; index < pending.length; index += 4) {
+      await Promise.all(pending.slice(index, index + 4).map(async ([id, zone]) => {
+        readySources.set(id, await source(zone, body.bank));
+      }));
+    }
   }
   function plan(body:SampleBankTimbreBody,note:SoundPlan['note']):SampleSoundPlan {
     const drum = unpitchedDrumKey(body);

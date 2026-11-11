@@ -64,7 +64,7 @@ export async function mountReleaseStudio(root: HTMLElement, platform: ReleasePla
     const songId = current && openMusicDocument(library, song, phrase, current.name);
     if (current) {
       if (!songId) throw new Error('工程缺少可编辑的歌曲。');
-      prepareProjectMelodyTimbres(library, songId);
+      if (!platform.demoProject) prepareProjectMelodyTimbres(library, songId);
       if (current.format) commitMusicDocument(library, song, phrase);
       staged!.publish();
       await directories?.finishLoading?.();
@@ -94,7 +94,8 @@ export async function mountReleaseStudio(root: HTMLElement, platform: ReleasePla
     const studio = mountStudio(root, { phrase, song, sound: runtime, hasPrevious: !!current,
       projectName: current?.name, doubleClickIntervalMs: state?.doubleClickIntervalMs, preferences, learning,
       workspaceState: current ? createMusicWorkspaceState(localStorage, current.id) : undefined,
-      musicGuide: { createDocument: createMusicGuideDocument, createSound: createBrowserSoundRuntime, mobileWeb: platform.demoProject?.mobileGuide },
+      musicGuide: { createDocument: name => createMusicGuideDocument(name, !!platform.demoProject),
+        createSound: createBrowserSoundRuntime, mobileWeb: platform.demoProject?.mobileGuide },
       initialEntry: current ? 'song' : 'welcome', audioFiles: platform.audioFiles, demo: !!platform.demoProject,
       startWithGuide: platform.demoProject?.startWithGuide,
       onFirstGuideChoice: directories && firstDesktopGuideChoice(localStorage, learning.read().guides.basics.status),
@@ -111,7 +112,7 @@ export async function mountReleaseStudio(root: HTMLElement, platform: ReleasePla
       }),
       projectTimbres() { return listProjectTimbres(library, projectId()).map(record => ({ id: record.id, name: record.name,
         requiresDeleteConfirmation: requiresTimbreDeleteConfirmation(record, library.listDrafts()) })); },
-      async onImportTimbre() {
+      onImportTimbre: platform.demoProject ? undefined : async () => {
         const id = projectId(); await platform.timbreFiles.sync?.(id);
         const opened = await platform.timbreFiles.open(); if (opened.status === 'cancelled') return false;
         if (id !== projectId()) throw new Error('项目已切换，请重新导入。');
@@ -129,7 +130,12 @@ export async function mountReleaseStudio(root: HTMLElement, platform: ReleasePla
     });
     const prepareClose = createProjectClosePreparation({ flush: () => studio.prepareClose(),
       prepareSave: () => prepareFile(), name: () => song.readDraft()?.name });
-    return { openGuide: studio.openGuide, prepareClose, dispose() { studio.dispose(); void runtime.dispose(); } };
+    const warmup = platform.demoProject && !platform.demoProject.startWithGuide
+      ? requestAnimationFrame(() => { void phrase.preparePreview().catch(() => {}); }) : undefined;
+    return { openGuide: studio.openGuide, prepareClose, dispose() {
+      if (warmup !== undefined) cancelAnimationFrame(warmup);
+      studio.dispose(); void runtime.dispose();
+    } };
   } catch (error) {
     void runtime.dispose();
     throw error;

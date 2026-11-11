@@ -2,7 +2,7 @@ import type { LearningSettings, LearningSettingsPort } from '../../contracts/gui
 import './workspace.css';
 import './settings.css';
 
-export function showLearningSettings(root: HTMLElement, preferences: LearningSettingsPort, options: {
+export function showLearningSettings(root: HTMLElement, preferences: LearningSettingsPort | undefined, options: {
   requiresTempoRolls?: boolean; onChange?(): void; onReplayGuide?(): void;
 }): void {
   if (root.querySelector('.learning-settings')) return;
@@ -13,24 +13,26 @@ export function showLearningSettings(root: HTMLElement, preferences: LearningSet
   const close = document.createElement('button'); close.type = 'button'; close.textContent = '×'; close.setAttribute('aria-label', '关闭设置');
   close.addEventListener('click', () => dialog.close()); header.append(title, close);
   const problem = document.createElement('p'); problem.className = 'dialog-error'; problem.hidden = true; problem.setAttribute('role', 'alert');
-  function feature(name: string, key: keyof Pick<LearningSettings, 'multipleTempoRolls' | 'drumLanes' | 'workbench'>, write: (enabled: boolean) => void, disabled = false) {
+  function feature(prefs: LearningSettingsPort, name: string, key: keyof Pick<LearningSettings, 'multipleTempoRolls' | 'drumLanes' | 'workbench'>, write: (enabled: boolean) => void, disabled = false) {
     const label = document.createElement('label'); label.className = 'learning-feature';
-    const input = document.createElement('input'); input.type = 'checkbox'; input.checked = preferences.read()[key] === true;
+    const input = document.createElement('input'); input.type = 'checkbox'; input.checked = prefs.read()[key] === true;
     input.disabled = disabled; input.setAttribute('aria-label', name);
     const text = document.createElement('span'); text.textContent = name; label.append(input, text);
     input.addEventListener('change', () => {
       problem.hidden = true;
       try { write(input.checked); options.onChange?.(); }
-      catch (error) { input.checked = preferences.read()[key] === true; problem.textContent = String(error instanceof Error ? error.message : error); problem.hidden = false; }
+      catch (error) { input.checked = prefs.read()[key] === true; problem.textContent = String(error instanceof Error ? error.message : error); problem.hidden = false; }
     });
     return label;
   }
-  dialog.append(header, feature('多卷帘', 'multipleTempoRolls', preferences.setMultipleTempoRolls, !!options.requiresTempoRolls),
-    feature('打击音色', 'drumLanes', preferences.setDrumLanes),
-    feature('工作台', 'workbench', preferences.setWorkbench), problem);
+  dialog.append(header);
+  if (preferences) dialog.append(
+    feature(preferences, '多卷帘', 'multipleTempoRolls', preferences.setMultipleTempoRolls, !!options.requiresTempoRolls),
+    feature(preferences, '打击音色', 'drumLanes', preferences.setDrumLanes),
+    feature(preferences, '工作台', 'workbench', preferences.setWorkbench), problem);
   if (options.onReplayGuide) {
     const replay = document.createElement('button'); replay.type = 'button'; replay.className = 'secondary learning-replay-guide';
-    replay.textContent = '再次观看引导';
+    replay.textContent = '重新观看引导';
     replay.addEventListener('click', () => { dialog.close(); options.onReplayGuide!(); });
     dialog.append(replay);
   }

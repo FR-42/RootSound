@@ -10,7 +10,7 @@ import { createTimbrePlayback } from '../src/workstation/modules/timbre/public.t
 import { createSampleBankAudio } from '../src/workstation/modules/timbre/sample-bank.ts';
 
 test('every curated voice reads real PCM through the desktop playback path', async () => {
-  let text = createInitialProjectLibrary('采样播放测试', true);
+  let text = createInitialProjectLibrary('采样播放测试');
   const library = createMaterialLibrary({ read: () => text, write: value => { text = value; } });
   const song = library.listDrafts().find(draft => draft.kind === 'rootsound.song')!;
   const fetcher = (async (url: string) => {

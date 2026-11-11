@@ -65,7 +65,7 @@ export function introduceTimbres(shell: HTMLElement, host: HTMLElement, heading:
     const current = shell.dataset.timbrePhase;
     if (current === 'select' && value === 'select-group') {
       phase('draw');
-      copy.replaceChildren(mutedTip, drawTip);
+      copy.replaceChildren(...(shelf.querySelectorAll('.melody-note-family').length > 1 ? [mutedTip, drawTip] : [drawTip]));
     } else if (current === 'draw' && value === 'draw-note') {
       phase('deselect');
       drawTip.replaceWith(deselectTip);

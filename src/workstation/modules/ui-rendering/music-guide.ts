@@ -48,7 +48,6 @@ const scenes = [
   { title: '顶栏', lines: [
     '顶栏是核心控制区',
     '左上角是乐曲名，双击可修改',
-    '在设置中开启「多卷帘」，可为不同卷帘设置 BPM',
   ], wait: 5000 },
 ] as const;
 
@@ -68,7 +67,7 @@ function seed(document: MusicGuideDocument): void {
   phrase.setLength(16);
   const tones = document.listTimbres();
   for (const [index, notes] of [[[.6, 60], [2.4, 64], [4, 62]], [[1.4, 67], [3.2, 65]], [[4.8, 69]]].entries()) {
-    const tone = tones[index]!;
+    const tone = tones[index % tones.length]!;
     const part = phrase.read().body!.parts.find(part => part.timbreId === tone.id && !part.unassigned)?.id ?? document.addGroup(tone.id);
     phrase.addNotes(part, notes.map(([startBeat, pitch]) => ({
       startBeat: startBeat!, durationBeats: .55, frequencyHz: 440 * 2 ** ((pitch! - 69) / 12), velocity: .65,

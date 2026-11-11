@@ -1,13 +1,18 @@
-import starterExample from '../../../website/examples/starter.json';
-import { commitMusicDocument } from './music-document.ts';
-import { createBrowserTimbreFiles } from './platform/timbre-files.ts';
-import { mountReleaseStudio, showReleaseStartupError } from './release-studio.ts';
-import { createWebExampleModel } from './web-demo-example.ts';
+function loadEditor() {
+  return Promise.all([
+    import('../../../website/examples/starter.json'),
+    import('./music-document.ts'),
+    import('./platform/timbre-files.ts'),
+    import('./release-studio.ts'),
+    import('./web-demo-example.ts'),
+    import('./web-demo-model.ts'),
+  ]);
+}
 
 const root = document.getElementById('app')!;
 const choiceKey = 'rootsound.website-guide-choice.v1';
 let startup: Promise<void> | undefined;
-let studio: Awaited<ReturnType<typeof mountReleaseStudio>> | undefined;
+let studio: Awaited<ReturnType<typeof import('./release-studio.ts')['mountReleaseStudio']>> | undefined;
 
 function start(watchGuide: boolean) {
   if (startup) {
@@ -16,8 +21,10 @@ function start(watchGuide: boolean) {
   }
   try { if (localStorage.getItem(choiceKey) === null) localStorage.setItem(choiceKey, watchGuide ? 'yes' : 'no'); } catch {}
   startup = (async () => {
+    const [{ default: starterExample }, { commitMusicDocument }, { createBrowserTimbreFiles },
+      { mountReleaseStudio, showReleaseStartupError }, { createWebExampleModel }, { WEBSITE_PIANO }] = await loadEditor();
     try {
-      const example = createWebExampleModel(starterExample);
+      const example = createWebExampleModel(starterExample, undefined, WEBSITE_PIANO);
       commitMusicDocument(example.library, example.song, example.score);
       let text = example.readLibrary();
       studio = await mountReleaseStudio(root, {
@@ -27,7 +34,7 @@ function start(watchGuide: boolean) {
         timbreFiles: createBrowserTimbreFiles(),
       });
     } catch (error) { showReleaseStartupError(root, error); }
-  })();
+  })().catch(error => { root.textContent = error instanceof Error ? error.message : String(error); });
 }
 
 function askAboutGuide() {
@@ -53,4 +60,7 @@ let answered = false;
 try { answered = localStorage.getItem(choiceKey) !== null; } catch {}
 if (new URLSearchParams(location.search).get('guide') === '1') start(true);
 else if (answered) start(false);
-else askAboutGuide();
+else {
+  askAboutGuide();
+  if ('requestIdleCallback' in window) requestIdleCallback(() => { void loadEditor().catch(() => {}); });
+}

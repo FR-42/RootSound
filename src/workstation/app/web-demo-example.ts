@@ -21,11 +21,11 @@ export function webExampleSnapshot(model: Model): WebExample {
 }
 
 /** Each visitor receives a fresh editable document; edits never rewrite the example. */
-export function createWebExampleModel(input: unknown, fetcher: typeof fetch = globalThis.fetch): Model {
+export function createWebExampleModel(input: unknown, fetcher: typeof fetch = globalThis.fetch, instrumentKeys?: readonly string[]): Model {
   const example = input as WebExample;
   if (example?.format !== 'RootSoundWebExample' || example.version !== 1 || typeof example.name !== 'string')
     throw new Error('网页示例格式无效。');
-  const model = createWebDemoModel(undefined, example.name, fetcher);
+  const model = createWebDemoModel(undefined, example.name, fetcher, instrumentKeys);
   const body = readPhraseBody({ ...example.body, parts: example.body.parts.map(({ tone, ...part }) => {
     const voice = model.palette.find(voice => voice.key === tone);
     if (!voice) throw new Error('示例包含网页版未提供的音色。');

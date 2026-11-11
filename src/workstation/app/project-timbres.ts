@@ -92,12 +92,12 @@ export function listProjectTimbres(library: MaterialLibrary, songDraftId: string
 }
 
 /** Seed independent local starters together; repeated entry never resets edits or names. */
-export function ensureProjectMelodyTimbres(library: MaterialLibrary, songDraftId: string, _studio?: boolean): ContentRecord[] {
-  prepareProjectMelodyTimbres(library, songDraftId);
+export function ensureProjectMelodyTimbres(library: MaterialLibrary, songDraftId: string, instrumentKeys?: readonly string[]): ContentRecord[] {
+  prepareProjectMelodyTimbres(library, songDraftId, instrumentKeys);
   return listProjectTimbres(library, songDraftId);
 }
 
-export function prepareProjectMelodyTimbres(library: MaterialLibrary, songDraftId: string, _studio?: boolean): void {
+export function prepareProjectMelodyTimbres(library: MaterialLibrary, songDraftId: string, instrumentKeys?: readonly string[]): void {
   const song = library.readDraft(songDraftId);
   if (!song) throw new Error('先打开一首歌曲，再选择音色。');
   const songBody = readSongBody(song.body);
@@ -110,7 +110,7 @@ export function prepareProjectMelodyTimbres(library: MaterialLibrary, songDraftI
     .filter(item => item.kind === 'rootsound.timbre' && library.projectScopeOf?.({ type: 'revision' in item ? 'content' : 'draft', id: item.id }) === scope)
     .map(item => nameKey(item.name)));
   const created: ContentRecord[] = [];
-  const presets = prepareStudioInstruments();
+  const presets = prepareStudioInstruments(instrumentKeys);
   for (const preset of presets) {
     const id = `${preset.id}:${scope}`;
     if (current.some(record => record.id === id)) continue;

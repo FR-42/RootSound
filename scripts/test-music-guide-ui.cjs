@@ -670,7 +670,7 @@ async function runTest() {
   await step(10);
   assert(await visible('.song-topbar'));
   assert.equal(await js('document.querySelector(".song-topbar .song-clock") === null'), true);
-  assert.deepEqual(await copyLines(), ['顶栏是核心控制区', '左上角是乐曲名，双击可修改', '在设置中开启「多卷帘」，可为不同卷帘设置 BPM']);
+  assert.deepEqual(await copyLines(), ['顶栏是核心控制区', '左上角是乐曲名，双击可修改']);
   assert.equal(await style('.music-guide-copy p:first-child', 'color'), darkPrompt);
   assert.equal(await style('.music-guide-copy p:last-child', 'color'), 'rgb(98, 119, 140)');
   await key('Enter');

@@ -43,8 +43,8 @@ export function studioInstrumentForMidi(program: number, drum?: number) {
     'trumpet', 'sax', 'flute', 'flute', 'piano', 'violin', 'violin', 'guitar', 'piano'];
   return studioDefinitions.find(item => item.key === `studio-${alternatives[group] ?? 'piano'}`)!;
 }
-export function prepareStudioInstruments(): ContentRecord[] {
-  return studioDefinitions.map(spec => ({
+export function prepareStudioInstruments(keys?: readonly string[]): ContentRecord[] {
+  return studioDefinitions.filter(spec => !keys || keys.includes(spec.key)).map(spec => ({
     id: `rootsound.instrument.${spec.key}.v3`, kind: 'rootsound.timbre', owner: 'timbre', schemaVersion: 1,
     revision: 1, name: spec.name, dependencies: [],
     body: { model: 'sample-bank', version: 1, bank: studioBank, instrument: spec.key, attackSeconds: 0, releaseSeconds: .03, level: .7 },

@@ -99,6 +99,8 @@ let expression='starting',stage='setup';
  await js("(()=>{const input=document.querySelector('.song-project-name-input');input.value="+JSON.stringify(name)+";input.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true,cancelable:true}))})()");
  await wait(()=>js("document.querySelector('.song-project-name')?.textContent==="+JSON.stringify(name)));
  await click('.song-settings');await ready('.learning-settings[open]');
+ assert.equal(await js("document.querySelectorAll('.learning-settings input').length"),0);
+ assert.deepEqual(await js("[...document.querySelectorAll('.learning-settings button')].map(button=>button.textContent)"),['×','重新观看引导']);
  await click('.learning-replay-guide');await ready('.music-guide-word');
  assert.equal(await js("document.querySelector('.music-guide-word').textContent"),'卷帘');
  assert.equal(await js("!!document.querySelector('.music-guide.is-mobile-web, .music-guide-touch-right')"),false);
@@ -108,10 +110,8 @@ let expression='starting',stage='setup';
 
  stage='complete palette loads on demand';
  await click('.melody-add-note-family');await ready('.melody-tone-library[open]');
- assert.equal(await js("document.querySelectorAll('.melody-library-tone').length"),12);
- const beforePreview=await js("__webTest.fetches.filter(url=>url.endsWith('.wav')).length");
- await js("(()=>{const tone=[...document.querySelectorAll('.melody-library-tone')].find(n=>n.textContent==='次中音萨克斯');tone.closest('.melody-library-card').querySelector('.melody-library-preview').click()})()");
- await wait(()=>js("__webTest.fetches.filter(url=>url.endsWith('.wav')).length>"+beforePreview));
+ assert.deepEqual(await js("[...document.querySelectorAll('.melody-library-tone')].map(tone=>tone.textContent)"),['三角钢琴']);
+ await click('.melody-library-preview');
  await click('.melody-library-close');
  await wait(()=>js("!document.querySelector('.melody-tone-library[open]')"));
  assert.deepEqual(await js('__webTest.errors'),[]);
@@ -195,8 +195,9 @@ let expression='starting',stage='setup';
    }
    if(step===6) {
      await ready('.music-guide[data-timbre-phase=select]');
+     assert.deepEqual(await js("[...document.querySelectorAll('.music-guide .melody-note-family')].map(tone=>tone.textContent)"),['三角钢琴']);
      await click('.melody-note-family');
-     assert.equal(await js("document.querySelector('.music-guide-copy p:nth-child(2)').textContent"),'左键卷帘添加音符');
+     assert.deepEqual(await js("[...document.querySelectorAll('.music-guide-copy p')].map(line=>line.textContent)"),['左键卷帘添加音符']);
      const drawn=await js("(()=>{const canvas=document.querySelector('.melody-canvas'),r=document.querySelector('.melody-scroll').getBoundingClientRect(),x=r.x+r.width*.58,y=r.y+180;const opts={bubbles:true,cancelable:true,pointerId:31,isPrimary:true,pointerType:'mouse',button:0,buttons:1,clientX:x,clientY:y};const note=()=>document.querySelector('.melody-note.is-drawing');const length=()=>parseFloat(note().style.height);const count=()=>document.querySelectorAll('.melody-note').length;const before=count();canvas.dispatchEvent(new PointerEvent('pointerdown',opts));const initial=length();document.dispatchEvent(new PointerEvent('pointermove',{...opts,clientY:y+100}));const down=length();document.dispatchEvent(new PointerEvent('pointermove',{...opts,clientY:y+55}));const up=length();document.dispatchEvent(new PointerEvent('pointerup',{...opts,clientY:y+55,buttons:0}));return {initial,down,up,added:count()-before,finished:!note(),notice:document.querySelector('.melody-notice')?.textContent}})()");
      assert(drawn.down>drawn.initial&&drawn.up<drawn.down,JSON.stringify(drawn));
      assert.equal(drawn.added,1,JSON.stringify(drawn));
@@ -290,7 +291,7 @@ let expression='starting',stage='setup';
  await wait(()=>parentJs("document.querySelector('.music-guide-word')?.textContent==='卷帘'"));
  assert.deepEqual(rendererErrors,[]);assert(!win.isVisible());
  fs.writeFileSync(root+'/report.json',JSON.stringify({passed:true,firstVisitYes:true,firstVisitNo:true,returningVisit:true,replayFromSettings:true,
-   guideStages:10,timbreDragLength:true,mobileGuideControls:true,mobilePinchAxes:true,draftPreserved:true,defaultPitchedVoices:12,starterPlayback:true,firstPlaybackMs,recordingsOnDemand:true,visibleWindow:false,physicalAudio:false},null,2));win.destroy();app.exit(0);
+   guideStages:10,timbreDragLength:true,mobileGuideControls:true,mobilePinchAxes:true,draftPreserved:true,defaultPitchedVoices:1,starterPlayback:true,firstPlaybackMs,visibleWindow:false,physicalAudio:false},null,2));win.destroy();app.exit(0);
 }catch(error){fs.writeFileSync(root+'/report.json',JSON.stringify({error:String(error),stack:error?.stack,expression:expression.slice(0,350),stage}));app.exit(1)}})();
 `);
 const env={...process.env};delete env.ELECTRON_RUN_AS_NODE;

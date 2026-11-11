@@ -12,6 +12,7 @@ import type { PhraseBody } from '../contracts/phrase.ts';
 import { phraseBeatSeconds, phraseHeldSeconds } from '../contracts/phrase-time.ts';
 
 export const WEB_TONES = ['studio-piano', 'studio-flute', 'studio-violin', 'studio-bass', 'studio-guitar', 'studio-black-pearl-kick', 'studio-black-pearl-snare', 'studio-black-pearl-hat-closed'] as const;
+export const WEBSITE_PIANO = ['studio-piano'] as const;
 export const WEB_MAX_BEATS = 64;
 export const WEB_MAX_NOTES = 2048;
 export const WEB_MAX_FILE_BYTES = 16 * 1024 * 1024;
@@ -29,8 +30,10 @@ export function checkWebScore(body: PhraseBody): void {
 }
 
 /** A new isolated memory store per document. No draft is saved to browser storage. */
-export function createWebDemoModel(input?: string, fallbackName = '我的音乐', fetcher: typeof fetch = globalThis.fetch) {
-  let text: string | null = input ?? createInitialProjectLibrary(fallbackName);
+export function createWebDemoModel(input?: string, fallbackName = '我的音乐', fetcher: typeof fetch = globalThis.fetch,
+  instrumentKeys?: readonly string[]) {
+  const paletteKeys = instrumentKeys ?? WEB_TONES;
+  let text: string | null = input ?? createInitialProjectLibrary(fallbackName, instrumentKeys);
   let workspaceId = crypto.randomUUID();
   let portable: string | undefined;
   if (input) {
@@ -69,11 +72,11 @@ export function createWebDemoModel(input?: string, fallbackName = '我的音乐'
   openMusicDocument(library, song, score);
   checkWebScore(score.read().body!);
   const projectId = song.read().draft!.id;
-  ensureProjectMelodyTimbres(library, projectId);
+  ensureProjectMelodyTimbres(library, projectId, instrumentKeys);
   const palette = listProjectTimbres(library, projectId).flatMap(record => {
     const info = defaultInstrumentInfo(record.id, record.body);
-    return info && WEB_TONES.includes(info.key as typeof WEB_TONES[number]) ? [{ id: record.id, name: record.name, key: info.key }] : [];
-  }).sort((a, b) => WEB_TONES.indexOf(a.key as typeof WEB_TONES[number]) - WEB_TONES.indexOf(b.key as typeof WEB_TONES[number]));
+    return info && paletteKeys.includes(info.key) ? [{ id: record.id, name: record.name, key: info.key }] : [];
+  }).sort((a, b) => paletteKeys.indexOf(a.key) - paletteKeys.indexOf(b.key));
   const uniquePalette = palette.filter((tone, index) => palette.findIndex(item => item.key === tone.key) === index);
   let replaced = 0;
   for (const part of score.read().body!.parts) {
@@ -84,7 +87,7 @@ export function createWebDemoModel(input?: string, fallbackName = '我的音乐'
     const fallback = info?.category === '弦乐' || info?.category === '人声' ? 'studio-violin'
       : info?.category === '低音' ? 'studio-bass' : info?.category === '木管' || info?.category === '铜管' ? 'studio-flute'
       : info && 'drum' in info ? info.drum! >= 42 ? 'studio-black-pearl-hat-closed' : info.drum! >= 38 ? 'studio-black-pearl-snare' : 'studio-black-pearl-kick' : 'studio-piano';
-    const replacement = available ?? uniquePalette.find(tone => tone.key === fallback)!;
+    const replacement = available ?? uniquePalette.find(tone => tone.key === fallback) ?? uniquePalette[0]!;
     changeProjectPhraseNoteGroupTimbre(library, projectId, score.read().draft!.id, part.id, replacement.id);
     if (!available) replaced++;
   }

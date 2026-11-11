@@ -92,9 +92,9 @@ export function mountStudio(root: HTMLElement, options: StudioOptions): { dispos
   let page: { dispose(): void } | undefined;
   function leave(): void { editor?.dispose(); editor = undefined; page?.dispose(); page = undefined; options.sound.stopAll(); }
   function settings(inMusic: boolean): void {
-    if (!options.learning) return;
-    showLearningSettings(root, options.learning, {
-      requiresTempoRolls: inMusic && needsTempoRolls(options.phrase?.read().body),
+    if (!options.learning && !options.demo) return;
+    showLearningSettings(root, options.demo ? undefined : options.learning, {
+      requiresTempoRolls: !options.demo && inMusic && needsTempoRolls(options.phrase?.read().body),
       onChange: () => editor?.refresh(),
       onReplayGuide: options.demo ? () => { void openGuide(); } : undefined,
     });
@@ -135,10 +135,10 @@ export function mountStudio(root: HTMLElement, options: StudioOptions): { dispos
     editor = mountPhraseComposition(root, { phrase, initialView, sound: options.sound, directMusic: true,
       workspaceState: options.workspaceState, frameNotesOnMount: frameNotes,
       mobileWeb: options.demo && options.musicGuide?.mobileWeb,
-      readWorkbench: () => options.learning?.read().workbench === true,
-      readMultipleTempoRolls: options.learning ? () => options.learning!.read().multipleTempoRolls : undefined,
-      readDrumLanes: () => options.learning?.read().drumLanes === true,
-      onSettings: options.learning ? () => settings(true) : undefined,
+      readWorkbench: () => !options.demo && options.learning?.read().workbench === true,
+      readMultipleTempoRolls: options.demo ? () => false : options.learning ? () => options.learning!.read().multipleTempoRolls : undefined,
+      readDrumLanes: () => !options.demo && options.learning?.read().drumLanes === true,
+      onSettings: options.demo || options.learning ? () => settings(true) : undefined,
       // Retired mode cannot reactivate from a previously saved preference.
       readPerformanceMode: () => false,
       listTimbres: options.projectTimbres, onImportTimbre: options.onImportTimbre,

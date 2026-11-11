@@ -275,8 +275,8 @@ test('tap dialog supports mouse and keyboard, reset, cancel and listener cleanup
   }finally{dialog.dispose();dom.restore();}
 });
 
-function editableRoll(options: { workbench?: boolean; workspaceState?: MusicWorkspaceStatePort; performance?: boolean; orientation?: 'vertical'; playing?: boolean; multipleRolls?: boolean; studio?: boolean; readDrumLanes?(): boolean; onLearningAction?(action: LearningAction): void } = {}) {
-  const dom=installDom();let text=createInitialProjectLibrary('交互测试', options.studio);
+function editableRoll(options: { workbench?: boolean; workspaceState?: MusicWorkspaceStatePort; performance?: boolean; orientation?: 'vertical'; playing?: boolean; multipleRolls?: boolean; readDrumLanes?(): boolean; onLearningAction?(action: LearningAction): void } = {}) {
+  const dom=installDom();let text=createInitialProjectLibrary('交互测试');
   const library=createMaterialLibrary({read:()=>text,write:value=>{text=value;}});
   const tones=createTimbrePlayback(library,undefined,undefined,musicClockVoice),phrase=createPhraseEditor(library,tones);
   const song=createSongEditor(library,createPhrasePlayback(library,tones),{defaultTempoMode:'source'});openMusicDocument(library,song,phrase);
@@ -304,7 +304,7 @@ function editableRoll(options: { workbench?: boolean; workspaceState?: MusicWork
 
 test('the studio library filters by actual instruments, separate drum kits and custom sounds', () => {
   let drumLanes = false;
-  const f = editableRoll({ orientation: 'vertical', studio: true, readDrumLanes: () => drumLanes });
+  const f = editableRoll({ orientation: 'vertical', readDrumLanes: () => drumLanes });
   try {
     f.root.querySelector('.melody-add-tone')!.emit('click');
     const tabs = () => f.root.querySelectorAll('.melody-library-category');
@@ -343,7 +343,7 @@ test('drum cards reveal the divider, each drag changes one lane, and zoom respec
   const storage = { getItem: (key: string) => records.get(key) ?? null, setItem: (key: string, value: string) => { records.set(key, value); } };
   const workspaceState = createMusicWorkspaceState(storage, 'drum-divider');
   let drumLanes = true;
-  const f = editableRoll({ orientation: 'vertical', studio: true, workspaceState, readDrumLanes: () => drumLanes });
+  const f = editableRoll({ orientation: 'vertical', workspaceState, readDrumLanes: () => drumLanes });
   try {
     const strip = f.root.querySelector('.melody-drum-strip')!;
     const canvas = strip.querySelector('.melody-drum-canvas')!;
