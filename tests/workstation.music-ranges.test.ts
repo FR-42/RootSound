@@ -102,14 +102,14 @@ test('saving an unrepresentable MIDI tempo fails explicitly instead of overflowi
 test('tap timing supports both 1 and 1000 BPM without treating regular slow beats as pauses',()=>{
   for(const bpm of [1,4,30,480,1000]){const model=createTapTempo();for(let n=0;n<4;n++)model.tap(n*60000/bpm);assert.equal(model.read().bpm,bpm);}
 });
-test('MIDI percussion keeps its source key without doubling the timbre tuning offset',()=>{
+test('MIDI percussion keeps its source key and uses an unpitched studio drum',()=>{
   const bytes=Uint8Array.from(writeMidi({header:{format:0,numTracks:1,ticksPerBeat:480},tracks:[[
     {deltaTime:0,type:'noteOn',channel:9,noteNumber:36,velocity:100},{deltaTime:480,type:'noteOff',channel:9,noteNumber:36,velocity:0},{deltaTime:0,type:'endOfTrack'},
   ]]}));
   const f=open(readMusicFile(bytes,'Drums.mid','midi').libraryText),part=f.score.read().body!.parts[0]!,note=part.notes[0]!;
   const tone=readEditableTimbreBody(f.library.readContent(part.timbreId)!.body);assert.equal(tone.model,'sample-bank');
   if(tone.model!=='sample-bank')throw Error('Expected GM samples');
-  close(69+12*Math.log2(note.frequencyHz/440),36);close(69+12*Math.log2(note.frequencyHz/440)+(tone.tuningSemitones??0),60);
+  close(69+12*Math.log2(note.frequencyHz/440),36);assert.equal(tone.midiDrum,36);assert.equal(tone.instrument,'studio-black-pearl-kick');
 });
 test('MusicXML preserves both MIDI edges without using a forbidden negative octave number',()=>{
   const score={name:'Edges',length:1,tempos:[{beat:0,bpm:1}],parts:[{name:'Piano',program:0,notes:[0,127].map(pitch=>({pitch,beat:0,duration:.25,velocity:.8,level:1,pan:0}))}]};

@@ -19,7 +19,7 @@ function fixture(){let text=createInitialProjectLibrary('移除测试');
 test('library removal really removes an unused default and does not reseed it',()=>{
   const f=fixture(),root=f.song.read().draft!.id,tone=listProjectTimbres(f.library,root)[0]!;
   removeProjectTimbre(f.library,root,tone.id);assert.equal(f.library.readContentInfo(tone.id),undefined);
-  assert.equal(listProjectTimbres(f.library,root).length,174);assert.equal(ensureProjectMelodyTimbres(f.library,root).length,174);
+  assert.equal(listProjectTimbres(f.library,root).length,33);assert.equal(ensureProjectMelodyTimbres(f.library,root).length,33);
 });
 test('removing an already added sound preserves its notes silently and allows reassignment',()=>{
   const f=fixture(),root=f.song.read().draft!.id,tone=listProjectTimbres(f.library,root)[0]!;
@@ -28,7 +28,7 @@ test('removing an already added sound preserves its notes silently and allows re
   commitMusicDocument(f.library,f.song,f.phrase);removeProjectTimbre(f.library,root,tone.id);
   const current=f.phrase.read().body!.parts[0]!;assert(current.unassigned);assert.deepEqual(current.notes[0],note);
   assert.equal(f.phrase.previewPlan(undefined,{allowSilence:true}).events.length,0);
-  assert.equal(listProjectTimbres(f.library,root).length,174);assert.equal(f.library.readContentInfo(tone.id),undefined);
+  assert.equal(listProjectTimbres(f.library,root).length,33);assert.equal(f.library.readContentInfo(tone.id),undefined);
   assert(!listProjectTimbres(f.library,root).some(item=>item.name==='未定义音色'));
   const saved=f.library.readContent(f.phrase.read().draft!.sourceId!)!;assert(readPhraseBody(saved.body).parts[0]!.unassigned);
   const replacement=listProjectTimbres(f.library,root)[0]!;f.phrase.setPartTimbre(part,replacement.id);

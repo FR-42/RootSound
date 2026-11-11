@@ -223,7 +223,7 @@ function compileSong(body: SongBody, phrases: PhrasePlaybackPort, allowSilence =
       durationSeconds = Math.max(durationSeconds, offset + plan.durationSeconds);
       for(const lane of plan.midiExpression??[])midiExpression.push({id:`${clip.id}:${lane.id}`,events:lane.events.map(event=>({...event,atSeconds:event.atSeconds+offset}))});
       for (const event of plan.events) events.push({ atSeconds: offset + event.atSeconds,
-        sound: { ...event.sound, ...(event.sound.kind==='sample'&&event.sound.soundFont?.midiChannelId?{soundFont:{...event.sound.soundFont,midiChannelId:`${clip.id}:${event.sound.soundFont.midiChannelId}`}}:{}),level: event.sound.level * track.level * (clip.level ?? 1) * (body.masterLevel ?? 1) },
+        sound: { ...event.sound, level: event.sound.level * track.level * (clip.level ?? 1) * (body.masterLevel ?? 1) },
         pan: Math.max(-1, Math.min(1, (event.pan ?? 0) + (clip.pan ?? track.pan) + (track.panOffset ?? 0))) });
       if (events.length > MAX_SEQUENCE_EVENTS) throw new Error(`这首歌曲超过当前 ${MAX_SEQUENCE_EVENTS} 个发声音符的试听范围，请缩短编排。`);
     }

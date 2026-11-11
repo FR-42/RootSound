@@ -1,4 +1,0 @@
-Full SoundFont renderer: spessasynth_core 4.4.4 by Spessasus
-https://github.com/spessasus/spessasynth_core
-Apache-2.0. Bundled dependencies fflate and stb-vorbis have their own included licenses.
-Sound bank: GeneralUser GS 2.0.3 by S. Christian Collins. See LICENSE.txt and CREDITS.txt.

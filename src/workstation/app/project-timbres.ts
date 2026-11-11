@@ -1,7 +1,7 @@
 import type { ContentRecord, Draft, MaterialLibrary } from '../contracts/content.ts';
 import type { PhraseSection } from '../contracts/phrase.ts';
-import { instrumentCatalogVersion } from '../modules/timbre/instrument-catalog.ts';
-import { createTimbrePlayback, createTimbreReferenceAdapter, prepareMelodyTimbres, readEditableTimbreBody } from '../modules/timbre/public.ts';
+import { prepareStudioInstruments, studioInstrumentCatalogVersion } from '../modules/timbre/instrument-catalog.ts';
+import { createTimbrePlayback, createTimbreReferenceAdapter, readEditableTimbreBody } from '../modules/timbre/public.ts';
 import { createPhraseReferenceAdapter, readPhraseBody } from '../modules/phrase/public.ts';
 import { createSongReferenceAdapter, readSongBody } from '../modules/song/public.ts';
 import { createSampleReferenceAdapter } from '../modules/sampling/public.ts';
@@ -23,7 +23,7 @@ export function requiresTimbreDeleteConfirmation(record: ContentRecord, workingD
   if (workingDrafts.some(draft => draft.sourceId === record.id && (draft.editingContext || draft.baseRevision !== record.revision
     || draft.name !== record.name || JSON.stringify(draft.body) !== JSON.stringify(record.body)
     || JSON.stringify(draft.dependencies) !== JSON.stringify(record.dependencies)))) return true;
-  starterSignatures ??= prepareMelodyTimbres().map(preset => ({
+  starterSignatures ??= prepareStudioInstruments().map(preset => ({
     prefix: `${preset.id}:`, name: preset.name, body: JSON.stringify(readEditableTimbreBody(preset.body)),
   }));
   const body = JSON.stringify(readEditableTimbreBody(record.body));
@@ -64,6 +64,8 @@ function songLibraryMetadataChanges(library: MaterialLibrary, song: Draft, body:
 /** Current song identities only: no global starters, other songs or historical custody. */
 export function listProjectTimbres(library: MaterialLibrary, songDraftId: string): ContentRecord[] {
   const { song, view, scope } = currentSong(library, songDraftId);
+  const songBody = readSongBody(song.body);
+  const studio = (songBody.timbreCatalogVersion ?? 1) >= studioInstrumentCatalogVersion;
   const ids = new Set([...view.contents.filter(record => record.kind === 'rootsound.timbre').map(record => record.id),
     ...view.drafts.filter(record => record.kind === 'rootsound.timbre').flatMap(record => record.sourceId ? [record.sourceId] : [])]);
   const phraseParts = [...view.contents.filter(record => record.kind === 'rootsound.phrase')
@@ -76,11 +78,13 @@ export function listProjectTimbres(library: MaterialLibrary, songDraftId: string
     return draft ? { ...record, name: draft.name } : record;
   }).filter(record => {
     const uses = phraseParts.filter(part => part.timbreId === record.id);
+    if (studio && !uses.length && /^rootsound\.instrument\.[a-z0-9-]+\.v[12]:/u.test(record.id)
+      && !requiresTimbreDeleteConfirmation(record, view.drafts)) return false;
     // Scaffold voices remain stored, but untouched empty defaults are not choices.
     return view.memberIds.includes(record.id) || !uses.length || !uses.every(part => generatedEmptyPlaceholder(library, part));
   }).sort((first, second) => first.name.localeCompare(second.name, 'zh-CN') || first.id.localeCompare(second.id));
   const byId = new Map(records.map(record => [record.id, record])); const ordered: ContentRecord[] = [];
-  for (const id of readSongBody(song.body).timbreLibraryOrder ?? []) {
+  for (const id of songBody.timbreLibraryOrder ?? []) {
     const record = byId.get(id); if (record) { ordered.push(record); byId.delete(id); }
   }
   for (const record of records) if (byId.delete(record.id)) ordered.push(record);
@@ -88,16 +92,17 @@ export function listProjectTimbres(library: MaterialLibrary, songDraftId: string
 }
 
 /** Seed independent local starters together; repeated entry never resets edits or names. */
-export function ensureProjectMelodyTimbres(library: MaterialLibrary, songDraftId: string): ContentRecord[] {
+export function ensureProjectMelodyTimbres(library: MaterialLibrary, songDraftId: string, _studio?: boolean): ContentRecord[] {
   prepareProjectMelodyTimbres(library, songDraftId);
   return listProjectTimbres(library, songDraftId);
 }
 
-export function prepareProjectMelodyTimbres(library: MaterialLibrary, songDraftId: string): void {
+export function prepareProjectMelodyTimbres(library: MaterialLibrary, songDraftId: string, _studio?: boolean): void {
   const song = library.readDraft(songDraftId);
   if (!song) throw new Error('先打开一首歌曲，再选择音色。');
   const songBody = readSongBody(song.body);
-  if (songBody.melodyTimbresSeeded && (songBody.timbreCatalogVersion ?? 1) >= instrumentCatalogVersion) return;
+  const version = studioInstrumentCatalogVersion;
+  if (songBody.melodyTimbresSeeded && (songBody.timbreCatalogVersion ?? 1) >= version) return;
   const expectedToken = library.currentToken();
   const { view, scope } = currentSong(library, songDraftId);
   const current = listProjectTimbres(library, songDraftId);
@@ -105,7 +110,8 @@ export function prepareProjectMelodyTimbres(library: MaterialLibrary, songDraftI
     .filter(item => item.kind === 'rootsound.timbre' && library.projectScopeOf?.({ type: 'revision' in item ? 'content' : 'draft', id: item.id }) === scope)
     .map(item => nameKey(item.name)));
   const created: ContentRecord[] = [];
-  for (const preset of prepareMelodyTimbres(songBody.melodyTimbresSeeded ? songBody.timbreCatalogVersion ?? 1 : 0)) {
+  const presets = prepareStudioInstruments();
+  for (const preset of presets) {
     const id = `${preset.id}:${scope}`;
     if (current.some(record => record.id === id)) continue;
     // A renamed/edited preset is still the same saved identity after reopening.
@@ -116,7 +122,7 @@ export function prepareProjectMelodyTimbres(library: MaterialLibrary, songDraftI
     names.add(nameKey(name)); created.push({ ...preset, id, name });
   }
   songBody.melodyTimbresSeeded = true;
-  songBody.timbreCatalogVersion = instrumentCatalogVersion;
+  songBody.timbreCatalogVersion = version;
   songBody.timbreLibraryOrder = [...new Set([...(songBody.timbreLibraryOrder ?? []), ...current.map(record => record.id), ...created.map(record => record.id)])];
   committed(library.commitTransaction({ expectedToken, label: '准备本曲音色', createContents: created,
     replaceDrafts: songLibraryMetadataChanges(library, song, songBody),

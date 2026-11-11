@@ -35,7 +35,7 @@ const noteEditPrompts: ReadonlyArray<readonly [action: LearningAction, text: str
 const scenes = [
   { title: '卷帘', lines: ['核心创作画布'], wait: enterDelayMs },
   { title: '音符', lines: ['音符散落在卷帘上'], wait: enterDelayMs },
-  { title: '播放头', lines: ['播放头匀速向下，碰到音符就发声', '按空格开始或暂停'], wait: 0 },
+  { title: '播放线', lines: ['播放线匀速向下，碰到音符就发声', '按空格开始或暂停'], wait: 0 },
   { title: '琴键与列线', lines: ['卷帘分列，列与琴键一一对应，表示音调。'], wait: enterDelayMs },
   { title: 'BPM', lines: ['BPM 值 × 一拍的时长 = 一分钟', '相邻两条横线之间是一拍', '点击左下角数字以改变 BPM'], wait: 0 },
   { title: '音色', lines: [], wait: 0 },
@@ -48,6 +48,7 @@ const scenes = [
   { title: '顶栏', lines: [
     '顶栏是核心控制区',
     '左上角是乐曲名，双击可修改',
+    '在设置中开启「多卷帘」，可为不同卷帘设置 BPM',
   ], wait: 5000 },
 ] as const;
 

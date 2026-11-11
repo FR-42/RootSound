@@ -45,7 +45,7 @@ window.check=async()=>{
  return {passed:true,checks:5,wetEnergy,dryEnergy,physicalAudio:false,desktopControl:false};
 };return true;})();
 </script></body></html>`);
-const server=await createServer({configFile:false,publicDir:path.resolve('public'),optimizeDeps:{include:['midi-file','spessasynth_core','@xmldom/xmldom','fflate']},server:{host:'127.0.0.1',port:0,hmr:false,watch:{ignored:['**/.cache/**','**/.test-output/**','**/project/**','**/legacy/**','**/release/**']}},logLevel:'error'});await server.listen();
+const server=await createServer({configFile:false,publicDir:path.resolve('public'),optimizeDeps:{include:['midi-file','@xmldom/xmldom','fflate']},server:{host:'127.0.0.1',port:0,hmr:false,watch:{ignored:['**/.cache/**','**/.test-output/**','**/project/**','**/legacy/**','**/release/**']}},logLevel:'error'});await server.listen();
 const origin='http://127.0.0.1:'+server.httpServer.address().port;
 await fs.writeFile(path.join(root,'qa.cjs'),`
 const {app,BrowserWindow}=require('electron'),fs=require('node:fs'),path=require('node:path');

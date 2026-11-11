@@ -7,7 +7,7 @@ on:
       - 'website/**'
       - 'web/**'
       - 'src/workstation/**'
-      - 'public/instruments/generaluser-gs-2.0.3/**'
+      - 'public/instruments/rootsound-studio-v1/**'
       - 'scripts/build-web-demo.mjs'
       - 'vite.web.config.ts'
       - 'package.json'

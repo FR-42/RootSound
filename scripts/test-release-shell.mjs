@@ -57,28 +57,20 @@ async function run(){
   assert.equal(fs.readFileSync(created.project.path,'utf8'),stored,'loading cannot autosave');
   await js("document.querySelector('.melody-add-note-family').click()");
   assert(await js("!!document.querySelector('.melody-tone-library')"));
-  const voiceCount=await js("document.querySelectorAll('.melody-library-tone').length");assert.equal(voiceCount,175);
+  const voiceCount=await js("document.querySelectorAll('.melody-library-tone').length");assert.equal(voiceCount,12);
   await js("document.querySelector('.melody-library-close').click()");
   const save=await js("JSON.parse(await rootSoundDesktop.projectDirectories.Save('发布集成检查'))");assert.equal(save.status,'saved');
   const missing=await js("(await fetch('/__payload/invalid')).status");assert.equal(missing,404);
-  // Exercise the actual packaged worklet under the production URL scheme/CSP.
-  // Only OfflineAudioContext is permitted; this never opens the speaker device.
-  const assets=path.join(path.dirname(main),'ui/assets');
-  const worker=fs.readdirSync(assets).find(name=>name.startsWith('soundfont-worklet-')&&fs.statSync(path.join(assets,name)).size>100000);assert(worker);
-  const fontAudio=await js('(async()=>{'+
-   'globalThis.AudioContext=class{constructor(){throw Error("physical audio forbidden")}};'+
+  const recordingAudio=await js('(async()=>{'+
+   'const base="/instruments/rootsound-studio-v1/";'+
+   'const manifest=await fetch(base+"manifest.json").then(response=>response.json());'+
+   'const response=await fetch(base+manifest.instruments["studio-piano"][0].asset);'+
    'const context=new OfflineAudioContext(2,48000,48000);'+
-   'await context.audioWorklet.addModule('+JSON.stringify('/assets/'+worker)+');'+
-   'const bank=await fetch("/instruments/generaluser-gs-2.0.3/GeneralUser-GS.sf2").then(response=>{if(!response.ok)throw Error("missing SF2");return response.arrayBuffer()});'+
-   'const init=new AudioWorkletNode(context,"rootsound-soundfont",{numberOfInputs:0,numberOfOutputs:1,outputChannelCount:[2],processorOptions:{bank}});'+
-   'await new Promise((resolve,reject)=>{init.port.onmessage=event=>event.data.type==="ready"?resolve():reject(Error(event.data.message));init.onprocessorerror=()=>reject(Error("worklet initialization failed"))});init.port.close();'+
-   'const font={bank:"generaluser-gs-2.0.3",program:0,key:60,velocity:100,cents:0,drums:false};'+
-   'const voice=new AudioWorkletNode(context,"rootsound-soundfont",{numberOfInputs:0,numberOfOutputs:1,outputChannelCount:[2],processorOptions:{events:[{atSeconds:0,holdSeconds:.2,releaseSeconds:.5,level:.7,pan:0,font}]}});voice.connect(context.destination);'+
-   'const ready=new Promise((resolve,reject)=>{voice.port.onmessage=event=>event.data.type==="scheduled"?resolve():event.data.type==="error"&&reject(Error(event.data.message));voice.onprocessorerror=()=>reject(Error("worklet render failed"))});'+
-   'voice.port.postMessage({type:"start",at:0,position:0});voice.port.postMessage({type:"stop",at:.9});await ready;'+
-   'const audio=await context.startRendering();let peak=0;for(const value of audio.getChannelData(0))peak=Math.max(peak,Math.abs(value));voice.disconnect();voice.port.close();if(peak<.00001)throw Error("packaged SoundFont was silent");return {peak,frames:audio.length,offlineOnly:true};})()');
+   'const pcm=await context.decodeAudioData(await response.arrayBuffer());'+
+   'if(!pcm.getChannelData(0).some(value=>Math.abs(value)>.00001))throw Error("packaged piano was silent");'+
+   'return {frames:pcm.length,offlineOnly:true};})()');
   assert(!window.isVisible());
-  fs.writeFileSync(report,JSON.stringify({passed:true,actualBundledRenderer:true,actualBundledDotnet:true,welcome:true,bundledProjects:bundled,createAndReload:true,noteCount:view.notes,defaultVoices:voiceCount,fontAudio,save:true,manualSavePreserved:true,noOldArrangement:true,opaquePayloadBoundary:true,visibleWindow:false,screenCaptured:false,audioDeviceOpened:false},null,2));
+  fs.writeFileSync(report,JSON.stringify({passed:true,actualBundledRenderer:true,actualBundledDotnet:true,welcome:true,bundledProjects:bundled,createAndReload:true,noteCount:view.notes,defaultVoices:voiceCount,recordingAudio,save:true,manualSavePreserved:true,noOldArrangement:true,opaquePayloadBoundary:true,visibleWindow:false,screenCaptured:false,audioDeviceOpened:false},null,2));
   window.destroy();app.exit(0);
  }catch(error){fs.writeFileSync(report,JSON.stringify({error:error.stack}));app.exit(1);}
 }

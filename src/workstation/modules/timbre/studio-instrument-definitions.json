@@ -1,0 +1,274 @@
+[
+  {
+    "key": "studio-piano",
+    "name": "三角钢琴",
+    "category": "键盘",
+    "libraryGroup": "钢琴",
+    "midi": 60,
+    "program": 0
+  },
+  {
+    "key": "studio-sax",
+    "name": "次中音萨克斯",
+    "category": "木管",
+    "libraryGroup": "木管",
+    "midi": 60,
+    "program": 66
+  },
+  {
+    "key": "studio-bass",
+    "name": "指弹电贝斯",
+    "category": "低音",
+    "libraryGroup": "贝斯",
+    "midi": 40,
+    "program": 33
+  },
+  {
+    "key": "studio-guitar",
+    "name": "古典吉他",
+    "category": "拨弦",
+    "libraryGroup": "吉他",
+    "midi": 57,
+    "program": 24
+  },
+  {
+    "key": "studio-violin",
+    "name": "独奏小提琴",
+    "category": "弦乐",
+    "libraryGroup": "弦乐",
+    "midi": 64,
+    "program": 40
+  },
+  {
+    "key": "studio-viola",
+    "name": "中提琴组",
+    "category": "弦乐",
+    "libraryGroup": "弦乐",
+    "midi": 57,
+    "program": 41
+  },
+  {
+    "key": "studio-cello",
+    "name": "大提琴组",
+    "category": "弦乐",
+    "libraryGroup": "弦乐",
+    "midi": 48,
+    "program": 42
+  },
+  {
+    "key": "studio-flute",
+    "name": "管弦长笛",
+    "category": "木管",
+    "libraryGroup": "木管",
+    "midi": 72,
+    "program": 73
+  },
+  {
+    "key": "studio-trumpet",
+    "name": "管弦小号",
+    "category": "铜管",
+    "libraryGroup": "铜管",
+    "midi": 64,
+    "program": 56
+  },
+  {
+    "key": "studio-trombone",
+    "name": "管弦长号",
+    "category": "铜管",
+    "libraryGroup": "铜管",
+    "midi": 55,
+    "program": 57
+  },
+  {
+    "key": "studio-horn",
+    "name": "管弦圆号",
+    "category": "铜管",
+    "libraryGroup": "铜管",
+    "midi": 53,
+    "program": 60
+  },
+  {
+    "key": "studio-dizi",
+    "name": "竹笛",
+    "category": "木管",
+    "libraryGroup": "木管",
+    "midi": 79,
+    "program": 73
+  },
+  {
+    "key": "studio-black-pearl-kick",
+    "name": "录音室鼓 A · 底鼓",
+    "category": "打击",
+    "libraryGroup": "录音室鼓 A",
+    "midi": 60,
+    "drum": 36
+  },
+  {
+    "key": "studio-black-pearl-snare",
+    "name": "录音室鼓 A · 军鼓",
+    "category": "打击",
+    "libraryGroup": "录音室鼓 A",
+    "midi": 60,
+    "drum": 38
+  },
+  {
+    "key": "studio-black-pearl-rim",
+    "name": "录音室鼓 A · 边击",
+    "category": "打击",
+    "libraryGroup": "录音室鼓 A",
+    "midi": 60,
+    "drum": 37
+  },
+  {
+    "key": "studio-black-pearl-hat-closed",
+    "name": "录音室鼓 A · 闭镲",
+    "category": "打击",
+    "libraryGroup": "录音室鼓 A",
+    "midi": 60,
+    "drum": 42
+  },
+  {
+    "key": "studio-black-pearl-hat-pedal",
+    "name": "录音室鼓 A · 踏板踩镲",
+    "category": "打击",
+    "libraryGroup": "录音室鼓 A",
+    "midi": 60,
+    "drum": 44
+  },
+  {
+    "key": "studio-black-pearl-hat-half",
+    "name": "录音室鼓 A · 半开镲",
+    "category": "打击",
+    "libraryGroup": "录音室鼓 A",
+    "midi": 60,
+    "drum": 46
+  },
+  {
+    "key": "studio-black-pearl-hat-open",
+    "name": "录音室鼓 A · 开镲",
+    "category": "打击",
+    "libraryGroup": "录音室鼓 A",
+    "midi": 60,
+    "drum": 46
+  },
+  {
+    "key": "studio-black-pearl-tom-floor",
+    "name": "录音室鼓 A · 落地通鼓",
+    "category": "打击",
+    "libraryGroup": "录音室鼓 A",
+    "midi": 60,
+    "drum": 41
+  },
+  {
+    "key": "studio-black-pearl-tom-rack",
+    "name": "录音室鼓 A · 架子通鼓",
+    "category": "打击",
+    "libraryGroup": "录音室鼓 A",
+    "midi": 60,
+    "drum": 45
+  },
+  {
+    "key": "studio-black-pearl-crash",
+    "name": "录音室鼓 A · 吊镲",
+    "category": "打击",
+    "libraryGroup": "录音室鼓 A",
+    "midi": 60,
+    "drum": 49
+  },
+  {
+    "key": "studio-black-pearl-ride",
+    "name": "录音室鼓 A · 叮叮镲",
+    "category": "打击",
+    "libraryGroup": "录音室鼓 A",
+    "midi": 60,
+    "drum": 51
+  },
+  {
+    "key": "studio-red-zeppelin-kick",
+    "name": "录音室鼓 B · 底鼓",
+    "category": "打击",
+    "libraryGroup": "录音室鼓 B",
+    "midi": 60,
+    "drum": 36
+  },
+  {
+    "key": "studio-red-zeppelin-snare",
+    "name": "录音室鼓 B · 军鼓",
+    "category": "打击",
+    "libraryGroup": "录音室鼓 B",
+    "midi": 60,
+    "drum": 38
+  },
+  {
+    "key": "studio-red-zeppelin-rim",
+    "name": "录音室鼓 B · 边击",
+    "category": "打击",
+    "libraryGroup": "录音室鼓 B",
+    "midi": 60,
+    "drum": 37
+  },
+  {
+    "key": "studio-red-zeppelin-hat-closed",
+    "name": "录音室鼓 B · 闭镲",
+    "category": "打击",
+    "libraryGroup": "录音室鼓 B",
+    "midi": 60,
+    "drum": 42
+  },
+  {
+    "key": "studio-red-zeppelin-hat-pedal",
+    "name": "录音室鼓 B · 踏板踩镲",
+    "category": "打击",
+    "libraryGroup": "录音室鼓 B",
+    "midi": 60,
+    "drum": 44
+  },
+  {
+    "key": "studio-red-zeppelin-hat-half",
+    "name": "录音室鼓 B · 半开镲",
+    "category": "打击",
+    "libraryGroup": "录音室鼓 B",
+    "midi": 60,
+    "drum": 46
+  },
+  {
+    "key": "studio-red-zeppelin-hat-open",
+    "name": "录音室鼓 B · 开镲",
+    "category": "打击",
+    "libraryGroup": "录音室鼓 B",
+    "midi": 60,
+    "drum": 46
+  },
+  {
+    "key": "studio-red-zeppelin-tom-floor",
+    "name": "录音室鼓 B · 落地通鼓",
+    "category": "打击",
+    "libraryGroup": "录音室鼓 B",
+    "midi": 60,
+    "drum": 41
+  },
+  {
+    "key": "studio-red-zeppelin-tom-rack",
+    "name": "录音室鼓 B · 架子通鼓",
+    "category": "打击",
+    "libraryGroup": "录音室鼓 B",
+    "midi": 60,
+    "drum": 45
+  },
+  {
+    "key": "studio-red-zeppelin-crash",
+    "name": "录音室鼓 B · 吊镲",
+    "category": "打击",
+    "libraryGroup": "录音室鼓 B",
+    "midi": 60,
+    "drum": 49
+  },
+  {
+    "key": "studio-red-zeppelin-ride",
+    "name": "录音室鼓 B · 叮叮镲",
+    "category": "打击",
+    "libraryGroup": "录音室鼓 B",
+    "midi": 60,
+    "drum": 51
+  }
+]

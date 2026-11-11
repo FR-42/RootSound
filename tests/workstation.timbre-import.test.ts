@@ -24,10 +24,10 @@ function fixture() {
   return { library, storage, policy, playback, songId, raw: () => raw, fail() { fail = true; } };
 }
 test('external voices become independent song-wide members with unique names and no phrase edits', () => {
-  const f = fixture(); const original = prepareBasicTimbre('钢琴'); const source = structuredClone(original);
+  const f = fixture(); const original = prepareBasicTimbre('三角钢琴'); const source = structuredClone(original);
   const before = f.library.readDraft(f.songId); const first = importProjectTimbre(f.library, f.songId, original);
   const second = importProjectTimbre(f.library, f.songId, original);
-  assert.equal(first.name, '钢琴 2'); assert.equal(second.name, '钢琴 3');
+  assert.equal(first.name, '三角钢琴 2'); assert.equal(second.name, '三角钢琴 3');
   assert.notEqual(first.id, second.id); assert.notEqual(first.id, original.id); assert.deepEqual(original, source);
   assert.deepEqual(f.library.readDraft(f.songId), before);
   assert(listProjectTimbres(f.library, f.songId).some(record => record.id === first.id));
@@ -36,7 +36,7 @@ test('external voices become independent song-wide members with unique names and
     assert(part); assert(f.library.readDraft(phrase.draftId)!.dependencies.includes(first.id));
   }
   const separate = fixture(); const sameName = importProjectTimbre(separate.library, separate.songId, original);
-  assert.equal(sameName.name, '钢琴 2');
+  assert.equal(sameName.name, '三角钢琴 2');
   assert(!listProjectTimbres(separate.library, separate.songId).some(record => record.id === first.id));
 });
 test('unused imported tones survive Save As and self-contained project transfer without the source file', () => {

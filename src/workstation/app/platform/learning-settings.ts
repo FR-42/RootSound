@@ -10,13 +10,15 @@ export function restartLearning(storage: PreferenceStorage): void {
   storage.setItem(LEARNING_KEY, JSON.stringify({ version: 1, lessonVersion: LESSON_VERSION, ...settings }));
 }
 export function createLearningSettings(storage: PreferenceStorage): LearningSettingsPort {
-  const fresh = (): LearningSettings => ({ multipleTempoRolls: false,
+  const fresh = (): LearningSettings => ({ multipleTempoRolls: false, drumLanes: false, workbench: false,
     guides: { basics: { status: 'new', step: 0 }, 'tempo-rolls': { status: 'new', step: 0 } } });
   let value = fresh();
   try {
     const parsed = JSON.parse(storage.getItem(LEARNING_KEY) ?? 'null');
     if (parsed?.version === 1) {
       value.multipleTempoRolls = parsed.multipleTempoRolls === true;
+      value.drumLanes = parsed.drumLanes === true;
+      value.workbench = parsed.workbench === true;
       for (const id of ['basics', 'tempo-rolls'] as const) {
         const p = parsed.guides?.[id];
         if (p && ['new', 'learning', 'completed', 'skipped'].includes(p.status)
@@ -35,6 +37,8 @@ export function createLearningSettings(storage: PreferenceStorage): LearningSett
   return {
     read: () => structuredClone(value),
     setMultipleTempoRolls(enabled) { write({ ...value, multipleTempoRolls: enabled }); },
+    setDrumLanes(enabled) { write({ ...value, drumLanes: enabled }); },
+    setWorkbench(enabled) { write({ ...value, workbench: enabled }); },
     record(id: GuideId, progress: GuideProgress) { write({ ...value, guides: { ...value.guides, [id]: { ...progress } } }); },
   };
 }

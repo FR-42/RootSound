@@ -9,6 +9,7 @@ import { createTimbrePlayback, createTimbreReferenceAdapter, defaultInstrumentIn
 import { createPhraseEditor, createPhrasePlayback, createPhraseReferenceAdapter, readPhraseBody } from '../modules/phrase/public.ts';
 import { createSongEditor, createSongReferenceAdapter, readSongBody } from '../modules/song/public.ts';
 import { createSampleReferenceAdapter } from '../modules/sampling/public.ts';
+import { studioBank, studioInstrumentForMidi } from '../modules/timbre/instrument-catalog.ts';
 import generalMidi from '../modules/timbre/general-midi.json' with { type: 'json' };
 import { openMusicDocument, commitMusicDocument } from './music-document.ts';
 import { readExchangeMidi, writeExchangeMidi, createMidiPatcher } from './music-interchange-midi.ts';
@@ -35,8 +36,8 @@ function libraryFromScore(score: ExchangeScore): string {
       const proposed = part.drum === undefined ? generalMidi.programs[part.program]! : (generalMidi.drums as Record<number, string>)[part.drum] ?? `鼓 ${part.drum}`;
       let name = proposed, suffix = 2; while (names.has(name)) name = `${proposed} ${suffix++}`; names.add(name);
       tone = { id: crypto.randomUUID(), kind: 'rootsound.timbre', owner: 'timbre', schemaVersion: 1, revision: 1,
-        name, dependencies: [], body: { model: 'sample-bank', version: 1, bank: 'generaluser-gs-2.0.3', instrument: key,
-          attackSeconds: 0, releaseSeconds: .03, level: .7, ...(part.drum === undefined ? {} : { tuningSemitones: 60 - part.drum }) } };
+        name, dependencies: [], body: { model: 'sample-bank', version: 1, bank: studioBank, instrument: studioInstrumentForMidi(part.program, part.drum).key,
+          attackSeconds: 0, releaseSeconds: .03, level: .7, ...(part.drum === undefined ? { midiProgram: part.program } : { midiDrum: part.drum }) } };
       palette.set(key, tone);
     }
     return { id: crypto.randomUUID(), name: `${part.name || '声部'} ${index + 1}`, timbreId: tone.id, section: 'melody' as const,
@@ -87,19 +88,22 @@ export function scoreForFile(library: MaterialLibrary, body: PhraseBody, name: s
   const parts = exportParts.filter(part => !part.unassigned).map(part => {
     const record = library.readContent(part.timbreId), info = record && defaultInstrumentInfo(record.id, record.body);
     if (!info) warnings.add('原格式不能携带自定义音色采样；这些音符将使用 GM 钢琴。另存为 .rootsound 可保留实际音色。');
-    const drum = info && 'drum' in info ? info.drum : undefined;
     const voice = record?.body;
-    if (info && voice && typeof voice === 'object' && !Array.isArray(voice)
+    const source = voice && typeof voice === 'object' && !Array.isArray(voice) ? voice : undefined;
+    const drum = typeof source?.midiDrum === 'number' ? source.midiDrum : info?.drum;
+    if (info && voice && typeof voice === 'object' && !Array.isArray(voice) && voice.bank === 'rootsound-studio-v1')
+      warnings.add('原格式只记录对应的 GM 编号，不能携带录音音色。另存为 .rootsound 可保留音色选择。');
+    else if (info && voice && typeof voice === 'object' && !Array.isArray(voice)
       && (voice.model !== 'sample-bank' || voice.attackSeconds !== 0 || voice.releaseSeconds !== .03 || voice.level !== .7
         || (voice.tuningSemitones ?? 0) !== (drum === undefined ? 0 : 60 - drum)))
       warnings.add('原格式只记录 GM 乐器编号，不能保留自定义音色的包络和调音设置；另存为 .rootsound 可完整保留。');
     if (part.hiddenNotes?.length) warnings.add('隐藏音符只保存在 .rootsound 工程中；原格式只写入当前可播放的音符。');
-    return { id: part.id, name: part.name, program: info && 'program' in info ? info.program! : 0, ...(drum === undefined ? {} : { drum }),
+    return { id: part.id, name: part.name, program: typeof source?.midiProgram === 'number' ? source.midiProgram : info?.program ?? 0, ...(drum === undefined ? {} : { drum }),
       ...(part.midiChannelId ? { midiChannelId: part.midiChannelId } : {}),
       notes: part.notes.map(note => ({ id: note.id, beat: note.startBeat,
         duration: phraseSecondsBeat(body, phraseBeatSeconds(body, note.startBeat) + phraseHeldSeconds(body, note)) - note.startBeat,
         pitch: drum ?? 69 + 12 * Math.log2(note.frequencyHz / 440), velocity: note.velocity,
-        level: (note.level ?? 1) * (body.masterLevel ?? 1), pan: note.pan ?? 0,
+        level: (note.level ?? 1) * (body.masterLevel ?? 1) * (part.level ?? 1), pan: Math.max(-1, Math.min(1, (note.pan ?? 0) + (part.pan ?? 0))),
         ...(note.midiOnOrder === undefined ? {} : { midiOnOrder: note.midiOnOrder }), ...(note.midiOffOrder === undefined ? {} : { midiOffOrder: note.midiOffOrder }) })) };
   });
   if (body.parts.some(part => part.unassigned && part.notes.length)) warnings.add('未定义音色的静默音符不写入原格式；.rootsound 可以保留。');

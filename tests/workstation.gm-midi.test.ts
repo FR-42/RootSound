@@ -31,7 +31,7 @@ for(const drums of [false,true])test(`MIDI ${drums?'47 drum notes':'all 128 prog
   const library=createMaterialLibrary({read:()=>text,write:value=>{text=value;}},{project:{rootKind:'rootsound.song',adapters:[createTimbreReferenceAdapter(),createPhraseReferenceAdapter(),createSongReferenceAdapter()]}});
   const requests=new Set<string>();
   const fetcher=(async(input:RequestInfo|URL)=>{
-    const url=String(input);assert(url.startsWith('/instruments/generaluser-gs-2.0.3/'));
+    const url=String(input);assert(url.startsWith('/instruments/rootsound-studio-v1/'));
     requests.add(url);return new Response(readFileSync(resolve('public','.'+url)));
   }) as typeof fetch;
   const bank=createSampleBankAudio(library,undefined,fetcher),tones=createTimbrePlayback(library,undefined,undefined,bank);
@@ -50,13 +50,13 @@ for(const drums of [false,true])test(`MIDI ${drums?'47 drum notes':'all 128 prog
   // strike must nevertheless retain at least one audible original layer.
   for(const event of plan.events)assert(prepared.events.some(rendered=>rendered.atSeconds===event.atSeconds
     && rendered.sound.kind==='sample'&&rendered.sound.source.peak>1e-5),`silent strike at ${event.atSeconds}`);
-  const instruments=library.listContent().filter(record=>record.kind==='rootsound.timbre').map(record=>record.body as {instrument:string});
-  assert.deepEqual(new Set(instruments.map(body=>body.instrument)),new Set(Array.from({length:count},(_,i)=>drums?`gm-drum-${35+i}`:`gm-${i}`)));
+  const instruments=library.listContent().filter(record=>record.kind==='rootsound.timbre').map(record=>record.body as {midiProgram?:number; midiDrum?:number});
+  assert.deepEqual(new Set(instruments.map(body=>drums?body.midiDrum:body.midiProgram)),new Set(Array.from({length:count},(_,i)=>drums?35+i:i)));
   assert.equal([...requests].filter(url=>url.endsWith('manifest.json')).length,1);
 });
 
 test('the complete installed PCM bank stays below the user’s 1 GB budget',()=>{
-  const directory='public/instruments/generaluser-gs-2.0.3';
+  const directory='public/instruments/rootsound-studio-v1';
   const total=readdirSync(directory).reduce((sum,name)=>sum+statSync(resolve(directory,name)).size,0);
   assert(total<1_000_000_000);assert(total>30_000_000);
 });

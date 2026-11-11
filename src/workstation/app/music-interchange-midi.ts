@@ -35,7 +35,7 @@ export function readExchangeMidi(bytes: Uint8Array, name: string): { score: Exch
       const id = `midi:${note.port ?? 0}:${note.channel}`;
       part = { name: track?.name || `声部 ${note.trackIndex + 1}`, program: note.program, sourceTrack: note.trackIndex, sourceChannel: note.channel, sourcePort: note.port ?? 0,
         ...(expression.has(id) ? { midiChannelId: id } : {}),
-        ...(note.channel === 9 ? { drum: Math.max(35, Math.min(81, note.pitch)) } : {}), notes: [] };
+        ...(note.channel === 9 ? { drum: note.pitch } : {}), notes: [] };
       parts.set(key, part);
     }
     while (midi.tempos[tempoIndex + 1] && midi.tempos[tempoIndex + 1]!.beat <= note.startBeat) tempoIndex++;

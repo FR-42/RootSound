@@ -63,11 +63,6 @@ export interface SampleSoundPlan {
   readonly layers?: readonly Omit<SampleSoundPlan, 'layers' | 'layerReferenceLevel'>[];
   /** Initial root gain, so later note/track/master edits also scale every layer. */
   readonly layerReferenceLevel?: number;
-  /** Complete installed SoundFont recipe; PCM is streamed by the global renderer. */
-  readonly soundFont?: { readonly bank: 'generaluser-gs-2.0.3'; readonly program: number; readonly key: number;
-    readonly velocity: number; readonly cents: number; readonly drums: boolean;
-    readonly midiChannelId?: string; readonly midiOnOrder?: number; readonly midiOffOrder?: number;
-    readonly sostenutoSeconds?: number; readonly soundingSeconds?: number };
 }
 export type PlayableNotePlan = SoundPlan | SampleSoundPlan;
 

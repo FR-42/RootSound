@@ -21,6 +21,7 @@ export type PhraseNote = {
   durationSeconds?: number;
   /** Explicit physical pitch; the editor's keyboard does not limit stored precision. */
   frequencyHz: number;
+  drumLane?: number;
   velocity: number;
   /** Per-note output gain; omitted older notes use unity gain. */
   level?: number;
@@ -34,6 +35,7 @@ export type PhraseSection = 'melody' | 'rhythm';
 /** Older unmarked parts belong to Melody; both sections share one phrase clock. */
 export type PhrasePart = {
   id: string; name: string; timbreId: string; section?: PhraseSection;
+  level?: number; pan?: number;
   /** Unassigned tone uses keep notes and origin identity for rebinding but remain silent. */
   unassigned?: boolean;
   notes: PhraseNote[];
@@ -109,6 +111,7 @@ export interface PhraseEditorPort {
   setLength(lengthBeats: number): void;
   addPart(timbreId: string, section?: PhraseSection): string;
   setPartTimbre(partId: string, timbreId: string): void;
+  setPartMix(partId: string, changes: { level?: number; pan?: number }): void;
   /** Unselecting a tone preserves its notes as silent, undefined tone uses. */
   setPartVisible(partId: string, visible: boolean): void;
   /** Related duplicate uses toggle together in one undo step. */

@@ -19,12 +19,26 @@ export function createMelodyNoteIndex(body: PhraseBody, parts: readonly PhrasePa
   const maximumEnds = new Float64Array(size * 2).fill(-Infinity);
   for (let i = 0; i < entries.length; i++) maximumEnds[size + i] = entries[i]!.end;
   for (let i = size - 1; i > 0; i--) maximumEnds[i] = Math.max(maximumEnds[i * 2]!, maximumEnds[i * 2 + 1]!);
-  return { byId, startingBetween(start: number, end: number): IndexedMelodyNote[] {
-    let low = 0, high = entries.length;
-    while (low < high) { const mid = (low + high) >>> 1; if (entries[mid]!.start < start) low = mid + 1; else high = mid; }
-    const result: IndexedMelodyNote[] = [];
-    for (let i = low; i < entries.length && entries[i]!.start <= end; i++) result.push(entries[i]!);
-    return result;
+  let previousFirst = 0, previousLast = 0;
+  const empty: readonly IndexedMelodyNote[] = [];
+  let previous = empty;
+  function boundary(seconds: number, inclusive: boolean, low = 0): number {
+    let high = entries.length;
+    while (low < high) {
+      const mid = (low + high) >>> 1;
+      const start = entries[mid]!.start;
+      if (start < seconds || inclusive && start === seconds) low = mid + 1;
+      else high = mid;
+    }
+    return low;
+  }
+  return { byId, startingBetween(start: number, end: number): readonly IndexedMelodyNote[] {
+    const first = boundary(start, false), last = boundary(end, true, first);
+    if (first !== previousFirst || last !== previousLast) {
+      previousFirst = first; previousLast = last;
+      previous = first === last ? empty : entries.slice(first, last);
+    }
+    return previous;
   }, visible(start: number, end: number): IndexedMelodyNote[] {
     const result: IndexedMelodyNote[] = [];
     function visit(node: number, left: number, right: number): void {

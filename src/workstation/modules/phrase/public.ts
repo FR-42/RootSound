@@ -159,7 +159,7 @@ export function readPhraseBody(value: unknown): PhraseBody {
   })();
   const parts: PhrasePart[] = body.parts.map(raw => {
     const part = object(raw, '音乐中的声音');
-    fields(part, ['id', 'name', 'timbreId', 'section', 'unassigned', 'notes', 'hiddenNotes', 'midiChannelId'], '音乐中的声音');
+    fields(part, ['id', 'name', 'timbreId', 'section', 'unassigned', 'notes', 'hiddenNotes', 'midiChannelId', 'level', 'pan'], '音乐中的声音');
     const id = unique(part.id, '声音标识');
     const name = text(part.name, '声音名称');
     const timbreId = text(part.timbreId, '引用声音标识');
@@ -173,15 +173,18 @@ export function readPhraseBody(value: unknown): PhraseBody {
     if (noteCount > MAX_PHRASE_NOTES) throw new Error(`当前音乐最多可编辑 ${MAX_PHRASE_NOTES} 个音符。`);
     function readNote(rawNote: unknown, hidden = false): PhraseNote {
       const note = object(rawNote, '音符');
-      fields(note, ['id', 'startBeat', 'durationBeats', 'durationSeconds', 'frequencyHz', 'velocity', 'level', 'pan', 'midiOnOrder', 'midiOffOrder', 'midiChannelId'], '音符');
+      fields(note, ['id', 'startBeat', 'durationBeats', 'durationSeconds', 'frequencyHz', 'velocity', 'level', 'pan', 'midiOnOrder', 'midiOffOrder', 'midiChannelId', 'drumLane'], '音符');
       const noteId = unique(note.id, '音符标识');
       const noteChannel = note.midiChannelId == null ? note.midiChannelId : text(note.midiChannelId, '音符演奏通道');
       if (noteChannel != null && !laneIds.has(noteChannel)) throw new Error('找不到音符对应的 MIDI 演奏通道。');
       const startBeat = number(note.startBeat, '音符开始位置', 0, hidden ? MAX_PHRASE_BEATS : lengthBeats);
       const durationBeats = number(note.durationBeats, '音符长度', MIN_NOTE_BEATS, hidden ? MAX_PHRASE_BEATS : lengthBeats);
       if (!hidden && exceedsLength(startBeat, durationBeats, lengthBeats)) throw new Error('音符超出音乐结尾，请先延长音乐。');
+      const drumLane = note.drumLane === undefined ? undefined : number(note.drumLane, '打击位', 0, Number.MAX_SAFE_INTEGER);
+      if (drumLane !== undefined && !Number.isInteger(drumLane)) throw new Error('打击位必须是整数。');
       return {
         id: noteId, startBeat, durationBeats,
+        ...(drumLane === undefined ? {} : { drumLane }),
         ...(noteChannel === undefined ? {} : { midiChannelId: noteChannel }),
         ...(note.midiOnOrder === undefined ? {} : { midiOnOrder: number(note.midiOnOrder, 'MIDI 按键顺序', 0, Number.MAX_SAFE_INTEGER) }),
         ...(note.midiOffOrder === undefined ? {} : { midiOffOrder: number(note.midiOffOrder, 'MIDI 松键顺序', 0, Number.MAX_SAFE_INTEGER) }),
@@ -201,7 +204,9 @@ export function readPhraseBody(value: unknown): PhraseBody {
       if (note.durationSeconds === undefined) throw new Error('被隐藏的音符缺少原始持续时值。');
       return { sectionId, note };
     });
-    return { id, name, timbreId, ...(midiChannelId === undefined ? {} : { midiChannelId }), ...(section === undefined ? {} : { section }),
+    return { id, name, timbreId,
+      ...(part.level === undefined ? {} : { level: number(part.level, '音色音量', 0, 1) }),
+      ...(part.pan === undefined ? {} : { pan: number(part.pan, '音色声像', -1, 1) }), ...(midiChannelId === undefined ? {} : { midiChannelId }), ...(section === undefined ? {} : { section }),
       ...(part.unassigned === undefined ? {} : { unassigned: part.unassigned }), notes,
       ...(hiddenNotes?.length ? { hiddenNotes } : {}) };
   });
@@ -280,16 +285,11 @@ function compilePhrase(body: PhraseBody, playback: TimbrePlaybackPort, tempoBpm 
         holdSeconds: Math.max(MIN_NOTE_SECONDS, note.durationSeconds ?? phraseHeldSeconds(body, note) * ratio), velocity: note.velocity });
       const at = phraseBeatSeconds(body, note.startBeat) * ratio;
       const gate = performance?.gates.get(note.id);
-      const channelId = note.midiChannelId === undefined ? part.midiChannelId : note.midiChannelId;
-      if (channelId && performance && sound.kind === 'sample' && sound.soundFont) sound = { ...sound, soundFont: {
-        ...sound.soundFont, midiChannelId: channelId, midiOnOrder: note.midiOnOrder, midiOffOrder: performance.keyOrders.get(note.id) ?? note.midiOffOrder,
-        sostenutoSeconds: Math.max(MIN_NOTE_SECONDS, (gate?.keyEnd ?? at + sound.note.holdSeconds) - at),
-        soundingSeconds: Math.max(MIN_NOTE_SECONDS, (gate?.soundEnd ?? at + sound.note.holdSeconds) - at) } };
-      else if (gate) sound = { ...sound, note: { ...sound.note, holdSeconds: Math.max(MIN_NOTE_SECONDS, gate.soundEnd - at) } };
-      const level = (body.masterLevel ?? 1) * (note.level ?? 1);
+      if (gate) sound = { ...sound, note: { ...sound.note, holdSeconds: Math.max(MIN_NOTE_SECONDS, gate.soundEnd - at) } };
+      const level = (body.masterLevel ?? 1) * (note.level ?? 1) * (part.level ?? 1);
       return { atSeconds: phraseBeatSeconds(body, note.startBeat) * ratio,
-        sound: body.masterLevel === undefined && note.level === undefined ? sound : { ...sound, level: sound.level * level },
-        ...(note.pan === undefined ? {} : { pan: note.pan }) };
+        sound: body.masterLevel === undefined && note.level === undefined && part.level === undefined ? sound : { ...sound, level: sound.level * level },
+        ...(note.pan === undefined && part.pan === undefined ? {} : { pan: Math.max(-1, Math.min(1, (note.pan ?? 0) + (part.pan ?? 0))) }) };
   }));
   if (!events.length && !allowSilence && !body.parts.some(part => part.unassigned && part.notes.length || part.hiddenNotes?.length)) throw new Error('先添加几个音符，再试听这个音乐吧。');
   events.sort((a, b) => a.atSeconds - b.atSeconds);
@@ -508,6 +508,11 @@ export function createPhraseEditor(library: MaterialLibrary, playback: TimbrePla
       modify(body => { body.parts.push({ id, name, timbreId, ...(selectedSection === undefined ? {} : { section: selectedSection }), notes: [] }); });
       return id;
     },
+    setPartMix(partId, changes) {
+      if (changes.level !== undefined) number(changes.level, '音色音量', 0, 1);
+      if (changes.pan !== undefined) number(changes.pan, '音色声像', -1, 1);
+      modify(body => { Object.assign(part(body, partId), changes); });
+    },
     setPartTimbre(partId, timbreId) {
       if (!availableSounds(current().draft).some(sound => sound.id === timbreId)) throw new Error('请选择当前歌曲音色库里的音色。');
       const name = soundName(timbreId);
@@ -540,6 +545,14 @@ export function createPhraseEditor(library: MaterialLibrary, playback: TimbrePla
         const source = part(body, sourcePartId), target = part(body, targetPartId);
         if (source.unassigned || target.unassigned || source.timbreId !== target.timbreId)
           throw new Error('只能合并使用相同音色的音符组。');
+        if (source.level !== target.level || source.pan !== target.pan) {
+          for (const group of [source, target]) {
+            const bake = (note: PhraseNote): PhraseNote => ({ ...note, level: (note.level ?? 1) * (group.level ?? 1), pan: Math.max(-1, Math.min(1, (note.pan ?? 0) + (group.pan ?? 0))) });
+            group.notes = group.notes.map(bake);
+            if (group.hiddenNotes) group.hiddenNotes = group.hiddenNotes.map(item => ({ ...item, note: bake(item.note) }));
+            delete group.level; delete group.pan;
+          }
+        }
         const preserve = (note: PhraseNote): PhraseNote => {
           const channel = note.midiChannelId === undefined ? source.midiChannelId ?? null : note.midiChannelId;
           return (channel ?? undefined) === target.midiChannelId && note.midiChannelId === undefined
@@ -557,7 +570,7 @@ export function createPhraseEditor(library: MaterialLibrary, playback: TimbrePla
     addNotes(partId, inputs) {
       if (!Array.isArray(inputs)) throw new Error('音符列表无效。');
       const notes = inputs.map(input => {
-        fields(object(input, '音符'), ['startBeat', 'durationBeats', 'durationSeconds', 'frequencyHz', 'velocity', 'level', 'pan', 'midiOnOrder', 'midiOffOrder', 'midiChannelId'], '音符');
+        fields(object(input, '音符'), ['startBeat', 'durationBeats', 'durationSeconds', 'frequencyHz', 'velocity', 'level', 'pan', 'midiOnOrder', 'midiOffOrder', 'midiChannelId', 'drumLane'], '音符');
         return { ...input, id: crypto.randomUUID() };
       });
       modify(body => { part(body, partId).notes.push(...notes); });
@@ -572,7 +585,7 @@ export function createPhraseEditor(library: MaterialLibrary, playback: TimbrePla
         const ids = new Set<string>();
         for (const update of updates) {
           fields(object(update, '音符修改'), ['partId', 'noteId', 'changes'], '音符修改');
-          fields(object(update.changes, '音符修改'), ['startBeat', 'durationBeats', 'durationSeconds', 'frequencyHz', 'velocity', 'level', 'pan'], '音符修改');
+          fields(object(update.changes, '音符修改'), ['startBeat', 'durationBeats', 'durationSeconds', 'frequencyHz', 'velocity', 'level', 'pan', 'drumLane'], '音符修改');
           if (ids.has(update.noteId)) throw new Error('一次修改中不能重复指定同一音符。');
           ids.add(update.noteId);
           const found = part(body, update.partId).notes.find(item => item.id === update.noteId);
@@ -586,7 +599,7 @@ export function createPhraseEditor(library: MaterialLibrary, playback: TimbrePla
       });
     },
     moveNote(partId, noteId, targetPartId, changes = {}) {
-      fields(object(changes, '音符修改'), ['startBeat', 'durationBeats', 'durationSeconds', 'frequencyHz', 'velocity', 'level', 'pan'], '音符修改');
+      fields(object(changes, '音符修改'), ['startBeat', 'durationBeats', 'durationSeconds', 'frequencyHz', 'velocity', 'level', 'pan', 'drumLane'], '音符修改');
       modify(body => {
         const source = part(body, partId); const target = part(body, targetPartId);
         if ((source.section ?? 'melody') !== (target.section ?? 'melody')) throw new Error('音符只能在同一部门内更换音色。');

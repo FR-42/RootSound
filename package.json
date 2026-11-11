@@ -19,10 +19,10 @@
     "test:launcher": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Test-Launcher.ps1",
     "test:desktop-entry": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Test-DesktopEntry.ps1",
     "desktop": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Start-Desktop.ps1",
-    "test:music": "node --test --test-concurrency=1 tests/workstation.music-document.test.ts tests/workstation.music-workspace.test.ts tests/workstation.tempo-rolls.test.ts tests/workstation.melody-note-index.test.ts tests/workstation.music-workspace-state.test.ts tests/workstation.project-directories.test.ts tests/workstation.midi-entry.test.ts tests/workstation.phrase-composition-transport.test.ts tests/workstation.host-assets.test.ts tests/workstation.instrument-catalog.test.ts tests/workstation.sample-bank.test.ts tests/workstation.timbre-removal.test.ts tests/workstation.tap-tempo.test.ts tests/workstation.note-width.test.ts tests/workstation.gm-midi.test.ts tests/workstation.soundfont.test.ts tests/workstation.output-limiter.test.ts tests/workstation.guidance.test.ts tests/workstation.music-file.test.ts tests/workstation.music-ranges.test.ts",
+    "test:music": "node --test --test-concurrency=1 tests/workstation.music-document.test.ts tests/workstation.music-workspace.test.ts tests/workstation.tempo-rolls.test.ts tests/workstation.melody-note-index.test.ts tests/workstation.music-workspace-state.test.ts tests/workstation.project-directories.test.ts tests/workstation.midi-entry.test.ts tests/workstation.phrase-composition-transport.test.ts tests/workstation.host-assets.test.ts tests/workstation.instrument-catalog.test.ts tests/workstation.sample-bank.test.ts tests/workstation.timbre-removal.test.ts tests/workstation.tap-tempo.test.ts tests/workstation.note-width.test.ts tests/workstation.gm-midi.test.ts tests/workstation.output-limiter.test.ts tests/workstation.guidance.test.ts tests/workstation.music-file.test.ts tests/workstation.music-ranges.test.ts",
     "test:midi-expression": "node --test tests/workstation.midi-expression.test.ts",
     "test:music-files": "node --test tests/workstation.music-file.test.ts tests/workstation.midi-entry.test.ts tests/workstation.project-folders.test.ts",
-    "test:music-ranges": "node --test tests/workstation.music-ranges.test.ts tests/workstation.music-file.test.ts tests/workstation.music-document.test.ts tests/workstation.music-workspace.test.ts tests/workstation.tempo-rolls.test.ts tests/workstation.melody-key-entry.test.ts tests/workstation.tap-tempo.test.ts tests/workstation.music-workspace-state.test.ts tests/workstation.soundfont.test.ts",
+    "test:music-ranges": "node --test tests/workstation.music-ranges.test.ts tests/workstation.music-file.test.ts tests/workstation.music-document.test.ts tests/workstation.music-workspace.test.ts tests/workstation.tempo-rolls.test.ts tests/workstation.melody-key-entry.test.ts tests/workstation.tap-tempo.test.ts tests/workstation.music-workspace-state.test.ts",
     "test:release": "node --test tests/release-host.test.mjs tests/release-bundled-projects.test.mjs"
   },
   "devDependencies": {
@@ -34,7 +34,6 @@
   "dependencies": {
     "@xmldom/xmldom": "0.9.12",
     "fflate": "0.8.3",
-    "midi-file": "1.2.4",
-    "spessasynth_core": "4.4.4"
+    "midi-file": "1.2.4"
   }
 }

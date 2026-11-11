@@ -13,8 +13,8 @@ const between = (a: GuidePoint, b: GuidePoint, t: number) => ({ x: a.x + (b.x - 
 export function createGuidanceDemonstration(shell: HTMLElement, host: HTMLElement, practice: PracticeDocument, sound: SoundRuntimePort, advanced: boolean) {
   const phrase = practice.phrase, tones = practice.listTimbres();
   const reduced = matchMedia('(prefers-reduced-motion: reduce)');
-  const piano = tones.find(tone => tone.name === '钢琴') ?? tones[0]!;
-  const flute = tones.find(tone => tone.name === '长笛') ?? tones[1]!;
+  const piano = tones.find(tone => tone.name === '三角钢琴') ?? tones[0]!;
+  const flute = tones.find(tone => tone.name === '管弦长笛') ?? tones[1]!;
   const first = phrase.read().body!.parts[0]!;
   phrase.setPartTimbre(first.id, piano.id);
   for (const part of phrase.read().body!.parts.slice(1)) phrase.removePart(part.id);

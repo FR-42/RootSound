@@ -6,7 +6,6 @@ import { createWebDemoModel, WEB_TONES } from '../src/workstation/app/web-demo-m
 import { createWebExampleModel, webExampleSnapshot } from '../src/workstation/app/web-demo-example.ts';
 import { createInitialProjectLibrary } from '../src/workstation/app/project-setup.ts';
 import { createMidiProjectLibrary } from '../src/workstation/app/midi-project.ts';
-import { loadSoundFont, SoundFontStream } from '../src/workstation/modules/sound-runtime/soundfont-engine.ts';
 
 const fetcher = (async (input: string | URL | Request) => {
   const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
@@ -36,16 +35,16 @@ test('web score shares editable note timing, undo/redo and an atomic 64-beat lim
   assert.throws(() => model.score.updateNote(part, id, { durationSeconds: 96 }), /16 小节/);
 });
 
-test('web download is a native v2 workspace with embedded samples, no histories, and survives reopening', async () => {
+test('web download is a native v2 workspace with studio voices, no histories, and survives reopening', async () => {
   const model = createWebDemoModel(undefined, '网页工程', fetcher);
   model.score.addNote(model.score.read().body!.parts[0]!.id, note);
-  const bass = model.addGroup(model.palette.find(tone => tone.key === 'electric-bass')!.id);
+  const bass = model.addGroup(model.palette.find(tone => tone.key === 'studio-bass')!.id);
   model.score.addNote(bass, { ...note, frequencyHz: 110, startBeat: .25 });
   const text = await model.save(), envelope = JSON.parse(text), raw = JSON.parse(envelope.libraryText);
   assert.equal(envelope.format, 'RootSoundWorkspace'); assert.equal(envelope.version, 2);
   assert.match(envelope.id, /^[a-f0-9-]{36}$/); assert(new Date(envelope.createdAtUtc).getTime() > 0);
   assert(!raw.editHistory && !raw.transactionHistory);
-  assert(raw.contents.some((record: { kind: string }) => record.kind === 'rootsound.sample'));
+  assert(raw.contents.some((record: { body: { bank?: string } }) => record.body.bank === 'rootsound-studio-v1'));
   const opened = createWebDemoModel(text, '重新打开', fetcher);
   assert.equal(opened.score.read().draft!.name, '网页工程');
   assert.equal(opened.score.read().body!.parts.flatMap(part => part.notes).length, 2);
@@ -60,7 +59,7 @@ test('short MIDI remaps unsupported instruments without moving notes; oversized 
   const imported = createMidiProjectLibrary(midi, '短曲');
   const model = createWebDemoModel(imported.libraryText);
   const written = model.score.read().body!.parts[0]!.notes[0]!;
-  assert.equal(written.startBeat, 0); assert.equal(written.durationSeconds, .5); assert.equal(model.replaced, 1);
+  assert.equal(written.startBeat, 0); assert.equal(written.durationSeconds, .5); assert.equal(model.replaced, 0);
   const source = createInitialProjectLibrary('超长');
   const candidate = JSON.parse(source);
   for (const draft of candidate.drafts) if (draft.kind === 'rootsound.phrase') draft.body.lengthBeats = 128;
@@ -68,35 +67,6 @@ test('short MIDI remaps unsupported instruments without moving notes; oversized 
   assert.throws(() => createWebDemoModel(JSON.stringify(candidate)), /16 小节/);
   assert.equal(model.library.currentToken(), before);
 });
-
-test('website serves the same complete SF2 as the desktop build', async () => {
-  const bytes = await readFile('.cache/website/play/instruments/generaluser-gs-2.0.3/GeneralUser-GS.sf2');
-  assert.deepEqual(bytes, await readFile('public/instruments/generaluser-gs-2.0.3/GeneralUser-GS.sf2'));
-  const bank = loadSoundFont(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength));
-  const starterBytes = await readFile('.cache/website/play/instruments/generaluser-gs-2.0.3/GeneralUser-GS-starter.sf2');
-  assert(starterBytes.byteLength < bytes.byteLength / 5);
-  const starter = loadSoundFont(starterBytes.buffer.slice(starterBytes.byteOffset, starterBytes.byteOffset + starterBytes.byteLength));
-  assert.deepEqual(starter.presets.map(preset => preset.program).sort((a,b) => a-b), [0,48,73]);
-  const voices = [{program:0,key:60},{program:73,key:72},{program:48,key:60},{program:33,key:48},{program:10,key:72},
-    {program:0,key:35,drums:true},{program:0,key:38,drums:true},{program:0,key:42,drums:true}];
-  for (const voice of voices) {
-    const stream = new SoundFontStream(bank, 44100, [{atSeconds:0,holdSeconds:.2,releaseSeconds:.2,level:.5,pan:0,
-      font:{bank:'generaluser-gs-2.0.3',program:voice.program,key:voice.key,velocity:95,cents:0,drums:!!voice.drums}}]);
-    await stream.ready(); const left = new Float32Array(22050), right = new Float32Array(22050);
-    stream.process(left, right); stream.dispose();
-    assert(left.every(Number.isFinite));
-    assert(left.some(sample => Math.abs(sample) > .001), JSON.stringify(voice));
-    if (!voice.drums && [0,48,73].includes(voice.program)) {
-      const compact = new SoundFontStream(starter, 44100, [{atSeconds:0,holdSeconds:.2,releaseSeconds:.2,level:.5,pan:0,
-        font:{bank:'generaluser-gs-2.0.3',program:voice.program,key:voice.key,velocity:95,cents:0,drums:false}}]);
-      await compact.ready();
-      const output = new Float32Array(left.length);
-      compact.process(output, new Float32Array(right.length)); compact.dispose();
-      assert.deepEqual(output, left);
-    }
-  }
-});
-
 
 test('published starter retains the authored 40 notes and timing while each visit is independent', async () => {
   const snapshot = JSON.parse(await readFile('website/examples/starter.json', 'utf8'));

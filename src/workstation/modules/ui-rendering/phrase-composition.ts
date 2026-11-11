@@ -18,6 +18,8 @@ import { mountOutputVolume } from './output-volume.ts';
 import './song.css';
 import './phrase-composition.css';
 
+const MAX_PLAYHEAD_CLOCK_OFFSET = .012;
+
 function node<K extends keyof HTMLElementTagNameMap>(tag: K, className = '', text = ''): HTMLElementTagNameMap[K] {
   const element = document.createElement(tag); element.className = className; element.textContent = text; return element;
 }
@@ -42,6 +44,8 @@ export function mountPhraseComposition(root: HTMLElement, options: {
   onExport?(): void | Promise<void>;
   onSettings?(): void;
   readMultipleTempoRolls?(): boolean;
+  readDrumLanes?(): boolean;
+  readWorkbench?(): boolean;
   onLearningAction?(action: LearningAction): void;
   readLessonInput?: Parameters<typeof mountMelodyWorkspace>[1]['readLessonInput'];
   mobileTouch?: Parameters<typeof mountMelodyWorkspace>[1]['mobileTouch'];
@@ -81,6 +85,7 @@ export function mountPhraseComposition(root: HTMLElement, options: {
   let previewBody: Parameters<PhraseEditorPort['previewPlan']>[0];
   let playbackFamilyId: string | undefined;
   let state = { playing: false, preparing: false, position: 0, rate: 1 };
+  let playheadFrame: { timestamp: number; audio: number; display: number } | undefined;
   let spaceAction: 'pause-space' | 'resume-space' | undefined;
   let playButton: HTMLButtonElement; let viewport: HTMLElement; let ruler: HTMLElement;
   let playhead: HTMLElement; let handle: HTMLButtonElement; let notice: HTMLElement; let title: HTMLElement;
@@ -162,11 +167,26 @@ export function mountPhraseComposition(root: HTMLElement, options: {
     tempoInput.disabled = busy || !current.body;
     subdivisionSelect.disabled = subdivisionButton.disabled = busy || !current.body;
   }
-  function positionHead(): number | undefined {
+  function positionHead(timestamp?: number): number | undefined {
     if (disposed || !viewport) return;
     const seconds = headPreview ?? transport.position();
     if (clock) clock.textContent = formatPlayheadTime(seconds);
-    if (sectionEditor) { sectionEditor.setPlayhead(seconds, state.playing); return seconds; }
+    if (sectionEditor) {
+      let display = seconds;
+      if (timestamp !== undefined && state.playing) {
+        const previous = playheadFrame;
+        if (previous) {
+          const elapsed = (timestamp - previous.timestamp) / 1000;
+          const advance = elapsed * state.rate;
+          if (elapsed > 0 && elapsed < .1 && seconds >= previous.audio && Math.abs(seconds - previous.audio - advance) < .05) {
+            display = melodyClamp(previous.display + advance, Math.max(previous.display, seconds - MAX_PLAYHEAD_CLOCK_OFFSET), seconds + MAX_PLAYHEAD_CLOCK_OFFSET);
+          }
+        }
+        playheadFrame = { timestamp, audio: seconds, display };
+      } else playheadFrame = undefined;
+      sectionEditor.setPlayhead(seconds, state.playing, display);
+      return seconds;
+    }
     const beat = Math.max(0, Math.min(length(), seconds * tempo() / 60));
     const width = headWidth; const x = (Math.max(0, Math.min(duration(), seconds)) - view.leftSeconds) * melodyScale(view, width, duration());
     playhead.hidden = x < 0 || x > width; handle.hidden = playhead.hidden;
@@ -182,9 +202,9 @@ export function mountPhraseComposition(root: HTMLElement, options: {
     playButton.setAttribute('aria-label', state.preparing ? '取消播放准备' : state.playing ? '暂停' : '播放');
     cancelAnimationFrame(frame); positionHead(); if (state.playing) frame = requestAnimationFrame(tick);
   }
-  function tick(): void {
+  function tick(timestamp: number): void {
     if (disposed) return;
-    const seconds = positionHead();
+    const seconds = positionHead(timestamp);
     if (!state.playing) return;
     if (seconds !== undefined && seconds > state.position) options.onPlaybackAdvance?.();
     frame = requestAnimationFrame(tick);
@@ -412,7 +432,7 @@ export function mountPhraseComposition(root: HTMLElement, options: {
   openCreation.addEventListener('keydown', event => { if (event.key === ' ' || event.key === 'Enter') event.stopPropagation(); });
   sectionControls.append(node('div', 'phrase-composition-control-spacer'), openCreation, node('div', 'phrase-composition-control', '音乐控制台'));
   const canvas = node('div', 'phrase-composition-canvas'); ruler = node('div', 'phrase-composition-ruler');
-  handle = action('', 'phrase-composition-head-handle', () => {}); handle.setAttribute('role', 'slider'); handle.setAttribute('aria-label', '播放头'); handle.setAttribute('aria-valuemin', '0'); handle.setAttribute('aria-valuemax', String(length()));
+  handle = action('', 'phrase-composition-head-handle', () => {}); handle.setAttribute('role', 'slider'); handle.setAttribute('aria-label', '播放线'); handle.setAttribute('aria-valuemin', '0'); handle.setAttribute('aria-valuemax', String(length()));
   const flag = document.createElementNS('http://www.w3.org/2000/svg', 'svg'); flag.setAttribute('viewBox', '0 0 16 20'); flag.setAttribute('aria-hidden', 'true');
   const shape = document.createElementNS('http://www.w3.org/2000/svg', 'path'); shape.setAttribute('d', 'M1 1h14v11l-7 7-7-7z'); shape.setAttribute('fill', 'currentColor'); flag.append(shape); handle.append(flag); ruler.append(handle);
   handle.addEventListener('keydown', event => {
@@ -548,7 +568,8 @@ export function mountPhraseComposition(root: HTMLElement, options: {
     main.hidden = true; melodyRegion.hidden = false;
     activeSection = 'melody';
     try { sectionEditor = mountMelodyWorkspace(melodyRegion, { phrase, sound, initialView: current, gridBpm: gridTempo, readPerformanceMode: options.readPerformanceMode, includeAllSections: true,
-      readMultipleTempoRolls: options.readMultipleTempoRolls, onLearningAction: options.onLearningAction, readLessonInput: options.readLessonInput,
+      readMultipleTempoRolls: options.readMultipleTempoRolls, readDrumLanes: options.readDrumLanes,
+      readWorkbench: options.readWorkbench, onLearningAction: options.onLearningAction, readLessonInput: options.readLessonInput,
       mobileTouch,
       orientation: options.directMusic ? 'vertical' : 'horizontal',
       showPlayheadTime: options.directMusic,

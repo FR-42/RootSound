@@ -34,7 +34,8 @@ export type SampleBankZone = {
 };
 /** Empty zones use the immutable installed bank; confirmed projects embed used instruments' samples. */
 export type SampleBankTimbreBody = {
-  model: 'sample-bank'; version: 1; bank: 'generaluser-gs-2.0.3'; instrument: string;
+  model: 'sample-bank'; version: 1; bank: 'rootsound-studio-v1'; instrument: string;
+  midiProgram?: number; midiDrum?: number;
   attackSeconds: number; releaseSeconds: number; level: number; zones?: SampleBankZone[];
   tuningSemitones?: number;
 };

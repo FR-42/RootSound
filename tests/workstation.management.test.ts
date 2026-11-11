@@ -115,7 +115,9 @@ function settingsFixture(fail = false, required = false) {
   const open = () => showLearningSettings(root as unknown as HTMLElement, preferences, { requiresTempoRolls: required }); open();
   const find = (predicate: (node: SettingsElement) => boolean) => { const result = settingsNodes(root).find(predicate); assert(result); return result; };
   return { root, preferences, map, open,
-    feature: () => find(node => node.attributes.get('aria-label') === '分段调整速度'),
+    feature: () => find(node => node.attributes.get('aria-label') === '多卷帘'),
+    drums: () => find(node => node.attributes.get('aria-label') === '打击音色'),
+    workbench: () => find(node => node.attributes.get('aria-label') === '工作台'),
     error: () => find(node => node.attributes.get('role') === 'alert'),
     cleanup() { if (descriptor) Object.defineProperty(globalThis, 'document', descriptor); else Reflect.deleteProperty(globalThis, 'document'); } };
 }
@@ -123,14 +125,23 @@ function settingsFixture(fail = false, required = false) {
 test('settings expose segmented tempo without any guide and keep the settings open on enable', () => {
   const f = settingsFixture(); try {
     assert.equal(f.feature().checked, false);
-    assert.equal(settingsNodes(f.root).filter(node => node.tag === 'input').length, 1);
+    assert.equal(f.drums().checked, false);
+    assert.equal(f.workbench().checked, false);
+    assert.equal(settingsNodes(f.root).filter(node => node.tag === 'input').length, 3);
     assert.deepEqual(settingsNodes(f.root).filter(node => node.tag === 'button').map(node => node.textContent), ['×']);
     f.open(); assert.equal(settingsNodes(f.root).filter(node => node.tag === 'dialog').length, 1);
     f.feature().checked = true; f.feature().dispatchEvent(new Event('change'));
     assert.equal(f.preferences.read().multipleTempoRolls, true);
+    f.drums().checked = true; f.drums().dispatchEvent(new Event('change'));
+    assert.equal(f.preferences.read().drumLanes, true);
+    f.workbench().checked = true; f.workbench().dispatchEvent(new Event('change'));
+    assert.equal(f.preferences.read().workbench, true);
     assert.equal(f.preferences.read().guides['tempo-rolls'].status, 'new');
     assert.equal(f.map.get('song-data'), '完整工程原文'); assert.equal(f.root.children.length, 1);
-    assert.equal(createLearningSettings({ getItem: key => f.map.get(key) ?? null, setItem() {} }).read().multipleTempoRolls, true);
+    const reopened = createLearningSettings({ getItem: key => f.map.get(key) ?? null, setItem() {} });
+    assert.equal(reopened.read().multipleTempoRolls, true);
+    assert.equal(reopened.read().drumLanes, true);
+    assert.equal(reopened.read().workbench, true);
   } finally { f.cleanup(); }
 });
 

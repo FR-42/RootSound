@@ -1,5 +1,4 @@
 import starterExample from '../../../website/examples/starter.json';
-import { preloadWebSoundFont } from '../modules/sound-runtime/public.ts';
 import { commitMusicDocument } from './music-document.ts';
 import { createBrowserTimbreFiles } from './platform/timbre-files.ts';
 import { mountReleaseStudio, showReleaseStartupError } from './release-studio.ts';
@@ -9,8 +8,6 @@ const root = document.getElementById('app')!;
 const choiceKey = 'rootsound.website-guide-choice.v1';
 let startup: Promise<void> | undefined;
 let studio: Awaited<ReturnType<typeof mountReleaseStudio>> | undefined;
-
-void preloadWebSoundFont().catch(() => {});
 
 function start(watchGuide: boolean) {
   if (startup) {

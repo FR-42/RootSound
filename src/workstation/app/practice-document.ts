@@ -17,13 +17,13 @@ export function createPracticeFactory(storage: PreferenceStorage,
       const line = [64, 67, 69, 67, 64, 62, 60, 62, 64, 67, 72, 71, 69, 67, 64, 60];
       score.addNotes(voice, line.map((pitch, index) => ({ startBeat: index, durationBeats: index === 15 ? .95 : .72,
         frequencyHz: 440 * 2 ** ((pitch - 69) / 12), velocity: .8, level: .9 })));
-      const pad = model.addGroup(model.palette.find(tone => tone.key === 'bell-pluck')!.id);
+      const pad = model.addGroup(model.palette.find(tone => tone.key === 'studio-guitar')!.id);
       score.addNotes(pad, [48, 53, 55, 48].flatMap((pitch, index) => [0, 7].map(interval => ({ startBeat: index * 4,
         durationBeats: 2.8, frequencyHz: 440 * 2 ** ((pitch + interval - 69) / 12), velocity: .6, level: .44 }))));
     }
     const practice = model;
     return {
-      phrase: practice.score, listTimbres: () => practice.palette.filter(tone => ['piano', 'flute', 'string-ensemble'].includes(tone.key)),
+      phrase: practice.score, listTimbres: () => practice.palette.filter(tone => ['studio-piano', 'studio-flute', 'studio-violin'].includes(tone.key)),
       addGroup: tone => practice.addGroup(tone), changeTone: (part, tone) => practice.changeTone(part, tone),
       async save() { return save(await practice.save(), practice.score.read().draft!.name); },
       remember() { storage.setItem(key, JSON.stringify(webExampleSnapshot(practice))); },

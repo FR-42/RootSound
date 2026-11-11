@@ -19,6 +19,8 @@ export function createMusicWorkspaceState(storage: PreferenceStorage, projectId:
       // pitches when the new keys are inserted at both ends of the keyboard.
       const addedRows = value.orientation === 'vertical' ? (value.keyboardMinMidi ?? 16) - MIN_MIDI_PITCH : MAX_MIDI_PITCH - (value.keyboardMaxMidi ?? 111);
       current = { ...(value.showGridCells === true ? { showGridCells: true } : {}), ...(value.orientation === 'vertical' ? { orientation: 'vertical' as const } : {}), viewport: { leftSeconds: Math.max(0, view.leftSeconds), zoom: view.zoom, top: Math.max(0, view.top + addedRows * view.rowHeight), rowHeight: view.rowHeight },
+        ...(Number.isSafeInteger(value.drumLanes) && value.drumLanes >= 0 ? { drumLanes: value.drumLanes } : {}),
+        ...(Number.isFinite(value.drumLaneWidth) && value.drumLaneWidth > 0 ? { drumLaneWidth: value.drumLaneWidth } : {}),
         selection, playheadSeconds: Math.max(0, value.playheadSeconds), entryOctave: Math.max(MIN_PITCH_OCTAVE, Math.min(MAX_PITCH_OCTAVE, Math.round(value.entryOctave))),
         entryToneId: typeof value.entryToneId === 'string' ? value.entryToneId : undefined, noteLengths: noteLengths as Record<string, number> };
     }

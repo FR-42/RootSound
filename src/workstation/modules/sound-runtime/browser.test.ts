@@ -87,7 +87,7 @@ test('pause freezes device elapsed and resumes at the original sample and releas
 test('paused live edits validate before replacing retained state, and global replacement invalidates resume', async () => fixture(async () => {
   const runtime = createBrowserSoundRuntime(); const input = { ...phrase([{ atSeconds: 0, sound: longSample() }], 4), transport: { positionSeconds: 0, rate: 1 } };
   const session = await runtime.preview(input); audio().currentTime = session.startedAtSeconds + .5; runtime.pause!(session.id);
-  await assert.rejects(runtime.resume!(session.id, { ...input, transport: { positionSeconds: .5, rate: 0 } }), /播放头速度/);
+  await assert.rejects(runtime.resume!(session.id, { ...input, transport: { positionSeconds: .5, rate: 0 } }), /播放线速度/);
   close(runtime.position(session.id), .5);
   await runtime.preview(plan()); await assert.rejects(runtime.resume!(session.id, input), /已经结束/);
   await runtime.dispose();

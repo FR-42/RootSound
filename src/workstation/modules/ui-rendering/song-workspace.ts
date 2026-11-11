@@ -1109,7 +1109,7 @@ export function mountSongWorkspace(root: HTMLElement, options: {
     paletteList.addEventListener('dragover', reorderShelfPreview); paletteList.addEventListener('drop', dropShelfOrder);
     newPhraseButton = action('+', 'song-new-phrase', openPhraseLibrary); newPhraseButton.setAttribute('aria-label', '打开音乐库'); palette.append(paletteList, newPhraseButton);
     viewport = node('section', 'song-scroll'); viewport.tabIndex = -1; viewport.setAttribute('aria-label', '歌曲编排');
-    ruler = node('div', 'song-ruler'); content = node('div', 'song-timeline'); playhead = node('div', 'song-playhead'); headHandle = node('div', 'song-playhead-handle'); headHandle.setAttribute('aria-label', '拖动播放头');
+    ruler = node('div', 'song-ruler'); content = node('div', 'song-timeline'); playhead = node('div', 'song-playhead'); headHandle = node('div', 'song-playhead-handle'); headHandle.setAttribute('aria-label', '拖动播放线');
     gridLayer = node('div', 'song-grid-lines'); dropPreviewNode = node('div', 'song-drop-preview'); dropPreviewNode.hidden = true;
     addTrackButton = action('+', 'song-add-track', () => mutate(() => { song.addTrack(); })); addTrackButton.setAttribute('aria-label', '添加行');
     addTrackButton.addEventListener('pointerdown', event => event.stopPropagation());

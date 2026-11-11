@@ -11,7 +11,7 @@ import { ensureProjectMelodyTimbres, listProjectTimbres, createProjectPhraseNote
 import type { PhraseBody } from '../contracts/phrase.ts';
 import { phraseBeatSeconds, phraseHeldSeconds } from '../contracts/phrase-time.ts';
 
-export const WEB_TONES = ['piano', 'flute', 'string-ensemble', 'electric-bass', 'bell-pluck', 'acoustic-kick', 'snare', 'closed-hat'] as const;
+export const WEB_TONES = ['studio-piano', 'studio-flute', 'studio-violin', 'studio-bass', 'studio-guitar', 'studio-black-pearl-kick', 'studio-black-pearl-snare', 'studio-black-pearl-hat-closed'] as const;
 export const WEB_MAX_BEATS = 64;
 export const WEB_MAX_NOTES = 2048;
 export const WEB_MAX_FILE_BYTES = 16 * 1024 * 1024;
@@ -81,9 +81,9 @@ export function createWebDemoModel(input?: string, fallbackName = '我的音乐'
     const info = defaultInstrumentInfo(part.timbreId, original?.body);
     const available = uniquePalette.find(tone => tone.key === info?.key);
     if (available?.id === part.timbreId || part.unassigned) continue;
-    const fallback = info?.category === '弦乐' || info?.category === '人声' ? 'string-ensemble'
-      : info?.category === '低音' ? 'electric-bass' : info?.category === '木管' || info?.category === '铜管' ? 'flute'
-      : info && 'drum' in info ? info.drum! >= 42 ? 'closed-hat' : info.drum! >= 38 ? 'snare' : 'acoustic-kick' : 'piano';
+    const fallback = info?.category === '弦乐' || info?.category === '人声' ? 'studio-violin'
+      : info?.category === '低音' ? 'studio-bass' : info?.category === '木管' || info?.category === '铜管' ? 'studio-flute'
+      : info && 'drum' in info ? info.drum! >= 42 ? 'studio-black-pearl-hat-closed' : info.drum! >= 38 ? 'studio-black-pearl-snare' : 'studio-black-pearl-kick' : 'studio-piano';
     const replacement = available ?? uniquePalette.find(tone => tone.key === fallback)!;
     changeProjectPhraseNoteGroupTimbre(library, projectId, score.read().draft!.id, part.id, replacement.id);
     if (!available) replaced++;
@@ -104,8 +104,6 @@ export function createWebDemoModel(input?: string, fallbackName = '我的音乐'
     },
     rename(name: string) { const value = projectName(name); score.rename(value); song.rename(value); },
     async save() {
-      const used = score.read().body!.parts.filter(part => !part.unassigned).map(part => part.timbreId);
-      await bank.materialize(used);
       commitMusicDocument(library, song, score);
       const clean = JSON.parse(text!);
       delete clean.editHistory; delete clean.transactionHistory;

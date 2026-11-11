@@ -48,7 +48,8 @@ export function createPhraseAudition(
         // not become unhandled while a sampled tone is still being prepared.
         const plan = ready === undefined ? await preparation : (await Promise.all([preparation, ready]))[0];
         if (!stillCurrent()) return;
-        await sound.audition(level === 1 ? plan : { ...plan, level: plan.level * level });
+        const gain = level * (initial.body?.parts.find(item => item.id === partId)?.level ?? 1);
+        await sound.audition(gain === 1 ? plan : { ...plan, level: plan.level * gain });
       } catch (error) {
         if (stillCurrent()) {
           onError(`试音暂不可用：${error instanceof Error ? error.message : String(error)}`);

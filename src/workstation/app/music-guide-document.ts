@@ -6,7 +6,7 @@ export function createMusicGuideDocument(name: string): MusicGuideDocument {
   const model = createWebDemoModel(undefined, name);
   return {
     phrase: model.score,
-    listTimbres: () => model.palette.filter(tone => ['piano', 'flute', 'string-ensemble'].includes(tone.key)),
+    listTimbres: () => model.palette.filter(tone => ['studio-piano', 'studio-flute', 'studio-violin'].includes(tone.key)),
     addGroup: model.addGroup,
     changeTone: model.changeTone,
     rename: model.rename,

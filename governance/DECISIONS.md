@@ -1,11 +1,13 @@
 # RootSound decisions in force
 
-Updated 2026-11-05. This is the current decision summary, not an append-only delivery log.
+Updated 2026-11-11. This is the current decision summary, not an append-only delivery log.
 User-confirmed intent, implementation choices and open work are distinguished below.
 The Chinese mirror is [AItoHUMAN/DECISIONS.md](AItoHUMAN/DECISIONS.md); neither language overrides the user.
 Earlier wording and source IDs are preserved in [the original record](../history/2026-11-05-maintenance/governance/DECISIONS.md).
 
 ## Purpose and acceptance — USER CONFIRMED
+
+- RootSound is in early development. Once the user confirms a replacement, remove superseded files, assets and builds from the active project. Older song projects do not require backward compatibility or justify keeping superseded resources. Update bundled demo songs to the current format and resources.
 
 - Final purpose: 让音游曲爱好者快速上手做出满意的音乐. Audience: 音游曲及周边曲风爱好者.
   Low learning/operation burden serves that purpose. The earlier all-people/any-sound goal is superseded.
@@ -23,8 +25,7 @@ Earlier wording and source IDs are preserved in [the original record](../history
 - Public product name is 简乐; repository/technical name remains RootSound.
 - Welcome → physical song library → one editable music score. The former arrangement/phrase overview,
   separate melody/rhythm editors and co-creation route are not current release entry points.
-- A vertical piano roll uses horizontal pitch and vertical time. Note groups remain independently editable;
-  legacy section identity and stored data must survive opening/conversion even when the old UI is absent.
+- A vertical piano roll uses horizontal pitch and vertical time. Note groups remain independently editable.
 - Keep the interface compact and transport controls centered. Tempo rolls use thin one-line labels;
   clicking opens a panel with BPM, 敲击定位 and grid count. Rolls retain independent tempo/grid settings.
 - Old removal of empty settings is superseded by the explicit learning/advanced-feature settings.
@@ -63,18 +64,19 @@ Earlier wording and source IDs are preserved in [the original record](../history
   changed files. Write validated content atomically. Do not reinstate automatic .bak creation.
 - User confirmation 2026-11-05: conversion may shorten trailing empty time. Preserve all sound events,
   onsets, held durations and audible tails; this does not authorize trimming musical rests between notes.
-- Keep necessary samples/data in saved native projects for offline transfer, preserve unknown/legacy data at
-  defined compatibility boundaries, and keep destructive operations scoped and undoable where specified.
+- Keep user-owned sample data in saved native projects for offline transfer. Keep destructive operations scoped and undoable where specified.
   Sources: music-files, folder-library, library-minimal, library-arrows, no-bak, explicit-saving.
+
+- On 2026-11-10, the user removed RipX (.rip) support from the RootSound development scope.
 
 ## Instruments and performance — USER CONFIRMED / CURRENT IMPLEMENTATION
 
-- Develop real instruments and electronic sounds together. The current installed palette is 128 GM programs
-  plus 47 standard percussion notes using the licensed GeneralUser GS 2.0.3 recordings and original SF2.
-- Execute the SF2 through the shared sound runtime (currently spessasynth_core); do not substitute oscillator
-  imitations and call them equivalent recordings. Preserve licenses, provenance and existing user deletions.
-- Preserve supported pedal, bend, controller and aftertouch data and apply it in audition and WAV export.
-  Vendor SysEx/custom banks have limits.
+- On 2026-11-10 the user prioritized fewer, higher-quality recorded instruments for the desktop defaults and
+  allowed larger assets. The requested palette includes piano, bowed strings, saxophone, bamboo flute,
+  xiao, suona, brass, bass, guitar, and acoustic drum-kit pieces. Square and saw leads are outside the default palette.
+- Desktop, web and bundled demos use the current recorded sample library. MIDI imports map program and drum numbers to these recordings and retain the source numbers for export.
+- Preserve licenses, provenance and user deletions. The current sample runtime applies sustain and sostenuto. MIDI bend, continuous controllers and aftertouch remain in the score for export.
+- The UI calls the playhead “播放线”. The setting is “多卷帘” and has no description below it.
 - These mechanisms do not establish that the user is satisfied with the sound. See docs/GM_INSTRUMENTS.md
   and docs/MUSIC_FILES.md. Source: full-sf2, sampled-gm, timbre strengthening and MIDI-EXPRESSION.
 
@@ -103,8 +105,10 @@ Earlier wording and source IDs are preserved in [the original record](../history
   The user later restored right-click deletion. A right click on a note deletes it, and holding the
   right button erases all notes crossed by the pointer, including dimmed notes. A right click on blank
   space clears selection.
-- The user subsequently removed individual-note selection from the vertical roll. The sidebar selects
-  groups. Clicking or dragging a note can audition or edit it while keeping the existing group selection.
+- Without the optional workbench, only groups are selected in the vertical roll; clicking or dragging notes keeps that selection.
+- On 2026-11-10 the user enabled individual-note selection behind a default-off Workbench setting.
+  Group selection opens timbre replacement, removal, volume and pan; note selection opens volume, pan and sounding time.
+  Sounding time is provisionally implemented as held duration in seconds.
 - Advanced tools are opt-in, initially including multiple tempo rolls. Opening work requiring disabled tools
   must explain that requirement. An enable-and-open convenience is an implementation choice, not silent consent.
   Source: hands-on-guidance.

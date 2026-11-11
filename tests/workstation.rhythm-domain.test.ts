@@ -25,7 +25,7 @@ function fixture() {
   const song = createSongEditor(library, phrases, { defaultTempoMode: 'source' }); song.create();
   const songId = song.read().draft!.id; const source = createProjectPhrase(library, songId); phrase.openDraft(source.draftId);
   const tones = ensureProjectMelodyTimbres(library, songId);
-  const piano = tones.find(record => record.name === '钢琴')!; const flute = tones.find(record => record.name === '长笛')!;
+  const piano = tones.find(record => record.name === '三角钢琴')!; const flute = tones.find(record => record.name === '管弦长笛')!;
   const basic = timbrePresets().find(preset => preset.id === 'plain')!.body;
   const replacements = [piano, flute].map(record => ({ expected: record, replacement: { ...record, revision: record.revision + 1,
     body: { ...basic, sustain: record.id === flute.id ? .92 : .7 } } }));

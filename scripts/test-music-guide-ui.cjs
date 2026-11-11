@@ -176,7 +176,7 @@ async function runTest() {
   const playbackLabel = () => js('document.querySelector(".song-play").getAttribute("aria-label")');
   assert.equal(await playbackLabel(), '播放');
   assert.deepEqual(await call(() => Array.from(document.querySelectorAll('.music-guide-copy p'), p => p.textContent)),
-    ['播放头匀速向下，碰到音符就发声', '按空格开始或暂停']);
+    ['播放线匀速向下，碰到音符就发声', '按空格开始或暂停']);
   const spacePrompt = '.music-guide-copy p:last-child';
   const darkPrompt = 'rgb(25, 44, 64)';
   const breathe = 'music-guide-breathe';

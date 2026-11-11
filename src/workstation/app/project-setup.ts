@@ -19,7 +19,7 @@ export function projectName(input: string): string {
 }
 
 /** Build a fresh named song through its domain, without reading the active library. */
-export function createInitialProjectLibrary(input: string): string {
+export function createInitialProjectLibrary(input: string, studio = false): string {
   const name = projectName(input);
   let snapshot: string | null = null;
   const adapters = [createTimbreReferenceAdapter(), createPhraseReferenceAdapter(), createSongReferenceAdapter(),
@@ -29,7 +29,7 @@ export function createInitialProjectLibrary(input: string): string {
   const phrases = createPhrasePlayback(library, createTimbrePlayback(library));
   const song = createSongEditor(library, phrases, { defaultTempoMode: 'source', initialTrackCount: 7 });
   song.create(); song.rename(name);
-  ensureProjectMelodyTimbres(library, song.read().draft!.id);
+  ensureProjectMelodyTimbres(library, song.read().draft!.id, studio);
   const score = createPhraseEditor(library, createTimbrePlayback(library));
   openMusicDocument(library, song, score); commitMusicDocument(library, song, score);
   if (snapshot === null) throw new Error('未能准备新歌曲，尚未创建项目文件。');
@@ -79,7 +79,7 @@ export function createProjectSetup(directories: ProjectDirectoriesPort, enter: (
     create: (input, location) => exclusive(async () => {
       const name = projectName(input);
       if (!location.trim()) throw new Error('请选择项目的存储位置。');
-      await directories.create(name, location.trim(), createInitialProjectLibrary(name));
+      await directories.create(name, location.trim(), createInitialProjectLibrary(name, true));
       enter();
     }),
     async list() {

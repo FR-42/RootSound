@@ -1,13 +1,8 @@
 import { samePcm } from './pcm.ts';
 import { envelopeValue } from './envelope.ts';
 import { noteDuration, type SampleSourceSnapshot, type ScheduledPreview, type ScheduledSound } from './plan.ts';
-import { createSoundFontSource, type SoundFontSource } from './soundfont-node.ts';
-import type { FontEvent } from './soundfont-schedule.ts';
 
 export interface GraphResources {
-  soundFont?: { source: SoundFontSource; gain: GainNode };
-  sourceErrors?:Promise<never>[];
-  sourceScheduling?:Promise<void>[];
   readonly oscillators: OscillatorNode[];
   readonly samples: AudioBufferSourceNode[];
   readonly bufferReleases: (() => void)[];
@@ -21,8 +16,7 @@ export interface GraphResources {
 type GraphStart =
   | { kind: 'oscillator'; node: OscillatorNode; gain: GainNode; atSeconds: number; duration: number; frequency: number; level: number; pitch?: Extract<ScheduledSound, { kind: 'basic-synth' }>['pitch'] }
   | { kind: 'noise'; node: AudioBufferSourceNode; gain: GainNode; atSeconds: number; duration: number; level: number }
-  | { kind: 'sample'; node: AudioBufferSourceNode; atSeconds: number; duration: number; plan: Extract<ScheduledSound, { kind: 'sample' }> }
-  | { kind: 'soundfont'; node: AudioBufferSourceNode; atSeconds: number; duration: number };
+  | { kind: 'sample'; node: AudioBufferSourceNode; atSeconds: number; duration: number; plan: Extract<ScheduledSound, { kind: 'sample' }> };
 export interface SoundGraph {
   readonly envelopes: { atSeconds: number; plan: ScheduledSound; node: GainNode }[];
   readonly starts: GraphStart[];
@@ -67,43 +61,17 @@ function leaseBuffer(audio: BaseAudioContext, source: SampleSourceSnapshot): { b
 }
 
 /** One graph builder and one envelope scheduler serve live and offline clocks. */
-export function soundFontEvents(events: ScheduledPreview['events']): FontEvent[] {
-  return events.flatMap(({ atSeconds, sound, pan }) => sound.kind === 'sample' && sound.soundFont ? [{
-    atSeconds, holdSeconds: sound.note.holdSeconds, releaseSeconds: sound.envelope.releaseSeconds,
-    level: sound.level, pan: pan ?? 0, font: sound.soundFont,
-  }] : []);
-}
-
 export function allocateGraph(audio: BaseAudioContext, preview: ScheduledPreview, resources: GraphResources, ended?: () => void,
   destination: AudioNode = audio.destination): SoundGraph {
   let output: SoundGraph['output'];
   if (preview.output) {
     const node = audio.createGain(); resources.gains.push(node); (resources.outputBuses ??= []).push(node);
     node.connect(destination); destination = node; output = { node, preview };
-  } else if (preview.events.some(event => event.sound.kind === 'sample' && event.sound.soundFont)) {
-    // Keep SF2 and PCM outlets together when live listening gain or audition
-    // ducking reroutes an already-running graph.
-    const node = audio.createGain(); resources.gains.push(node); resources.outputBuses = [node];
-    node.connect(destination); destination = node;
   }
   const graph: SoundGraph = { envelopes: [], starts: [], pans: [], ...(output ? { output } : {}) };
-  const fonts=preview.events.filter(event=>event.sound.kind==='sample'&&event.sound.soundFont);
-  if(fonts.length) {
-    const node = createSoundFontSource(audio, soundFontEvents(fonts), preview.midiExpression);
-    (resources.sourceErrors??=[]).push(node.failure);
-    (resources.sourceScheduling??=[]).push(node.scheduled);
-    const gain=audio.createGain();resources.gains.push(gain);resources.samples.push(node);node.connect(gain);gain.connect(destination);
-    resources.soundFont = { source: node, gain };
-    if(ended)node.onended=ended;
-    const original=fonts[0]!.sound as Extract<ScheduledSound,{kind:'sample'}>;
-    const {soundFont:_font,...clock}=original;
-    graph.envelopes.push({atSeconds:0,node:gain,plan:{...clock,level:1,note:{...clock.note,velocity:1,holdSeconds:preview.durationSeconds},envelope:{attackSeconds:0,releaseSeconds:0},envelopeBaked:true}});
-    graph.starts.push({kind:'soundfont',node,atSeconds:0,duration:preview.durationSeconds});
-  }
   const buffers = new Map<SampleSourceSnapshot, AudioBuffer>();
   for (const event of preview.events) {
     const plan = event.sound;
-    if(plan.kind==='sample'&&plan.soundFont)continue;
     const envelope = audio.createGain();
     resources.gains.push(envelope);
     graph.envelopes.push({ atSeconds: event.atSeconds, plan, node: envelope });
@@ -159,9 +127,7 @@ export function allocateGraph(audio: BaseAudioContext, preview: ScheduledPreview
   return graph;
 }
 
-export function watchSourceErrors(resources:GraphResources,failed:(error:unknown)=>void):void {
-  for(const pending of resources.sourceErrors??[])void pending.catch(failed);
-}
+
 
 export function scheduleGraph(graph: SoundGraph, normalization: number, start: number, fromSeconds = 0, transitionSeconds = 0): void {
   if (graph.output) scheduleOutput(graph.output.node.gain, graph.output.preview, start, fromSeconds);
@@ -260,7 +226,6 @@ export function startGraphSource(scheduled: GraphStart, origin: number, fromSeco
   const age = Math.max(0, fromSeconds - scheduled.atSeconds);
   if (age >= scheduled.duration) { scheduled.node.onended = null; scheduled.node.disconnect(); return undefined; }
   const time = origin + Math.max(scheduled.atSeconds, fromSeconds);
-  if(scheduled.kind==='soundfont'){scheduled.node.start(time,age);scheduled.node.stop(origin+scheduled.duration+.001);return time;}
   if (scheduled.kind === 'sample') {
     let offset = scheduled.plan.startSeconds + age * scheduled.plan.playbackRate;
     const loop = scheduled.plan.loop;

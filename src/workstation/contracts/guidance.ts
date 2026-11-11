@@ -5,11 +5,15 @@ export type GuideStatus = 'new' | 'learning' | 'completed' | 'skipped';
 export interface GuideProgress { status: GuideStatus; step: number }
 export interface LearningSettings {
   multipleTempoRolls: boolean;
+  drumLanes: boolean;
+  workbench?: boolean;
   guides: Record<GuideId, GuideProgress>;
 }
 export interface LearningSettingsPort {
   read(): LearningSettings;
   setMultipleTempoRolls(enabled: boolean): void;
+  setDrumLanes(enabled: boolean): void;
+  setWorkbench(enabled: boolean): void;
   record(id: GuideId, progress: GuideProgress): void;
 }
 /** Report committed user actions, not tutorial clicks or synthetic input. */

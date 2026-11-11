@@ -12,8 +12,7 @@
 网页体验区复用桌面版的钢琴卷帘和编辑操作，初始曲目为 40 个钢琴音符、148 BPM 的示例。
 示例草稿留在当前页面。正式保存和 WAV 导出在桌面版使用。
 
-网页可用同一套 175 个内置音色。打开网页时预加载钢琴、弦乐和长笛的小音源，
-保留原有 SF2 录音和参数。用到其余音色时再加载完整音源。
+网页与桌面共用 34 个录音音色，按需读取当前音符使用的 WAV 采样。
 
 公开页面为 https://fr-42.github.io/RootSound/。独立体验入口为 https://fr-42.github.io/RootSound/play/。
 
@@ -22,7 +21,7 @@
 ## 源码与命令
 
 website/ 是宣传页，web/index.html 和 src/workstation/app/web-demo.ts 是在线编辑器。
-scripts/build-web-demo.mjs 构建共用编辑器，并附带入门音源、完整音源及许可，输出 .cache/website。
+scripts/build-web-demo.mjs 构建共用编辑器，并附带录音采样及许可，输出 .cache/website。
 
 ```powershell
 npm.cmd run build:website

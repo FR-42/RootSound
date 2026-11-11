@@ -120,7 +120,7 @@ export function createPlaylistTransport(options: {
   }
   function setRate(nextRate: number): void {
     if (disposed) return;
-    if (!Number.isFinite(nextRate) || nextRate < .25 || nextRate > 4) { options.onError(new Error('播放头速度需要在 0.25 至 4 倍之间。')); return; }
+    if (!Number.isFinite(nextRate) || nextRate < .25 || nextRate > 4) { options.onError(new Error('播放线速度需要在 0.25 至 4 倍之间。')); return; }
     if (nextRate === rate) return;
     const current = position();
     try {

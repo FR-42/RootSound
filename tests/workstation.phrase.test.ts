@@ -820,3 +820,22 @@ test('saved playback is read-only and supports the current tempo range', () => {
   assert.throws(() => playback.readSaved(f.first.id)); assert.throws(() => playback.planForSaved('missing'));
   assertCloseValue(f.raw(), raw);
 });
+
+
+test('group mix multiplies note gain, offsets pan, survives reopening and merging', () => {
+  const f = fixture(), id = start(f);
+  f.phrase.addNote(id, note({ level: .5, pan: .2 }));
+  const before = f.phrase.previewPlan();
+  f.phrase.setPartMix(id, { level: .4, pan: -.5 });
+  const mixed = f.phrase.previewPlan();
+  assert.equal(mixed.events[0]!.sound.level, before.events[0]!.sound.level * .4);
+  assert.equal(mixed.events[0]!.pan, -.3);
+  const reopened = createPhraseEditor(f.library, f.playback); reopened.openDraft(f.phrase.read().draft!.id);
+  assert.deepEqual(reopened.previewPlan(), mixed);
+  const target = f.phrase.addPart(f.first.id);
+  f.phrase.mergeParts(id, target);
+  assert.deepEqual(f.phrase.previewPlan(), mixed);
+  f.phrase.undo();
+  assert.equal(f.phrase.read().body!.parts.find(part => part.id === id)!.level, .4);
+  assert.throws(() => f.phrase.setPartMix(id, { level: 2 }));
+});

@@ -47,7 +47,7 @@
 .melody-note.is-drawing { pointer-events: none; opacity: .75; cursor: crosshair; }
 .melody-note-resize { position: absolute; right: 0; top: 0; bottom: 0; width: min(7px, 25%); cursor: ew-resize; }
 .melody-playhead { position: absolute; top: 0; bottom: 0; width: 1px; background: #ba4b48; pointer-events: none; z-index: 5; }
-.melody-note.is-sounding { filter:brightness(1.22); box-shadow:inset 0 0 0 1px #ffffffc0; }
+.melody-note.is-sounding { background-color: color-mix(in srgb, var(--tone-color) 42%, white); box-shadow:inset 0 0 0 1px #ffffffc0; }
 .melody-canvas { cursor:grab; }
 .melody-canvas.is-write-mode { cursor:crosshair; }
 .melody-console { flex: 0 0 auto; min-width: 0; max-width: 100%; min-height: 92px; padding: 12px 18px; display: flex; align-items: center; gap: 20px; border-top: 1px solid var(--border); background: var(--surface); overflow-x: auto; overflow-y: hidden; overscroll-behavior-x: contain; scrollbar-width: thin; }
@@ -113,13 +113,13 @@
 @media (prefers-reduced-motion: reduce) { .melody-library-grid.is-sorting .melody-library-card { transition: none; } }
 
 /* The active music workspace: pitches left-to-right, time top-to-bottom. */
-.melody-quick-scroll { position: absolute; right: 0; top: 0; bottom: 48px; width: 10px; z-index: 10; background: #62748a08; touch-action: none; user-select: none; }
+.melody-quick-scroll { position: absolute; right: 0; top: 0; bottom: 48px; width: var(--melody-quick-scroll-width); z-index: 10; background: #62748a08; touch-action: none; user-select: none; }
 .melody-quick-scroll[hidden], .melody-quick-hint[hidden] { display: none; }
 .melody-quick-thumb { position: absolute; top: 0; left: 2px; width: 6px; min-height: 28px; padding: 0; border: 0; border-radius: 0; background: #7b849766; cursor: ns-resize; touch-action: none; }
 .melody-quick-thumb:hover, .melody-quick-scroll.is-dragging .melody-quick-thumb { background: #7b8497aa; }
 .melody-quick-thumb:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.melody-quick-hint { position: absolute; right: 1px; width: 8px; height: 2px; transform: translateY(-1px); background: #ba4b48; pointer-events: none; }
-.is-vertical { --melody-roll-controls-width: 36px; --melody-shelf-width: clamp(76px, 9vw, 86px); }
+.melody-quick-hint { position: absolute; top: 0; right: 1px; width: 8px; height: 2px; background: #ba4b48; pointer-events: none; }
+.is-vertical { --melody-roll-controls-width: 36px; --melody-shelf-width: clamp(76px, 9vw, 86px); --melody-quick-scroll-width: 10px; }
 .is-vertical.is-single-roll { --melody-roll-controls-width: 24px; }
 .is-single-roll .melody-tempo-button { width: 100%; }
 .is-vertical .melody-main { grid-template-columns: var(--melody-shelf-width) minmax(0, 1fr); }
@@ -144,6 +144,9 @@
   background: var(--tone-color);
 }
 .is-vertical .melody-note-family.is-unassigned::before { background: var(--border); }
+.is-vertical .melody-note-family.is-drum-family { padding-right: 4px; line-height: 12px; }
+.melody-note-family.is-drum-family span { display: block; overflow: hidden; text-overflow: ellipsis; }
+.melody-drum-family-kit { font-size: 9px; opacity: .72; }
 .is-vertical .melody-note-family:hover { background: var(--surface-raised); }
 .is-vertical .melody-note-family.is-selected { outline: 0; background: #d7e6fb; color: #17365e; }
 .is-vertical .melody-tone-entry.is-merge-target { outline-offset: -1px; }
@@ -158,6 +161,46 @@
   grid-template-columns: var(--melody-roll-controls-width) minmax(0, 1fr);
   grid-template-rows: minmax(0, 1fr) 48px;
 }
+.is-vertical.has-drum-strip .melody-roll {
+  grid-template-columns: var(--melody-roll-controls-width) minmax(0, 1fr) var(--melody-drum-width);
+}
+.melody-drum-strip { grid-column: 3; grid-row: 1 / 3; display: grid; grid-template-rows: minmax(0, 1fr) 48px; min-height: 0; }
+.melody-drum-strip[hidden] { display: none; }
+.melody-drum-canvas {
+  position: relative;
+  overflow: hidden;
+  background: repeating-linear-gradient(to right, #bac8d8 0 1px, #eef4fa 1px var(--melody-drum-lane-width));
+  cursor: crosshair;
+  touch-action: none;
+}
+.melody-drum-keys { display: flex; flex-direction: row-reverse; }
+.melody-drum-key {
+  flex: 0 0 var(--melody-drum-lane-width);
+  box-sizing: border-box;
+  min-width: 0;
+  border: 0;
+  border-left: 1px solid #b9c9db;
+  border-top: 1px solid var(--border);
+  border-radius: 0;
+  padding: 0;
+  background: #deebf7;
+}
+.melody-drum-divider {
+  position: absolute;
+  inset-block: 0;
+  right: calc(var(--melody-drum-width) - 2px);
+  z-index: 9;
+  width: 6px;
+  cursor: col-resize;
+  touch-action: none;
+}
+.melody-drum-divider::after { content: ''; position: absolute; inset: 0 1px 0 auto; width: 1px; background: #8397ae; }
+.melody-drum-divider:hover::after, .melody-drum-divider:focus-visible::after { background: var(--accent); }
+.melody-drum-key:not(:disabled) { cursor: pointer; }
+.melody-drum-key:not(:disabled):hover { background: #c9ddf2; }
+.melody-drum-key.is-sounding { background: var(--key-flash-color); color: #24384d; }
+.melody-drum-canvas .melody-note-resize { display: none; }
+.is-vertical.has-drum-strip .melody-playhead-time { right: calc(var(--melody-drum-width) + 14px); }
 .is-vertical .melody-ruler-row { grid-column: 1; grid-row: 1; min-height: 0; display: flex; flex-direction: column; border: 0; border-right: 1px solid var(--border); }
 .is-vertical .melody-ruler-spacer, .is-vertical .melody-extend-cap { display: none; }
 .is-vertical .melody-ruler { width: 100%; cursor: ns-resize; }
@@ -192,6 +235,7 @@
 .is-vertical .melody-note.is-dim { opacity: .34; }
 .is-vertical .melody-note-resize { left: 0; right: 0; top: auto; bottom: 0; width: 100%; height: min(7px, 25%); cursor: ns-resize; }
 .is-vertical .melody-playhead { left: 0; right: 0; bottom: auto; width: auto; height: 2px; background: #b52f38; }
+.melody-workspace.is-playing :is(.melody-playhead, .melody-head-handle, .melody-playhead-time, .melody-quick-hint) { will-change: transform; }
 .melody-playhead-time {
   position: absolute;
   top: 0;
@@ -250,3 +294,6 @@
 .melody-note-family[draggable="true"] { cursor: grab; }
 .melody-note-family.is-group-dragging { opacity: .45; cursor: grabbing; }
 .melody-tone-entry.is-merge-target { outline: 2px solid var(--tone-color, #69c9b9); outline-offset: 2px; border-radius: 6px; background: #69c9b922; }
+
+.is-vertical.has-workbench .melody-roll { grid-template-rows: minmax(0, 1fr) 48px auto; }
+.is-vertical .melody-console { grid-column: 1 / -1; grid-row: 3; min-height: 76px; }

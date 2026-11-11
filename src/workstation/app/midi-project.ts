@@ -1,3 +1,4 @@
+import { studioBank, studioInstrumentForMidi } from '../modules/timbre/instrument-catalog.ts';
 import generalMidi from '../modules/timbre/general-midi.json' with { type: 'json' };
 import type { ContentRecord, Draft } from '../contracts/content.ts';
 import type { MidiNote } from '../contracts/midi.ts';
@@ -47,10 +48,9 @@ function voices() {
   function obtain(note:MidiNote):ContentRecord {
     const drum=note.channel===9,key=drum?`drum-${note.pitch}`:`program-${note.program}`;
     const existing=used.get(key);if(existing)return existing;
-    const pitch=Math.max(35,Math.min(81,note.pitch));
-    const body:SampleBankTimbreBody={model:'sample-bank',version:1,bank:'generaluser-gs-2.0.3',
-      instrument:drum?`gm-drum-${pitch}`:`gm-${note.program}`,attackSeconds:0,releaseSeconds:.03,level:.7,
-      ...(drum?{tuningSemitones:60-note.pitch}:{})};
+    const body:SampleBankTimbreBody={model:'sample-bank',version:1,bank:studioBank,
+      instrument:studioInstrumentForMidi(note.program,drum?note.pitch:undefined).key,attackSeconds:0,releaseSeconds:.03,level:.7,
+      ...(drum?{midiDrum:note.pitch}:{midiProgram:note.program})};
     const record:ContentRecord={id:crypto.randomUUID(),kind:'rootsound.timbre',owner:'timbre',schemaVersion:1,revision:1,
       name:reserve(names,drum?DRUM_NAMES[note.pitch]??`打击音 ${note.pitch}`:PROGRAM_NAMES[note.program]??`音色 ${note.program+1}`),dependencies:[],body};
     createTimbreReferenceAdapter().slots(record);used.set(key,record);return record;

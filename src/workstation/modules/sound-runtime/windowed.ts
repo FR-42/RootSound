@@ -30,11 +30,11 @@ export class WindowedGraph {
 
   constructor(audio: BaseAudioContext, preview: ScheduledPreview, resources: GraphResources, destination: AudioNode) {
     this.#audio = audio; this.#preview = preview;
-    this.#events = preview.events.filter(event=>!(event.sound.kind==='sample'&&event.sound.soundFont)).sort((a, b) => a.atSeconds - b.atSeconds);
+    this.#events = [...preview.events].sort((a, b) => a.atSeconds - b.atSeconds);
     this.fade = audio.createGain(); resources.gains.push(this.fade);
     // Keep the fader as the outlet so audition ducking can reroute a live stream.
     resources.outputBuses = [this.fade]; this.fade.connect(destination);
-    this.graph = allocateGraph(audio, { ...preview, events: preview.events.filter(event=>event.sound.kind==='sample'&&event.sound.soundFont) }, resources, undefined, this.fade);
+    this.graph = allocateGraph(audio, { ...preview, events: [] }, resources, undefined, this.fade);
     resources.outputBuses = [this.fade];
   }
 

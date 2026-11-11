@@ -30,7 +30,7 @@ export function prepareBasicTimbre(name = '旋律的声音'): ContentRecord {
 
 /** Complete bundled palette, generated without storing audio or opening a device. */
 export { defaultInstrumentInfo, listDefaultInstruments, instrumentCategories } from './instrument-catalog.ts';
-export { prepareDefaultInstruments as prepareMelodyTimbres } from './instrument-catalog.ts';
+export { prepareStudioInstruments as prepareMelodyTimbres } from './instrument-catalog.ts';
 
 function sampleSlots(body: EditableTimbreBody) {
   if(body.model==='sample-bank')return (body.zones??[]).map((zone,index)=>({id:`zone-${index}`,targetId:zone.sampleId,label:'乐器录音',endSeconds:zone.endSeconds}));
@@ -209,7 +209,8 @@ function savedSounds(library: MaterialLibrary, draftId?: string): ContentRecord[
   const items = draftId && library.listContentInfoForDraft ? library.listContentInfoForDraft(draftId) : library.listContentInfo();
   return items.filter(content => content.kind === KIND).map(content => library.readContent(content.id)!);
 }
-export function createTimbrePlayback(library: MaterialLibrary, sampleAudio?: SampleAudioPort, spectralAudio: SpectralAudio = createSpectralAudio(), bankAudio: SampleBankAudio = createSampleBankAudio(library,sampleAudio)): TimbrePlaybackPort {
+export function createTimbrePlayback(library: MaterialLibrary, sampleAudio?: SampleAudioPort, spectralAudio: SpectralAudio = createSpectralAudio(),
+  bankAudio: SampleBankAudio = createSampleBankAudio(library,sampleAudio), _studio?: boolean): TimbrePlaybackPort {
   const reader = createReader(library);
   const bodies = new Map<string, { revision: number; body: EditableTimbreBody }>();
   function readSaved(id: string) {
@@ -247,8 +248,8 @@ export function createTimbrePlayback(library: MaterialLibrary, sampleAudio?: Sam
       return playable(planBody(contentId), note, sampleAudio, spectralAudio, bankAudio);
     },
     async previewPianoPlan(note) {
-      const body: SampleBankTimbreBody = { model: 'sample-bank', version: 1, bank: 'generaluser-gs-2.0.3',
-        instrument: 'piano', level: .7, attackSeconds: 0, releaseSeconds: .03 };
+      const body: SampleBankTimbreBody = { model: 'sample-bank', version: 1, bank: 'rootsound-studio-v1',
+        instrument: 'studio-piano', level: .7, attackSeconds: 0, releaseSeconds: .03 };
       await bankAudio.prepare(body, [note]);
       return bankAudio.plan(body, note);
     },

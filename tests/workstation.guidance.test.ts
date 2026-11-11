@@ -92,3 +92,15 @@ test('old in-progress step numbers restart safely; old completions remain comple
   assert.equal(next.guides['tempo-rolls'].status, 'completed');
   assert.equal(next.multipleTempoRolls, true);
 });
+
+
+test('workbench is opt-in and survives reopening independently of tempo rolls', () => {
+  const store = storage(), settings = createLearningSettings(store);
+  assert.equal(settings.read().workbench, false);
+  settings.setWorkbench(true);
+  const reopened = createLearningSettings(store);
+  assert.equal(reopened.read().workbench, true);
+  assert.equal(reopened.read().multipleTempoRolls, false);
+  reopened.setWorkbench(false);
+  assert.equal(createLearningSettings(store).read().workbench, false);
+});

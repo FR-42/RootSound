@@ -13,4 +13,3 @@ export type {
 } from '../../contracts/sound.ts';
 
 export { createBrowserSoundRuntime } from './browser.ts';
-export { preloadWebSoundFont } from './soundfont-node.ts';

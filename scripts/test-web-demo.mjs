@@ -11,7 +11,7 @@ const root=await mkdtemp(path.resolve('.test-output/rb130/ui-'));
 const requests=[];
 const offline=`
 localStorage.setItem('rootsound.learning.v1',JSON.stringify({version:1,multipleTempoRolls:true,guides:{basics:{status:'skipped',step:0},'tempo-rolls':{status:'skipped',step:0}}}));
-window.__webTest={audioCreated:0,now:0,fetches:[],banks:[],errors:[]};
+window.__webTest={audioCreated:0,now:0,fetches:[],errors:[]};
 window.addEventListener('error',e=>__webTest.errors.push(e.message));
 window.addEventListener('unhandledrejection',e=>__webTest.errors.push(String(e.reason)));
 const request=window.fetch;
@@ -23,15 +23,6 @@ Object.defineProperty(window,'AudioContext',{configurable:true,value:class{
  constructor(){__webTest.audioCreated++;const clock=new OfflineAudioContext(2,44100,44100);
  Object.defineProperties(clock,{state:{get:()=> 'running'},currentTime:{get:()=>__webTest.now},close:{value:async()=>{}}});return clock;}
 }});
-const WorkletNode=window.AudioWorkletNode;
-window.AudioWorkletNode=class extends WorkletNode{
- constructor(context,name,options){
-   super(context,name,options);
-   if(options?.processorOptions?.bank) this.port.addEventListener('message',event=>{
-     if(event.data.type==='ready') __webTest.banks.push(options.processorOptions.starter ? 'starter' : 'full');
-   });
- }
-};
 const capturePointer=Element.prototype.setPointerCapture;
 Element.prototype.setPointerCapture=function(id){
  try{capturePointer.call(this,id)}catch(error){if(error.name!=='NotFoundError')throw error}
@@ -73,8 +64,6 @@ let expression='starting',stage='setup';
    frame=win.webContents.mainFrame.frames.find(f=>f.url.includes('/play/'));
  };
  const answerKey='rootsound.website-guide-choice.v1';
- const starterRequested="__webTest.fetches.some(url=>url.endsWith('/GeneralUser-GS-starter.sf2'))";
- const fullRequested="__webTest.fetches.some(url=>url.endsWith('/GeneralUser-GS.sf2'))";
  const heading='.website-guide-choice h1';
 
  stage='first visit and skip';
@@ -82,7 +71,6 @@ let expression='starting',stage='setup';
  assert.equal(await js("document.querySelector('.website-guide-choice h1').textContent"),'是否观看引导');
  assert.deepEqual(await js("[...document.querySelectorAll('.website-guide-choice button')].map(n=>n.textContent)"),['是','否']);
  assert.equal(await js("!!document.querySelector('.melody-workspace')"),false);
- await wait(()=>js(starterRequested));
  assert.equal(await js('__webTest.audioCreated'),0);
  await click('.website-guide-choice .secondary');await ready('.melody-workspace');
  assert.equal(await js("!!document.querySelector('.project-library-overlay')"),false);
@@ -101,10 +89,7 @@ let expression='starting',stage='setup';
  const began=Date.now();
  await click('.song-play');await wait(()=>js("document.querySelector('.song-play').getAttribute('aria-label')==='暂停'"));
  const firstPlaybackMs=Date.now()-began;
- assert.deepEqual(await js('__webTest.banks'),['starter']);
- assert.equal(await js(fullRequested),false);
- assert.equal(await js("__webTest.fetches.some(url=>url.endsWith('/manifest.json'))"),false);
- assert.equal(await js("__webTest.fetches.some(url=>url.endsWith('/manifest.starter.json'))"),true);
+ assert(await js("__webTest.fetches.some(url=>url.includes('/rootsound-studio-v1/') && url.endsWith('.wav'))"));
  await click('.song-stop');
 
  stage='replay guide without losing editor draft';
@@ -123,10 +108,10 @@ let expression='starting',stage='setup';
 
  stage='complete palette loads on demand';
  await click('.melody-add-note-family');await ready('.melody-tone-library[open]');
- assert.equal(await js("document.querySelectorAll('.melody-library-tone').length"),175);
- await js("(()=>{const tone=[...document.querySelectorAll('.melody-library-tone')].find(n=>n.textContent==='明亮钢琴');tone.closest('.melody-library-card').querySelector('.melody-library-preview').click()})()");
- await wait(()=>js(fullRequested));
- await wait(()=>js("__webTest.banks.includes('full')"));
+ assert.equal(await js("document.querySelectorAll('.melody-library-tone').length"),12);
+ const beforePreview=await js("__webTest.fetches.filter(url=>url.endsWith('.wav')).length");
+ await js("(()=>{const tone=[...document.querySelectorAll('.melody-library-tone')].find(n=>n.textContent==='次中音萨克斯');tone.closest('.melody-library-card').querySelector('.melody-library-preview').click()})()");
+ await wait(()=>js("__webTest.fetches.filter(url=>url.endsWith('.wav')).length>"+beforePreview));
  await click('.melody-library-close');
  await wait(()=>js("!document.querySelector('.melody-tone-library[open]')"));
  assert.deepEqual(await js('__webTest.errors'),[]);
@@ -305,7 +290,7 @@ let expression='starting',stage='setup';
  await wait(()=>parentJs("document.querySelector('.music-guide-word')?.textContent==='卷帘'"));
  assert.deepEqual(rendererErrors,[]);assert(!win.isVisible());
  fs.writeFileSync(root+'/report.json',JSON.stringify({passed:true,firstVisitYes:true,firstVisitNo:true,returningVisit:true,replayFromSettings:true,
-   guideStages:10,timbreDragLength:true,mobileGuideControls:true,mobilePinchAxes:true,draftPreserved:true,voices:175,starterPlayback:true,firstPlaybackMs,fullBankOnDemand:true,visibleWindow:false,physicalAudio:false},null,2));win.destroy();app.exit(0);
+   guideStages:10,timbreDragLength:true,mobileGuideControls:true,mobilePinchAxes:true,draftPreserved:true,defaultPitchedVoices:12,starterPlayback:true,firstPlaybackMs,recordingsOnDemand:true,visibleWindow:false,physicalAudio:false},null,2));win.destroy();app.exit(0);
 }catch(error){fs.writeFileSync(root+'/report.json',JSON.stringify({error:String(error),stack:error?.stack,expression:expression.slice(0,350),stage}));app.exit(1)}})();
 `);
 const env={...process.env};delete env.ELECTRON_RUN_AS_NODE;

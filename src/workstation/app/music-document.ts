@@ -49,7 +49,7 @@ export function openMusicDocument(library: MaterialLibrary, song: SongEditorPort
       beat:start+phraseBeatSeconds(source,event.beat)*source.tempoBpm/sourceBpm}))});
     const silent = track.muted || solo && !track.solo;
     for (const part of source.parts) {
-      const key = JSON.stringify([part.timbreId, !!part.unassigned,part.midiChannelId?`${clip.id}:${part.midiChannelId}`:undefined]);
+      const key = JSON.stringify([part.timbreId, !!part.unassigned,part.level,part.pan,part.midiChannelId?`${clip.id}:${part.midiChannelId}`:undefined]);
       let target = groups.get(key);
       if (!target) { target = { ...part, id: crypto.randomUUID(), section: 'melody', ...(part.midiChannelId?{midiChannelId:`${clip.id}:${part.midiChannelId}`} : {}),notes: [] }; groups.set(key, target); parts.push(target); }
       target.notes.push(...part.notes.map(note => {

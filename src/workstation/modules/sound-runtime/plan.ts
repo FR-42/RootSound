@@ -54,7 +54,7 @@ function fields(value: Record<string, unknown>, allowed: readonly string[], labe
 function readPlan(value: unknown, readSample: (value: unknown) => SampleSourceSnapshot): ScheduledSound {
   const plan = object(value, '声音执行计划');
   if (plan.kind === 'sample' && plan.version === 1) {
-    fields(plan, ['kind', 'version', 'source', 'startSeconds', 'endSeconds', 'playbackRate', 'envelope', 'note', 'level', 'loop', 'envelopeBaked', 'soundFont'], '采样声音执行计划');
+    fields(plan, ['kind', 'version', 'source', 'startSeconds', 'endSeconds', 'playbackRate', 'envelope', 'note', 'level', 'loop', 'envelopeBaked'], '采样声音执行计划');
     if (plan.envelopeBaked !== undefined && plan.envelopeBaked !== true) throw new Error('生成音色的包络标记无效。');
     const source = readSample(plan.source); const duration = source.audio.channels[0]!.length / source.audio.sampleRate;
     const startSeconds = number(plan.startSeconds, '采样开始位置', 0, duration);
@@ -67,25 +67,9 @@ function readPlan(value: unknown, readSample: (value: unknown) => SampleSourceSn
       if (loop.endSeconds <= loop.startSeconds) throw new Error('循环结束需要晚于循环开始。');
     }
     const common = readControls(plan);
-    let soundFont:SampleSoundPlan['soundFont'];
-    if(plan.soundFont!==undefined) {
-      const font=object(plan.soundFont,'SoundFont 音符');fields(font,['bank','program','key','velocity','cents','drums','midiChannelId','midiOnOrder','midiOffOrder','sostenutoSeconds','soundingSeconds'],'SoundFont 音符');
-      if(font.bank!=='generaluser-gs-2.0.3'||typeof font.drums!=='boolean')throw new Error('SoundFont 音源无效。');
-      const program=number(font.program,'音源编号',0,127),key=number(font.key,'音源琴键',0,127),velocity=number(font.velocity,'音源力度',0,127);
-      if(![program,key,velocity].every(Number.isInteger))throw new Error('SoundFont 编号必须是整数。');
-      soundFont={bank:font.bank,program,key,velocity,cents:number(font.cents,'音源调音',-12700,12700),drums:font.drums};
-      if(font.midiChannelId!==undefined){
-        if(typeof font.midiChannelId!=='string'||!font.midiChannelId||font.midiChannelId.length>4096)throw new Error('MIDI 演奏通道无效。');
-        soundFont={...soundFont,midiChannelId:font.midiChannelId,
-          ...(font.midiOnOrder===undefined?{}:{midiOnOrder:number(font.midiOnOrder,'MIDI 按键顺序',0,Number.MAX_SAFE_INTEGER)}),
-          ...(font.midiOffOrder===undefined?{}:{midiOffOrder:number(font.midiOffOrder,'MIDI 松键顺序',0,Number.MAX_SAFE_INTEGER)}),
-          sostenutoSeconds:number(font.sostenutoSeconds,'保持音踏板时长',.0001,MAX_SEQUENCE_SECONDS),
-          soundingSeconds:number(font.soundingSeconds,'踏板发声时长',.0001,MAX_SEQUENCE_SECONDS)};
-      }
-    }
     return { kind: 'sample', version: 1, source, startSeconds, endSeconds,
       playbackRate: number(plan.playbackRate, '采样播放倍率', 1 / 256, 256), ...common, ...(loop ? { loop } : {}),
-      ...(plan.envelopeBaked ? { envelopeBaked: true as const } : {}),...(soundFont?{soundFont}: {}) };
+      ...(plan.envelopeBaked ? { envelopeBaked: true as const } : {}) };
   }
   if (plan.kind !== 'basic-synth' || plan.version !== 1) {
     throw new Error('当前声音运行仅支持第 1 版基础合成计划。');
@@ -143,8 +127,8 @@ function readControls(plan: Record<string, unknown>): Pick<SoundPlan, 'envelope'
 }
 
 export function noteDuration(sound: ScheduledSound): number {
-  const envelope = Math.max(sound.note.holdSeconds,sound.kind==='sample'?sound.soundFont?.soundingSeconds??0:0) + sound.envelope.releaseSeconds;
-  return sound.kind === 'sample' && !sound.loop && !sound.soundFont ? Math.min(envelope, (sound.endSeconds - sound.startSeconds) / sound.playbackRate) : envelope;
+  const envelope = sound.note.holdSeconds + sound.envelope.releaseSeconds;
+  return sound.kind === 'sample' && !sound.loop ? Math.min(envelope, (sound.endSeconds - sound.startSeconds) / sound.playbackRate) : envelope;
 }
 
 function sourceReader(previous?: ScheduledPreview): { read(value: unknown): SampleSourceSnapshot; sources: SampleSourceSnapshot[] } {
@@ -193,11 +177,9 @@ export function samePreviewSamples(left: ScheduledPreview | undefined, right: Sc
 }
 
 function samplePeak(sound: Extract<ScheduledSound, { kind: 'sample' }>, pan = 0): number {
-  if(sound.soundFont?.velocity===0)return 0;
   // A full SF2 stream has its own velocity curves, envelopes and output peak
   // protection. Its thin placeholder PCM is not a full-scale waveform estimate.
   // Counting every held/releasing SF2 note as full scale attenuates entire scores.
-  if(sound.soundFont)return 0;
   const channels = sound.source.audio.channels.length;
   if (channels === 1) return sound.source.peak;
   if (channels === 2) {
@@ -233,7 +215,7 @@ export function readPreview(value: unknown, options: { allowEmptySequence?: bool
     const amplitude=sounds.reduce((sum,sound)=>sum+sound.level*sound.note.velocity*(sound.kind==='sample'?samplePeak(sound):1),0);
     return {
       events: sounds.map(sound=>({atSeconds:0,sound})),
-      durationSeconds: Math.max(...sounds.map(noteDuration))+(sounds.some(sound=>sound.kind==='sample'&&sound.soundFont)?3:0),
+      durationSeconds: Math.max(...sounds.map(noteDuration)),
       normalization: input.kind==='sample' ? 1/Math.max(1,amplitude) : 1,
       sequence: false,
       samples: sampleReader.sources,
@@ -250,8 +232,8 @@ export function readPreview(value: unknown, options: { allowEmptySequence?: bool
   const duration = number(input.durationSeconds, '音乐时长（秒）', 0.0001, MAX_SEQUENCE_SECONDS);
   let transport: ScheduledPreview['transport'];
   if (input.transport !== undefined) {
-    const settings = object(input.transport, '播放头设置'); fields(settings, ['positionSeconds', 'rate'], '播放头设置');
-    transport = { positionSeconds: number(settings.positionSeconds, '播放头位置', 0, duration), rate: number(settings.rate, '播放头速度', .25, 4) };
+    const settings = object(input.transport, '播放线设置'); fields(settings, ['positionSeconds', 'rate'], '播放线设置');
+    transport = { positionSeconds: number(settings.positionSeconds, '播放线位置', 0, duration), rate: number(settings.rate, '播放线速度', .25, 4) };
   }
   if (!Array.isArray(input.events) || (input.events.length < 1 && !options.allowEmptySequence) || input.events.length > MAX_SEQUENCE_EVENTS) {
     throw new Error(`音乐试听需要 1 至 ${MAX_SEQUENCE_EVENTS} 个音符，空音乐暂时无法试听。`);
@@ -341,8 +323,6 @@ export function readPreview(value: unknown, options: { allowEmptySequence?: bool
     while (onsets[index]!.time - onsets[begin]!.time > .35) upcomingSources -= onsets[begin++]!.sources;
     if (upcomingSources > MAX_LOOKAHEAD_SOURCES) throw new Error('音符过于密集：任意 0.35 秒内最多支持 4096 个波形声源，请减少极短音符。');
   }
-  if(scheduled.some(event=>event.sound.kind==='sample'&&event.sound.soundFont))durationSeconds+=3;
-  for(const event of scheduled)if(event.sound.kind==='sample'&&event.sound.soundFont?.midiChannelId&&!laneIds.has(event.sound.soundFont.midiChannelId))throw new Error('音符的演奏通道不存在。');
   return { ...(midiExpression?{midiExpression}:{}), events: scheduled, durationSeconds, normalization: 1 / peak, sequence: true, samples: sampleReader.sources, ...(output ? { output } : {}), ...(transport ? { transport, transportClock } : {}) };
 }
 

@@ -1,7 +1,0 @@
-GeneralUser GS 2.0.3 by S. Christian Collins
-https://www.schristiancollins.com/generaluser.php
-Source: https://github.com/mrbumpy409/GeneralUser-GS
-Pinned commit: 684543d5e5efaef08d02be50dcda8d552478fa60
-RootSound repackaging: selected, uncompressed original PCM regions and pitch/key/velocity/loop metadata.
-The original SF2 is included for full streamed playback using spessasynth_core. Extracted PCM zones remain available for project custody and legacy playback; the legacy PCM-only fallback does not reproduce the complete SF2 modulation model.
-See LICENSE.txt for the author's complete terms and source-provenance statement.

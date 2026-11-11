@@ -1,16 +1,16 @@
 import type { JsonValue } from '../../contracts/content.ts';
 import type { SampleBankTimbreBody, SampleBankZone } from '../../contracts/timbre.ts';
-import definitions from './sampled-instrument-definitions.json' with { type: 'json' };
+import { isStudioInstrument, studioBank } from './instrument-catalog.ts';
 
 export function readSampleBankBody(value: JsonValue): SampleBankTimbreBody {
   const fail = (): never => { throw new Error('采样乐器的音区或演奏参数无效。'); };
   if (!value || typeof value !== 'object' || Array.isArray(value)) return fail();
-  const keys = ['model','version','bank','instrument','attackSeconds','releaseSeconds','level','zones','tuningSemitones'];
-  if (Object.keys(value).some(key => !keys.includes(key)) || value.model !== 'sample-bank' || value.version !== 1
-    || value.bank !== 'generaluser-gs-2.0.3' || !(definitions.some(item => item.key === value.instrument)
-      || typeof value.instrument==='string' && (/^gm-(\d{1,3})$/u.test(value.instrument) && Number(value.instrument.slice(3))<128
-        || /^gm-drum-(\d{2})$/u.test(value.instrument) && Number(value.instrument.slice(8))>=35 && Number(value.instrument.slice(8))<=81))) return fail();
+  const keys = ['model','version','bank','instrument','attackSeconds','releaseSeconds','level','zones','tuningSemitones','midiProgram','midiDrum'];
+  if (Object.keys(value).some(key => !keys.includes(key)) || value.model !== 'sample-bank' || value.version !== 1) return fail();
+  if (value.bank !== studioBank || !isStudioInstrument(value.instrument)) return fail();
   const number = (n: unknown, low: number, high: number): number => typeof n === 'number' && Number.isFinite(n) && n >= low && n <= high ? n : fail();
+  const midiNumber = (n: unknown) => typeof n === 'number' && Number.isInteger(n) ? number(n, 0, 127) : fail();
+  if (value.midiProgram !== undefined && value.midiDrum !== undefined) return fail();
   let zones: SampleBankZone[] | undefined;
   if (value.zones !== undefined) {
     if (!Array.isArray(value.zones) || !value.zones.length || value.zones.length > 512) return fail();
@@ -39,6 +39,8 @@ export function readSampleBankBody(value: JsonValue): SampleBankTimbreBody {
   }
   return {model:'sample-bank',version:1,bank:value.bank,instrument:String(value.instrument),
     attackSeconds:number(value.attackSeconds,0,2),releaseSeconds:number(value.releaseSeconds,.01,4),level:number(value.level,0,1),...(zones ? {zones} : {}),
+    ...(value.midiProgram === undefined ? {} : { midiProgram: midiNumber(value.midiProgram) }),
+    ...(value.midiDrum === undefined ? {} : { midiDrum: midiNumber(value.midiDrum) }),
     ...(value.tuningSemitones===undefined?{}:{tuningSemitones:number(value.tuningSemitones,-127,127)})};
 }
 export function bankSampleIds(body: SampleBankTimbreBody): string[] { return [...new Set(body.zones?.map(zone=>zone.sampleId) ?? [])]; }

@@ -78,10 +78,6 @@ try {
   const fileSession = sourceFile && (await import('./music-file.ts')).createMusicFileSession(sourceFile.format, sourceFile.bytes, library, phrase.read().body!, song.read().draft!.name, sourceFile.libraryText);
   async function prepareFile(target: 'source' | 'rootsound' = 'source') {
     if (!song.read().draft) return;
-    if (!fileSession || target === 'rootsound') {
-      if (target === 'rootsound' || !directories || (await directories.read()).hasUnsavedChanges)
-        await bankAudio.materialize(phrase.read().body?.parts.filter(part => !part.unassigned).map(part => part.timbreId) ?? []);
-    }
     commitMusicDocument(library, song, phrase);
     if (fileSession && target === 'source') {
       const result = fileSession.serialize(library, phrase.read().body!, song.read().draft!.name, platform.storage.read()!);
