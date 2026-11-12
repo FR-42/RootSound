@@ -9,7 +9,7 @@ import type {
 } from '../../contracts/sound.ts';
 
 import { noteDuration, previewFingerprint, readPreview, samePreviewSamples, validateFrequency, type ScheduledPreview } from './plan.ts';
-import { allocateGraph, releaseGraph, scheduleGraph, startGraphSource, type GraphResources } from './graph.ts';
+import { allocateGraph, releaseGraph, releaseScheduledNotes, scheduleGraph, startGraphSource, type GraphResources, type SoundGraph } from './graph.ts';
 import { renderOffline } from './offline.ts';
 import { readPcmAudio } from './pcm.ts';
 import { WindowedGraph, WINDOWED_EVENT_THRESHOLD } from './windowed.ts';
@@ -37,6 +37,7 @@ interface ActiveVoice {
   fingerprint?: string;
   preview?: ScheduledPreview;
   startTimes: Map<AudioScheduledSourceNode, number>;
+  graph?: SoundGraph;
   readonly retiring: Set<{ resources: GraphResources; clock: ConstantSourceNode; until: number; windowed?: WindowedGraph }>;
   originSeconds: number;
   clockFloorSeconds?: number;
@@ -146,6 +147,17 @@ export function createBrowserSoundRuntime(): SoundRuntimePort {
     if (auditionVoice) releaseAudition(auditionVoice);
   }
 
+  function clearRetiring(voice: ActiveVoice): void {
+    for (const retiring of voice.retiring) {
+      retiring.windowed?.dispose();
+      retiring.clock.onended = null;
+      try { retiring.clock.stop(); } catch { /* It may have completed. */ }
+      retiring.clock.disconnect();
+      releaseGraph(retiring.resources);
+    }
+    voice.retiring.clear();
+  }
+
   function clearVoice(voice: ActiveVoice): void {
     voice.windowed?.dispose(); voice.windowed = undefined;
     if (voice.audioSource) {
@@ -159,17 +171,10 @@ export function createBrowserSoundRuntime(): SoundRuntimePort {
       voice.completion.disconnect();
     }
     releaseGraph(voice);
-    for (const retiring of voice.retiring) {
-      retiring.windowed?.dispose();
-      retiring.clock.onended = null;
-      try { retiring.clock.stop(); } catch { /* It may have completed. */ }
-      retiring.clock.disconnect();
-      releaseGraph(retiring.resources);
-    }
-    voice.retiring.clear();
+    clearRetiring(voice);
     voice.completion = null;
     voice.oscillators.length = 0; voice.samples.length = 0; voice.gains.length = 0; voice.panners.length = 0;
-    voice.outputBuses = undefined; voice.filters = undefined; voice.fadeGains = []; voice.startTimes.clear();
+    voice.outputBuses = undefined; voice.filters = undefined; voice.graph = undefined; voice.fadeGains = []; voice.startTimes.clear();
   }
 
   function finish(voice: ActiveVoice, status: Exclude<PlaybackStatus, 'playing' | 'paused'>, error?: string): void {
@@ -282,6 +287,7 @@ export function createBrowserSoundRuntime(): SoundRuntimePort {
         voice.remaining -= 1;
         if (voice.remaining === 0 && !preview.sequence) finish(voice, 'ended');
       }, mainMix ?? listeningOutput(audio));
+      voice.graph = graph;
       voice.fadeGains = voice.windowed ? [voice.windowed.fade] : graph.envelopes.map(envelope => envelope.node);
       // Allocate the graph before choosing a start, so large phrases do not consume
       // their first notes while nodes are still being built. The small lead also
@@ -494,7 +500,7 @@ export function createBrowserSoundRuntime(): SoundRuntimePort {
       voice.panners.splice(0, voice.panners.length, ...resources.panners);
       voice.outputBuses = resources.outputBuses;
       voice.filters = resources.filters;
-      voice.completion = completion; voice.windowed = windowed;
+      voice.completion = completion; voice.windowed = windowed; voice.graph = graph;
       voice.generation += 1;
       voice.fadeGains = windowed ? [windowed.fade] : graph.envelopes.map(envelope => envelope.node);
       voice.fingerprint = fingerprint;
@@ -526,7 +532,16 @@ export function createBrowserSoundRuntime(): SoundRuntimePort {
     if (elapsed(voice) >= voice.session.durationSeconds!) { finish(voice, 'ended'); return undefined; }
     voice.pausedElapsed = elapsed(voice);
     voice.generation++;
-    clearVoice(voice);
+    const clock = voice.completion;
+    if (context && voice.graph && clock) {
+      const now = context.currentTime;
+      clearRetiring(voice);
+      const end = voice.windowed?.releaseNotes(now) ?? releaseScheduledNotes(voice.graph, voice.startTimes, voice.originSeconds, now, voice.preview.normalization);
+      if (end > now) {
+        clock.onended = () => { if (voice.completion === clock && voice.session.status === 'paused') clearVoice(voice); };
+        clock.stop(end + .001);
+      } else clearVoice(voice);
+    } else clearVoice(voice);
     voice.session = Object.freeze({ ...voice.session, status: 'paused' });
     emit({ type: 'session', session: voice.session });
     return voice.session;
@@ -564,9 +579,10 @@ export function createBrowserSoundRuntime(): SoundRuntimePort {
       const starts = new Map<AudioScheduledSourceNode, number>();
       for (const scheduled of graph.starts) { const time = startGraphSource(scheduled, origin, fromSeconds); if (time !== undefined) starts.set(scheduled.node, time); }
       if (audio.currentTime >= start) throw new Error('当前声音续播未能及时完成，请减少同时使用的声音后重试。');
+      clearVoice(voice);
       voice.oscillators.push(...resources.oscillators); voice.samples.push(...resources.samples);
       voice.bufferReleases.push(...resources.bufferReleases); voice.gains.push(...resources.gains); voice.panners.push(...resources.panners);
-      voice.outputBuses = resources.outputBuses; voice.filters = resources.filters; voice.completion = completion; voice.windowed = windowed;
+      voice.outputBuses = resources.outputBuses; voice.filters = resources.filters; voice.completion = completion; voice.windowed = windowed; voice.graph = graph;
       voice.fadeGains = windowed ? [windowed.fade] : graph.envelopes.map(item => item.node); voice.startTimes = starts;
       voice.preview = preview; voice.fingerprint = previewFingerprint(preview); voice.originSeconds = origin; voice.clockFloorSeconds = fromSeconds; voice.pausedElapsed = undefined;
       voice.session = Object.freeze({ ...voice.session, status: 'playing', durationSeconds: preview.durationSeconds });

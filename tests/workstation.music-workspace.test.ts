@@ -17,7 +17,7 @@ import { createTimbreEditor, createTimbrePlayback, createTimbreReferenceAdapter 
 import { createPhraseEditor, createPhrasePlayback, createPhraseReferenceAdapter } from '../src/workstation/modules/phrase/public.ts';
 import { createSongEditor, createSongReferenceAdapter } from '../src/workstation/modules/song/public.ts';
 import { musicClockVoice } from './music-clock-fixture.ts';
-import { initialMelodyView, melodyScale, melodyDuration } from '../src/workstation/modules/ui-rendering/melody-geometry.ts';
+import { initialMelodyView, melodyScale, melodyDuration, melodySeconds } from '../src/workstation/modules/ui-rendering/melody-geometry.ts';
 const hooks = registerHooks({ load(url, context, next) { return url.endsWith('.css') ? { format: 'module', source: '', shortCircuit: true } : next(url, context); } });
 const { mountStudio } = await import('../src/workstation/modules/ui-rendering/public.ts'); hooks.deregister();
 const { mountMelodyWorkspace } = await import('../src/workstation/modules/ui-rendering/melody-workspace.ts');
@@ -978,7 +978,59 @@ test('dragging a BPM label previews only the boundary, snaps to a beat and suppo
   }finally{f.cleanup();}
 });
 
-test('off-grid note heads and triplets retain exact placement and QWEASD leave notes unchanged',()=>{
+test('note creation and dragging snap to a nearby visible grid line across a BPM boundary', () => {
+  const f = editableRoll({ orientation: 'vertical' });
+  try {
+    f.phrase.setLength(4);
+    const lower = f.phrase.addTempoSection();
+    f.phrase.setTempoSection(lower, 180);
+    f.phrase.setLastTempoRollLength(8);
+    f.phrase.setTempoSectionStart(lower, 5);
+    f.phrase.setTempoSectionSteps(lower, 3);
+    f.roll.refresh();
+    f.roll.frameNotes();
+    const grid = f.root.querySelector('.melody-grid-select')!;
+    grid.value = '3';
+    grid.emit('change');
+
+    const scroll = f.root.querySelector('.melody-scroll')!, canvas = f.root.querySelector('.melody-canvas')!;
+    const view = f.roll.readViewport();
+    const read = () => f.phrase.read().body!;
+    const latest = () => read().parts.find(part => part.id === f.first)!.notes.at(-1)!;
+    const scale = melodyScale(view, scroll.clientHeight - 48, melodyDuration(read()));
+    f.family(f.first).emit('click');
+
+    const existing = f.note(f.a), existingBounds = existing.getBoundingClientRect();
+    const original = f.read(), commits = f.commits.length;
+    const existingAt = { clientX: existingBounds.left + 4, clientY: existingBounds.top + 2 };
+    scroll.emit('pointerdown', { target: existing, ...existingAt, timeStamp: 0 });
+    f.document.emit('pointermove', { ...existingAt, clientY: existingAt.clientY + 2, timeStamp: 140 });
+    f.document.emit('pointerup', { timeStamp: 160 });
+    assert.equal(f.read(), original, 'a drag that snaps back to its starting line does not edit the score');
+    assert.equal(f.commits.length, commits);
+
+    // The lower roll starts at 2.5s but keeps its grid anchored at 2s.
+    const firstLine = 2 + 5 / 9;
+    const at = { clientX: 200, clientY: (firstLine - view.leftSeconds) * scale + 3 };
+    scroll.emit('pointerdown', { target: canvas, ...at });
+    f.document.emit('pointerup', at);
+    const created = latest();
+    assert(Math.abs(melodySeconds(created.startBeat, read()) - firstLine) < 1e-10);
+
+    const block = f.note(created.id), bounds = block.getBoundingClientRect();
+    const from = { clientX: bounds.left + 4, clientY: bounds.top + 2 };
+    const nextLine = 2 + 8 / 9;
+    scroll.emit('pointerdown', { target: block, ...from, timeStamp: 200 });
+    f.document.emit('pointermove', { ...from, clientY: from.clientY + (nextLine - firstLine) * scale - 3, timeStamp: 340 });
+    const previewTop = f.note(created.id).style.top;
+    f.document.emit('pointerup', { timeStamp: 360 });
+    assert(Math.abs(melodySeconds(latest().startBeat, read()) - nextLine) < 1e-10);
+    assert.equal(latest().durationSeconds, created.durationSeconds);
+    assert.equal(f.note(created.id).style.top, previewTop);
+  } finally { f.cleanup(); }
+});
+
+test('notes away from snap lines retain exact placement and QWEASD leave notes unchanged',()=>{
   const f=editableRoll({orientation:'vertical'});
   try{
     const scroll=f.root.querySelector('.melody-scroll')!,canvas=f.root.querySelector('.melody-canvas')!;

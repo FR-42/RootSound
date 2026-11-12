@@ -144,7 +144,7 @@ export interface SoundRuntimePort {
    * An empty sequence silences the music while its timeline keeps advancing.
    */
   update(sessionId: string, plan: PlayableNotePlan | SoundSequencePlan, options?: { preserveSounding?: boolean; elapsedSeconds?: number }): PlaybackSession | undefined;
-  /** Optional sequence transport: freeze source ages without suspending the shared device. */
+  /** Freeze the transport, cancel future attacks and let sounding notes release on the shared device. */
   pause?(sessionId: string): PlaybackSession | undefined;
   /** Continue the paused sequence at its retained source ages, optionally applying edits. */
   resume?(sessionId: string, plan?: SoundSequencePlan): Promise<PlaybackSession>;

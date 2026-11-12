@@ -49,11 +49,34 @@ test('phrase audition contains only the fixed four bars and leaves stored source
   const plan = f.calls.at(-1)!.plan!;
   assert.equal(plan.durationSeconds, 8); assert.equal(plan.events.length, 2);
   assert.equal(plan.events[0]!.sound, sound, 'notes inside the window retain their sound clock');
-  assert.equal(plan.events[1]!.sound.note.holdSeconds, .5); assert.equal(plan.events[1]!.sound.envelope.releaseSeconds, 0);
+  assert.equal(plan.events[1]!.sound.note.holdSeconds, .5); assert.equal(plan.events[1]!.sound.envelope.releaseSeconds, .2);
   assert.deepEqual(source, snapshot, 'four-bar audition never shortens the saved phrase');
   f.elapsed(8); assert.equal(f.transport.position(), 0); assert.equal(f.states.at(-1)!.playing, false);
-  assert.equal(f.calls.at(-1)!.method, 'stop'); f.transport.dispose();
+  assert.equal(f.calls.at(-1)!.method, 'preview', 'resetting the head does not stop the scheduled tail');
+  f.transport.stop(); assert.equal(f.calls.at(-1)!.method, 'stop', 'explicit stop can still cut the tail');
+  f.transport.dispose();
 });
+
+test('the head resets while the final release is still scheduled on the audio clock', async () => simulatedDevice(async () => {
+  const runtime = createBrowserSoundRuntime();
+  const transport = createPhraseCompositionTransport({
+    runtime, tempoBpm: () => 120, prepare: async () => {},
+    readPlan: () => ({ kind: 'sequence', version: 1, durationSeconds: 8, events: [{ atSeconds: 7.5, sound }] }),
+    onChange: () => {}, onError: error => assert.fail(String(error)),
+  });
+  try {
+    await transport.toggle();
+    const device = audio(), clock = device.clocks[0]!, note = device.oscillators[0]!;
+    device.currentTime = clock.startTime! + 8;
+    assert.equal(transport.position(), 0);
+    assert(!note.disconnected);
+    assert(Math.abs(note.stopTime! - device.currentTime - .201) < 1e-9);
+    device.currentTime = clock.stopTime!;
+    clock.end();
+    assert(note.disconnected);
+    assert.equal(transport.position(), 0);
+  } finally { transport.dispose(); await runtime.dispose(); }
+}));
 
 test('segmented clock plays beyond the old fixed-tempo ending and refreshes without seeking by a global BPM ratio',async()=>{
   let duration=24;const f=fixture(()=>duration);
@@ -73,7 +96,7 @@ test('empty phrase audition has a four-bar clock, including background completio
   f.elapsed(4); assert.equal(f.transport.position(), 4);
   f.elapsed(8); context.mock.timers.tick(8000);
   assert.equal(f.states.at(-1)!.playing, false); assert.equal(f.transport.position(), 0);
-  assert.equal(f.calls.at(-1)!.method, 'stop'); f.transport.dispose();
+  assert.equal(f.calls.at(-1)!.method, 'preview'); f.transport.dispose();
 });
 
 test('head placement clamps to the phrase edges and playing at the end starts a new audition', async () => {
@@ -87,12 +110,13 @@ test('head placement clamps to the phrase edges and playing at the end starts a 
   f.transport.dispose();
 });
 
-test('phrase speed changes move the head without stretching ordinary notes and crop only boundary tails', async () => {
+test('phrase speed changes move the head without stretching ordinary notes or truncating releases', async () => {
   const f = fixture(); f.plan({ kind: 'sequence', version: 1, durationSeconds: 12, events: [{ atSeconds: 0, sound }, { atSeconds: 7.5, sound }] });
   await f.transport.toggle(); f.elapsed(2); f.transport.setRate(1.25);
   const plan = f.calls.at(-1)!.plan!;
   assert.deepEqual(plan.transport, { positionSeconds: 2, rate: 1.25 }); assert.equal(plan.events[0]!.sound, sound);
   assert.equal(plan.events[1]!.sound.note.holdSeconds, .4);
+  assert.equal(plan.events[1]!.sound.envelope.releaseSeconds, .2);
   f.elapsed(4); assert.equal(f.transport.position(), 4.5); f.transport.pause();
   f.transport.setRate(.75); await f.transport.toggle(); assert.equal(f.calls.at(-1)!.method, 'resume');
   assert.deepEqual(f.calls.at(-1)!.plan!.transport, { positionSeconds: 4.5, rate: .75 });

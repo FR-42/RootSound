@@ -35,8 +35,9 @@ Earlier wording and source IDs are preserved in [the original record](../history
 
 ## Editing, timing and playback — USER CONFIRMED
 
-- Mouse note heads use the exact clicked/dragged time; grid count is a visual reference, not onset snapping.
-  Durations, keyboard-step progression and their independent constraints must not be conflated with this.
+- Updated 2026-11-10. When creating or dragging a note, its head lightly snaps to a nearby visible beat
+  or subdivision line. Positions farther from a line remain freely editable. Durations and keyboard
+  stepping have their own rules.
 - Q/W/E/A/S/D editing nudges, including double-A/D movement, were explicitly removed. Ordinary modified
   shortcuts and opt-in chromatic keyboard performance remain separate features.
 - Remember per-project viewport, selection, cursor and family note length separately from saved music.

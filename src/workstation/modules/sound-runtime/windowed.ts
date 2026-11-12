@@ -1,4 +1,4 @@
-import { allocateGraph, createWindowedSampleCache, releaseGraph, scheduleGraph, startGraphSource, type GraphResources, type SoundGraph } from './graph.ts';
+import { allocateGraph, createWindowedSampleCache, releaseGraph, releaseScheduledNotes, scheduleGraph, startGraphSource, type GraphResources, type SoundGraph } from './graph.ts';
 import { noteDuration, type ScheduledPreview } from './plan.ts';
 
 /** Device-clock lookahead; the timer only replenishes it, never supplies note timing. */
@@ -122,6 +122,14 @@ export class WindowedGraph {
       source.onended = null;
       try { source.stop((event.starts.get(source) ?? cutover) >= cutover ? cutover : until); } catch { /* Already ended. */ }
     }
+  }
+
+  releaseNotes(now: number): number {
+    this.#cancelTimer();
+    let end = now;
+    for (const event of this.#live)
+      end = Math.max(end, releaseScheduledNotes(event.graph, event.starts, this.#origin, now, this.#preview.normalization));
+    return end;
   }
 
   dispose(): void {

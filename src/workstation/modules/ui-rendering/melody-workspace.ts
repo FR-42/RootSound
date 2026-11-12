@@ -120,6 +120,7 @@ export function mountMelodyWorkspace(root: HTMLElement, options: {
   const noteLabels = new WeakMap<HTMLButtonElement, string>();
   const noteAppearance = new WeakMap<HTMLButtonElement, string>();
   const gridNodes: HTMLElement[] = [];
+  let gridSnapTimes: number[] = [];
   const drumGridNodes: HTMLElement[] = [];
   let headWidth = 1;
   let viewportFrame = 0;
@@ -249,6 +250,25 @@ export function mountMelodyWorkspace(root: HTMLElement, options: {
   function lastNoteStart(value: PhraseBody): number | undefined {
     const minimum = Math.max(MIN_BEATS, MIN_NOTE_SECONDS * phraseTempoAtBeat(value, value.lengthBeats) / 60);
     return value.lengthBeats >= minimum ? value.lengthBeats - minimum : undefined;
+  }
+  function noteStartAt(value: PhraseBody, seconds: number, limit: number, scale: number): number {
+    let low = 0, high = gridSnapTimes.length;
+    while (low < high) {
+      const middle = (low + high) >>> 1;
+      if (gridSnapTimes[middle]! < seconds) low = middle + 1;
+      else high = middle;
+    }
+    const lastSeconds = melodySeconds(limit, value);
+    let target = seconds, bestDistance = Infinity;
+    for (const index of [low - 1, low]) {
+      const time = gridSnapTimes[index];
+      if (time === undefined || time > lastSeconds) continue;
+      const gap = Math.min(time - (gridSnapTimes[index - 1] ?? -Infinity), (gridSnapTimes[index + 1] ?? Infinity) - time);
+      const radius = Math.min(5 / scale, gap / 4);
+      const distance = Math.abs(time - seconds);
+      if (distance <= radius && distance < bestDistance) { target = time; bestDistance = distance; }
+    }
+    return melodyClamp(melodyBeats(target, value), 0, limit);
   }
   function drawExtent(value: PhraseBody, startBeat: number): { cell: number; maximum: number } {
     const steps = editSteps(value, startBeat); const cell = 60 / phraseTempoAtBeat(value, startBeat) / steps;
@@ -811,7 +831,7 @@ export function mountMelodyWorkspace(root: HTMLElement, options: {
   function paintGrid(): void {
     const value = tempoRatePreview ?? body();
     tempoRolls?.paint(value);
-    if (!value) { grid.replaceChildren(); drumGrid.replaceChildren(); gridNodes.length = drumGridNodes.length = 0; return; }
+    if (!value) { grid.replaceChildren(); drumGrid.replaceChildren(); gridNodes.length = drumGridNodes.length = 0; gridSnapTimes = []; return; }
     // Read layout before changing any lines. Reading clientWidth after each
     // append/style write otherwise forces a fresh layout for every grid line.
     const canvasWidth = width(); headWidth = canvasWidth;
@@ -829,6 +849,7 @@ export function mountMelodyWorkspace(root: HTMLElement, options: {
       const previous = pixels.get(pixel);
       if (!previous || weight(line) > weight(previous)) pixels.set(pixel, line);
     }
+    gridSnapTimes = Array.from(pixels.values(), line => line.seconds).sort((a, b) => a - b);
     const grids = drumStrip.hidden ? [[grid, gridNodes] as const] : [[grid, gridNodes] as const, [drumGrid, drumGridNodes] as const];
     for (const [layer, elements] of grids) {
       layer.style.setProperty('--melody-grid-stroke', `${1 / pixelScale}px`);
@@ -1174,10 +1195,12 @@ export function mountMelodyWorkspace(root: HTMLElement, options: {
         if (!auditionOnClick) void audition.request(note.frequencyHz, phraseHeldSeconds(value, note), note.velocity, undefined, note.level ?? 1, voice.id);
       } else if (voice) {
         if (inDrumStrip !== (drum !== undefined)) return;
-        if (from.x < 0 || from.x >= (melodyDuration(value) - view.leftSeconds) * melodyScale(view, width(), melodyDuration(value))) return;
+        const canvasWidth = width(), duration = melodyDuration(value);
+        const scale = melodyScale(view, canvasWidth, duration);
+        if (from.x < 0 || from.x >= (duration - view.leftSeconds) * scale) return;
         const limit = value.lengthBeats; const lastStart = lastNoteStart(value);
         if (lastStart === undefined) return;
-        const start = melodyClamp(melodyBeats(melodyTimeAt(view, width(), melodyDuration(value), from.x), value), 0, lastStart);
+        const start = noteStartAt(value, melodyTimeAt(view, canvasWidth, duration, from.x), lastStart, scale);
         const frequencyHz = rhythm || inDrumStrip ? RHYTHM_PITCH : keys[melodyPitchAt(keys, from.y, view.rowHeight)]?.frequencyHz;
         if (frequencyHz === undefined) return;
         const lane = inDrumStrip ? drumLaneAt(from.y) : undefined;
@@ -1367,7 +1390,7 @@ export function mountMelodyWorkspace(root: HTMLElement, options: {
       }
       else if (lane !== undefined) {
         const startBeat = timeMoved
-          ? melodyClamp(melodyBeats(melodySeconds(active.note.startBeat, active.base) + delta, active.base), 0, lastNoteStart(active.base) ?? active.note.startBeat)
+          ? noteStartAt(active.base, melodySeconds(active.note.startBeat, active.base) + delta, lastNoteStart(active.base) ?? active.note.startBeat, scale)
           : active.note.startBeat;
         const seconds = phraseHeldSeconds(active.base, active.note);
         active.changes = {
@@ -1385,9 +1408,16 @@ export function mountMelodyWorkspace(root: HTMLElement, options: {
           : melodyPitchAt(keys, originalTop + melodyPitchHeight(keys, originalRow, view.rowHeight) / 2 + active.rawY, view.rowHeight);
         const offset = destination - originalRow; const pitch = keys[destination];
         if (rhythm) active.targetPartId = rowParts[originalRow + offset]!.id;
-        const startBeat = melodyClamp(melodyBeats(melodySeconds(active.note.startBeat, active.base) + delta, active.base), 0, lastNoteStart(active.base) ?? active.note.startBeat);
-        const seconds = phraseHeldSeconds(active.base, active.note);
-        active.changes = { startBeat, durationSeconds: seconds, durationBeats: melodyClamp(phraseHeldBeats(active.base, startBeat, seconds), MIN_BEATS, limit - startBeat), ...(!rhythm && offset && pitch ? { frequencyHz: pitch.frequencyHz } : {}) };
+        active.changes = !rhythm && offset && pitch ? { frequencyHz: pitch.frequencyHz } : {};
+        if (timeMoved) {
+          const startBeat = noteStartAt(active.base, melodySeconds(active.note.startBeat, active.base) + delta, lastNoteStart(active.base) ?? active.note.startBeat, scale);
+          if (Math.abs(startBeat - active.note.startBeat) > 1e-10) {
+            const seconds = phraseHeldSeconds(active.base, active.note);
+            active.changes.startBeat = startBeat;
+            active.changes.durationSeconds = seconds;
+            active.changes.durationBeats = melodyClamp(phraseHeldBeats(active.base, startBeat, seconds), MIN_BEATS, limit - startBeat);
+          }
+        }
       }
       active.last = now;
       if (!options.readIsPlaying) previewEdit();
@@ -1458,14 +1488,14 @@ export function mountMelodyWorkspace(root: HTMLElement, options: {
           const targetPartId = rhythm ? active.targetPartId ?? active.partId : active.partId;
           if (targetPartId !== active.partId) {
             phrase.moveNote(active.partId, active.note.id, targetPartId, changes); selection = { partId: targetPartId, noteId: active.note.id };
-          } else phrase.updateNote(active.partId, active.note.id, changes);
+          } else if (Object.keys(changes).length) phrase.updateNote(active.partId, active.note.id, changes);
           if (active.kind === 'resize') {
             rememberLength(active.partId, active.note, changes);
             if (options.onLearningAction && changes.durationSeconds !== undefined
               && Math.abs(changes.durationSeconds - phraseHeldSeconds(active.base, active.note)) > 1e-10) learningAction = 'resize-note';
           } else if (targetPartId !== active.partId || changes.frequencyHz !== undefined || changes.drumLane !== undefined
             || (changes.startBeat !== undefined && Math.abs(changes.startBeat - active.note.startBeat) > 1e-10)) learningAction = 'move-note';
-          changed = true;
+          changed = targetPartId !== active.partId || Object.keys(changes).length > 0;
         }
       }
     } catch (error) { failure = error instanceof Error ? error : new Error(String(error)); report(failure.message); }

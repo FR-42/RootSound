@@ -57,12 +57,18 @@ export function createPhraseCompositionTransport(options: {
       if (available < .0001) continue;
       const original = event.sound;
       const holdSeconds = Math.min(original.note.holdSeconds, available);
-      const releaseSeconds = Math.min(original.envelope.releaseSeconds, Math.max(0, available - holdSeconds));
-      const sound = holdSeconds === original.note.holdSeconds && releaseSeconds === original.envelope.releaseSeconds
-        ? original : { ...original, note: { ...original.note, holdSeconds }, envelope: { ...original.envelope, releaseSeconds } };
+      const sound = holdSeconds === original.note.holdSeconds ? original : { ...original, note: { ...original.note, holdSeconds } };
       events.push({ ...event, sound });
     }
-    return { ...source, durationSeconds: limit, events, ...(source.midiExpression ? {midiExpression:source.midiExpression.map(lane=>({id:lane.id,events:lane.events.filter(event=>event.atSeconds<=limit)}))}: {}) };
+    const midiExpression = source.midiExpression?.map(lane => {
+      const events = lane.events.filter(event => event.atSeconds <= limit);
+      if (limit < source.durationSeconds) {
+        for (const controller of [64, 66])
+          events.push({ type: 'controller', controller, value: 0, atSeconds: limit, order: Number.MAX_SAFE_INTEGER });
+      }
+      return { id: lane.id, events };
+    });
+    return { ...source, durationSeconds: limit, events, ...(midiExpression ? { midiExpression } : {}) };
   }
   const base = createPlaylistTransport({ ...options, readPlan, onChange(next) {
     if (!next.playing && !next.preparing && next.position === 0) manualTail = false;
@@ -73,7 +79,12 @@ export function createPhraseCompositionTransport(options: {
 
   function position(): number {
     const current = Math.min(duration(), base.position());
-    if (state.playing && current >= duration() - 1e-8) { stop(); return 0; }
+    if (state.playing && current >= duration() - 1e-8) {
+      manualTail = false;
+      clearEnd();
+      base.stop(true);
+      return 0;
+    }
     return current;
   }
   function stop(): void { manualTail = false; clearEnd(); base.stop(); }

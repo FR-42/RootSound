@@ -17,7 +17,7 @@ export function createPlaylistTransport(options: {
 }): {
   toggle(): Promise<void>;
   pause(): void;
-  stop(): void;
+  stop(allowScheduledTail?: boolean): void;
   setRate(rate: number): void;
   seek(seconds: number): Promise<void>;
   position(): number;
@@ -27,6 +27,7 @@ export function createPlaylistTransport(options: {
   const { runtime } = options;
   let playing = false; let preparing = false; let rate = 1; let cursor = 0; let duration = Infinity;
   let id: string | undefined; let anchorPosition = 0; let anchorElapsed = 0;
+  let tailId: string | undefined;
   let generation = 0; let editGeneration = 0; let disposed = false; let pendingDevice = false;
 
   function positionAt(elapsed: number): number {
@@ -59,6 +60,10 @@ export function createPlaylistTransport(options: {
     const previous = id; id = undefined;
     if (stop && previous) runtime.stop(previous);
   }
+  function stopTail(): void {
+    const previous = tailId; tailId = undefined;
+    if (previous) runtime.stop(previous);
+  }
   function pause(): void {
     if (disposed) return;
     generation++; editGeneration++;
@@ -77,14 +82,16 @@ export function createPlaylistTransport(options: {
     }
     changed();
   }
-  function stop(): void {
+  function stop(allowScheduledTail = false): void {
     if (disposed) return;
     generation++; editGeneration++;
     const cancelDevice = pendingDevice;
+    stopTail();
+    if (allowScheduledTail && playing) tailId = id;
     pendingDevice = false; playing = false; preparing = false;
     // Forget before stopping: the runtime synchronously publishes the stop.
     // That event must not restore the old cursor or invalidate the next start.
-    forget(true);
+    forget(!tailId);
     if (cancelDevice) runtime.stopAll();
     cursor = 0; anchorPosition = 0; anchorElapsed = 0;
     changed();
@@ -105,6 +112,7 @@ export function createPlaylistTransport(options: {
       else session = await runtime.preview(plan);
       if (request === generation) pendingDevice = false;
       if (disposed || request !== generation) { runtime.stop(session.id); return; }
+      stopTail();
       id = session.id; playing = session.status === 'playing';
       if (!playing && session.status !== 'paused') id = undefined;
       const currentElapsed = runtime.position(session.id) ?? previousElapsed;
@@ -138,7 +146,7 @@ export function createPlaylistTransport(options: {
     const continuePlaying = playing || preparing;
     generation++; editGeneration++;
     if (pendingDevice) { pendingDevice = false; runtime.stopAll(); }
-    preparing = false; playing = false; forget(true);
+    preparing = false; playing = false; forget(true); stopTail();
     // A paused head can be placed beyond the previously played extent; edits
     // may already have extended the song while its prepared duration is stale.
     cursor = Math.max(0, seconds); anchorPosition = cursor; anchorElapsed = 0;
@@ -165,6 +173,7 @@ export function createPlaylistTransport(options: {
     })();
   }
   const unsubscribe = runtime.subscribe(event => {
+    if (event.type === 'session' && event.session.id === tailId && ['ended', 'stopped', 'failed'].includes(event.session.status)) tailId = undefined;
     if (disposed || event.type !== 'session' || event.session.id !== id || event.session.status === 'playing') return;
     if (event.session.status === 'paused') { cursor = position(); playing = false; changed(); return; }
     cursor = event.session.status === 'ended' ? 0 : position();
@@ -176,6 +185,6 @@ export function createPlaylistTransport(options: {
     if (disposed) return;
     disposed = true; generation++; editGeneration++; unsubscribe();
     if (pendingDevice) runtime.stopAll();
-    forget(true); playing = false; preparing = false;
+    forget(true); stopTail(); playing = false; preparing = false;
   } };
 }

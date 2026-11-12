@@ -69,6 +69,11 @@ test('pause freezes device elapsed and resumes at the original sample and releas
   const input = { ...phrase([{ atSeconds: 0, sound: sample }, { atSeconds: 4, sound: sample }], 6), transport: { positionSeconds: 0, rate: 1 } };
   const session = await runtime.preview(input); audio().currentTime = session.startedAtSeconds + 2.4;
   const paused = runtime.pause!(session.id); assert.equal(paused?.status, 'paused'); close(runtime.position(session.id), 2.4);
+  const [releasing, queued] = audio().sampleSources;
+  assert(!releasing!.disconnected, 'a note already in its release finishes naturally');
+  close(queued!.stopTime, audio().currentTime);
+  close(audio().clocks[0]!.stopTime, session.startedAtSeconds + 3.001);
+  audio().clocks[0]!.end();
   assert(audio().sampleSources.every(source => source.stopped && source.disconnected));
   audio().currentTime += 20; close(runtime.position(session.id), 2.4);
   const resumed = await runtime.resume!(session.id, { ...input, transport: { positionSeconds: 2.4, rate: 1.25 } });
@@ -82,6 +87,29 @@ test('pause freezes device elapsed and resumes at the original sample and releas
   audio().currentTime = continued.startTime! + .2; close(runtime.position(session.id), 2.6);
   runtime.stopAll(); assert(audio().sampleSources.every(source => source.stopped && source.disconnected));
   await assert.rejects(runtime.resume!(session.id), /已经结束/); await runtime.dispose();
+}));
+
+test('pausing held notes releases from their current gain and cancels queued attacks', async () => fixture(async () => {
+  const runtime = createBrowserSoundRuntime();
+  try {
+    const sound = { ...plan(), note: { ...plan().note, holdSeconds: 4 },
+      envelope: { attackSeconds: 1, releaseSeconds: .45 } };
+    const session = await runtime.preview(phrase([{ atSeconds: 0, sound }, { atSeconds: 1, sound }], 6));
+    const device = audio();
+    device.currentTime = session.startedAtSeconds + .2;
+    const now = device.currentTime;
+    runtime.pause!(session.id);
+    close(runtime.position(session.id), .2);
+    close(device.oscillators[1]!.stopTime, now);
+    const release = device.gains.flatMap(gain => gain.gain.changes).find(change =>
+      change.kind === 'ramp' && change.value === 0 && Math.abs(change.time - now - .45) < 1e-9);
+    assert(release, 'the active envelope gets its full release from the current attack level');
+    assert(!device.oscillators[0]!.disconnected);
+    close(device.clocks[0]!.stopTime, now + .451);
+    await runtime.resume!(session.id);
+    assert(device.oscillators[0]!.disconnected, 'quick resume retires the old release graph');
+    close(runtime.position(session.id), .2);
+  } finally { await runtime.dispose(); }
 }));
 
 test('paused live edits validate before replacing retained state, and global replacement invalidates resume', async () => fixture(async () => {

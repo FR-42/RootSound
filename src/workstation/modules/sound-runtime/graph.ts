@@ -24,6 +24,38 @@ export interface SoundGraph {
   readonly output?: { node: GainNode; preview: ScheduledPreview };
 }
 
+export function releaseScheduledNotes(graph: SoundGraph, starts: ReadonlyMap<AudioScheduledSourceNode, number>, origin: number, now: number, normalization: number): number {
+  const soundingOnsets = new Set<number>();
+  for (const { node, atSeconds } of graph.starts) {
+    const start = starts.get(node);
+    if (start === undefined) continue;
+    if (start < now) soundingOnsets.add(atSeconds);
+    else {
+      node.onended = null;
+      try { node.stop(now); } catch { /* Source already expired. */ }
+    }
+  }
+  let end = now;
+  for (const { atSeconds, node, plan } of graph.envelopes) {
+    const age = now - origin - atSeconds;
+    const duration = noteDuration(plan);
+    if (!soundingOnsets.has(atSeconds) || age <= 0 || age >= duration) continue;
+    let tail = duration - age;
+    if (age < plan.note.holdSeconds) {
+      tail = Math.min(tail, Math.max(.005, plan.envelope.releaseSeconds));
+      if (typeof node.gain.cancelAndHoldAtTime === 'function') node.gain.cancelAndHoldAtTime(now);
+      else {
+        const level = plan.kind === 'sample' && plan.envelopeBaked ? 1 : envelopeValue(plan.envelope, plan.note.holdSeconds, age);
+        node.gain.cancelScheduledValues(now);
+        node.gain.setValueAtTime(level * plan.level * plan.note.velocity * normalization, now);
+      }
+      node.gain.linearRampToValueAtTime(0, now + tail);
+    }
+    end = Math.max(end, now + tail);
+  }
+  return end;
+}
+
 type BufferEntry = { audio: SampleSourceSnapshot['audio']; buffer: AudioBuffer; references: number };
 const bufferPools = new WeakMap<BaseAudioContext, Map<string, BufferEntry[]>>();
 const noisePools = new WeakMap<BaseAudioContext, AudioBuffer>();
