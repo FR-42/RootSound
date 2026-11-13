@@ -24,6 +24,7 @@ export interface MusicGuideFactory {
 }
 
 const enterDelayMs = 500;
+const keysStep = 4;
 const subdivisionStep = 8;
 const editStep = 9;
 const noteEditPrompts: ReadonlyArray<readonly [action: LearningAction, text: string]> = [
@@ -36,7 +37,7 @@ const scenes = [
   { title: '卷帘', lines: ['核心创作画布'], wait: enterDelayMs },
   { title: '音符', lines: ['音符散落在卷帘上'], wait: enterDelayMs },
   { title: '播放线', lines: ['播放线匀速向下，碰到音符就发声', '按空格开始或暂停'], wait: 0 },
-  { title: '琴键与列线', lines: ['卷帘分列，列与琴键一一对应，表示音调。'], wait: enterDelayMs },
+  { title: '琴键与小节线', lines: ['卷帘分列，列与琴键一一对应，表示音调。'], wait: enterDelayMs },
   { title: 'BPM', lines: ['BPM 值 × 一拍的时长 = 一分钟', '相邻两条横线之间是一拍', '点击左下角数字以改变 BPM'], wait: 0 },
   { title: '音色', lines: [], wait: 0 },
   { title: '缩放', lines: ['Control + 滚轮竖直缩放，Shift + Control + 滚轮水平缩放'], wait: 5000 },
@@ -343,13 +344,14 @@ export function mountMusicGuide(root: HTMLElement, factory: MusicGuideFactory, o
       touchPlay.hidden = step < 3;
       setRightMode(false);
     }
-    if (step === 3 || step === 4 || step === editStep) editor?.frameNotes(step !== 3);
+    if (step === 3 || step === keysStep || step === editStep) editor?.frameNotes(step !== 3);
     host.querySelector<HTMLElement>('.song-topbar')?.toggleAttribute('inert', step < finalStep);
     host.querySelector<HTMLElement>('.melody-tempo-dock')?.toggleAttribute('inert', step < 5);
     host.querySelector<HTMLElement>('.melody-ruler-row')?.toggleAttribute('inert', step < 3);
     const heading = element('h2', 'music-guide-word', scene.title);
     const copy = element('div', 'music-guide-copy');
     copy.append(...scene.lines.map(line => element('p', '', line)));
+    if (step === keysStep) copy.append(element('p', 'music-guide-prompt', '拖动卷帘下边缘可改变乐曲长度'));
     if (factory.mobileWeb && step === 7) copy.append(element('p', '', '手机端可以双指缩放'));
     const subdivisionTip = step === subdivisionStep ? copy.lastElementChild : null;
     subdivisionTip?.remove();
@@ -387,6 +389,9 @@ export function mountMusicGuide(root: HTMLElement, factory: MusicGuideFactory, o
     if (event.defaultPrevented || event.isComposing || event.keyCode === 229 || event.altKey || event.ctrlKey || event.metaKey
       || host.querySelector('dialog[open]')) { lastEnterAt = -Infinity; return; }
     const target = event.target;
+    const transportControl = target instanceof Element ? target.closest('.song-transport-control') : null;
+    if (transportControl && (event.key === 'Enter' || event.code === 'Space'
+      || event.key === 'Escape' && transportControl.querySelector('[aria-expanded="true"]'))) { lastEnterAt = -Infinity; return; }
     if (target instanceof HTMLElement && (target.isContentEditable || target.closest('input, select, textarea')
       || target.closest('.music-guide-touch') && (event.key === 'Enter' || event.code === 'Space'))) { lastEnterAt = -Infinity; return; }
     if (event.key !== 'Enter' && !event.repeat) lastEnterAt = -Infinity;

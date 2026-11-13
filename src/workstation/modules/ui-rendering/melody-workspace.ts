@@ -21,12 +21,20 @@ import { formatPlayheadTime, melodyBeats, melodyClamp, melodyDuration, melodyDet
 import './melody-workspace.css';
 import { createMelodyNoteIndex, melodyFollowTarget, type IndexedMelodyNote } from './melody-note-index.ts';
 import { mountMelodyTempoRolls } from './melody-tempo-rolls.ts';
+import { createInstrumentIcon } from './instrument-icon.ts';
+import { libraryIcon } from './library-icon.ts';
 
 function node<K extends keyof HTMLElementTagNameMap>(tag: K, className = '', text = ''): HTMLElementTagNameMap[K] {
   const element = document.createElement(tag); element.className = className; element.textContent = text; return element;
 }
 function button(text: string, className: string, callback: () => void): HTMLButtonElement {
   const element = node('button', className, text); element.type = 'button'; element.addEventListener('click', callback); return element;
+}
+function addInstrumentIcon(button: HTMLButtonElement, key: string | undefined): void {
+  const icon = createInstrumentIcon(key);
+  if (!icon) return;
+  button.classList.add('has-instrument-icon');
+  button.append(icon);
 }
 type NoteChanges = Partial<Omit<PhraseNote, 'id'>>;
 type Point = { x: number; y: number };
@@ -154,6 +162,8 @@ export function mountMelodyWorkspace(root: HTMLElement, options: {
   let soundingKeys = new Map<number, string>();
   let toneColors = new Map<string, string>();
   let toneNames = new Map<string, string>();
+  const instrumentIcons = vertical;
+  let instrumentKeys = new Map<string, string>();
   const drumKeys = new Map<string, number>();
   const page = node('div', 'melody-workspace'); const main = node('div', 'melody-main'); const shelf = node('aside', 'melody-shelf');
   page.classList.toggle('rhythm-workspace', rhythm);
@@ -506,7 +516,7 @@ export function mountMelodyWorkspace(root: HTMLElement, options: {
         card.setAttribute('aria-label', label);
         card.replaceChildren(node('span', 'melody-drum-family-kit', label.slice(0, separator)),
           node('span', '', label.slice(separator + 3)));
-      }
+      } else if (instrumentIcons && !value.unassigned) addInstrumentIcon(card, instrumentKeys.get(value.timbreId));
       card.dataset.partId = value.id; card.style.setProperty('--tone-color', toneColor(value.timbreId)); card.classList.toggle('is-selected', editingFamily === value.id);
       if (vertical) card.addEventListener('dblclick', () => openLibrary({ kind: 'replace', partId: value.id }));
       card.classList.toggle('is-unassigned', !!value.unassigned);
@@ -555,7 +565,15 @@ export function mountMelodyWorkspace(root: HTMLElement, options: {
       }
       shelf.append(entry);
     }
-    const add = button('+', rhythm ? 'melody-add-tone' : 'melody-add-tone melody-add-note-family', () => openLibrary()); add.setAttribute('aria-label', rhythm || vertical ? '添加音色' : '新建总音符'); shelf.append(add);
+    const add = button('+', rhythm ? 'melody-add-tone' : 'melody-add-tone melody-add-note-family', () => openLibrary());
+    const addLabel = rhythm || vertical ? '添加音色' : '新建总音符';
+    add.setAttribute('aria-label', addLabel);
+    if (vertical) {
+      const mark = node('span', 'melody-add-tone-icon', '+');
+      mark.setAttribute('aria-hidden', 'true');
+      add.replaceChildren(mark, node('span', '', addLabel));
+    }
+    shelf.append(add);
     paintEntryRange();
   }
   function openLibrary(intent: LibraryIntent = { kind: 'create' }): void {
@@ -564,7 +582,9 @@ export function mountMelodyWorkspace(root: HTMLElement, options: {
     const openedDraftId = current.draft?.id;
     const dialog = node('dialog', 'melody-tone-library'); library = dialog; dialog.setAttribute('aria-label', '音色库');
     const heading = node('div', 'melody-library-heading'); const close = button('→', 'melody-library-close', dismiss); close.setAttribute('aria-label', '关闭音色库');
-    heading.append(node('h2', '', '音色库'), close); const tiles = node('div', 'melody-library-grid'); const error = node('p', 'melody-library-error'); error.hidden = true;
+    const libraryTitle = node('h2', '', '音色库');
+    if (instrumentIcons) libraryTitle.append(libraryIcon('score'));
+    heading.append(libraryTitle, close); const tiles = node('div', 'melody-library-grid'); const error = node('p', 'melody-library-error'); error.hidden = true;
     let category = '全部'; let query = '';
     const tools = node('div', 'melody-library-tools');
     const search = node('input', 'melody-library-search'); search.type = 'search'; search.placeholder = '搜索音色'; search.setAttribute('aria-label', '搜索音色');
@@ -681,6 +701,7 @@ export function mountMelodyWorkspace(root: HTMLElement, options: {
             deleteToneArmed = undefined; refresh(); notify();
           } catch (reason) { error.hidden = false; error.textContent = reason instanceof Error ? reason.message : String(reason); }
         });
+        if (instrumentIcons) addInstrumentIcon(tile, info?.key);
         tile.dataset.timbreId = timbre.id; if (rhythm) { tile.setAttribute('aria-pressed', String(selected)); tile.classList.toggle('is-on-shelf', selected); }
         const play = button('▶', 'melody-tone-preview melody-library-preview', () => { if (!disposed && library === dialog) void audition.requestTimbre(timbre.id); });
         play.setAttribute('aria-label', `试听${timbre.name}`); frame.append(tile, play);
@@ -857,7 +878,8 @@ export function mountMelodyWorkspace(root: HTMLElement, options: {
       for (const [pixel, line] of pixels) {
         let element = elements[index++];
         if (!element) { element = node('i', 'melody-grid-line'); elements.push(element); layer.append(element); }
-        element.classList.toggle('is-beat', line.beat);
+        element.classList.toggle('is-beat', line.beat || line.bar);
+        element.classList.toggle('is-bar', line.bar);
         element.classList.toggle('is-cell', line.cell);
         element.style[vertical ? 'top' : 'left'] = `${pixel / pixelScale}px`;
       }
@@ -989,7 +1011,7 @@ export function mountMelodyWorkspace(root: HTMLElement, options: {
             headHandle.setAttribute('aria-valuetext', text);
           }
         }
-        headTime.style.transform = `translateY(${coordinate < 14 ? coordinate + 4 : coordinate - 14}px)`;
+        headTime.style.transform = coordinate < 19 ? `translateY(${coordinate + 4}px)` : `translateY(calc(${coordinate}px - 100% - 3px))`;
       }
     }
   }
@@ -1069,6 +1091,10 @@ export function mountMelodyWorkspace(root: HTMLElement, options: {
     // The view already contains project-scoped sound names. Re-listing the
     // complete project here re-read/validated the same records on every edit.
     toneNames = new Map(current.availableSounds.map(record => [record.id, record.name] as const));
+    if (instrumentIcons) instrumentKeys = new Map(current.availableSounds.flatMap(record => {
+      const key = defaultInstrumentInfo(record.id, record.body)?.key;
+      return key ? [[record.id, key] as const] : [];
+    }));
     drumKeys.clear();
     for (const record of current.availableSounds) {
       const key = unpitchedDrumKey(record.body);

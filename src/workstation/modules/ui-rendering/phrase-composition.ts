@@ -14,7 +14,7 @@ import type { PhraseEditorViewport } from './phrase-editor-viewport.ts';
 import { centerTop, mountPhraseOverviewNotes } from './phrase-overview-notes.ts';
 import { clampPhraseSplit, defaultPhraseSplit, phraseSplitBounds } from './phrase-section-split.ts';
 import { showTapTempo } from './tap-tempo.ts';
-import { mountOutputVolume } from './output-volume.ts';
+import { mountOutputVolume, mountTransportPopover } from './output-volume.ts';
 import './song.css';
 import './phrase-composition.css';
 
@@ -26,12 +26,16 @@ function node<K extends keyof HTMLElementTagNameMap>(tag: K, className = '', tex
 function action(text: string, className: string, callback: () => void): HTMLButtonElement {
   const button = node('button', className, text); button.type = 'button'; button.addEventListener('click', callback); return button;
 }
-function icon(kind: 'play' | 'pause' | 'stop' | 'tempo'): SVGSVGElement {
+type Icon = 'play' | 'pause' | 'stop' | 'tempo' | 'settings' | 'save' | 'exit';
+function icon(kind: Icon): SVGSVGElement {
   const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg'); svg.setAttribute('viewBox', '0 0 24 24'); svg.setAttribute('aria-hidden', 'true');
   const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
   path.setAttribute('d', { play: 'M8 5v14l11-7z', pause: 'M7 5h3v14H7zM14 5h3v14h-3z', stop: 'M6 6h12v12H6z',
-    tempo: 'M9 3h6l5 18H4zM12 6v10m-3-4 7-5M8 18h8' }[kind]);
-  path.setAttribute('fill', ['play', 'pause', 'stop'].includes(kind) ? 'currentColor' : 'none'); path.setAttribute('stroke', 'currentColor'); path.setAttribute('stroke-width', '1.5'); path.setAttribute('stroke-linejoin', 'round'); svg.append(path); return svg;
+    tempo: 'M9 3h6l5 18H4zM12 6v10m-3-4 7-5M8 18h8',
+    settings: 'M10 3h4l.5 2.3 1.6.9 2.2-.7 2 3.5-1.6 1.6v1.8l1.6 1.6-2 3.5-2.2-.7-1.6.9-.5 2.3h-4l-.5-2.3-1.6-.9-2.2.7-2-3.5 1.6-1.6v-1.8L3.7 9l2-3.5 2.2.7 1.6-.9zM14.7 11.5a2.7 2.7 0 1 1-5.4 0 2.7 2.7 0 0 1 5.4 0z',
+    save: 'M5 4.5h12l2.5 2.5v12.5H5zM8 4.5v5h8v-5M8 19.5v-6h8v6',
+    exit: 'M11 5H5v14h6m-2-7h11m-4-4 4 4-4 4' }[kind]);
+  path.setAttribute('fill', ['play', 'pause', 'stop'].includes(kind) ? 'currentColor' : 'none'); path.setAttribute('stroke', 'currentColor'); path.setAttribute('stroke-width', '1.5'); path.setAttribute('stroke-linejoin', 'round'); path.setAttribute('stroke-linecap', 'round'); svg.append(path); return svg;
 }
 type FileActionResult = void | 'saved' | 'download-started' | 'cancelled';
 
@@ -197,6 +201,7 @@ export function mountPhraseComposition(root: HTMLElement, options: {
   }
   function updatePlayback(): void {
     if (!playButton || disposed) return;
+    syncPlaybackRate();
     playButton.replaceChildren(icon(state.playing ? 'pause' : 'play')); playButton.classList.toggle('is-preparing', state.preparing);
     playButton.setAttribute('aria-label', state.preparing ? '取消播放准备' : state.playing ? '暂停' : '播放');
     cancelAnimationFrame(frame); positionHead(); if (state.playing) frame = requestAnimationFrame(tick);
@@ -340,6 +345,7 @@ export function mountPhraseComposition(root: HTMLElement, options: {
   };
 
   const page = node('div', 'song-studio phrase-composition-studio');
+  if (options.directMusic) page.classList.add('music-editor');
   const topbar = node('header', 'song-topbar');
   title = node('div', 'song-project-name'); title.title = '双击修改名称';
   const unsavedMarker = node('span', 'song-project-unsaved', '*');
@@ -398,10 +404,31 @@ export function mountPhraseComposition(root: HTMLElement, options: {
   const volumeCommit = () => { if (disposed || busy) return; try { commitMaster(); } catch (error) { masterPreview = undefined; report(error instanceof Error ? error.message : String(error), true); sync(); } };
   controls.append(stopButton, playButton);
   if (clock) controls.append(clock, bpm, subdivision);
-  mountOutputVolume(controls, () => sound);
+  const speed = mountTransportPopover(controls, '播放倍速', 'song-playback-rate');
+  const rateChoices = [0.25, 0.5, 0.75, 1, 1.5].map(rate => {
+    const choice = action(`${rate}×`, 'song-rate-choice', () => {
+      transport.setRate(rate);
+      speed.close(true);
+    });
+    speed.panel.append(choice);
+    return { rate, choice };
+  });
+  function syncPlaybackRate() {
+    speed.button.textContent = `${state.rate}×`;
+    speed.button.setAttribute('aria-label', `播放倍速 ${state.rate} 倍`);
+    for (const { rate, choice } of rateChoices) choice.setAttribute('aria-pressed', String(state.rate === rate));
+  }
+  syncPlaybackRate();
+  const outputVolume = mountOutputVolume(controls, () => sound);
   const files = node('div', 'song-file-actions');
+  function fileAction(label: string, className: string, glyph: 'settings' | 'save' | 'exit', callback: () => void): HTMLButtonElement {
+    const button = action('', `${className} song-file-icon`, callback);
+    button.title = label; button.setAttribute('aria-label', label);
+    button.append(icon(glyph));
+    return button;
+  }
   let mobileTouch = options.mobileTouch;
-  if (options.onSettings) files.append(action('设置', 'song-save song-settings', () => { void execute(options.onSettings); }));
+  if (options.onSettings) files.append(fileAction('设置', 'song-save song-settings', 'settings', () => { void execute(options.onSettings); }));
   if (options.mobileWeb) {
     let rightMode = false;
     const right = action('右键', 'song-save song-touch-right', () => {
@@ -413,10 +440,10 @@ export function mountPhraseComposition(root: HTMLElement, options: {
     mobileTouch = { readRightButton: () => rightMode };
   }
   if (options.onSave) {
-    const save = action('保存', 'song-save song-save-project', () => { void execute(options.onSave, true); });
+    const save = fileAction('保存', 'song-save song-save-project', 'save', () => { void execute(options.onSave, true); });
     files.append(save); fileButtons.push(save);
   }
-  if (options.onExit) { const exit = action('退出', 'song-exit', () => { void execute(options.onExit); }); files.append(exit); fileButtons.push(exit); }
+  if (options.onExit) { const exit = fileAction('退出', 'song-exit', 'exit', () => { void execute(options.onExit); }); files.append(exit); fileButtons.push(exit); }
   const identity = node('div', 'phrase-composition-identity');
   const back = action('‹', 'song-icon-button phrase-melody-back', () => { void execute(showOverview); });
   back.title = '返回音乐'; back.setAttribute('aria-label', '返回音乐'); back.hidden = true;
@@ -622,6 +649,7 @@ export function mountPhraseComposition(root: HTMLElement, options: {
   }
   return { dispose() {
     if (disposed) return; finishGesture(false); disposed = true; tapTempoDialog?.dispose(); sectionEditor?.dispose(); sectionEditor = undefined; melodyOverview.dispose(); removeConsoleWheel(); transport.dispose(); observer?.disconnect(); cancelAnimationFrame(frame); cancelAnimationFrame(overviewFrame); overviewFrame = 0; window.clearTimeout(noticeTimer);
+    speed.dispose(); outputVolume.dispose();
     document.removeEventListener('pointermove', move); document.removeEventListener('pointerup', up); document.removeEventListener('pointercancel', cancel); document.removeEventListener('keydown', key);
     window.removeEventListener('resize', resize);
   }, refresh, notify: report, frameNotes(reserveEndSpace) { sectionEditor?.frameNotes(reserveEndSpace); }, previewTempoRate(value) { sectionEditor?.previewTempoRate(value); }, async flush() {

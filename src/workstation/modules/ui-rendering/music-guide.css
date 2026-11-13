@@ -128,9 +128,6 @@
 .music-guide:is([data-timbre-phase="opening"], [data-timbre-phase="cards"]) .melody-shelf .melody-note-family { visibility: hidden; }
 .music-guide-timbre-flight { position: absolute; inset: 0; z-index: 26; pointer-events: none; }
 .music-guide .music-guide-timbre-flight > button { position: absolute; margin: 0; box-sizing: border-box; }
-.music-guide .is-vertical .melody-note-family { padding-right: 4px; }
-.music-guide .is-vertical .melody-note-family:not(.is-selected) { background: var(--surface-raised); }
-.music-guide .is-vertical .melody-add-tone { border: 1px solid var(--border); }
 .music-guide:is([data-step="1"], [data-step="2"], [data-step="3"], [data-step="4"]) .melody-tempo-dock { visibility: hidden; }
 .music-guide:is([data-step="1"], [data-step="2"], [data-step="3"], [data-step="4"]) .melody-ruler-row { background: #fff; }
 .music-guide:is([data-step="1"], [data-step="2"]) .melody-roll { grid-template-columns: 0 minmax(0, 1fr); }
@@ -144,7 +141,8 @@
 .music-guide:not([data-step="1"], [data-step="2"]) .melody-playhead { pointer-events: auto; cursor: ns-resize; touch-action: none; }
 .music-guide:not([data-step="1"], [data-step="2"]) .melody-playhead::before { content: ''; position: absolute; inset: -4px 0; }
 .music-guide:is([data-step="2"], [data-step="3"], [data-step="4"], [data-step="5"], [data-step="6"], [data-step="7"], [data-step="8"]) .melody-note { cursor: default; }
-.music-guide:is([data-step="1"], [data-step="2"], [data-step="3"], [data-step="4"]) .melody-grid { visibility: hidden; }
+.music-guide:is([data-step="1"], [data-step="2"], [data-step="3"]) .melody-grid,
+.music-guide[data-step="4"] .melody-grid-line:not(.is-bar) { visibility: hidden; }
 .music-guide:is([data-step="5"], [data-step="6"], [data-step="7"]) .melody-grid-line:not(.is-beat) { visibility: hidden; }
 .music-guide .is-drawing-subdivisions .melody-grid-line:not(.is-beat) {
   clip-path: polygon(0 0, var(--music-guide-subdivision-edge) 0, var(--music-guide-subdivision-edge) 100%, 0 100%);

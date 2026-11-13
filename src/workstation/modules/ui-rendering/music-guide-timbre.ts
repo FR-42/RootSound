@@ -5,7 +5,7 @@ export function introduceTimbres(shell: HTMLElement, host: HTMLElement, heading:
   const main = shelf.closest<HTMLElement>('.melody-main')!;
   const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
   const layer = document.createElement('div');
-  layer.className = 'music-guide-timbre-flight is-vertical';
+  layer.className = 'music-guide-timbre-flight music-editor is-vertical';
   layer.setAttribute('aria-hidden', 'true');
   layer.inert = true;
   shell.append(layer);

@@ -74,7 +74,7 @@ let expression='starting',stage='setup';
  assert.equal(await js('__webTest.audioCreated'),0);
  await click('.website-guide-choice .secondary');await ready('.melody-workspace');
  assert.equal(await js("!!document.querySelector('.project-library-overlay')"),false);
- assert.deepEqual(await js("[...document.querySelectorAll('.song-file-actions button')].map(n=>n.textContent)"),['设置']);
+ assert.deepEqual(await js("[...document.querySelectorAll('.song-file-actions button')].map(n=>[n.textContent,n.title])"),[['','设置']]);
  assert.equal(await js("document.querySelector('.melody-tempo-button').textContent"),'148');
  assert.equal(await js("document.querySelectorAll('.melody-key').length"),128);
  assert(await js("(()=>{const note=document.querySelector('.melody-note');if(!note)return false;const style=getComputedStyle(note),canvas=document.createElement('canvas').getContext('2d');canvas.fillStyle=style.getPropertyValue('--tone-color').trim();canvas.fillRect(0,0,1,1);const original=[...canvas.getImageData(0,0,1,1).data];canvas.fillStyle=style.backgroundColor;canvas.fillRect(0,0,1,1);const lighter=[...canvas.getImageData(0,0,1,1).data];return lighter.slice(0,3).every((value,index)=>value>=original[index])&&lighter.slice(0,3).some((value,index)=>value>original[index])})()"));
@@ -192,6 +192,11 @@ let expression='starting',stage='setup';
      await wait(()=>js("document.querySelector('.song-play').getAttribute('aria-label')==='暂停'"));
      await click('.music-guide-touch-play');
      await wait(()=>js("document.querySelector('.song-play').getAttribute('aria-label')==='播放'"));
+   }
+   if(step===4){
+     assert.equal(await js("document.querySelector('.music-guide-word').textContent"),'琴键与小节线');
+     assert.equal(await js("document.querySelector('.music-guide-copy .music-guide-prompt').textContent"),'拖动卷帘下边缘可改变乐曲长度');
+     assert(await js("!document.querySelector('.melody-roll-end').hidden && getComputedStyle(document.querySelector('.melody-grid-line.is-bar')).visibility==='visible'"));
    }
    if(step===6) {
      await ready('.music-guide[data-timbre-phase=select]');
