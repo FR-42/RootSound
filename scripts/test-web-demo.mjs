@@ -99,7 +99,15 @@ let expression='starting',stage='setup';
  await js("(()=>{const input=document.querySelector('.song-project-name-input');input.value="+JSON.stringify(name)+";input.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true,cancelable:true}))})()");
  await wait(()=>js("document.querySelector('.song-project-name')?.textContent==="+JSON.stringify(name)));
  await click('.song-settings');await ready('.learning-settings[open]');
- assert.equal(await js("document.querySelectorAll('.learning-settings input').length"),0);
+ assert.equal(await js("document.querySelectorAll('.learning-settings input').length"),1);
+ const gridRange='.learning-settings input[type=range]';
+ assert.equal(await js("document.querySelector("+JSON.stringify(gridRange)+").value"),'30');
+ assert.equal(await js("getComputedStyle(document.querySelector('.melody-grid-line')).opacity"),'0.384');
+ await inFrame(selector=>{
+   const range=document.querySelector(selector);range.value='55';
+   range.dispatchEvent(new Event('input'));range.dispatchEvent(new Event('change'));
+ },gridRange);
+ assert.equal(await js("getComputedStyle(document.querySelector('.melody-grid-line')).opacity"),'0.604');
  assert.deepEqual(await js("[...document.querySelectorAll('.learning-settings button')].map(button=>button.textContent)"),['×','重新观看引导']);
  await click('.learning-replay-guide');await ready('.music-guide-word');
  assert.equal(await js("document.querySelector('.music-guide-word').textContent"),'卷帘');
@@ -190,13 +198,23 @@ let expression='starting',stage='setup';
    if(step===3){
      await click('.music-guide-touch-play');
      await wait(()=>js("document.querySelector('.song-play').getAttribute('aria-label')==='暂停'"));
+     await js('__webTest.now += .25');
+     await wait(()=>js("document.querySelector('.music-guide-prompt')?.textContent==='点击最左列并拖动，可以召唤播放线'"));
+     assert(await js("document.querySelector('.music-guide-touch button:nth-child(2)').disabled"));
+     await dragTouch('.melody-ruler',0,60,[.5,.25]);
+     await wait(()=>js("!document.querySelector('.music-guide-enter').hidden"));
      await click('.music-guide-touch-play');
      await wait(()=>js("document.querySelector('.song-play').getAttribute('aria-label')==='播放'"));
    }
    if(step===4){
-     assert.equal(await js("document.querySelector('.music-guide-word').textContent"),'琴键与小节线');
+     assert.equal(await js("document.querySelector('.music-guide-word').textContent"),'琴键与列线');
      assert.equal(await js("document.querySelector('.music-guide-copy .music-guide-prompt').textContent"),'拖动卷帘下边缘可改变乐曲长度');
      assert(await js("!document.querySelector('.melody-roll-end').hidden && getComputedStyle(document.querySelector('.melody-grid-line.is-bar')).visibility==='visible'"));
+     assert(await js("document.querySelector('.music-guide-touch button:nth-child(2)').disabled"));
+     const rollHeight=await js("document.querySelector('.melody-scroll').clientHeight");
+     await dragTouch('.melody-roll-end',0,-rollHeight*.24,[.5,.5]);
+     await wait(()=>js("!document.querySelector('.music-guide-enter').hidden"));
+     assert.equal(await js("!!document.querySelector('.music-guide-prompt')"),false);
    }
    if(step===6) {
      await ready('.music-guide[data-timbre-phase=select]');

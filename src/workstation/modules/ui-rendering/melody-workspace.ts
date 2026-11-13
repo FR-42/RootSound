@@ -41,7 +41,7 @@ type Point = { x: number; y: number };
 type Selection = { partId: string; noteId?: string };
 type LibraryIntent = { kind: 'create' } | { kind: 'replace'; partId: string };
 type Gesture = { id: number; capture: HTMLElement; base: PhraseBody; draftId: string; from: Point; last: Point; clientFrom: Point } & (
-  { kind: 'head'; seconds: number } | { kind: 'pan'; lastClient: Point } |
+  { kind: 'head'; seconds: number; fromRuler: boolean; moved: boolean } | { kind: 'pan'; lastClient: Point } |
   { kind: 'erase'; refs: Map<string, { partId: string; noteId: string }>; moved: boolean; sampleTime?: number; touchRight?: boolean } |
   { kind: 'note' | 'create' | 'resize'; partId: string; targetPartId?: string; note: PhraseNote; changes: NoteChanges; rawY: number; moved: boolean; drumLane?: number; auditionOnClick?: boolean; touchDrag?: boolean; dragReadyAt?: number });
 type Mix = { partId: string; note: PhraseNote; base: PhraseBody; changes: NoteChanges; pointerId?: number };
@@ -1157,6 +1157,7 @@ export function mountMelodyWorkspace(root: HTMLElement, options: {
   }
   function moveHead(active: Extract<Gesture, { kind: 'head' }>, event: Pick<PointerEvent, 'clientX' | 'clientY'>): void {
     const delta = vertical ? event.clientY - active.clientFrom.y : event.clientX - active.clientFrom.x;
+    active.moved ||= Math.abs(delta) >= 4;
     active.seconds = melodyTimeAt(view, headWidth, melodyDuration(active.base), active.from.x + delta);
     positionHead();
   }
@@ -1182,7 +1183,7 @@ export function mountMelodyWorkspace(root: HTMLElement, options: {
     event.preventDefault(); if (!safeFlush()) return; const value = body(); if (!value) return; scroll.focus({ preventScroll: true }); panMoved = false;
     const from = point(event); const base = { id: event.pointerId, capture: headGesture ? ruler : inDrumStrip ? drumCanvas : scroll, base: value, draftId: current.draft!.id, from, last: from, clientFrom: { x: event.clientX, y: event.clientY } };
     if (headGesture) {
-      gesture = { ...base, kind: 'head', seconds: playheadSeconds };
+      gesture = { ...base, kind: 'head', seconds: playheadSeconds, fromRuler: ruler.contains(target), moved: false };
       ruler.setPointerCapture?.(event.pointerId);
       moveHead(gesture, event);
       return;
@@ -1462,6 +1463,7 @@ export function mountMelodyWorkspace(root: HTMLElement, options: {
         playheadSeconds = active.seconds;
         void options.onSeek(playheadSeconds);
         persistWorkspace();
+        if (active.fromRuler && active.moved) options.onLearningAction?.('drag-playhead-ruler');
       }
       positionHead();
       return;

@@ -15,6 +15,7 @@ import type { WorkspaceId, WorkspacePreferencesPort, MusicWorkspaceStatePort } f
 import type { ReferenceEditingPort } from '../../contracts/references.ts';
 import type { LearningSettingsPort } from '../../contracts/guidance.ts';
 import { showLearningSettings, showFeatureGate } from './settings.ts';
+import { applyRollAppearance } from './roll-appearance.ts';
 import { needsTempoRolls } from './guidance-flow.ts';
 import { mountPhraseComposition } from './phrase-composition.ts';
 import { mountMusicGuide, type MusicGuideFactory } from './music-guide.ts';
@@ -88,14 +89,19 @@ export function mountStudio(root: HTMLElement, options: StudioOptions): { dispos
   let editor: ReturnType<typeof mountPhraseComposition> | undefined;
   let page: { dispose(): void } | undefined;
   let closeSaveLibrary: ((choice?: ProjectSaveChoice) => void) | undefined;
-  function leave(): void { editor?.dispose(); editor = undefined; page?.dispose(); page = undefined; options.sound.stopAll(); }
+  let closeSettings: (() => void) | undefined;
+  const appearance = options.preferences;
+  const savedAppearance = appearance?.read().rollAppearance;
+  if (savedAppearance) applyRollAppearance(root, savedAppearance);
+  function leave(): void { closeSettings?.(); closeSettings = undefined; editor?.dispose(); editor = undefined; page?.dispose(); page = undefined; options.sound.stopAll(); }
   function settings(inMusic: boolean): void {
     if (!options.learning && !options.demo) return;
-    showLearningSettings(root, options.demo ? undefined : options.learning, {
+    closeSettings = showLearningSettings(root, options.demo ? undefined : options.learning, {
+      appearance,
       requiresTempoRolls: !options.demo && inMusic && needsTempoRolls(options.phrase?.read().body),
       onChange: () => editor?.refresh(),
       onReplayGuide: options.demo ? () => { void openGuide(); } : undefined,
-    });
+    }) ?? closeSettings;
   }
   async function saveInLibrary(mode: 'edit' | 'exit' | 'close' = 'edit'): Promise<ProjectSaveChoice> {
     const service = options.projectSetup!;

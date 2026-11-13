@@ -24,6 +24,7 @@ export interface MusicGuideFactory {
 }
 
 const enterDelayMs = 500;
+const playbackStep = 3;
 const keysStep = 4;
 const subdivisionStep = 8;
 const editStep = 9;
@@ -37,7 +38,7 @@ const scenes = [
   { title: '卷帘', lines: ['核心创作画布'], wait: enterDelayMs },
   { title: '音符', lines: ['音符散落在卷帘上'], wait: enterDelayMs },
   { title: '播放线', lines: ['播放线匀速向下，碰到音符就发声', '按空格开始或暂停'], wait: 0 },
-  { title: '琴键与小节线', lines: ['卷帘分列，列与琴键一一对应，表示音调。'], wait: enterDelayMs },
+  { title: '琴键与列线', lines: ['卷帘分列，列与琴键一一对应，表示音调。'], wait: 0 },
   { title: 'BPM', lines: ['BPM 值 × 一拍的时长 = 一分钟', '相邻两条横线之间是一拍', '点击左下角数字以改变 BPM'], wait: 0 },
   { title: '音色', lines: [], wait: 0 },
   { title: '缩放', lines: ['Control + 滚轮竖直缩放，Shift + Control + 滚轮水平缩放'], wait: 5000 },
@@ -86,6 +87,8 @@ export function mountMusicGuide(root: HTMLElement, factory: MusicGuideFactory, o
   let leaveSubdivisionScene: (() => void) | undefined;
   let timbreScene: ReturnType<typeof introduceTimbres> | undefined;
   let noteEditAction: ((action: LearningAction) => void) | undefined;
+  let actionPrompt: HTMLElement | undefined;
+  let awaitedAction: LearningAction | 'playback-advance' | undefined;
   let sound: SoundRuntimePort | undefined;
   let editor: ReturnType<typeof mountPhraseComposition> | undefined;
   const shell = element('main', 'music-guide');
@@ -100,8 +103,8 @@ export function mountMusicGuide(root: HTMLElement, factory: MusicGuideFactory, o
   touchPlay.hidden = !!factory.mobileWeb;
   let rightMode = false;
   const touchRight = factory.mobileWeb ? button('music-guide-touch-right', '右键', () => setRightMode(!rightMode)) : undefined;
-  touchControls.append(touchPlay,
-    button('', '下一步', () => { if (shown && !host.querySelector('dialog[open]')) advance(); }),
+  const touchNext = button('', '下一步', () => { if (shown && !host.querySelector('dialog[open]')) advance(); });
+  touchControls.append(touchPlay, touchNext,
     button('', '退出引导', () => finish()));
   if (touchRight) {
     touchRight.setAttribute('aria-pressed', 'false');
@@ -125,7 +128,10 @@ export function mountMusicGuide(root: HTMLElement, factory: MusicGuideFactory, o
     touchRight?.setAttribute('aria-pressed', String(enabled));
   }
   function cueAfter(delay = enterDelayMs) {
-    advanceTimer = window.setTimeout(() => { enterCue.hidden = false; }, delay);
+    advanceTimer = window.setTimeout(() => {
+      enterCue.hidden = false;
+      touchNext.disabled = false;
+    }, delay);
   }
   function introduceNoteEdits(copy: HTMLElement) {
     let index = 0;
@@ -319,12 +325,17 @@ export function mountMusicGuide(root: HTMLElement, factory: MusicGuideFactory, o
           || action === 'delete-note' && words.querySelector('[data-guide-action="delete-note"]'))) setRightMode(false);
         timbreScene?.action(action);
         noteEditAction?.(action);
-      },
-      onPlaybackAdvance() {
-        if (step === 3 && !advanceTimer) {
-          words.querySelector('.music-guide-prompt')?.classList.remove('music-guide-prompt');
+        if (action === awaitedAction) {
+          actionPrompt?.remove();
+          actionPrompt = undefined;
+          awaitedAction = undefined;
           cueAfter();
         }
+      },
+      onPlaybackAdvance() {
+        if (awaitedAction !== 'playback-advance' || !actionPrompt) return;
+        actionPrompt.textContent = '点击最左列并拖动，可以召唤播放线';
+        awaitedAction = 'drag-playhead-ruler';
       },
     });
   }
@@ -338,6 +349,9 @@ export function mountMusicGuide(root: HTMLElement, factory: MusicGuideFactory, o
     enterCue.hidden = true;
     lastEnterAt = -Infinity;
     step = next;
+    actionPrompt = undefined;
+    awaitedAction = undefined;
+    touchNext.disabled = step === playbackStep || step === keysStep;
     const scene = scenes[step - 1]!;
     shell.dataset.step = String(step);
     if (factory.mobileWeb) {
@@ -351,11 +365,19 @@ export function mountMusicGuide(root: HTMLElement, factory: MusicGuideFactory, o
     const heading = element('h2', 'music-guide-word', scene.title);
     const copy = element('div', 'music-guide-copy');
     copy.append(...scene.lines.map(line => element('p', '', line)));
-    if (step === keysStep) copy.append(element('p', 'music-guide-prompt', '拖动卷帘下边缘可改变乐曲长度'));
+    if (step === keysStep) {
+      actionPrompt = element('p', 'music-guide-prompt', '拖动卷帘下边缘可改变乐曲长度');
+      copy.append(actionPrompt);
+      awaitedAction = 'resize-roll';
+    }
     if (factory.mobileWeb && step === 7) copy.append(element('p', '', '手机端可以双指缩放'));
     const subdivisionTip = step === subdivisionStep ? copy.lastElementChild : null;
     subdivisionTip?.remove();
-    if (step === 3) copy.lastElementChild?.classList.add('music-guide-prompt');
+    if (step === playbackStep) {
+      actionPrompt = copy.lastElementChild as HTMLElement;
+      actionPrompt.classList.add('music-guide-prompt');
+      awaitedAction = 'playback-advance';
+    }
     words.replaceChildren(heading, copy);
     words.hidden = false;
     if (step === 5) introduceTempo(heading, copy);
@@ -382,6 +404,7 @@ export function mountMusicGuide(root: HTMLElement, factory: MusicGuideFactory, o
   }
   function finish() { if (!disposed) { dispose(); onClose(); } }
   function advance() {
+    if ((step === playbackStep || step === keysStep) && enterCue.hidden) return;
     if (step === finalStep) finish();
     else showScene(step + 1);
   }

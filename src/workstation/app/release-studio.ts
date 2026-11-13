@@ -70,7 +70,7 @@ export async function mountReleaseStudio(root: HTMLElement, platform: ReleasePla
     function prepareFile() {
       if (songId) commitMusicDocument(library, song, phrase);
     }
-    const preferences = createWorkspacePreferences(localStorage);
+    const preferences = createWorkspacePreferences(localStorage, platform.demoProject ? 30 : undefined);
     const learning = createLearningSettings(localStorage);
     const projectId = () => { if (!songId) throw new Error('先打开一个音乐项目。'); return songId; };
     const studio = mountStudio(root, { phrase, song, sound: runtime, hasPrevious: !!current,

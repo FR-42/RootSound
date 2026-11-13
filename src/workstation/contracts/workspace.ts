@@ -1,4 +1,9 @@
 export type WorkspaceId = 'sound' | 'phrase' | 'song' | 'library' | 'co-creation' | 'sampling';
+export interface RollAppearance {
+  gridStrength: number;
+}
+export const DEFAULT_ROLL_APPEARANCE: Readonly<RollAppearance> = { gridStrength: 100 };
+
 export interface WorkspacePreferences {
   /** Chromatic note-entry shortcuts are opt-in and stay local to this device. */
   keyboardPerformance: boolean;
@@ -7,6 +12,7 @@ export interface WorkspacePreferences {
   /** Retained legacy data, no longer an active startup setting. */
   startWorkspace: 'last' | WorkspaceId;
   lastWorkspace: WorkspaceId;
+  rollAppearance?: RollAppearance;
 }
 export interface WorkspacePreferencesPort {
   read(): WorkspacePreferences;

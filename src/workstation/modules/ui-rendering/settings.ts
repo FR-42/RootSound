@@ -1,10 +1,12 @@
 import type { LearningSettings, LearningSettingsPort } from '../../contracts/guidance.ts';
+import type { WorkspacePreferencesPort } from '../../contracts/workspace.ts';
+import { mountRollAppearanceSettings } from './roll-appearance.ts';
 import './workspace.css';
 import './settings.css';
 
 export function showLearningSettings(root: HTMLElement, preferences: LearningSettingsPort | undefined, options: {
-  requiresTempoRolls?: boolean; onChange?(): void; onReplayGuide?(): void;
-}): void {
+  requiresTempoRolls?: boolean; appearance?: WorkspacePreferencesPort; onChange?(): void; onReplayGuide?(): void;
+}): (() => void) | undefined {
   if (root.querySelector('.learning-settings')) return;
   const dialog = document.createElement('dialog'); dialog.className = 'settings-dialog learning-settings';
   dialog.setAttribute('aria-label', '设置');
@@ -29,14 +31,18 @@ export function showLearningSettings(root: HTMLElement, preferences: LearningSet
   if (preferences) dialog.append(
     feature(preferences, '多卷帘', 'multipleTempoRolls', preferences.setMultipleTempoRolls, !!options.requiresTempoRolls),
     feature(preferences, '打击音色', 'drumLanes', preferences.setDrumLanes),
-    feature(preferences, '工作台', 'workbench', preferences.setWorkbench), problem);
+    feature(preferences, '工作台', 'workbench', preferences.setWorkbench));
+  const disposeAppearance = options.appearance && mountRollAppearanceSettings(root, dialog, options.appearance, problem);
+  if (preferences || options.appearance) dialog.append(problem);
   if (options.onReplayGuide) {
     const replay = document.createElement('button'); replay.type = 'button'; replay.className = 'secondary learning-replay-guide';
     replay.textContent = '重新观看引导';
     replay.addEventListener('click', () => { dialog.close(); options.onReplayGuide!(); });
     dialog.append(replay);
   }
-  dialog.addEventListener('close', () => dialog.remove(), { once: true }); root.append(dialog); dialog.showModal();
+  const dispose = () => { disposeAppearance?.(); dialog.remove(); };
+  dialog.addEventListener('close', dispose, { once: true }); root.append(dialog); dialog.showModal();
+  return dispose;
 }
 
 export function showFeatureGate(root: HTMLElement, options: { onEnable(): void | Promise<void>; onCancel(): void | Promise<void> }): void {
