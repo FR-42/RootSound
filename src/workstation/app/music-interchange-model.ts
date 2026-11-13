@@ -2,7 +2,7 @@ import type { MidiExpressionLane } from '../contracts/midi-expression.ts';
 /** Format-neutral performance data. Beats are quarter notes, never screen cells. */
 export interface ExchangeNote { id?: string; beat: number; duration: number; pitch: number; velocity: number; level: number; pan: number; midiOnOrder?: number; midiOffOrder?: number }
 export interface ExchangePart { id?: string; name: string; program: number; drum?: number; sourceTrack?: number; sourceChannel?: number; sourcePort?: number; midiChannelId?: string; notes: ExchangeNote[] }
-export interface ExchangeScore { name: string; length: number; tempos: { beat: number; bpm: number }[]; parts: ExchangePart[]; midiExpression?: MidiExpressionLane[] }
+export interface ExchangeScore { name: string; length: number; tempos: { beat: number; bpm: number }[]; meter?: { numerator: number; denominator: number }; parts: ExchangePart[]; midiExpression?: MidiExpressionLane[] }
 export const musicFileFormat = (name: string) => /\.(?:mid|midi|smf|kar|rmi)$/iu.test(name) ? 'midi' as const
   : /\.mxl$/iu.test(name) ? 'mxl' as const : /\.(?:musicxml|xml)$/iu.test(name) ? 'musicxml' as const
     : /\.rsproject$/iu.test(name) ? 'rsproject' as const : undefined;

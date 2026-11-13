@@ -49,6 +49,19 @@ test('direct MIDI score preserves original beats and complete tempo map instead 
   assert.equal(body.tempoSections?.[0]?.tempoBpm,80);
   assert.deepEqual(body.parts[0]!.notes.map(note => [note.startBeat,note.durationBeats]),[[0,1],[1,1]]);
 });
+test('imports the opening MIDI meter and retains it when editing note positions', () => {
+  const original = rawMidi(midiFixture());
+  original.tracks[0]!.unshift({ deltaTime: 0, type: 'timeSignature', numerator: 3, denominator: 8, metronome: 24, thirtyseconds: 8 });
+  const f = load(Uint8Array.from(writeMidi(original)));
+  const before = f.score.read().body!;
+  assert.equal(before.beatsPerBar, 3);
+  assert.equal(before.beatUnit, 8);
+  assert.deepEqual(before.parts[0]!.notes.map(note => [note.startBeat, note.durationBeats]), [[0, 1], [1, 1]]);
+  f.score.rename('Changed');
+  assert.deepEqual(readExchangeMidi(f.save().bytes, 'Changed').score.meter, { numerator: 3, denominator: 8 });
+  f.score.setMeter(4, 4);
+  assert.equal(readExchangeMidi(f.save().bytes, 'Changed').score.meter, undefined);
+});
 test('saving an untouched MIDI retains every byte, including markers and event ordering', () => {
   const bytes = midiFixture(), f = load(bytes); assert.deepEqual(f.save().bytes,bytes); assert.deepEqual(f.save().warnings,[]);
 });
@@ -80,6 +93,7 @@ test('ordinary MIDI note edits preserve the original bend and controller events'
 const xml = strToU8(`<?xml version="1.0"?><score-partwise version="4.0"><part-list><score-part id="P1"><part-name>Flute</part-name><midi-instrument id="I1"><midi-program>74</midi-program></midi-instrument></score-part></part-list><part id="P1"><measure number="1"><attributes><divisions>4</divisions><time><beats>2</beats><beat-type>4</beat-type></time><transpose><chromatic>2</chromatic></transpose></attributes><direction><sound tempo="120"/></direction><note><pitch><step>C</step><octave>4</octave></pitch><duration>4</duration><voice>1</voice><tie type="start"/></note><note><pitch><step>C</step><octave>4</octave></pitch><duration>4</duration><voice>1</voice><tie type="stop"/></note><backup><duration>8</duration></backup><note><pitch><step>E</step><octave>4</octave></pitch><duration>8</duration><voice>2</voice></note></measure><measure number="2"><direction><sound tempo="80"/></direction><note><rest/><duration>4</duration></note><note><pitch><step>G</step><octave>4</octave></pitch><duration>4</duration></note></measure></part></score-partwise>`);
 test('MusicXML reads voices, backup, rests, ties, transpose, GM programs and variable tempi',()=>{
   const parsed=readExchangeXml(xml,'Demo',false).score;
+  assert.deepEqual(parsed.meter, { numerator: 2, denominator: 4 });
   assert.equal(parsed.parts[0]!.program,73);assert.equal(parsed.parts[0]!.notes.length,3);
   assert.deepEqual(parsed.parts[0]!.notes.map(note=>[note.beat,note.duration,note.pitch]),[[0,2,62],[0,2,66],[3,1,69]]);
   assert.deepEqual(parsed.tempos,[{beat:0,bpm:120},{beat:2,bpm:80}]);
@@ -88,6 +102,7 @@ test('MusicXML unchanged save is byte exact; edited save remains MusicXML and wa
   const f=load(xml,'musicxml','Demo.musicxml');assert.deepEqual(f.save().bytes,xml);
   f.score.rename('Changed');const result=f.save();assert(result.warnings.some(item=>item.includes('排版')));
   const reloaded=readExchangeXml(result.bytes,'Changed',false).score;
+  assert.deepEqual(reloaded.meter, { numerator: 2, denominator: 4 });
   assert.equal(reloaded.parts[0]!.notes.length,3);assert.deepEqual(reloaded.tempos,[{beat:0,bpm:120},{beat:2,bpm:80}]);
 });
 test('compressed MXL uses its declared rootfile and can be edited then read again',()=>{

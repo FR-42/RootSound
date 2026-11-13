@@ -12,6 +12,11 @@
   background: var(--surface-base);
   color: var(--text);
 }
+#app { -webkit-user-select: none; user-select: none; }
+:where(#app) :where(input:read-write, textarea:read-write, [contenteditable]:read-write) {
+  -webkit-user-select: text;
+  user-select: text;
+}
 body, .welcome, .studio { background: var(--surface-base); color: var(--text); }
 .wordmark, .invitation h1, .project-start-title, .project-start-label { color: var(--text); }
 .project-start-hint, .project-start-location { color: var(--muted); }
@@ -36,9 +41,6 @@ body, .welcome, .studio { background: var(--surface-base); color: var(--text); }
 .melody-workspace, .melody-scroll { background: var(--surface-base); color: var(--text); }
 .melody-pitch-row { border-color: #dbe2e8; }
 .melody-pitch-row.is-accidental { background: #536c8107; }
-.melody-grid-line { background: #55718d14; }
-.melody-grid-line.is-beat { background: #55718d35; }
-.melody-grid-line.is-bar { background: #55718d66; }
 .melody-key { background: #f7f9fc; color: #202938; border-color: #858f9e; }
 .melody-key.is-accidental { background: #647181; color: #fff; border-color: #4c596c; }
 .melody-key:hover, .is-vertical .melody-key:hover { background: #b9cfdf; color: #142033; }

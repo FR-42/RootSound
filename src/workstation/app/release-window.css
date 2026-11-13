@@ -1,0 +1,14 @@
+:root { --release-titlebar-height: env(titlebar-area-height, 0px); }
+
+.release-window-titlebar {
+  height: var(--release-titlebar-height);
+  width: env(titlebar-area-width, 100%);
+  margin-left: env(titlebar-area-x, 0px);
+  background: #eff6fa;
+  box-shadow: inset 0 -1px #dce8ee;
+  -webkit-app-region: drag;
+}
+
+#app .song-studio { height: calc(100dvh - var(--release-titlebar-height)); }
+#app .welcome { min-height: calc(100svh - var(--release-titlebar-height)); }
+#app .music-guide { top: var(--release-titlebar-height); }

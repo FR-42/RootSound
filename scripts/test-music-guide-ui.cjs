@@ -199,7 +199,7 @@ async function runTest() {
   assert(await visible(headTime));
   assert.equal(await js('document.querySelector(".melody-playhead-time").textContent'), '00:00.000');
   assert.equal(await style(headTime, 'pointerEvents'), 'none');
-  assert.equal(await style(headTime, 'color'), 'rgb(181, 47, 56)');
+  assert.equal(await style(headTime, 'color'), 'rgb(145, 67, 76)');
   assert.equal(await style(headTime, 'fontSize'), '9px');
   const timeAtTop = await geometry(headTime);
   const rollViewport = await geometry('.melody-scroll');
@@ -208,13 +208,12 @@ async function runTest() {
   await key(' ', 'Space');
   await wait(async () => await playbackLabel() === '暂停', 'example audio transport starts');
   await wait(async () => await transform('.melody-playhead') !== firstHead, 'playhead moves down');
-  assert.equal(await style(spacePrompt, 'animationName'), 'none');
-  assert.equal(await style(spacePrompt, 'color'), darkPrompt);
-  const movingSince = Date.now();
+  await wait(() => js('document.querySelector(".music-guide-prompt").textContent==="点击最左列并拖动，可以召唤播放线"'), 'playback reveals the ruler prompt');
+  assert.equal(await style(spacePrompt, 'animationName'), breathe);
   await key('Enter');
   assert.equal(await currentStep(), 3);
   assert.equal(await visible('.music-guide-enter'), false);
-  await expectCue(movingSince, 'the playhead cue waits 0.5 seconds from the first movement');
+  await wait(async () => (await geometry(headTime)).y + (await geometry(headTime)).h < (await geometry('.melody-playhead')).y, 'timestamp moves above the playhead');
   const movingTime = await geometry(headTime);
   assert(movingTime.y + movingTime.h < (await geometry('.melody-playhead')).y);
   const pitchBeforeTimeCheck = await pitchOffset();
@@ -239,8 +238,14 @@ async function runTest() {
     return minutes * 60 + seconds;
   });
   const rulerX = ruler.x + ruler.w / 2;
+  await gesture([[rulerX, ruler.y + 90]]);
+  assert.equal(await visible('.music-guide-enter'), false);
+  assert(await visible('.music-guide-prompt'));
+  const rulerDraggedAt = Date.now();
   await gesture([[rulerX, ruler.y + 90], [rulerX, ruler.y + 205]]);
+  assert.equal(await visible('.music-guide-prompt'), false);
   await wait(async () => await playbackLabel() === '暂停' && await readClock() > 2, 'ruler seeks and resumes playback');
+  await expectCue(rulerDraggedAt, 'the playhead cue waits after the ruler drag');
 
   const playhead = await geometry('.melody-playhead');
   const headX = ruler.x + ruler.w + 250;
@@ -269,20 +274,45 @@ async function runTest() {
   assert.equal(await visible('.melody-keys'), false);
   await next();
   await step(4);
-  const fourthShownAt = Date.now();
   await key('Enter');
   assert.equal(await currentStep(), 4);
+  assert.equal(await js('document.querySelector(".music-guide-word").textContent'), '琴键与列线');
   assert(await visible('.melody-pitch-row'));
   assert(await visible('.melody-keys'));
+  const keyboard = await geometry('.melody-keys');
+  const rollCanvas = await geometry('.melody-canvas');
+  assert.equal(rollCanvas.y + rollCanvas.h, keyboard.y);
+  assert.equal((await geometry('.melody-ruler-row')).y, rollCanvas.y);
   assert(await visible('.melody-roll-end'));
   assert.equal(await js('document.querySelector(".music-guide-copy p").textContent'), '卷帘分列，列与琴键一一对应，表示音调。');
+  assert.equal(await js('document.querySelector(".music-guide-copy .music-guide-prompt").textContent'), '拖动卷帘下边缘可改变乐曲长度');
+  assert.equal(await style('.music-guide-copy .music-guide-prompt', 'animationIterationCount'), 'infinite');
+  assert(await visible('.melody-grid-line.is-bar'));
+  assert.equal(await visible('.melody-grid-line:not(.is-bar)'), false);
   assert.equal(await js('document.querySelector(".melody-ruler-row").inert'), false);
   const fourthHead = await geometry('.melody-playhead');
   await gesture([[headX, fourthHead.y + 1], [headX, ruler.y + 36]]);
   await wait(async () => await playbackLabel() === '暂停' && await readClock() < 1, 'the playback head still seeks in the fourth scene');
   await key(' ', 'Space');
   await wait(async () => await playbackLabel() === '播放', 'Space still pauses in the fourth scene');
-  await expectCue(fourthShownAt, 'the keys scene waits 0.5 seconds');
+  await key('Enter');
+  await key('Enter');
+  assert.equal(await currentStep(), 4);
+  const edge = await geometry('.melody-roll-end');
+  const edgeViewport = await geometry('.melody-scroll');
+  const edgePoint = [edgeViewport.x + edgeViewport.w / 2, edge.y + 5];
+  assert(await call((x, y) => !!document.elementFromPoint(x, y)?.closest('.melody-roll-end'), ...edgePoint));
+  await gesture([edgePoint]);
+  assert(await visible('.music-guide-prompt'));
+  const resizedAt = Date.now();
+  await gesture([edgePoint, [edgePoint[0], edgePoint[1] - rollCanvas.h * .24]]);
+  assert.equal(await visible('.music-guide-prompt'), false);
+  await expectCue(resizedAt, 'the keys cue waits after the song length changes');
+  const shorterEdge = await geometry('.melody-roll-end');
+  assert(shorterEdge.y < edge.y);
+  const restorePoint = [edgePoint[0], shorterEdge.y + 5];
+  await gesture([restorePoint, [restorePoint[0], restorePoint[1] + rollCanvas.h * .24]]);
+  await wait(async () => Math.abs((await geometry('.melody-roll-end')).y - edge.y) < 2, 'practice length is restored for later scenes');
 
   stage = 'tempo and drawing';
   await next();
@@ -334,6 +364,10 @@ async function runTest() {
   assert.equal(await js('document.querySelector(".music-guide-word").textContent'), 'BPM');
   await wait(() => js('getComputedStyle(document.querySelector(".music-guide-word > span")).opacity === "0.18"'), 'the centered BPM title fades');
   assert.equal(await js('document.querySelector(".melody-tempo-button").textContent'), '120');
+  const dock = await geometry('.melody-tempo-dock');
+  const pianoViewport = await geometry('.melody-scroll');
+  assert.equal(dock.y, (await geometry('.melody-keys')).y);
+  assert.equal(dock.x + dock.w, pianoViewport.x);
   assert.equal((await geometry('.melody-ruler-row')).w, 24);
   assert.equal(await visible('.melody-extend'), false);
   assert(await visible('.melody-roll-end'));
@@ -354,7 +388,7 @@ async function runTest() {
   assert((await geometry('.melody-tempo-panel')).w < 185);
   assert.equal(await visible('.music-guide-enter'), false);
   assert.equal(await visible('.melody-tempo-grid-field'), false);
-  assert.equal(await visible('input[aria-label="小节数"]'), false);
+  assert.equal(await visible('select[aria-label="拍号"]'), false);
   assert.deepEqual(await call(() => Array.from(document.querySelectorAll('.music-guide-copy p'), p => p.textContent)), [
     'BPM 值 × 一拍的时长 = 一分钟', '相邻两条横线之间是一拍', '点击左下角数字以改变 BPM',
   ]);
@@ -362,6 +396,7 @@ async function runTest() {
   const rate = await geometry('.melody-tempo-rate-input');
   const ratePoint = [rate.x + 17, rate.y + rate.h / 2];
   const readRate = () => js('document.querySelector(".melody-tempo-rate-input").value');
+  const unsavedBeforeTempo = await js('document.querySelector(".song-project-unsaved").hidden');
   assert(await visible('.melody-tempo-scrub-mark'));
   assert.equal(await js('getComputedStyle(document.querySelector(".melody-tempo-rate-input")).appearance'), 'textfield');
   await send('mousePressed', ...ratePoint, { button: 'left', buttons: 1, clickCount: 1 });
@@ -369,7 +404,7 @@ async function runTest() {
   await send('mouseMoved', ratePoint[0], ratePoint[1] - 60, { button: 'left', buttons: 1 });
   assert.equal(await js('getComputedStyle(document.querySelector(".melody-tempo-rate-input")).outlineStyle'), 'none');
   await wait(async () => await readRate() === '180' && await beatGap() < initialGap * .75, 'drag previews the value and grid before release');
-  assert.equal(await js('document.querySelector(".song-project-unsaved").hidden'), true);
+  assert.equal(await js('document.querySelector(".song-project-unsaved").hidden'), unsavedBeforeTempo);
   await send('mouseReleased', ratePoint[0], ratePoint[1] - 60, { button: 'left', buttons: 0, clickCount: 1 });
   await wait(() => js('!document.querySelector(".song-project-unsaved").hidden'), 'the drag commits on release');
   await wheel(...ratePoint, -100, 0);
@@ -542,8 +577,15 @@ async function runTest() {
   assert.equal(await notes(), 7);
   assert(await visible('.melody-note-family.is-selected'));
   assert.equal(await visible('.music-guide-enter'), false);
+  const emptyPoint = await call((x, y) => {
+    for (const offset of [-60, -90, 60, 90, 130]) {
+      const target = document.elementFromPoint(x + offset, y);
+      if (target?.closest('.melody-canvas') && !target.closest('.melody-note, .melody-playhead, .melody-roll-end')) return [x + offset, y];
+    }
+  }, ...drawPoint);
+  assert(emptyPoint);
   const deselectedAt = Date.now();
-  await gesture([[drawPoint[0] - 60, drawPoint[1]]], 'right');
+  await gesture([emptyPoint], 'right');
   assert.equal(await visible('.melody-note-family.is-selected'), false);
   assert.equal(await visible('.melody-note.is-dim'), false);
   assert.equal(await notes(), 7);
@@ -559,6 +601,12 @@ async function runTest() {
   stage = 'zoom and detail';
   await next();
   await step(7);
+  const gridLineStyle = selector => call(selector => {
+    const { backgroundColor, height } = getComputedStyle(document.querySelector('.melody-grid-line' + selector));
+    return { opacity: Number(backgroundColor.match(/, ([\d.]+)\)$/)?.[1]), height: parseFloat(height) };
+  }, selector);
+  const bar = await gridLineStyle('.is-bar');
+  const beat = await gridLineStyle('.is-beat:not(.is-bar)');
   const zoomWidth = await keyWidth();
   await wheel(...point, -240, 10);
   await wait(async () => await keyWidth() !== zoomWidth, 'ctrl shift wheel zooms pitch');
@@ -582,19 +630,16 @@ async function runTest() {
   await ready(subdivision);
   assert.deepEqual(await call(selector => Array.from(document.querySelector(selector).options, option => option.textContent), subdivision),
     Array.from({ length: 8 }, (_, i) => (i + 2) + ' 份'));
-  assert.equal(await visible('input[aria-label="小节数"]'), false);
+  assert.equal(await visible('select[aria-label="拍号"]'), false);
   await click('.melody-tempo-button');
   await ready('.melody-grid-line.is-cell:not(.is-beat)');
   await wheel(point[0], 30, -1020, 2);
   await ready('.melody-grid-line:not(.is-beat, .is-cell)');
-  const lineStyles = await call(() => ['.is-beat', '.is-cell:not(.is-beat)', ':not(.is-beat, .is-cell)'].map(selector => {
-    const { backgroundColor, height } = getComputedStyle(document.querySelector('.melody-grid-line' + selector));
-    return { opacity: Number(backgroundColor.match(/, ([\d.]+)\)$/)?.[1]), height };
-  }));
-  const [beat, subdivisionLine, finerLine] = lineStyles;
-  assert(beat.opacity >= .7 && subdivisionLine.opacity >= .44 && finerLine.opacity >= .23);
-  assert(beat.opacity > subdivisionLine.opacity && subdivisionLine.opacity > finerLine.opacity);
-  assert(beat.height === subdivisionLine.height && subdivisionLine.height === finerLine.height);
+  const subdivisionLine = await gridLineStyle('.is-cell:not(.is-beat)');
+  const finerLine = await gridLineStyle(':not(.is-beat, .is-cell)');
+  assert(bar.opacity > beat.opacity && beat.opacity > subdivisionLine.opacity);
+  assert(bar.height > beat.height && beat.height > subdivisionLine.height);
+  assert.deepEqual(subdivisionLine, finerLine);
 
   stage = 'edit and save';
   await next();
@@ -673,6 +718,7 @@ async function runTest() {
   assert.deepEqual(await copyLines(), ['顶栏是核心控制区', '左上角是乐曲名，双击可修改']);
   assert.equal(await style('.music-guide-copy p:first-child', 'color'), darkPrompt);
   assert.equal(await style('.music-guide-copy p:last-child', 'color'), 'rgb(98, 119, 140)');
+  assert(await visible('.music-guide .music-editor .output-volume .song-transport-toggle'));
   await key('Enter');
   assert.equal(await currentStep(), 10);
   await click('.song-play');
@@ -730,6 +776,11 @@ async function runTest() {
   await key('Enter');
   assert.equal(await currentStep(), 3);
   await key('Enter');
+  assert.equal(await currentStep(), 3);
+  await key(' ', 'Space');
+  await wait(() => js('document.querySelector(".music-guide-prompt")?.textContent.startsWith("点击最左列")'), 'playhead starts before dragging');
+  await gesture([[rulerX, ruler.y + 80], [rulerX, ruler.y + 122]]);
+  await next();
   await step(4);
   const lowerEdge = await geometry('.melody-roll-end');
   const edgeX = lowerEdge.x + lowerEdge.w / 2, edgeY = lowerEdge.y + lowerEdge.h / 2;
@@ -738,9 +789,7 @@ async function runTest() {
   assert(dragRoom > 100);
   await gesture([[edgeX, edgeY], [edgeX, edgeY + dragRoom * .75]]);
   assert((await geometry('.melody-roll-end')).y > lowerEdge.y + 80);
-  await key('Enter');
-  assert.equal(await currentStep(), 4);
-  await key('Enter');
+  await next();
   await step(5);
   assert(await visible('.melody-roll-end'));
   const gapBeforeSweep = await beatGap();

@@ -1,4 +1,5 @@
 import { parseMidi as parseRawMidi, writeMidi, type MidiEvent } from 'midi-file';
+import { isSupportedMeter } from '../contracts/phrase-time.ts';
 import { parseMidi } from '../modules/midi-import/public.ts';
 import type { ExchangeScore } from './music-interchange-model.ts';
 import type { MidiExpressionLane } from '../contracts/midi-expression.ts';
@@ -20,6 +21,9 @@ export function unwrapMidi(bytes: Uint8Array): Uint8Array {
 }
 export function readExchangeMidi(bytes: Uint8Array, name: string): { score: ExchangeScore; warnings: string[] } {
   const midi = parseMidi(unwrapMidi(bytes), { allowEmpty: true, captureExpression: true });
+  const { numerator, denominator } = midi.timeSignatures[0]!;
+  const supported = isSupportedMeter(numerator, denominator);
+  const meter = supported && (numerator !== 4 || denominator !== 4) ? { numerator, denominator } : undefined;
   const expression = new Map<string, MidiExpressionLane>();
   for (const event of midi.expression ?? []) {
     const id = `midi:${event.port}:${event.channel}`, lane = expression.get(id) ?? { id, events: [] };
@@ -48,13 +52,20 @@ export function readExchangeMidi(bytes: Uint8Array, name: string): { score: Exch
   let length = Math.max(.25, midi.durationBeats);
   for (const part of parts.values()) for (const note of part.notes) length = Math.max(length, note.beat + note.duration);
   return { score: { name, length, tempos: midi.tempos.map(point => ({ beat: point.beat, bpm: point.bpm })), parts: [...parts.values()],
-    ...(expression.size ? { midiExpression: [...expression.values()] } : {}) },
-    warnings: [...midi.warnings, 'MIDI 使用内置 GM 采样音色试听，不包含原演奏设备的声音。',
+    ...(meter ? { meter } : {}), ...(expression.size ? { midiExpression: [...expression.values()] } : {}) },
+    warnings: [...midi.warnings.filter(warning => warning !== '音符时间已保留；非 4/4 拍号尚未显示为对应的小节网格。'),
+      ...(!supported ? ['文件开头的拍号超出支持范围，使用 4/4 网格。'] : []),
+      ...(midi.timeSignatures.length > 1 ? ['文件中途有拍号变化，网格使用开头的拍号。'] : []), 'MIDI 使用内置 GM 采样音色试听，不包含原演奏设备的声音。',
       ...(midi.notes.some(note => note.channel === 9 && (note.pitch < 35 || note.pitch > 81)) ? ['部分鼓音超出标准 GM 鼓组，已用邻近鼓音试听；普通音符编辑仍保留其原始鼓编号。'] : [])] };
 }
 type TimedEvent = { tick: number; order: number; event: MidiEvent };
 type NewEvent = MidiEvent extends infer T ? T extends MidiEvent ? Omit<T, 'deltaTime'> : never : never;
 const event = (data: NewEvent): MidiEvent => ({ ...data, deltaTime: 0 }) as MidiEvent;
+const meterKey = (meter: ExchangeScore['meter']) => `${meter?.numerator ?? 4}/${meter?.denominator ?? 4}`;
+function midiMeter(meter: ExchangeScore['meter']): TimedEvent {
+  const { numerator, denominator } = meter ?? { numerator: 4, denominator: 4 };
+  return { tick: 0, order: -1, event: event({ type: 'timeSignature', numerator, denominator, metronome: 24, thirtyseconds: 8 }) };
+}
 function midiTempo(bpm: number): number {
   const value = Math.round(60000000 / bpm);
   if (value < 1 || value > 0xffffff) throw new Error('MIDI 文件最低约支持 3.58 BPM。请提高速度，或另存为 .rootsound 保留当前速度。');
@@ -124,7 +135,10 @@ export function createMidiPatcher(source: Uint8Array, baseline: ExchangeScore) {
       // New notes must use their source channel's current volume and pan.
       if(!before&&(Math.abs(note.level-1)>1e-8||Math.abs(note.pan)>1e-8))return undefined;
     }
-    const output=tracks.map(items=>items.filter(item=>!['noteOn','noteOff','setTempo','endOfTrack'].includes(item.event.type)).map(item=>({...item})));
+    const meterChanged = meterKey(current.meter) !== meterKey(baseline.meter);
+    const output=tracks.map(items=>items.filter(item=>!['noteOn','noteOff','setTempo','endOfTrack'].includes(item.event.type)
+      && !(meterChanged && item.event.type === 'timeSignature')).map(item=>({...item})));
+    if (meterChanged) output[0]!.push(midiMeter(current.meter));
     for(const point of current.tempos)output[0]!.push({tick:Math.round(point.beat*ppq),order:-1,event:event({type:'setTempo',microsecondsPerBeat:midiTempo(point.bpm)})});
     let pedalMoved=false;
     const pedal=tracks.flat().some(item=>item.event.type==='controller'&&item.event.controllerType===64);
@@ -154,13 +168,15 @@ export function writeExchangeMidi(score: ExchangeScore, source?: Uint8Array): { 
   const ppq = 9600, warnings = new Set<string>();
   const conductor: TimedEvent[] = score.tempos.map(point => ({ tick: Math.round(point.beat * ppq), order: 0,
     event: event({ type: 'setTempo', microsecondsPerBeat: midiTempo(point.bpm) }) }));
+  const meterChanged = source ? meterKey(score.meter) !== meterKey(readExchangeMidi(source, score.name).score.meter) : !!score.meter;
+  if (meterChanged) conductor.push(midiMeter(score.meter));
   if (source) {
     const original = parseRawMidi(unwrapMidi(source)), sourcePpq = original.header.ticksPerBeat!;
     for (const track of original.tracks) {
       let tick = 0;
       for (const item of track) {
         tick += item.deltaTime;
-        if (['trackName', 'setTempo', 'endOfTrack'].includes(item.type)) continue;
+        if (['trackName', 'setTempo', 'endOfTrack'].includes(item.type) || meterChanged && item.type === 'timeSignature') continue;
         if ('channel' in item || item.type === 'sysEx' || item.type === 'endSysEx') {
           if (item.type==='sysEx'||item.type==='endSysEx'||item.type==='controller'&&[0,32].includes(item.controllerType)&&item.value!==0) warnings.add('设备专用的音源设置与自定义音色库选择无法写回；标准演奏控制信息会保留。');
           continue;

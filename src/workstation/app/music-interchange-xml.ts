@@ -1,5 +1,6 @@
 import { DOMParser, type Element } from '@xmldom/xmldom';
 import { unzipSync, zipSync, strToU8, strFromU8 } from 'fflate';
+import { isSupportedMeter } from '../contracts/phrase-time.ts';
 import type { ExchangeNote, ExchangeScore } from './music-interchange-model.ts';
 
 const MAX_XML_BYTES = 32 * 1024 * 1024;
@@ -42,7 +43,7 @@ export function readExchangeXml(bytes: Uint8Array, name: string, compressed: boo
   if (!root || !['score-partwise', 'score-timewise'].includes(root.localName ?? '')) throw new Error('这个 XML 不是 MusicXML 乐谱。');
   const partList = child(root, 'part-list'); if (!partList) throw new Error('MusicXML 缺少声部列表。');
   const warnings = new Set<string>(), parts: ExchangeScore['parts'] = [], tempoMap = new Map<number, number>([[0, 120]]);
-  let scoreLength = .25;
+  let scoreLength = .25, initialMeter: ExchangeScore['meter'];
   for (const definition of children(partList, 'score-part')) {
     const partId = definition.getAttribute('id')!, title = text(definition, 'part-name') || partId;
     const instruments = children(definition, 'midi-instrument');
@@ -66,7 +67,15 @@ export function readExchangeXml(bytes: Uint8Array, name: string, compressed: boo
           const time = child(item, 'time');
           if (time) {
             const beats = text(time, 'beats').split('+').reduce((sum, part) => sum + Number(part), 0);
-            if (beats) barLength = positive(beats * 4 / positive(numeric(time, 'beat-type', 4), 'beat-type'), '小节长度');
+            if (beats) {
+              const denominator = positive(numeric(time, 'beat-type', 4), 'beat-type');
+              barLength = positive(beats * 4 / denominator, '小节长度');
+              if (!isSupportedMeter(beats, denominator)) warnings.add('文件中有超出支持范围的拍号。');
+              else if (position === 0 && cursor === 0 && !initialMeter) initialMeter = { numerator: beats, denominator };
+              else if (beats !== (initialMeter?.numerator ?? 4) || denominator !== (initialMeter?.denominator ?? 4)) {
+                warnings.add('文件中有不同的拍号，网格使用开头的拍号。');
+              }
+            }
           }
           const trans = child(item, 'transpose'); if (trans) transpose = numeric(trans, 'chromatic') + numeric(trans, 'octave-change') * 12;
         } else if (item.localName === 'backup') cursor -= numeric(item, 'duration') / divisions;
@@ -126,17 +135,20 @@ export function readExchangeXml(bytes: Uint8Array, name: string, compressed: boo
   if (root.getElementsByTagName('repeat').length) warnings.add('反复记号暂按谱面顺序播放一遍。');
   if (root.getElementsByTagName('ornaments').length || root.getElementsByTagName('articulations').length) warnings.add('装饰音及部分演奏法未转成发声效果。');
   const tempos = [...tempoMap].sort((a, b) => a[0] - b[0]).filter(([beat]) => beat < scoreLength).map(([beat, bpm]) => ({ beat, bpm }));
-  return { score: { name, length: scoreLength, tempos, parts }, warnings: [...warnings] };
+  const meter = initialMeter && (initialMeter.numerator !== 4 || initialMeter.denominator !== 4) ? initialMeter : undefined;
+  return { score: { name, length: scoreLength, tempos, parts, ...(meter ? { meter } : {}) }, warnings: [...warnings] };
 }
 const escape = (value: string) => value.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;');
 /** Each note has its own voice, so arbitrary overlaps do not become accidental chords. */
 export function writeExchangeXml(score: ExchangeScore, compressed: boolean): Uint8Array {
   if (!score.parts.length) score = { ...score, parts: [{ name: '音乐', program: 0, notes: [] }] };
+  const { numerator, denominator } = score.meter ?? { numerator: 4, denominator: 4 };
+  const barLength = numerator * 4 / denominator;
   const divisions = 9600, ticks = (beat: number) => Math.round(beat * divisions);
   const definitions = score.parts.map((part, i) => `<score-part id="P${i}"><part-name>${escape(part.name)}</part-name><score-instrument id="I${i}"><instrument-name>${escape(part.name)}</instrument-name></score-instrument><midi-instrument id="I${i}"><midi-channel>${part.drum === undefined ? i % 9 + 1 : 10}</midi-channel><midi-program>${part.program + 1}</midi-program>${part.drum === undefined ? '' : `<midi-unpitched>${part.drum + 1}</midi-unpitched>`}</midi-instrument></score-part>`).join('');
   const parts = score.parts.map((part, i) => {
-    const bars = Array.from({ length: Math.max(1, Math.ceil(score.length / 4)) }, (_, bar) => {
-      const start = bar * 4, length = Math.min(4, score.length - start), finish = start + length;
+    const bars = Array.from({ length: Math.max(1, Math.ceil(score.length / barLength)) }, (_, bar) => {
+      const start = bar * barLength, length = Math.min(barLength, score.length - start), finish = start + length;
       const tempi = i ? '' : score.tempos.filter(point => point.beat >= start && point.beat < finish).map(point => `<sound tempo="${point.bpm}"><offset>${ticks(point.beat - start)}</offset></sound>`).join('');
       const notes = part.notes.map((note, index) => {
       if (note.beat >= finish || note.beat + note.duration <= start) return '';
@@ -151,7 +163,7 @@ export function writeExchangeXml(score: ExchangeScore, compressed: boolean): Uin
       const ties = `${note.beat < start ? '<tie type="stop"/>' : ''}${note.beat + note.duration > finish ? '<tie type="start"/>' : ''}`;
       return `${offset ? `<forward><duration>${offset}</duration></forward>` : ''}<sound dynamics="${note.velocity * note.level * 100}"><midi-instrument id="I${i}"><volume>100</volume><pan>${note.pan * 90}</pan></midi-instrument></sound><note>${pitch}<duration>${gate}</duration>${ties}<instrument id="I${i}"/><voice>${index + 1}</voice></note><backup><duration>${offset + gate}</duration></backup>`;
     }).join('');
-      return `<measure number="${bar+1}"${length<4?' implicit="yes"':''}>${bar?'':`<attributes><divisions>${divisions}</divisions><time><beats>4</beats><beat-type>4</beat-type></time></attributes>`}${tempi}${notes}<forward><duration>${ticks(length)}</duration></forward></measure>`;
+      return `<measure number="${bar+1}"${length<barLength?' implicit="yes"':''}>${bar?'':`<attributes><divisions>${divisions}</divisions><time><beats>${numerator}</beats><beat-type>${denominator}</beat-type></time></attributes>`}${tempi}${notes}<forward><duration>${ticks(length)}</duration></forward></measure>`;
     }).join('');
     return `<part id="P${i}">${bars}</part>`;
   }).join('');

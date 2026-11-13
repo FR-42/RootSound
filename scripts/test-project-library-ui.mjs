@@ -14,7 +14,7 @@ await fs.writeFile(entry, `<!doctype html><html lang="zh-CN"><meta charset="utf-
 import {mountProjectLibrary} from '/src/workstation/modules/ui-rendering/project-library.ts';
 import '/src/workstation/modules/ui-rendering/studio.css'; import '/src/workstation/modules/ui-rendering/theme.css';
 const root='D:/RootSound/project', folder=root+'/my music', midiFolder=root+'/MIDI';
-window.fixture={opened:[],browsed:[],errors:[],root,folder,midiFolder};addEventListener('error',e=>fixture.errors.push(e.message));addEventListener('unhandledrejection',e=>fixture.errors.push(String(e.reason)));
+window.fixture={opened:[],browsed:[],revealed:[],errors:[],root,folder,midiFolder};addEventListener('error',e=>fixture.errors.push(e.message));addEventListener('unhandledrejection',e=>fixture.errors.push(String(e.reason)));
 let project={kind:'project',id:'p',name:'我的歌曲',path:folder+'/我的歌曲.rootsound'};
 const pages={
  [root]:{root,path:root,entries:[{kind:'folder',name:'my music',path:folder},{kind:'folder',name:'MIDI',path:midiFolder},{kind:'folder',name:'空文件夹',path:root+'/空文件夹'}]},
@@ -25,6 +25,7 @@ const pages={
 window.library=mountProjectLibrary(document.querySelector('#app'),document.querySelector('#start'),{
  browse:async(path=root)=>{fixture.browsed.push(path);await new Promise(r=>setTimeout(r,5));return structuredClone(pages[path]);},
  list:async()=>{throw Error('Unexpected recursive scan')},open:async path=>{fixture.opened.push(path??'picker');},
+ reveal:async entry=>{fixture.revealed.push(entry.path);},
  rename:async(old,name)=>{project={...old,kind:'project',name,path:folder+'/'+name+'.rootsound'};pages[folder].entries[0]=project;return project;},
  remove:async()=>{pages[folder].entries=pages[folder].entries.filter(e=>e.kind!=='project');},
 },()=>{fixture.newProject=true},100);
@@ -48,13 +49,30 @@ const delay=ms=>new Promise(r=>setTimeout(r,ms));let win,checks=0,stage='start';
  const js=code=>win.webContents.executeJavaScript(code);const check=(value,label)=>{assert(value,label);checks++};
  async function wait(code){for(let i=0;i<200;i++){if(await js(code).catch(()=>false))return;await delay(20)}throw Error('Timeout '+stage)};
  const click=selector=>js('document.querySelector('+JSON.stringify(selector)+').click()');
+ const drag=async (start,end,y)=>{
+  const send=(type,x,buttons)=>win.webContents.debugger.sendCommand('Input.dispatchMouseEvent',{type,x,y,button:'left',buttons,clickCount:1});
+  await send('mousePressed',start,1);await send('mouseMoved',end,1);await send('mouseReleased',end,0);
+ };
  const capture=async name=>{await delay(100);win.webContents.invalidate();await delay(60);fs.writeFileSync(path.join(evidence,name),(await win.webContents.capturePage()).toPNG())};
  await win.loadURL(url);await wait('window.fixtureReady');await delay(150);stage='root';await click('#start');await wait("document.querySelectorAll('.project-library-folder').length===3");
- check(await js("document.querySelectorAll('.project-library-song,.project-library-midi').length===0"),'root is not flattened');check(await js("[...document.querySelectorAll('.project-library h2,.project-library-navigation button')].filter(n=>n.textContent==='乐曲库'&&!n.closest('[hidden]')).length===1"),'single library title');check(await js("getComputedStyle(document.querySelector('.project-library-folder')).borderTopWidth==='0px'"),'rows have no file boxes');check(await js("!document.querySelector('.project-library-columns,.project-library-count')"),'no column labels or item count');check(await js("getComputedStyle(document.querySelector('.project-library-folder'),'::before').maskImage!=='none'&&['none','normal'].includes(getComputedStyle(document.querySelector('.project-library-folder'),'::after').content)"),'left icons without a type column');await capture('root.png');
+ win.webContents.debugger.attach('1.3');
+ const titleBox=await js("(()=>{const range=document.createRange();range.selectNodeContents(document.querySelector('.project-library h2'));return range.getBoundingClientRect().toJSON()})()");
+ await drag(titleBox.left+1,titleBox.right-1,titleBox.y+titleBox.height/2);
+ check(await js("getSelection().toString()===''"),'fixed library title cannot be drag-selected');
+ check(await js("document.querySelectorAll('.project-library-song,.project-library-midi').length===0"),'root is not flattened');check(await js("[...document.querySelectorAll('.project-library h2,.project-library-navigation button')].filter(n=>n.textContent==='乐曲库'&&!n.closest('[hidden]')).length===1"),'single library title');check(await js("getComputedStyle(document.querySelector('.project-library-folder')).borderTopWidth==='0px'"),'rows have no file boxes');check(await js("!document.querySelector('.project-library aside')"),'no directory overview');check(await js("(()=>{const list=document.querySelector('.project-library-grid'),header=document.querySelector('.project-library-header');return list.getBoundingClientRect().width===header.getBoundingClientRect().width})()"),'file list uses the full width');check(await js("getComputedStyle(document.querySelector('.project-library-folder'),'::before').maskImage!=='none'&&['none','normal'].includes(getComputedStyle(document.querySelector('.project-library-folder'),'::after').content)"),'left icons without a type column');await capture('root.png');
  stage='folder';await click('.project-library-grid button[aria-label="打开文件夹 my music"]');await wait("document.querySelectorAll('.project-library-midi').length===1");
  check(await js("document.querySelector('.project-library-song').textContent==='我的歌曲'"),'project visible');check(await js("!document.querySelector('.project-library-midi').draggable"),'MIDI cannot be dragged to project deletion');
+ stage='reveal';await js("document.querySelector('.project-library-song').dispatchEvent(new MouseEvent('contextmenu',{bubbles:true,cancelable:true,clientX:320,clientY:270}))");
+ await wait("!document.querySelector('.project-library-context').hidden");
+ check(await js("[...document.querySelectorAll('.project-library-context button')].map(button=>button.textContent).join('|')==='改名|打开所在文件夹|删除'"),'context menu offers file location');
+ await click('button[aria-label="打开所在文件夹 我的歌曲"]');
+ await wait("fixture.revealed.length===1&&document.querySelector('.project-library').getAttribute('aria-busy')==='false'");
+ check(await js("fixture.revealed[0]===fixture.folder+'/我的歌曲.rootsound'&&fixture.opened.length===0&&!document.querySelector('.project-library-overlay').hidden"),'reveal uses the original path without opening the score or closing the library');
  await capture('folder.png');check(await js("(()=>{const n=document.querySelector('.project-library-navigation button');n.focus();const event=new KeyboardEvent('keydown',{bubbles:true,cancelable:true,key:'Tab'});n.dispatchEvent(event);return !event.defaultPrevented})()"),'folder navigation participates in keyboard focus');await click('.project-library-midi');await delay(40);check(await js("fixture.opened[0]===fixture.folder+'/参考乐曲.mid'"),'MIDI opens exact path');
  stage='rename';await js("document.querySelector('.project-library-song').dispatchEvent(new MouseEvent('dblclick',{bubbles:true,cancelable:true}))");await wait("!!document.querySelector('.project-library-name')");
+ const inputBox=await js("(()=>{const input=document.querySelector('.project-library-name'),box=input.getBoundingClientRect();input.setSelectionRange(0,0);return {x:box.left+parseFloat(getComputedStyle(input).paddingLeft),y:box.y+box.height/2}})()");
+ await drag(inputBox.x+1,inputBox.x+100,inputBox.y);
+ check(await js("(()=>{const input=document.querySelector('.project-library-name');return input.selectionStart===0&&input.selectionEnd===input.value.length})()"),'editable song names can be drag-selected');
  check(await js("(()=>{const n=document.querySelector('.project-library-name'),e=new KeyboardEvent('keydown',{bubbles:true,cancelable:true,key:'ArrowRight'});n.focus();n.dispatchEvent(e);return !e.defaultPrevented&&document.querySelector('.project-library-name')===n})()"),'rename keeps arrow-key text editing');
  await js("(()=>{const n=document.querySelector('.project-library-name');n.value='新的名字';n.dispatchEvent(new KeyboardEvent('keydown',{bubbles:true,key:'Enter'}))})()");await wait("document.querySelector('.project-library-song')?.textContent==='新的名字'");checks++;
  stage='delete';await js("(()=>{const dataTransfer=new DataTransfer();document.querySelector('.project-library-song').dispatchEvent(new DragEvent('dragstart',{bubbles:true,dataTransfer}));document.querySelector('.project-library-trash').dispatchEvent(new DragEvent('drop',{bubbles:true,cancelable:true,dataTransfer}))})()");await wait("!document.querySelector('.project-delete-overlay').hidden");

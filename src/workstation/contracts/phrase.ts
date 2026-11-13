@@ -1,11 +1,16 @@
 import type { ContentRecord, Draft, SaveConfirmation, SaveResult } from './content.ts';
 import type { PlayableNotePlan, SoundPlan, SoundSequencePlan } from './sound.ts';
 import type { MidiExpressionLane } from './midi-expression.ts';
+import type { CurveControls, PerformanceCurve } from './gain-curve.ts';
 
 /** Legacy default. Each phrase can choose its own editing resolution without retiming notes. */
 export const PHRASE_STEPS_PER_BEAT = 4;
 
 /** Omitted older phrases retain four cells per beat; explicit choices are validated. */
+export function phraseNotePan(part: Pick<PhrasePart, 'pan'>, note: Pick<PhraseNote, 'pan'>): number {
+  return Math.max(-1, Math.min(1, (part.pan ?? 0) + (note.pan ?? 0)));
+}
+
 export function phraseStepsPerBeat(body?: Pick<PhraseBody, 'stepsPerBeat'>): number {
   const steps = body?.stepsPerBeat === undefined ? PHRASE_STEPS_PER_BEAT : body.stepsPerBeat;
   if (!Number.isInteger(steps) || steps < 2 || steps > 9) throw new Error('每拍细分的份数必须是 2 至 9 的整数。');
@@ -32,10 +37,13 @@ export type PhraseNote = {
   midiChannelId?: string | null;
 };
 export type PhraseSection = 'melody' | 'rhythm';
+export type PhraseGainPoint = { beat: number; db: number } & CurveControls;
 /** Older unmarked parts belong to Melody; both sections share one phrase clock. */
 export type PhrasePart = {
   id: string; name: string; timbreId: string; section?: PhraseSection;
   level?: number; pan?: number;
+  gainCurve?: PhraseGainPoint[];
+  performanceCurves?: Partial<Record<PerformanceCurve, PhraseGainPoint[]>>;
   /** Unassigned tone uses keep notes and origin identity for rebinding but remain silent. */
   unassigned?: boolean;
   notes: PhraseNote[];
@@ -57,8 +65,8 @@ export type PhraseBody = {
   lengthBeats: number;
   /** Editing cells per beat only; changing this never quantizes existing notes. Omitted values are four. */
   stepsPerBeat?: number;
-  /** Quarter-note beats per bar; omitted legacy scores use four. */
   beatsPerBar?: number;
+  beatUnit?: number;
   /** Initial incomplete bar, in quarter-note beats. */
   pickupBeats?: number;
   /** Phrase output gain; omitted older content uses unity gain. */
@@ -97,7 +105,9 @@ export interface PhraseEditorPort {
   openDraft(draftId: string): void;
   rename(name: string): void;
   setTempo(tempoBpm: number, options?: { preserveNoteDurations?: boolean }): void;
+  setMeter(beatsPerBar: number, beatUnit: number): void;
   addTempoSection(): string;
+  removeTempoSection(id: string): void;
   setTempoSection(id: string, tempoBpm: number): void;
   /** Change one roll's grid, retaining all note timing and other rolls' resolutions. */
   setTempoSectionSteps(id: string | undefined, stepsPerBeat: number): void;
@@ -112,6 +122,8 @@ export interface PhraseEditorPort {
   addPart(timbreId: string, section?: PhraseSection): string;
   setPartTimbre(partId: string, timbreId: string): void;
   setPartMix(partId: string, changes: { level?: number; pan?: number }): void;
+  setPartGainCurve(partId: string, points: readonly PhraseGainPoint[]): void;
+  setPartPerformanceCurve(partId: string, kind: PerformanceCurve, points: readonly PhraseGainPoint[]): void;
   /** Unselecting a tone preserves its notes as silent, undefined tone uses. */
   setPartVisible(partId: string, visible: boolean): void;
   /** Related duplicate uses toggle together in one undo step. */

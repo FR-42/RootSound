@@ -90,6 +90,7 @@ export function createProjectSetup(directories: ProjectDirectoriesPort, enter: (
     ...(directories.createFolder ? { createFolder: (path: string, name: string) => exclusive(() => directories.createFolder!(path, projectName(name))) } : {}),
     ...(directories.renameEntry ? { renameEntry: (path: string, name: string) => exclusive(() => directories.renameEntry!(path, projectName(name))) } : {}),
     ...(directories.removeEntry ? { removeEntry: (path: string) => exclusive(() => directories.removeEntry!(path)) } : {}),
+    ...(directories.reveal ? { reveal: (entry: Parameters<NonNullable<ProjectDirectoriesPort['reveal']>>[0]) => exclusive(() => directories.reveal!(entry)) } : {}),
     ...(source && directories.browse ? { async readSaveSource() { return (await directories.read()).current; } } : {}),
     open: path => exclusive(async () => {
       const result = await directories.open(path);

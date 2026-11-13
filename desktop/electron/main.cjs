@@ -1,4 +1,4 @@
-const { app, BrowserWindow, protocol, ipcMain, dialog, Menu } = require('electron');
+const { app, BrowserWindow, protocol, ipcMain, dialog, Menu, shell, nativeTheme } = require('electron');
 const fs = require('node:fs');
 const fsp = require('node:fs/promises');
 const path = require('node:path');
@@ -64,6 +64,14 @@ async function invoke(method, args) {
   if (method === 'project.Open') return openFile('project');
   if (method === 'timbres.Open') return openFile('timbre');
   if (method === 'audio.Save') return exportAudio(...args);
+  if (method === 'project.RevealLibrarySong') {
+    const [source, id] = args;
+    if (typeof source !== 'string' || typeof id !== 'string' || !path.isAbsolute(source)) throw new Error('请重新选择乐曲库中的歌曲。');
+    const item = readResponse(await host.call('project.ResolveLibrarySongPath', [source, id]));
+    if (item.status !== 'ready' || typeof item.path !== 'string' || !path.isAbsolute(item.path)) throw new Error('无法找到乐曲所在的文件夹。');
+    shell.showItemInFolder(item.path);
+    return JSON.stringify({ status: 'ready' });
+  }
   if (method === 'project.ChooseLocation') return pick(async () => {
     const selected = await dialog.showOpenDialog(window, { title: '选择项目保存位置', defaultPath: args[0] || lastDirectory,
       properties: ['openDirectory', 'createDirectory'] });
@@ -128,6 +136,9 @@ app.whenReady().then(async () => {
   readResponse(await host.call('project.Read'));
   protocol.handle('https', resource);
   window = new BrowserWindow({ title: 'RootSound', icon: path.join(base, 'icon.png'), width: 1280, height: 850, minWidth: 800, minHeight: 560, backgroundColor: '#fafbfd', show: false,
+    ...(process.platform === 'win32' && !nativeTheme.shouldUseHighContrastColors ? {
+      titleBarStyle: 'hidden', titleBarOverlay: { color: '#eff6fa', symbolColor: '#35566a', height: 32 },
+    } : {}),
     webPreferences: { preload: path.join(base, 'preload.cjs'), contextIsolation: true, sandbox: true, nodeIntegration: false, webSecurity: true } });
   window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   window.webContents.on('will-navigate', (event, url) => { if (new URL(url).origin !== ORIGIN) event.preventDefault(); });

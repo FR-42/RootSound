@@ -82,6 +82,27 @@ public sealed partial class ProjectDirectoryManager
         }
     }
 
+    public string ResolveLibrarySongPath(string path, string expectedId)
+    {
+        lock (gate)
+        {
+            ThrowIfDisposed();
+            path = FullDirectory(path);
+            if (expectedId.Length == 0)
+            {
+                path = RequireLibraryEntry(path);
+                if (!File.Exists(path)) throw new IOException("请选择乐曲文件。");
+                return path;
+            }
+            if (!Guid.TryParse(expectedId, out _) || !IsKnownProjectPath(path))
+                throw new IOException("请重新选择乐曲库中的歌曲。");
+            bool file = File.Exists(path);
+            var project = file ? ReadEnvelope(path).Project : ReadManifest(path);
+            if (project.Id != expectedId) throw new IOException("这个位置的歌曲已被替换，请重新选择。");
+            return file ? path : Path.Combine(path, "project.json");
+        }
+    }
+
     public void CreateLibraryFolder(string path, string name)
     {
         lock (gate)

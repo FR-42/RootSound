@@ -1,13 +1,14 @@
 import { readMidiExpressionMessage, MAX_MIDI_EXPRESSION_EVENTS, type MidiExpressionLane } from '../../contracts/midi-expression.ts';
-import { phraseExpression } from '../../contracts/phrase-expression.ts';
+import { phraseExpression, phrasePartTouch } from '../../contracts/phrase-expression.ts';
 import type { ContentRecord, Draft, MaterialLibrary } from '../../contracts/content.ts';
 import type { KeyboardPitch, PhraseBody, PhraseEditorPort, PhraseNote, PhrasePart, PhrasePlaybackPort, PhraseSection } from '../../contracts/phrase.ts';
 import type { SoundPlan, SoundSequencePlan } from '../../contracts/sound.ts';
 import type { TimbrePlaybackPort } from '../../contracts/timbre.ts';
 import type { ReferenceAdapter } from '../../contracts/references.ts';
 import { MAX_PHRASE_BEATS, MAX_PHRASE_NOTES, MIN_NOTE_BEATS, MIN_NOTE_SECONDS } from '../../contracts/phrase-limits.ts';
-import { phraseStepsPerBeat } from '../../contracts/phrase.ts';
-import { phraseBeatSeconds, phraseDurationSeconds, phraseHeldSeconds, phraseHeldBeats } from '../../contracts/phrase-time.ts';
+import { phraseNotePan, phraseStepsPerBeat } from '../../contracts/phrase.ts';
+import { isSupportedMeter, phraseBarBeats, phraseBeatSeconds, phraseDurationSeconds, phraseGainTimeline, phraseHeldSeconds, phraseHeldBeats } from '../../contracts/phrase-time.ts';
+import { CURVE_LIMITS, isPedalCurve, MAX_GAIN_CURVE_POINTS, PERFORMANCE_CURVES, type CurveKind } from '../../contracts/gain-curve.ts';
 import { resizeTempoRoll } from './tempo-roll-resize.ts';
 import { MIN_TEMPO_BPM, MAX_TEMPO_BPM, MIN_PITCH_HZ, MAX_PITCH_HZ, MIN_MIDI_PITCH, MAX_MIDI_PITCH } from '../../contracts/music-limits.ts';
 
@@ -20,20 +21,22 @@ const OWNER = 'phrase';
 const MAX_PARTS = 128;
 
 /** Tempo edits retain musical lengths, including old notes stored in seconds. */
-function retimeHeldNotes(body:PhraseBody, change:()=>void):void {
+function retimeHeldNotes(body:PhraseBody, change:()=>void, maxSeconds = Infinity):void {
   const before=structuredClone(body);
   const held=new Map(body.parts.flatMap(part=>part.notes.map(note=>[note.id,phraseHeldBeats(before,note.startBeat,phraseHeldSeconds(before,note))] as const)));
+  const hiddenSections = new Map(body.parts.flatMap(part => (part.hiddenNotes ?? []).map(item => [item.note.id, item.sectionId] as const)));
   change();
   for(const part of body.parts) {
     for(const note of part.notes) {
       const beats=held.get(note.id)!;
       note.durationBeats=Math.max(MIN_NOTE_BEATS,Math.min(body.lengthBeats-note.startBeat,beats));
-      note.durationSeconds=Math.max(MIN_NOTE_SECONDS,phraseBeatSeconds(body,note.startBeat+beats)-phraseBeatSeconds(body,note.startBeat));
+      note.durationSeconds=Math.min(maxSeconds,Math.max(MIN_NOTE_SECONDS,phraseBeatSeconds(body,note.startBeat+beats)-phraseBeatSeconds(body,note.startBeat)));
     }
     for(const hidden of part.hiddenNotes??[]) {
-      const oldTempo=hidden.sectionId==='first'?before.tempoBpm:before.tempoSections!.find(section=>section.id===hidden.sectionId)!.tempoBpm;
+      const oldId = hiddenSections.get(hidden.note.id);
+      const oldTempo=oldId==='first'?before.tempoBpm:before.tempoSections!.find(section=>section.id===oldId)!.tempoBpm;
       const newTempo=hidden.sectionId==='first'?body.tempoBpm:body.tempoSections!.find(section=>section.id===hidden.sectionId)!.tempoBpm;
-      hidden.note.durationSeconds=hidden.note.durationSeconds!*oldTempo/newTempo;
+      hidden.note.durationSeconds=Math.min(maxSeconds,Math.max(MIN_NOTE_SECONDS,hidden.note.durationSeconds!*oldTempo/newTempo));
     }
   }
 }
@@ -95,12 +98,16 @@ function partSection(value: unknown): PhraseSection {
 /** Strict reads reject unknown fields rather than silently truncating future content. */
 export function readPhraseBody(value: unknown): PhraseBody {
   const body = object(value, '音乐');
-  fields(body, ['model', 'version', 'timeUnit', 'tempoBpm', 'tempoSections', 'lengthBeats', 'stepsPerBeat', 'beatsPerBar', 'pickupBeats', 'masterLevel', 'parts', 'midiExpression'], '音乐');
+  fields(body, ['model', 'version', 'timeUnit', 'tempoBpm', 'tempoSections', 'lengthBeats', 'stepsPerBeat', 'beatsPerBar', 'beatUnit', 'pickupBeats', 'masterLevel', 'parts', 'midiExpression'], '音乐');
   if (body.model !== 'note-phrase' || body.version !== 1 || body.timeUnit !== 'beat') {
     throw new Error('暂不支持这份音乐的格式或版本。原内容已保留。');
   }
   const tempoBpm = number(body.tempoBpm, '速度', MIN_TEMPO_BPM, MAX_TEMPO_BPM);
   const lengthBeats = number(body.lengthBeats, '音乐长度', 0.25, MAX_PHRASE_BEATS);
+  const beatsPerBar = body.beatsPerBar === undefined ? undefined : number(body.beatsPerBar, '每小节拍数', 1, 16);
+  const beatUnit = body.beatUnit === undefined ? undefined : number(body.beatUnit, '拍号分母', 1, 32);
+  if (!isSupportedMeter(beatsPerBar ?? 4, beatUnit ?? 4)) throw new Error('拍号超出当前支持范围。');
+  const bar = phraseBarBeats({ beatsPerBar, beatUnit });
   let previousStart = 0;
   const sectionIds = new Set<string>();
   const tempoSections = body.tempoSections === undefined ? undefined : (() => {
@@ -111,15 +118,13 @@ export function readPhraseBody(value: unknown): PhraseBody {
       if (id === 'first' || sectionIds.has(id) || startBeat <= previousStart || startBeat >= lengthBeats) throw new Error('BPM卷帘必须按时间连续排列。');
       sectionIds.add(id); previousStart = startBeat;
       return { id, startBeat, tempoBpm: number(value.tempoBpm, 'BPM卷帘速度', MIN_TEMPO_BPM, MAX_TEMPO_BPM),
-        ...(value.gridOffsetBeats === undefined ? {} : { gridOffsetBeats: number(value.gridOffsetBeats, 'BPM卷帘网格偏移', 0, 16) }),
+        ...(value.gridOffsetBeats === undefined ? {} : { gridOffsetBeats: number(value.gridOffsetBeats, 'BPM卷帘网格偏移', 0, 64) }),
         ...(value.stepsPerBeat === undefined ? {} : { stepsPerBeat: phraseStepsPerBeat({ stepsPerBeat: value.stepsPerBeat as number }) }) };
     });
   })();
   const stepsPerBeat = body.stepsPerBeat === undefined ? undefined : phraseStepsPerBeat({ stepsPerBeat: body.stepsPerBeat as number });
-  const beatsPerBar = body.beatsPerBar === undefined ? undefined : number(body.beatsPerBar, '每小节拍数', 1, 16);
-  if (beatsPerBar !== undefined && !Number.isInteger(beatsPerBar)) throw new Error('每小节拍数必须是整数。');
-  const pickupBeats = body.pickupBeats === undefined ? undefined : number(body.pickupBeats, '弱起拍数', 0, beatsPerBar ?? 4);
-  if (pickupBeats !== undefined && pickupBeats >= (beatsPerBar ?? 4)) throw new Error('弱起拍数必须少于一小节。');
+  const pickupBeats = body.pickupBeats === undefined ? undefined : number(body.pickupBeats, '弱起拍数', 0, bar);
+  if (pickupBeats !== undefined && pickupBeats >= bar) throw new Error('弱起拍数必须少于一小节。');
   const masterLevel = body.masterLevel === undefined ? undefined : number(body.masterLevel, '音乐音量', 0, 1);
   if (!Array.isArray(body.parts) || body.parts.length > MAX_PARTS) {
     throw new Error(`当前音乐最多可使用 ${MAX_PARTS} 个声音。`);
@@ -159,7 +164,7 @@ export function readPhraseBody(value: unknown): PhraseBody {
   })();
   const parts: PhrasePart[] = body.parts.map(raw => {
     const part = object(raw, '音乐中的声音');
-    fields(part, ['id', 'name', 'timbreId', 'section', 'unassigned', 'notes', 'hiddenNotes', 'midiChannelId', 'level', 'pan'], '音乐中的声音');
+    fields(part, ['id', 'name', 'timbreId', 'section', 'unassigned', 'notes', 'hiddenNotes', 'midiChannelId', 'level', 'pan', 'gainCurve', 'performanceCurves'], '音乐中的声音');
     const id = unique(part.id, '声音标识');
     const name = text(part.name, '声音名称');
     const timbreId = text(part.timbreId, '引用声音标识');
@@ -196,6 +201,13 @@ export function readPhraseBody(value: unknown): PhraseBody {
       };
     }
     const notes = part.notes.map(rawNote => readNote(rawNote));
+    const gainCurve = part.gainCurve === undefined ? undefined : readGainCurve(part.gainCurve);
+    const rawCurves = part.performanceCurves === undefined ? {} : object(part.performanceCurves, '演奏曲线');
+    fields(rawCurves, PERFORMANCE_CURVES, '演奏曲线');
+    const performanceCurves = Object.fromEntries(PERFORMANCE_CURVES.flatMap(kind => {
+      const points = rawCurves[kind] === undefined ? [] : readGainCurve(rawCurves[kind], kind);
+      return points.length ? [[kind, points]] : [];
+    }));
     const hiddenNotes = (part.hiddenNotes as unknown[] | undefined)?.map(raw => {
       const item = object(raw, '被隐藏的音符'); fields(item, ['sectionId', 'note'], '被隐藏的音符');
       const sectionId = text(item.sectionId, '音符所属卷帘');
@@ -206,6 +218,8 @@ export function readPhraseBody(value: unknown): PhraseBody {
     });
     return { id, name, timbreId,
       ...(part.level === undefined ? {} : { level: number(part.level, '音色音量', 0, 1) }),
+      ...(gainCurve?.length ? { gainCurve } : {}),
+      ...(Object.keys(performanceCurves).length ? { performanceCurves } : {}),
       ...(part.pan === undefined ? {} : { pan: number(part.pan, '音色声像', -1, 1) }), ...(midiChannelId === undefined ? {} : { midiChannelId }), ...(section === undefined ? {} : { section }),
       ...(part.unassigned === undefined ? {} : { unassigned: part.unassigned }), notes,
       ...(hiddenNotes?.length ? { hiddenNotes } : {}) };
@@ -214,8 +228,26 @@ export function readPhraseBody(value: unknown): PhraseBody {
     ...(tempoSections === undefined ? {} : { tempoSections }),
     ...(stepsPerBeat === undefined ? {} : { stepsPerBeat }),
     ...(beatsPerBar === undefined ? {} : { beatsPerBar }),
+    ...(beatUnit === undefined ? {} : { beatUnit }),
     ...(pickupBeats === undefined ? {} : { pickupBeats }),
     ...(masterLevel === undefined ? {} : { masterLevel }), ...(midiExpression === undefined ? {} : { midiExpression }), parts };
+}
+
+function readGainCurve(value: unknown, kind: CurveKind = 'gain'): NonNullable<PhrasePart['gainCurve']> {
+  if (!Array.isArray(value) || value.length > MAX_GAIN_CURVE_POINTS) throw new Error('曲线控制点数量超出范围。');
+  const limit = CURVE_LIMITS[kind], pedal = isPedalCurve(kind);
+  let previous = -1;
+  return value.map(raw => {
+    const point = object(raw, '音量增益控制点');
+    fields(point, pedal ? ['beat', 'db'] : ['beat', 'db', 'before', 'after'], '曲线控制点');
+    const beat = number(point.beat, '控制点位置', 0, MAX_PHRASE_BEATS);
+    if (beat <= previous) throw new Error('音量增益控制点必须按时间排列，且不能重叠。');
+    previous = beat;
+    const db = number(point.db, '控制点数值', pedal ? 0 : -limit, limit);
+    if (pedal && !Number.isInteger(db)) throw new Error('踏板只能开启或关闭。');
+    return { beat, db, ...(point.before === undefined ? {} : { before: number(point.before, '曲线形状', -limit, limit) }),
+      ...(point.after === undefined ? {} : { after: number(point.after, '曲线形状', -limit, limit) }) };
+  });
 }
 
 type Snapshot = { name: string; dependencies: string[]; body: PhraseBody };
@@ -225,9 +257,10 @@ async function preparePhraseSounds(body: PhraseBody, playback: TimbrePlaybackPor
   const sounds = new Map<string, Map<string, SoundPlan['note']>>();
   for (const part of body.parts) {
     if (part.unassigned) continue;
+    const touch = phrasePartTouch(body, part);
     for (const note of part.notes) {
       const input = { frequencyHz: note.frequencyHz,
-        holdSeconds: Math.max(MIN_NOTE_SECONDS, note.durationSeconds ?? phraseHeldSeconds(body, note) * ratio), velocity: note.velocity };
+        holdSeconds: Math.max(MIN_NOTE_SECONDS, note.durationSeconds ?? phraseHeldSeconds(body, note) * ratio), velocity: touch(note) };
       const unique = sounds.get(part.timbreId) ?? new Map<string, SoundPlan['note']>();
       unique.set(JSON.stringify([input.frequencyHz, input.holdSeconds, input.velocity]), input); sounds.set(part.timbreId, unique);
     }
@@ -279,23 +312,35 @@ function validatePhrase(record: Draft | ContentRecord, playback: TimbrePlaybackP
 function compilePhrase(body: PhraseBody, playback: TimbrePlaybackPort, tempoBpm = body.tempoBpm, allowSilence = false, midiEffects = true): SoundSequencePlan {
   number(tempoBpm, '速度', MIN_TEMPO_BPM, MAX_TEMPO_BPM);
   const ratio = body.tempoBpm / tempoBpm;
-  const performance = midiEffects ? phraseExpression(body, ratio) : undefined;
-  const events = body.parts.filter(part => !part.unassigned).flatMap(part => part.notes.map(note => {
+  const performance = phraseExpression(body, ratio, midiEffects);
+  const activeParts = body.parts.filter(part => !part.unassigned && part.notes.length);
+  const curveMap = (pick: (part: PhrasePart) => PhrasePart['gainCurve']) => Object.fromEntries(activeParts.flatMap(part => {
+    const points = pick(part);
+    return points?.some(point => point.db || point.before || point.after) ? [[part.id, phraseGainTimeline(body, points, ratio)]] : [];
+  }));
+  const gainCurves = curveMap(part => part.gainCurve), pitchCurves = curveMap(part => part.performanceCurves?.pitch);
+  const events = activeParts.flatMap(part => {
+    const touch = phrasePartTouch(body, part);
+    return part.notes.map(note => {
       let sound = playback.planForSaved(part.timbreId, { frequencyHz: note.frequencyHz,
-        holdSeconds: Math.max(MIN_NOTE_SECONDS, note.durationSeconds ?? phraseHeldSeconds(body, note) * ratio), velocity: note.velocity });
+        holdSeconds: Math.max(MIN_NOTE_SECONDS, note.durationSeconds ?? phraseHeldSeconds(body, note) * ratio), velocity: touch(note) });
       const at = phraseBeatSeconds(body, note.startBeat) * ratio;
-      const gate = performance?.gates.get(note.id);
+      const gate = performance.gates.get(note.id);
       if (gate) sound = { ...sound, note: { ...sound.note, holdSeconds: Math.max(MIN_NOTE_SECONDS, gate.soundEnd - at) } };
       const level = (body.masterLevel ?? 1) * (note.level ?? 1) * (part.level ?? 1);
       return { atSeconds: phraseBeatSeconds(body, note.startBeat) * ratio,
         sound: body.masterLevel === undefined && note.level === undefined && part.level === undefined ? sound : { ...sound, level: sound.level * level },
-        ...(note.pan === undefined && part.pan === undefined ? {} : { pan: Math.max(-1, Math.min(1, (note.pan ?? 0) + (part.pan ?? 0))) }) };
-  }));
+        ...(Object.hasOwn(gainCurves, part.id) ? { gainCurveId: part.id } : {}),
+        ...(Object.hasOwn(pitchCurves, part.id) ? { pitchCurveId: part.id } : {}),
+        ...(note.pan === undefined && part.pan === undefined ? {} : { pan: phraseNotePan(part, note) }) };
+    });
+  });
   if (!events.length && !allowSilence && !body.parts.some(part => part.unassigned && part.notes.length || part.hiddenNotes?.length)) throw new Error('先添加几个音符，再试听这个音乐吧。');
   events.sort((a, b) => a.atSeconds - b.atSeconds);
   const durationSeconds = events.reduce((end, event) => Math.max(end,
     event.atSeconds + event.sound.note.holdSeconds + event.sound.envelope.releaseSeconds), phraseDurationSeconds(body) * ratio);
-  return { kind: 'sequence', version: 1, durationSeconds, events, ...(performance?.lanes.length ? { midiExpression: performance.lanes } : {}) };
+  return { kind: 'sequence', version: 1, durationSeconds, events, ...(Object.keys(gainCurves).length ? { gainCurves } : {}),
+    ...(Object.keys(pitchCurves).length ? { pitchCurves } : {}), ...(performance.lanes.length ? { midiExpression: performance.lanes } : {}) };
 }
 
 export function createPhrasePlayback(library: MaterialLibrary, playback: TimbrePlaybackPort): PhrasePlaybackPort {
@@ -440,15 +485,49 @@ export function createPhraseEditor(library: MaterialLibrary, playback: TimbrePla
         else retimeHeldNotes(body,()=>{body.tempoBpm=value;});
       });
     },
+    setMeter(beatsPerBar, beatUnit) {
+      if (!isSupportedMeter(beatsPerBar, beatUnit)) throw new Error('拍号超出当前支持范围。');
+      modify(body => {
+        if ((body.beatsPerBar ?? 4) === beatsPerBar && (body.beatUnit ?? 4) === beatUnit) return;
+        body.beatsPerBar = beatsPerBar;
+        body.beatUnit = beatUnit;
+        const bar = phraseBarBeats(body);
+        if (body.pickupBeats !== undefined && body.pickupBeats >= bar) body.pickupBeats %= bar;
+      });
+    },
     addTempoSection() {
       const id = crypto.randomUUID();
       modify(body => {
         const startBeat = body.lengthBeats, tempoBpm = body.tempoSections?.at(-1)?.tempoBpm ?? body.tempoBpm;
-        body.lengthBeats += (body.beatsPerBar ?? 4) * 4;
+        body.lengthBeats += phraseBarBeats(body) * 4;
         const stepsPerBeat = body.tempoSections?.at(-1)?.stepsPerBeat ?? phraseStepsPerBeat(body);
         body.tempoSections = [...(body.tempoSections ?? []), { id, startBeat, tempoBpm, stepsPerBeat }];
       });
       return id;
+    },
+    removeTempoSection(id) {
+      modify(body => {
+        const sections = body.tempoSections ?? [];
+        const index = sections.findIndex(section => section.id === id);
+        if (index < 0) throw new Error('这个 BPM 卷帘不能删除。');
+        const previous = sections[index - 1];
+        const upperId = previous?.id ?? 'first';
+        const offset = sections[index]!.startBeat - (previous?.startBeat ?? 0);
+        const merge = () => {
+          if (sections.length === 1) delete body.tempoSections;
+          else body.tempoSections = sections.filter(section => section.id !== id);
+          for (const part of body.parts) for (const item of part.hiddenNotes ?? []) {
+            if (item.sectionId !== id) continue;
+            item.sectionId = upperId; item.note.startBeat += offset;
+          }
+          for (const lane of body.midiExpression ?? []) for (const item of lane.hiddenEvents ?? []) {
+            if (item.sectionId !== id) continue;
+            item.sectionId = upperId; item.event.beat += offset;
+          }
+        };
+        if (sections[index]!.tempoBpm === (previous?.tempoBpm ?? body.tempoBpm)) merge();
+        else retimeHeldNotes(body, merge, 96);
+      });
     },
     setTempoSection(id, tempoBpm) {
       const value = number(tempoBpm, 'BPM卷帘速度', MIN_TEMPO_BPM, MAX_TEMPO_BPM);
@@ -513,6 +592,26 @@ export function createPhraseEditor(library: MaterialLibrary, playback: TimbrePla
       if (changes.pan !== undefined) number(changes.pan, '音色声像', -1, 1);
       modify(body => { Object.assign(part(body, partId), changes); });
     },
+    setPartGainCurve(partId, points) {
+      const curve = readGainCurve(points);
+      modify(body => {
+        const target = part(body, partId);
+        if (curve.length) target.gainCurve = curve;
+        else delete target.gainCurve;
+      });
+    },
+    setPartPerformanceCurve(partId, kind, points) {
+      if (!PERFORMANCE_CURVES.includes(kind)) throw new Error('未知的演奏曲线。');
+      const curve = readGainCurve(points, kind);
+      modify(body => {
+        const target = part(body, partId);
+        const curves = { ...target.performanceCurves };
+        if (curve.length) curves[kind] = curve;
+        else delete curves[kind];
+        if (Object.keys(curves).length) target.performanceCurves = curves;
+        else delete target.performanceCurves;
+      });
+    },
     setPartTimbre(partId, timbreId) {
       if (!availableSounds(current().draft).some(sound => sound.id === timbreId)) throw new Error('请选择当前歌曲音色库里的音色。');
       const name = soundName(timbreId);
@@ -545,6 +644,8 @@ export function createPhraseEditor(library: MaterialLibrary, playback: TimbrePla
         const source = part(body, sourcePartId), target = part(body, targetPartId);
         if (source.unassigned || target.unassigned || source.timbreId !== target.timbreId)
           throw new Error('只能合并使用相同音色的音符组。');
+        if (!same(source.gainCurve ?? [], target.gainCurve ?? []) || PERFORMANCE_CURVES.some(kind =>
+          !same(source.performanceCurves?.[kind] ?? [], target.performanceCurves?.[kind] ?? []))) throw new Error('两个音色卡的曲线不同，无法合并。');
         if (source.level !== target.level || source.pan !== target.pan) {
           for (const group of [source, target]) {
             const bake = (note: PhraseNote): PhraseNote => ({ ...note, level: (note.level ?? 1) * (group.level ?? 1), pan: Math.max(-1, Math.min(1, (note.pan ?? 0) + (group.pan ?? 0))) });

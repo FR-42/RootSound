@@ -6,6 +6,7 @@ using RootSound.Desktop;
 // filesystem RPC is exposed to the renderer or to other applications.
 Console.InputEncoding = new UTF8Encoding(false);
 Console.OutputEncoding = new UTF8Encoding(false);
+if (args is ["--cleanup-installed-versions"]) return InstalledVersionCleanup.Run();
 if (args.Length != 1) return 2;
 Directory.CreateDirectory(args[0]);
 using var manager = new ProjectDirectoryManager(Path.GetFullPath(args[0]));
@@ -35,6 +36,7 @@ for (string? line; (line = Console.ReadLine()) is not null;)
             "project.CreateLibraryFolder" => ChangeLibrary(() => manager.CreateLibraryFolder(A(0), A(1))),
             "project.RenameLibraryEntry" => ChangeLibrary(() => manager.RenameLibraryEntry(A(0), A(1))),
             "project.DeleteLibraryEntry" => ChangeLibrary(() => manager.DeleteLibraryEntry(A(0))),
+            "project.ResolveLibrarySongPath" => Pack(new { status = "ready", path = manager.ResolveLibrarySongPath(A(0), A(1)) }),
             "project.OpenPath" => NativeDocumentFiles.Format(A(0)) is not null ? Source(manager.ReadDocumentFile(A(0))) : Pack(new { status = "opened", project = manager.Open(A(0)) }),
             "project.OpenKnown" => NativeDocumentFiles.Format(A(0)) is not null
                 ? Source(manager.ReadDocumentFile(A(0), known: true))

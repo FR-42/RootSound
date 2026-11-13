@@ -1,6 +1,8 @@
 import { samePcm } from './pcm.ts';
-import { envelopeValue } from './envelope.ts';
-import { noteDuration, type SampleSourceSnapshot, type ScheduledPreview, type ScheduledSound } from './plan.ts';
+import { envelopeValue, releaseBreakpoints } from './envelope.ts';
+import { noteAmplitude, pitchSampleOffset, type SampleSourceSnapshot, type ScheduledPitch, type ScheduledPreview, type ScheduledSound } from './plan.ts';
+import { dbAmplitude, gainAtTime, segmentAfter } from '../../contracts/gain-curve.ts';
+import type { SoundGainPoint } from '../../contracts/sound.ts';
 
 export interface GraphResources {
   readonly oscillators: OscillatorNode[];
@@ -14,11 +16,11 @@ export interface GraphResources {
 }
 
 type GraphStart =
-  | { kind: 'oscillator'; node: OscillatorNode; gain: GainNode; atSeconds: number; duration: number; frequency: number; level: number; pitch?: Extract<ScheduledSound, { kind: 'basic-synth' }>['pitch'] }
+  | { kind: 'oscillator'; node: OscillatorNode; gain: GainNode; atSeconds: number; duration: number; frequency: number; level: number; pitch?: Extract<ScheduledSound, { kind: 'basic-synth' }>['pitch']; pitchCurve?: ScheduledPitch }
   | { kind: 'noise'; node: AudioBufferSourceNode; gain: GainNode; atSeconds: number; duration: number; level: number }
-  | { kind: 'sample'; node: AudioBufferSourceNode; atSeconds: number; duration: number; plan: Extract<ScheduledSound, { kind: 'sample' }> };
+  | { kind: 'sample'; node: AudioBufferSourceNode; atSeconds: number; duration: number; plan: Extract<ScheduledSound, { kind: 'sample' }>; pitchCurve?: ScheduledPitch };
 export interface SoundGraph {
-  readonly envelopes: { atSeconds: number; plan: ScheduledSound; node: GainNode }[];
+  readonly envelopes: { atSeconds: number; duration: number; plan: ScheduledSound; node: GainNode; automation?: { node: GainNode; points: readonly SoundGainPoint[] } }[];
   readonly starts: GraphStart[];
   readonly pans: { atSeconds: number; node: StereoPannerNode; pan: number }[];
   readonly output?: { node: GainNode; preview: ScheduledPreview };
@@ -36,9 +38,8 @@ export function releaseScheduledNotes(graph: SoundGraph, starts: ReadonlyMap<Aud
     }
   }
   let end = now;
-  for (const { atSeconds, node, plan } of graph.envelopes) {
+  for (const { atSeconds, node, plan, duration } of graph.envelopes) {
     const age = now - origin - atSeconds;
-    const duration = noteDuration(plan);
     if (!soundingOnsets.has(atSeconds) || age <= 0 || age >= duration) continue;
     let tail = duration - age;
     if (age < plan.note.holdSeconds) {
@@ -47,7 +48,7 @@ export function releaseScheduledNotes(graph: SoundGraph, starts: ReadonlyMap<Aud
       else {
         const level = plan.kind === 'sample' && plan.envelopeBaked ? 1 : envelopeValue(plan.envelope, plan.note.holdSeconds, age);
         node.gain.cancelScheduledValues(now);
-        node.gain.setValueAtTime(level * plan.level * plan.note.velocity * normalization, now);
+        node.gain.setValueAtTime(level * noteAmplitude(plan) * normalization, now);
       }
       node.gain.linearRampToValueAtTime(0, now + tail);
     }
@@ -138,13 +139,17 @@ export function allocateGraph(audio: BaseAudioContext, preview: ScheduledPreview
     const plan = event.sound;
     const envelope = audio.createGain();
     resources.gains.push(envelope);
-    graph.envelopes.push({ atSeconds: event.atSeconds, plan, node: envelope });
+    const automation = event.gainCurve ? { node: audio.createGain(), points: event.gainCurve } : undefined;
+    graph.envelopes.push({ atSeconds: event.atSeconds, duration: event.duration, plan, node: envelope, ...(automation ? { automation } : {}) });
     // Use the same equal-power path at center and on either side. Bypassing the
     // panner only for zero would make its level jump as a slider crosses center.
     const panner = audio.createStereoPanner();
     resources.panners.push(panner);
     graph.pans.push({ atSeconds: event.atSeconds, node: panner, pan: event.pan ?? 0 });
-    envelope.connect(panner);
+    if (automation) {
+      resources.gains.push(automation.node);
+      envelope.connect(automation.node); automation.node.connect(panner);
+    } else envelope.connect(panner);
     panner.connect(destination);
     if (plan.kind === 'sample') {
       let buffer = buffers.get(plan.source);
@@ -152,7 +157,7 @@ export function allocateGraph(audio: BaseAudioContext, preview: ScheduledPreview
       const source = audio.createBufferSource(); resources.samples.push(source); source.buffer = buffer; source.loop = !!plan.loop;
       if (plan.loop) { source.loopStart = plan.loop.startSeconds; source.loopEnd = plan.loop.endSeconds; }
       source.connect(envelope); if (ended) source.onended = ended;
-      graph.starts.push({ kind: 'sample', node: source, atSeconds: event.atSeconds, duration: noteDuration(plan), plan });
+      graph.starts.push({ kind: 'sample', node: source, atSeconds: event.atSeconds, duration: event.duration, plan, pitchCurve: event.pitchCurve });
       continue;
     }
     let input: AudioNode = envelope;
@@ -170,7 +175,7 @@ export function allocateGraph(audio: BaseAudioContext, preview: ScheduledPreview
         const noise = audio.createBufferSource(); resources.samples.push(noise); noise.buffer = noiseBuffer(audio); noise.loop = true;
         const gain = audio.createGain(); resources.gains.push(gain); noise.connect(gain); gain.connect(input);
         if (ended) noise.onended = ended;
-        graph.starts.push({ kind: 'noise', node: noise, gain, atSeconds: event.atSeconds, duration: noteDuration(plan), level: source.level });
+        graph.starts.push({ kind: 'noise', node: noise, gain, atSeconds: event.atSeconds, duration: event.duration, level: source.level });
         continue;
       }
       const oscillator = audio.createOscillator();
@@ -184,7 +189,7 @@ export function allocateGraph(audio: BaseAudioContext, preview: ScheduledPreview
       graph.starts.push({
         kind: 'oscillator', node: oscillator, gain, atSeconds: event.atSeconds,
         duration: plan.note.holdSeconds + plan.envelope.releaseSeconds,
-        frequency: plan.note.frequencyHz * source.frequencyRatio, level: source.level, ...(plan.pitch ? { pitch: plan.pitch } : {}),
+        frequency: plan.note.frequencyHz * source.frequencyRatio, level: source.level, pitchCurve: event.pitchCurve, ...(plan.pitch ? { pitch: plan.pitch } : {}),
       });
     }
   }
@@ -201,7 +206,20 @@ export function scheduleGraph(graph: SoundGraph, normalization: number, start: n
     const noteStart = start + scheduled.atSeconds;
     const release = noteStart + plan.note.holdSeconds;
     const end = release + plan.envelope.releaseSeconds;
-    const amplitude = plan.level * plan.note.velocity * normalization;
+    const amplitude = noteAmplitude(plan) * normalization;
+    if (scheduled.automation) {
+      const { node, points } = scheduled.automation;
+      const from = Math.max(scheduled.atSeconds, fromSeconds);
+      const until = scheduled.atSeconds + scheduled.duration;
+      node.gain.setValueAtTime(dbAmplitude(gainAtTime(points, from, false)), start + from);
+      let low = 0, high = points.length;
+      while (low < high) { const mid = (low + high) >>> 1; if (points[mid]!.atSeconds <= from) low = mid + 1; else high = mid; }
+      for (let index = low; index < points.length && points[index]!.atSeconds < until; index++) {
+        const point = points[index]!;
+        node.gain.exponentialRampToValueAtTime(dbAmplitude(point.db), start + point.atSeconds);
+      }
+      if (until > from) node.gain.exponentialRampToValueAtTime(dbAmplitude(gainAtTime(points, until, false)), start + until);
+    }
     if (plan.kind === 'sample' && plan.envelopeBaked) {
       const age = Math.max(0, fromSeconds - scheduled.atSeconds); if (age >= plan.note.holdSeconds + plan.envelope.releaseSeconds) continue;
       const time = noteStart + age; const joined = Math.min(end, time + transitionSeconds);
@@ -210,13 +228,13 @@ export function scheduleGraph(graph: SoundGraph, normalization: number, start: n
       envelope.gain.setValueAtTime(0, end);
       continue;
     }
-    if (plan.envelope.decaySeconds !== undefined) {
+    if (plan.envelope.decaySeconds !== undefined || plan.envelope.releaseShape === 'natural') {
       const age = Math.max(0, fromSeconds - scheduled.atSeconds); if (age >= plan.note.holdSeconds + plan.envelope.releaseSeconds) continue;
       const time = noteStart + age; const joined = Math.min(plan.note.holdSeconds + plan.envelope.releaseSeconds, age + transitionSeconds);
       const value = (at: number) => amplitude * envelopeValue(plan.envelope, plan.note.holdSeconds, at);
       envelope.gain.setValueAtTime(transitionSeconds > 0 ? 0 : value(age), time);
       if (joined > age) envelope.gain.linearRampToValueAtTime(value(joined), noteStart + joined);
-      const points = [plan.envelope.attackSeconds, plan.envelope.attackSeconds + plan.envelope.decaySeconds, plan.note.holdSeconds, plan.note.holdSeconds + plan.envelope.releaseSeconds];
+      const points = [plan.envelope.attackSeconds, plan.envelope.attackSeconds + (plan.envelope.decaySeconds ?? 0), plan.note.holdSeconds, ...releaseBreakpoints(plan.envelope, plan.note.holdSeconds)];
       for (const point of [...new Set(points)].filter(point => point > joined && point <= plan.note.holdSeconds + plan.envelope.releaseSeconds).sort((a, b) => a - b)) envelope.gain.linearRampToValueAtTime(value(point), noteStart + point);
       continue;
     }
@@ -255,6 +273,18 @@ export function scheduleGraph(graph: SoundGraph, normalization: number, start: n
   }
   for (const scheduled of graph.starts) {
     const time = start + Math.max(scheduled.atSeconds, fromSeconds);
+    if (scheduled.kind !== 'noise' && scheduled.pitchCurve) {
+      const from = Math.max(scheduled.atSeconds, fromSeconds), until = scheduled.atSeconds + scheduled.duration;
+      const { points } = scheduled.pitchCurve, parameter = scheduled.node.detune;
+      if (until > from) {
+        parameter.setValueAtTime(gainAtTime(points, from, false) * 100, time);
+        for (let index = segmentAfter(points, from); index < points.length && points[index]!.atSeconds < until; index++) {
+          const point = points[index]!;
+          parameter.linearRampToValueAtTime(point.db * 100, start + point.atSeconds);
+        }
+        parameter.linearRampToValueAtTime(gainAtTime(points, until, false) * 100, start + until);
+      }
+    }
     if (scheduled.kind === 'oscillator') {
       const pitch = scheduled.pitch; const age = Math.max(0, fromSeconds - scheduled.atSeconds);
       const initial = pitch ? scheduled.frequency * 2 ** (pitch.semitones / 12) : scheduled.frequency;
@@ -291,7 +321,8 @@ export function startGraphSource(scheduled: GraphStart, origin: number, fromSeco
   if (age >= scheduled.duration) { scheduled.node.onended = null; scheduled.node.disconnect(); return undefined; }
   const time = origin + Math.max(scheduled.atSeconds, fromSeconds);
   if (scheduled.kind === 'sample') {
-    let offset = scheduled.plan.startSeconds + age * scheduled.plan.playbackRate;
+    const distance = scheduled.pitchCurve ? pitchSampleOffset(scheduled.pitchCurve, scheduled.atSeconds, scheduled.atSeconds + age) : age;
+    let offset = scheduled.plan.startSeconds + distance * scheduled.plan.playbackRate;
     const loop = scheduled.plan.loop;
     if (loop) {
       if (offset >= loop.endSeconds) offset = loop.startSeconds + (offset - loop.startSeconds) % (loop.endSeconds - loop.startSeconds);

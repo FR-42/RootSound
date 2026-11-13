@@ -2,7 +2,7 @@ import type { KeyboardPitch, PhraseBody, PhraseNote } from '../../contracts/phra
 import { PHRASE_STEPS_PER_BEAT, phraseStepsPerBeat } from '../../contracts/phrase.ts';
 import { phrasePitchRow } from './phrase-viewport.ts';
 import { MIN_TEMPO_BPM, MAX_TEMPO_BPM } from '../../contracts/music-limits.ts';
-import { phraseBeatSeconds, phraseSecondsBeat, phraseDurationSeconds, phraseHeldSeconds, phraseTempoSpans, phraseStepsAtBeat } from '../../contracts/phrase-time.ts';
+import { phraseBeatSeconds, phraseSecondsBeat, phraseDurationSeconds, phraseHeldSeconds, phraseTempoSpans, phraseStepsAtBeat, phraseBarBeats, phraseMeterBeatLength } from '../../contracts/phrase-time.ts';
 
 export type MelodyView = { leftSeconds: number; zoom: number; rowHeight: number };
 export const melodyPitchTop = (keys: readonly KeyboardPitch[], row: number, height: number) => Math.max(0, Math.min(keys.length, row)) * height;
@@ -21,7 +21,7 @@ export function formatPlayheadTime(seconds: number): string {
 export const melodyDuration = phraseDurationSeconds;
 /** Start with usable cells rather than fitting an arbitrarily long score on screen. */
 export function initialMelodyView(body: PhraseBody, width: number): MelodyView {
-  return clampMelodyView({ leftSeconds: 0, zoom: 8 * 32 * phraseStepsPerBeat(body) * body.tempoBpm / (60 * Math.max(1, width)), rowHeight: 32 }, melodyDuration(body));
+  return clampMelodyView({ leftSeconds: 0, zoom: 8 * 32 * phraseStepsPerBeat(body) * body.tempoBpm / (60 * Math.max(1, width) * phraseMeterBeatLength(body)), rowHeight: 32 }, melodyDuration(body));
 }
 export const melodyClamp = (value: number, low: number, high: number) => Math.max(low, Math.min(high, value));
 export function clampMelodyView(view: MelodyView, duration: number): MelodyView {
@@ -56,7 +56,7 @@ export function melodyScoreGrid(body: PhraseBody, view: MelodyView, width: numbe
     const local = { ...view, leftSeconds: view.leftSeconds - origin };
     const endFromOrigin = span.endSeconds - origin;
     const steps = phraseStepsAtBeat(body, span.startBeat);
-    for (const line of melodyGridLines(endFromOrigin, span.tempoBpm, steps, local, width, body.beatsPerBar ?? 4, span.startBeat === 0 ? body.pickupBeats ?? 0 : 0, steps ** depth)) {
+    for (const line of melodyGridLines(endFromOrigin, span.tempoBpm, steps, local, width, phraseBarBeats(body), span.startBeat === 0 ? body.pickupBeats ?? 0 : 0, steps ** depth, phraseMeterBeatLength(body))) {
       if (line.seconds < offset - 1e-8 || line.seconds >= endFromOrigin - 1e-8 && span.endBeat < body.lengthBeats) continue;
       result.push({ ...line, seconds: line.seconds + origin });
     }
@@ -67,35 +67,48 @@ export function melodyScoreGridDepth(body: PhraseBody, scale: number, minimumCel
   let depth = Infinity;
   for (const span of phraseTempoSpans(body)) {
     const steps = phraseStepsAtBeat(body, span.startBeat);
-    depth = Math.min(depth, melodyGridDepth(span.tempoBpm, steps, scale, minimumCellPixels));
+    depth = Math.min(depth, melodyGridDepth(span.tempoBpm, steps, scale, minimumCellPixels, phraseMeterBeatLength(body)));
     if (!depth) break;
   }
   return depth;
 }
-function melodyGridDepth(tempo: number, steps: number, scale: number, minimumCellPixels: number): number {
-  const cellPixels = 60 / tempo / steps * scale;
+function melodyGridDepth(tempo: number, steps: number, scale: number, minimumCellPixels: number, beatSize: number): number {
+  const cellPixels = 60 / tempo * beatSize / steps * scale;
   if (cellPixels < (minimumCellPixels || 6)) return 0;
   const threshold = minimumCellPixels || 48;
   return Math.min(1 + Math.max(0, Math.floor(Math.log(cellPixels / threshold) / Math.log(steps) + 1e-12)), Math.floor(Math.log(4096) / Math.log(steps) + 1e-12));
 }
 /** Only reveal subdivisions when there is room, then subdivide further as zoom increases. */
-export function melodyDetailSteps(tempo: number, steps: number, scale: number, minimumCellPixels = 48): number {
-  return steps ** melodyGridDepth(tempo, steps, scale, minimumCellPixels);
+export function melodyDetailSteps(tempo: number, steps: number, scale: number, minimumCellPixels = 48, beatSize = 1): number {
+  return steps ** melodyGridDepth(tempo, steps, scale, minimumCellPixels, beatSize);
 }
-export function melodyDetailGrid(duration: number, tempo: number, steps: number, view: MelodyView, width: number, beatsPerBar = 4, pickupBeats = 0, minimumCellPixels = 48) {
-  const divisions = melodyDetailSteps(tempo, steps, melodyScale(view, width, duration), minimumCellPixels);
-  return melodyGridLines(duration, tempo, steps, view, width, beatsPerBar, pickupBeats, divisions);
+export function melodyDetailGrid(duration: number, tempo: number, steps: number, view: MelodyView, width: number, beatsPerBar = 4, pickupBeats = 0, minimumCellPixels = 48, beatSize = 1) {
+  const divisions = melodyDetailSteps(tempo, steps, melodyScale(view, width, duration), minimumCellPixels, beatSize);
+  return melodyGridLines(duration, tempo, steps, view, width, beatsPerBar, pickupBeats, divisions, beatSize);
 }
-function melodyGridLines(duration: number, tempo: number, steps: number, view: MelodyView, width: number, beatsPerBar: number, pickupBeats: number, divisions: number) {
+function melodyGridLines(duration: number, tempo: number, steps: number, view: MelodyView, width: number, beatsPerBar: number, pickupBeats: number, divisions: number, beatSize: number) {
   const scale = melodyScale(view, width, duration);
-  const cell = 60 / tempo / divisions;
-  const first = Math.max(0, Math.ceil((view.leftSeconds - 1 / scale) / cell));
-  const last = Math.floor((Math.min(duration, view.leftSeconds + (width + 1) / scale) + 1e-8) / cell);
-  return Array.from({ length: Math.max(0, last - first + 1) }, (_, offset) => {
+  const cell = 60 / tempo * beatSize / divisions;
+  const visibleStart = view.leftSeconds - 1 / scale;
+  const visibleEnd = Math.min(duration, view.leftSeconds + (width + 1) / scale) + 1e-8;
+  const first = Math.max(0, Math.ceil(visibleStart / cell));
+  const last = Math.floor(visibleEnd / cell);
+  const lines = Array.from({ length: Math.max(0, last - first + 1) }, (_, offset) => {
     const index = first + offset;
-    const measure = (index / divisions - pickupBeats) / beatsPerBar;
-    return { seconds: index * cell, beat: index % divisions === 0, cell: divisions >= steps && index % (divisions / steps) === 0, bar: measure >= 0 && Math.abs(measure - Math.round(measure)) < 1e-8 };
+    const measure = (index / divisions * beatSize - pickupBeats) / beatsPerBar;
+    return { seconds: index * cell, beat: index % divisions === 0, cell: divisions >= steps && index % (divisions / steps) === 0, bar: measure >= -1e-8 && Math.abs(measure - Math.round(measure)) < 1e-8 };
   });
+  const pickupCells = pickupBeats / beatSize * divisions;
+  if (Math.abs(pickupCells - Math.round(pickupCells)) > 1e-8) {
+    const pickupSeconds = pickupBeats * 60 / tempo;
+    const barSeconds = beatsPerBar * 60 / tempo;
+    const firstBar = Math.max(0, Math.ceil((visibleStart - pickupSeconds) / barSeconds));
+    for (let seconds = pickupSeconds + firstBar * barSeconds; seconds <= visibleEnd; seconds += barSeconds) {
+      lines.push({ seconds, bar: true, beat: false, cell: false });
+    }
+    lines.sort((a, b) => a.seconds - b.seconds);
+  }
+  return lines;
 }
 /** The grid tempo is a visual ruler; note positions always use the phrase's own clock. */
 export function melodyGrid(duration: number, tempo: number, stepsPerBeat = PHRASE_STEPS_PER_BEAT): Array<{ seconds: number; beat: boolean; bar: boolean }> {

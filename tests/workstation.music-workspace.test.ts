@@ -18,6 +18,8 @@ import { createPhraseEditor, createPhrasePlayback, createPhraseReferenceAdapter 
 import { createSongEditor, createSongReferenceAdapter } from '../src/workstation/modules/song/public.ts';
 import { musicClockVoice } from './music-clock-fixture.ts';
 import { initialMelodyView, melodyScale, melodyDuration, melodySeconds } from '../src/workstation/modules/ui-rendering/melody-geometry.ts';
+import { gainAtTime } from '../src/workstation/contracts/gain-curve.ts';
+import { phraseBeatSeconds, phraseGainTimeline } from '../src/workstation/contracts/phrase-time.ts';
 const hooks = registerHooks({ load(url, context, next) { return url.endsWith('.css') ? { format: 'module', source: '', shortCircuit: true } : next(url, context); } });
 const { mountStudio } = await import('../src/workstation/modules/ui-rendering/public.ts'); hooks.deregister();
 const { mountMelodyWorkspace } = await import('../src/workstation/modules/ui-rendering/melody-workspace.ts');
@@ -79,7 +81,7 @@ class Element {
   blur(): void { const doc = globalThis.document as unknown as Document; if (doc.activeElement === this) doc.activeElement = undefined; this.emit('blur'); }
   select(): void {}
 }
-class Input extends Element {}
+class Input extends Element { checked = false; }
 class Select extends Element {}
 class TextArea extends Element {}
 class Document extends Element {
@@ -91,7 +93,7 @@ class Document extends Element {
 function installDom() {
   const document = new Document('document'); const window = new Element('window'); const timers: ReturnType<typeof setTimeout>[] = [];
   const frames = new Map<number, FrameRequestCallback>(); let serial = 0;
-  Object.assign(window, { setTimeout(callback: () => void, delay: number) { const timer = setTimeout(callback, delay); timer.unref(); timers.push(timer); return Number(timer); }, clearTimeout });
+  Object.assign(window, { innerWidth: 1280, innerHeight: 850, setTimeout(callback: () => void, delay: number) { const timer = setTimeout(callback, delay); timer.unref(); timers.push(timer); return Number(timer); }, clearTimeout });
   const replacements = { document, window, HTMLElement: Element, HTMLInputElement: Input, HTMLSelectElement: Select, HTMLTextAreaElement: TextArea,
     Node: Element, requestAnimationFrame(callback: FrameRequestCallback) { frames.set(++serial, callback); return serial; }, cancelAnimationFrame(id: number) { frames.delete(id); } };
   const previous = new Map<string, PropertyDescriptor | undefined>();
@@ -157,8 +159,19 @@ test('unified music opens in the piano roll, plays and tracks unsaved changes th
     assert.equal(root.querySelector('.song-phrase-library'), undefined);
     assert.equal(root.querySelector('.song-project-name')!.textContent, '直达创作');
     assert.equal(root.querySelector('.song-settings'),undefined,'empty settings entry is removed');
-    assert.equal(root.querySelector('.song-rate-choice'),undefined,'playback rate control is removed');
-    assert.equal(root.querySelector('.song-volume-panel'),undefined,'topbar volume control is removed');
+    const speed = root.querySelector('.song-playback-rate')!;
+    const rates = speed.querySelectorAll('.song-rate-choice');
+    assert.deepEqual(rates.map(choice => choice.textContent), ['0.25×', '0.5×', '0.75×', '1×', '1.5×']);
+    speed.querySelector('.song-transport-toggle')!.click();
+    rates[1]!.click();
+    assert.equal(speed.querySelector('.song-transport-toggle')!.textContent, '0.5×');
+    assert(speed.querySelector('.song-transport-panel')!.hidden);
+    rates[3]!.click();
+    const output = root.querySelector('.output-volume')!;
+    assert(output.querySelector('.song-transport-panel')!.hidden);
+    output.querySelector('.song-transport-toggle')!.click();
+    assert.equal(output.querySelector('.song-transport-panel')!.hidden, false);
+    output.querySelector('.song-transport-toggle')!.click();
     assert.equal(root.querySelector('.workspace-settings-dialog'),undefined);
     root.querySelector('.melody-tone')!.emit('click');
     dom.document.emit('keydown',{key:'c'});
@@ -219,14 +232,17 @@ test('only family selection changes the playback scope, and clicking a note keep
   const tone = library.listContentInfo().find(item => item.kind === 'rootsound.timbre')!.id;
   const first = phrase.addPart(tone), second = phrase.addPart(tone), empty = phrase.addPart(tone);
   phrase.addNote(first, { startBeat: 0, durationBeats: 1, frequencyHz: 440, velocity: .6 });
-  const other = phrase.addNote(second, { startBeat: 1, durationBeats: 1, frequencyHz: 660, velocity: .6 });
+  const other = phrase.addNote(second, { startBeat: 1, durationBeats: 3, frequencyHz: 660, velocity: .6, level: .25, pan: .25 });
+  phrase.setPartMix(second, { level: .5, pan: .25 });
+  phrase.setMasterLevel(.5);
   let releaseFirst!: () => void; const readiness = new Promise<void>(resolve => { releaseFirst = resolve; });
   let delayed = true; const prepared: string[][] = [], prepare = phrase.preparePreview.bind(phrase);
   phrase.preparePreview = async body => { prepared.push(body!.parts.map(part => part.id)); if (delayed) { delayed = false; await readiness; } await prepare(body); };
   const before = text, plans: SoundSequencePlan[] = [];
+  const auditions: Parameters<SoundRuntimePort['audition']>[] = [];
   const session = (plan: SoundSequencePlan) => { plans.push(plan); return { id: 'selected-play', status: 'playing', durationSeconds: plan.durationSeconds }; };
   const sound = { preview: async (plan: SoundSequencePlan) => session(plan), update: (_id: string, plan: SoundSequencePlan) => session(plan),
-    position: () => .25, stop() {}, stopAll() {}, cancelAudition() {}, audition: async () => {}, subscribe: () => () => {} } as unknown as SoundRuntimePort;
+    position: () => .25, stop() {}, stopAll() {}, cancelAudition() {}, async audition(...args: Parameters<SoundRuntimePort['audition']>) { auditions.push(args); }, subscribe: () => () => {} } as unknown as SoundRuntimePort;
   const root = new Element('main');
   const shell = mountPhraseComposition(root as unknown as HTMLElement, { phrase, sound, directMusic: true });
   const choose = (id: string) => root.querySelectorAll('.melody-tone').find(item => item.dataset.partId === id)!.emit('click');
@@ -248,6 +264,11 @@ test('only family selection changes the playback scope, and clicking a note keep
       clientX: block.getBoundingClientRect().left + 5, clientY: block.getBoundingClientRect().top + 2 });
     dom.document.emit('pointerup', { pointerId: 93 });
     await settle(); assert.deepEqual(pitches(), [660], 'clicking a note keeps the selected family');
+    const playback = plans.at(-1)!;
+    assert.equal(playback.preserveNoteLevel, true);
+    const event = playback.events[0]!;
+    assert.equal(event.sound.note.holdSeconds, 1.5);
+    assert.deepEqual(auditions, [[event.sound, { pan: event.pan, preserveNoteLevel: true }]]);
     assert.equal(text, before, 'listening scope must not edit or save music');
     choose(first); phrase.removePart(first); shell.refresh(); await settle();
     assert.deepEqual(pitches(), [660], 'removed family must not leave a stale listening scope');
@@ -519,6 +540,41 @@ test('added families can be removed, populated removal can be cancelled and note
   }finally{f.cleanup();}
 });
 
+test('right-click deletion confirms the targeted card and its notes without changing the selected card', () => {
+  const f = editableRoll({ orientation: 'vertical' });
+  try {
+    f.family(f.first).click();
+    const menu = f.root.querySelector('.melody-card-menu')!;
+    const open = (id: string) => {
+      const event = f.family(id).emit('contextmenu', { button: 2, clientX: 40, clientY: 45 });
+      assert(event.defaultPrevented);
+      assert.equal(menu.hidden, false);
+    };
+    const before = f.phrase.read().body;
+    open(f.second);
+    f.document.emit('keydown', { key: 'Escape' });
+    assert.equal(menu.hidden, true);
+    open(f.second);
+    menu.querySelector('button')!.click();
+    assert(f.root.querySelector('dialog[open]'));
+    f.root.querySelector('.melody-tone-delete-cancel')!.click();
+    assert.deepEqual(f.phrase.read().body, before);
+    open(f.second);
+    menu.querySelector('button')!.click();
+    f.root.querySelector('.melody-tone-delete-confirm')!.click();
+    assert.equal(f.family(f.second), undefined);
+    assert.equal(f.note(f.b), undefined);
+    assert(f.family(f.first).classList.contains('is-selected'));
+    assert(f.note(f.a));
+    f.phrase.undo(); f.roll.refresh();
+    assert.deepEqual(f.phrase.read().body, before);
+    open(f.empty);
+    menu.querySelector('button')!.click();
+    assert(f.root.querySelector('dialog[open]'));
+    assert(f.family(f.empty));
+  } finally { f.cleanup(); }
+});
+
 test('roll starts with spacious cells even for a long score, and subdivision changes preserve cell width',()=>{
   const f=editableRoll();try{
     const body=f.phrase.read().body!;
@@ -579,7 +635,7 @@ test('duration wheel requires hovering the selected note; blank and unselected n
   }finally{f.cleanup();}
 });
 
-test('vertical time lines use one physical pixel at 125 percent scaling', () => {
+test('vertical time lines align to physical pixels at 125 percent scaling', () => {
   const f = editableRoll({ orientation: 'vertical' });
   try {
     Object.assign(f.window, { devicePixelRatio: 1.25 });
@@ -846,7 +902,7 @@ test('footer plus appends connected rolls and the BPM menu has no duplicate crea
   }finally{f.cleanup();}
 });
 
-test('the keyboard BPM follows and edits the tempo roll at the lower viewport edge', () => {
+test('the keyboard BPM follows the viewport until clicking a roll, then edits the clicked roll', () => {
   const f = editableRoll({ orientation: 'vertical' });
   try {
     f.phrase.setLength(16);
@@ -866,6 +922,17 @@ test('the keyboard BPM follows and edits the tempo roll at the lower viewport ed
     assert.equal(button.textContent, '120');
     lowerEdge(8.25);
     assert(f.roll.readViewport().leftSeconds < 8);
+    assert.equal(dock.dataset.sectionId, section);
+    assert.equal(button.textContent, '90');
+    const clickRoll = (seconds: number) => {
+      const at = { clientX: 200, clientY: (seconds - f.roll.readViewport().leftSeconds) * scale };
+      scroll.emit('pointerdown', { target: canvas, ...at });
+      f.document.emit('pointerup', at);
+    };
+    clickRoll(7.75);
+    assert.equal(dock.dataset.sectionId, 'first');
+    assert.equal(button.textContent, '120');
+    clickRoll(8.125);
     assert.equal(dock.dataset.sectionId, section);
     assert.equal(button.textContent, '90');
     button.emit('click');
@@ -1222,18 +1289,24 @@ test('single-roll mode keeps the draggable end and blocks adding tempo sections'
     assert.equal(f.phrase.read().body!.tempoSections, undefined);
     edge.emit('keydown', {key:'ArrowDown'});
     assert.equal(f.phrase.read().body!.lengthBeats, original!.lengthBeats + 8);
-    const measures = f.root.querySelectorAll('input').find(input => input.attributes.get('aria-label') === '小节数')!;
-    measures.value = '8'; measures.emit('change');
-    assert.equal(f.phrase.read().body!.lengthBeats, 32);
+    const beforeMeter = structuredClone(f.phrase.read().body!);
+    const meter = f.root.querySelector('.melody-meter-select')!;
+    assert.equal(meter.value, '4/4');
+    assert.equal(meter.attributes.get('aria-label'), '拍号');
+    meter.value = '3/8'; meter.emit('change');
+    assert.deepEqual(f.phrase.read().body, { ...beforeMeter, beatsPerBar: 3, beatUnit: 8 });
     options.multipleRolls = true; f.roll.refresh(); assert.equal(plus.hidden, false);
     plus.emit('click'); assert.equal(f.phrase.read().body!.tempoSections!.length, 1);
   } finally { f.cleanup(); }
 });
 
-test('desktop blocks a multi-roll project until its required feature is explicitly enabled', async()=>{
+test('desktop requires multi-roll mode until deleting back to one roll through the control menu', async()=>{
   const f = editableRoll({ orientation: 'vertical' }); let studio: ReturnType<typeof mountStudio> | undefined;
   try {
-    f.roll.dispose(); f.phrase.addTempoSection(); const before = structuredClone(f.phrase.read().body);
+    f.roll.dispose(); f.phrase.setLength(4);
+    const lower = f.phrase.addTempoSection();
+    f.phrase.addNote(f.first, { startBeat: 5, durationBeats: .5, frequencyHz: 440, velocity: .75 });
+    const before = structuredClone(f.phrase.read().body!);
     let raw: string | null = null;
     const learning = createLearningSettings({ getItem: () => raw, setItem(_key,value) { raw = value; } });
     learning.record('basics', { status: 'learning', step: 1 });
@@ -1248,6 +1321,40 @@ test('desktop blocks a multi-roll project until its required feature is explicit
     assert.equal(f.root.querySelector('.guidance-invitation'), undefined);
     assert.equal(f.root.querySelector('.guidance-shell'), undefined);
     assert.deepEqual(f.phrase.read().body, before, 'unlocking only changes local visibility, never music');
+    const blocks = () => f.root.querySelectorAll('.melody-tempo-block');
+    const first = blocks().find(block => block.dataset.sectionId === 'first')!;
+    assert(!first.hidden);
+    const marker = first.querySelector('.melody-tempo-marker')!;
+    assert.equal(marker.textContent, '120');
+    marker.emit('pointerdown', { clientY: 8 });
+    f.document.emit('pointermove', { clientY: 170 }); f.document.emit('pointerup');
+    assert.deepEqual(f.phrase.read().body, before);
+    marker.emit('click');
+    assert.equal(f.root.querySelector('.melody-tempo-input')!.value, '120');
+    const openSettings = async () => {
+      f.root.querySelector('.song-settings')!.emit('click'); await settle();
+      return f.root.querySelector('.learning-settings')!;
+    };
+    let settings = await openSettings();
+    const switchInput = () => settings.querySelectorAll('input').find(input => input.attributes.get('aria-label') === '多卷帘') as Input;
+    assert(switchInput().disabled); settings.close();
+    const menu = f.root.querySelector('.melody-tempo-menu')!;
+    first.emit('contextmenu', { clientX: 18, clientY: 8 });
+    assert(!menu.hidden); assert(menu.querySelector('button')!.disabled);
+    f.document.emit('keydown', { key: 'Escape' }); assert(menu.hidden);
+    const lowerBlock = blocks().find(block => block.dataset.sectionId === lower)!;
+    assert(!lowerBlock.hidden);
+    lowerBlock.emit('contextmenu', { clientX: 18, clientY: 100 });
+    const remove = menu.querySelector('button')!;
+    assert(!menu.hidden); assert.equal(remove.textContent, '删除'); assert(!remove.disabled);
+    remove.emit('click');
+    assert(menu.hidden);
+    assert.equal(f.phrase.read().body!.tempoSections, undefined);
+    assert.deepEqual(f.phrase.read().body!.parts, before.parts);
+    settings = await openSettings();
+    assert(!switchInput().disabled);
+    switchInput().checked = false; switchInput().emit('change');
+    assert.equal(learning.read().multipleTempoRolls, false);
   } finally { studio?.dispose(); f.cleanup(); }
 });
 
@@ -1456,6 +1563,39 @@ test('short mouse presses with drift audition the note, and holding allows editi
   }
 });
 
+test('vertical roll can draw a note over another group’s dim note and resize edge', () => {
+  const f = editableRoll({ orientation: 'vertical' });
+  try {
+    const scroll = f.root.querySelector('.melody-scroll')!;
+    const before = structuredClone(f.phrase.read().body!);
+    const background = before.parts.find(part => part.id === f.second)!;
+    const foreground = before.parts.find(part => part.id === f.first)!;
+    f.family(f.first).emit('click');
+    for (const onEdge of [false, true]) {
+      const dim = f.note(f.b);
+      assert(dim.classList.contains('is-dim'));
+      const bounds = dim.getBoundingClientRect();
+      scroll.emit('pointerdown', {
+        target: onEdge ? dim.querySelector('.melody-note-resize')! : dim,
+        clientX: bounds.left + bounds.width / 2 - scroll.scrollLeft,
+        clientY: onEdge ? bounds.bottom - 6 : bounds.top + 2,
+      });
+      f.document.emit('pointerup');
+      const after = f.phrase.read().body!;
+      assert.deepEqual(after.parts.find(part => part.id === f.second), background);
+      const notes = after.parts.find(part => part.id === f.first)!.notes;
+      assert.equal(notes.length, foreground.notes.length + 1);
+      const added = notes.find(note => note.id !== f.a)!;
+      const under = background.notes[0]!;
+      assert.equal(added.frequencyHz, under.frequencyHz);
+      assert(added.startBeat >= under.startBeat && added.startBeat < under.startBeat + under.durationBeats);
+      assert(f.family(f.first).classList.contains('is-selected'));
+      f.phrase.undo();
+      f.roll.refresh();
+    }
+  } finally { f.cleanup(); }
+});
+
 test('vertical roll can grab any bright note or its lower edge and right-click deletes the targeted note', () => {
   for (const mode of ['none', 'group']) {
     const f = editableRoll({ orientation: 'vertical' });
@@ -1472,16 +1612,6 @@ test('vertical roll can grab any bright note or its lower edge and right-click d
         else clear(canvas);
       };
       setMode();
-      if (mode === 'group') {
-        const before = structuredClone(f.phrase.read().body);
-        for (const target of [f.note(f.b), f.note(f.b).querySelector('.melody-note-resize')!]) {
-          scroll.emit('pointerdown', { target, clientX: 400, clientY: 200 });
-          f.document.emit('pointermove', { clientX: 440, clientY: 260 });
-          f.document.emit('pointerup');
-        }
-        assert.deepEqual(f.phrase.read().body, before);
-        assert(f.family(f.first).classList.contains('is-selected'));
-      }
       const original = { ...note() };
       const bounds = f.note(f.a).getBoundingClientRect();
       const x = bounds.left + bounds.width / 2, y = bounds.top + bounds.height / 2;
@@ -1512,33 +1642,49 @@ test('vertical roll can grab any bright note or its lower edge and right-click d
   }
 });
 
-test('holding right click erases across groups along the swept path in one undo step', () => {
-  const f = editableRoll({ orientation: 'vertical', playing: true });
-  try {
-    const scroll = f.root.querySelector('.melody-scroll')!, canvas = f.root.querySelector('.melody-canvas')!;
-    f.family(f.first).emit('click');
-    const centre = (id: string) => {
-      const bounds = f.note(id).getBoundingClientRect();
-      return { clientX: bounds.left + bounds.width / 2 - scroll.scrollLeft, clientY: bounds.top + bounds.height / 2 };
-    };
-    const a = centre(f.a), b = centre(f.b);
-    const original = structuredClone(f.phrase.read().body);
-    scroll.emit('pointerdown', { target: canvas, button: 2, clientX: a.clientX, clientY: a.clientY - 4 });
-    f.document.emit('pointermove', { ...b, getCoalescedEvents: () => [a, b] });
-    f.flushFrames();
-    assert.deepEqual(f.phrase.read().body, original);
-    assert.equal(f.root.querySelectorAll('.melody-note').length, 0);
-    f.document.emit('pointercancel');
-    assert.equal(f.root.querySelectorAll('.melody-note').length, 2);
-    scroll.emit('pointerdown', { target: f.note(f.b), button: 2, ...b });
-    f.document.emit('pointermove', a);
-    f.document.emit('pointermove', b);
-    f.document.emit('pointerup', { button: 2, ...b });
-    assert(f.phrase.read().body!.parts.every(part => part.notes.length === 0));
-    assert.deepEqual(f.commits, [true]);
-    f.phrase.undo();
-    assert.deepEqual(f.phrase.read().body, original);
-  } finally { f.cleanup(); }
+test('right-click sweeps respect group selection and undo in one step', () => {
+  for (const groupSelected of [true, false]) {
+    const f = editableRoll({ orientation: 'vertical', playing: true });
+    try {
+      const scroll = f.root.querySelector('.melody-scroll')!, canvas = f.root.querySelector('.melody-canvas')!;
+      if (groupSelected) f.family(f.first).emit('click');
+      const centre = (id: string) => {
+        const bounds = f.note(id).getBoundingClientRect();
+        return { clientX: bounds.left + bounds.width / 2 - scroll.scrollLeft, clientY: bounds.top + bounds.height / 2 };
+      };
+      const a = centre(f.a), b = centre(f.b);
+      const original = structuredClone(f.phrase.read().body!);
+      scroll.emit('pointerdown', { target: canvas, button: 2, clientX: a.clientX, clientY: a.clientY - 4 });
+      f.document.emit('pointerrawupdate', { ...b, getCoalescedEvents: () => [a, b] });
+      f.flushFrames();
+      assert.deepEqual(f.phrase.read().body, original);
+      assert.equal(f.note(f.a), undefined);
+      assert.equal(Boolean(f.note(f.b)), groupSelected);
+      f.document.emit('pointercancel');
+      assert.equal(f.root.querySelectorAll('.melody-note').length, 2);
+
+      scroll.emit('pointerdown', { target: f.note(f.b), button: 2, ...b });
+      f.document.emit('pointermove', a);
+      f.document.emit('pointermove', b);
+      f.document.emit('pointerup', { button: 2, ...b });
+      const remaining = f.phrase.read().body!.parts.flatMap(part => part.notes);
+      const background = original.parts.find(part => part.id === f.second)!.notes;
+      assert.deepEqual(remaining, groupSelected ? background : []);
+      assert.deepEqual(f.commits, [true]);
+      f.phrase.undo();
+      assert.deepEqual(f.phrase.read().body, original);
+
+      if (groupSelected) {
+        f.roll.refresh();
+        assert(f.note(f.b).classList.contains('is-dim'));
+        scroll.emit('pointerdown', { target: f.note(f.b), button: 2, ...b });
+        f.document.emit('pointerup', { button: 2, ...b });
+        assert.deepEqual(f.phrase.read().body, original);
+        assert(!f.family(f.first).classList.contains('is-selected'));
+        assert.deepEqual(f.commits, [true]);
+      }
+    } finally { f.cleanup(); }
+  }
 });
 
 test('fast raw pointer turns catch thin note edges even when the regular move only reports the return point', () => {
@@ -1644,5 +1790,81 @@ test('optional workbench selects individual notes and persists group mix indepen
     settings.workbench = false; f.roll.refresh();
     assert.equal(f.root.querySelector('.melody-console')!.hidden, true);
     assert(!f.note(f.a).classList.contains('is-selected'));
+  } finally { f.cleanup(); }
+});
+
+test('the gain curve isolates one group, previews a drag and saves one undoable edit', () => {
+  const f = editableRoll({ orientation: 'vertical', workbench: true });
+  try {
+    f.family(f.first).click();
+    f.root.querySelector('.melody-edit-gain-curve')!.click();
+    const layer = f.root.querySelector('.melody-gain-curve')!;
+    assert(!layer.hidden);
+    assert(f.root.querySelector('.melody-workspace')!.classList.contains('is-gain-editing'));
+    assert(f.root.querySelectorAll('.melody-note').every(note => note.dataset.partId === f.first));
+    const first = layer.querySelector('.melody-gain-point')!;
+    const before = f.phrase.read().body!;
+    const scroll = f.root.querySelector('.melody-scroll')!;
+    const ruler = f.root.querySelector('.melody-ruler')!;
+    ruler.emit('pointerdown', { clientY: 120 });
+    f.document.emit('pointerup', { clientY: 120 });
+    assert(f.seeks[0]! > 0);
+    scroll.emit('pointerdown', { target: f.note(f.a), button: 2 });
+    f.document.emit('pointerup', { button: 2 });
+    first.emit('pointerdown', { clientX: 500 });
+    f.document.emit('pointermove', { clientX: 670 });
+    assert.deepEqual(f.phrase.read().body, before);
+    assert(f.previews.at(-1)?.parts.find(part => part.id === f.first)?.gainCurve?.[0]?.db);
+    f.document.emit('pointerup', { clientX: 670 });
+    const after = f.phrase.read().body!;
+    assert.equal(after.parts.find(part => part.id === f.first)!.gainCurve?.[0]?.beat, 0);
+    assert(after.parts.find(part => part.id === f.first)!.gainCurve![0]!.db > 0);
+    assert.deepEqual(after.parts.map(part => part.notes), before.parts.map(part => part.notes));
+    f.phrase.undo(); f.roll.refresh(); assert.deepEqual(f.phrase.read().body, before);
+    f.phrase.redo(); f.roll.refresh(); assert.deepEqual(f.phrase.read().body, after);
+    assert(layer.querySelector('path')!.attributes.get('d')?.includes('C'));
+    const guidesBefore = layer.querySelectorAll('.is-guide').map(guide => guide.attributes.get('aria-label'));
+    assert(guidesBefore.length > 1);
+    layer.emit('wheel', { clientY: 80, deltaY: -620, ctrlKey: true });
+    f.flushFrames();
+    const guidesAfter = layer.querySelectorAll('.is-guide');
+    assert(guidesAfter.some(guide => !guidesBefore.includes(guide.attributes.get('aria-label'))));
+    assert.deepEqual(f.phrase.read().body, after);
+    const guide = guidesAfter[0]!;
+    const adjacent = guidesAfter[1]!;
+    const targetBeat = Number(guide.dataset.point!.slice(6));
+    const adjacentBeat = Number(adjacent.dataset.point!.slice(6));
+    const baseline = phraseGainTimeline(after, after.parts.find(part => part.id === f.first)!.gainCurve!);
+    guide.emit('pointerdown', { clientX: 500 });
+    f.document.emit('pointermove', { clientX: 620 });
+    f.document.emit('pointerup', { clientX: 620 });
+    const edited = f.phrase.read().body!.parts.find(part => part.id === f.first)!.gainCurve!;
+    assert(edited.length > after.parts.find(part => part.id === f.first)!.gainCurve!.length);
+    const updated = phraseGainTimeline(after, edited);
+    const valueAt = (curve: typeof updated, beat: number) => gainAtTime(curve, phraseBeatSeconds(after, beat));
+    assert(Math.abs(valueAt(updated, targetBeat) - valueAt(baseline, targetBeat)) > 1);
+    for (let beat = adjacentBeat; beat <= after.lengthBeats; beat += .125) {
+      assert(Math.abs(valueAt(updated, beat) - valueAt(baseline, beat)) < 1e-8, `changed beyond the neighboring point at ${beat}`);
+    }
+    const viewport = f.roll.readViewport();
+    layer.emit('pointerdown', { clientX: 400, clientY: 250 });
+    f.document.emit('pointermove', { clientX: 400, clientY: 120 });
+    f.document.emit('pointerup', { clientX: 400, clientY: 120 });
+    f.flushFrames();
+    assert(f.roll.readViewport().leftSeconds > viewport.leftSeconds);
+    assert.deepEqual(f.phrase.read().body!.parts.find(part => part.id === f.first)!.gainCurve, edited);
+    const picker = layer.querySelector('.melody-curve-picker')!;
+    for (const kind of ['pitch', 'velocity', 'sustain', 'sostenuto', 'soft'] as const) {
+      picker.value = kind;
+      picker.emit('change');
+      const point = layer.querySelector('.is-guide')!;
+      point.emit('pointerdown', { clientX: 500 });
+      if (kind === 'pitch' || kind === 'velocity') f.document.emit('pointermove', { clientX: 630 });
+      f.document.emit('pointerup', { clientX: 630 });
+      assert(f.phrase.read().body!.parts.find(part => part.id === f.first)!.performanceCurves?.[kind]?.some(point => point.db > 0));
+    }
+    f.document.emit('keydown', { key: 'Escape' });
+    assert(layer.hidden);
+    assert(f.root.querySelectorAll('.melody-note').some(note => note.dataset.partId === f.second));
   } finally { f.cleanup(); }
 });

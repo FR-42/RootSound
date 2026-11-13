@@ -6,6 +6,7 @@ class FakeParam {
   readonly changes: { kind: 'set' | 'ramp' | 'hold'; value: number; time: number }[] = [];
   setValueAtTime(value: number, time: number): void { this.changes.push({ kind: 'set', value, time }); }
   linearRampToValueAtTime(value: number, time: number): void { this.changes.push({ kind: 'ramp', value, time }); }
+  exponentialRampToValueAtTime(value: number, time: number): void { this.changes.push({ kind: 'ramp', value, time }); }
   cancelAndHoldAtTime(time: number): void { this.changes.push({ kind: 'hold', value: 0, time }); }
 }
 
@@ -23,6 +24,7 @@ class FakePanner extends FakeNode { readonly pan = new FakeParam(); }
 
 class FakeOscillator extends FakeNode {
   readonly frequency = new FakeParam();
+  readonly detune = new FakeParam();
   type = 'sine';
   onended: (() => void) | null = null;
   started = false;

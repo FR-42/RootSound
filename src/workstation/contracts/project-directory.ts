@@ -33,6 +33,7 @@ export interface ProjectDirectoriesPort {
   createFolder?(path: string, name: string): Promise<void>;
   renameEntry?(path: string, name: string): Promise<void>;
   removeEntry?(path: string): Promise<void>;
+  reveal?(entry: Exclude<ProjectLibraryEntry, { kind: 'folder' }>): Promise<void>;
   remove?(project: ProjectDirectory): Promise<ProjectRemovalResult>;
   inspect?(project: ProjectDirectory): Promise<ProjectLibrarySnapshot>;
   rename?(project: ProjectDirectory, name: string, libraryText: string, token: string): Promise<ProjectDirectory>;
@@ -53,6 +54,7 @@ export interface ProjectSetupPort {
   createFolder?(path: string, name: string): Promise<void>;
   renameEntry?(path: string, name: string): Promise<void>;
   removeEntry?(path: string): Promise<void>;
+  reveal?(entry: Exclude<ProjectLibraryEntry, { kind: 'folder' }>): Promise<void>;
   remove?(project: ProjectDirectory): Promise<ProjectRemovalResult>;
   rename?(project: ProjectDirectory, name: string): Promise<ProjectDirectory>;
   open(path?: string): Promise<void>;

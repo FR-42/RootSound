@@ -1,10 +1,11 @@
 import type { ProjectDirectory, ProjectLibraryEntry, ProjectLibraryPage, ProjectSaveChoice, ProjectSetupPort } from '../../contracts/project-directory.ts';
 import { showProjectNameDialog } from './project-save-as.ts';
 import { libraryClickDelay } from './library-click.ts';
+import { libraryIcon } from './library-icon.ts';
 import './project-library.css';
 
 /** The welcome page's only entry: discover songs, create one, or pick a file. */
-export function mountProjectLibrary(container: HTMLElement, trigger: HTMLButtonElement, service: Pick<ProjectSetupPort, 'open' | 'list' | 'browse' | 'remove' | 'rename' | 'createFolder' | 'renameEntry' | 'removeEntry'>,
+export function mountProjectLibrary(container: HTMLElement, trigger: HTMLButtonElement, service: Pick<ProjectSetupPort, 'open' | 'list' | 'browse' | 'remove' | 'rename' | 'createFolder' | 'renameEntry' | 'removeEntry' | 'reveal'>,
   onNew: () => void, doubleClickIntervalMs?: number, save?: {
     source?: ProjectDirectory; name: string; original?: () => Promise<void>; discard?: () => Promise<void>;
     copy(name: string, path: string): Promise<void>; finish(choice: ProjectSaveChoice): void;
@@ -22,7 +23,7 @@ export function mountProjectLibrary(container: HTMLElement, trigger: HTMLButtonE
   let editing: { project: ProjectLibraryEntry; input: HTMLInputElement } | undefined; let renaming = false;
   let contextTarget: HTMLButtonElement | undefined;
   const overlay = document.createElement('div'); overlay.className = 'project-library-overlay'; overlay.hidden = true;
-  const dialog = document.createElement('section'); dialog.className = 'project-library';
+  const dialog = document.createElement('section'); dialog.className = save ? 'project-library is-saving' : 'project-library';
   dialog.setAttribute('role', 'dialog'); dialog.setAttribute('aria-modal', 'true'); dialog.setAttribute('aria-label', '乐曲库');
   const header = document.createElement('header'); header.className = 'project-library-header';
   const title = document.createElement('h2'); title.textContent = '乐曲库';
@@ -32,7 +33,7 @@ export function mountProjectLibrary(container: HTMLElement, trigger: HTMLButtonE
   const grid = document.createElement('div'); grid.className = 'project-library-grid';
   const navigation = document.createElement('nav'); navigation.className = 'project-library-navigation'; navigation.hidden = true;
   navigation.setAttribute('aria-label', '乐曲库文件夹');
-  const note = document.createElement('p'); note.className = 'project-library-note';
+  const note = document.createElement('p'); note.className = 'project-library-note'; note.setAttribute('role', 'status');
   const problem = document.createElement('p'); problem.className = 'project-library-error'; problem.setAttribute('role', 'alert');
   const footer = document.createElement('footer'); footer.className = 'project-library-footer';
   const pagination = document.createElement('div'); pagination.className = 'project-library-pagination'; pagination.hidden = true;
@@ -53,7 +54,8 @@ export function mountProjectLibrary(container: HTMLElement, trigger: HTMLButtonE
   }
   const contextMenu = document.createElement('div'); contextMenu.className = 'project-library-context'; contextMenu.hidden = true;
   contextMenu.setAttribute('role', 'menu');
-  header.append(title, actions, closeButton); dialog.append(header, navigation, grid, note, problem, footer, contextMenu); overlay.append(dialog); container.append(overlay);
+  const titleIcon = document.createElement('span'); titleIcon.className = 'project-library-title-icon'; titleIcon.append(libraryIcon('musicLibrary'));
+  header.append(titleIcon, title, actions, closeButton); dialog.append(header, navigation, grid, note, problem, footer, contextMenu); overlay.append(dialog); container.append(overlay);
   overlay.addEventListener('wheel', event => { event.preventDefault(); event.stopPropagation(); }, { passive: false });
   const trash = document.createElement('div'); trash.className = 'project-library-trash'; trash.hidden = true;
   trash.setAttribute('role', 'region'); trash.setAttribute('aria-label', '删除乐曲项目');
@@ -94,7 +96,9 @@ export function mountProjectLibrary(container: HTMLElement, trigger: HTMLButtonE
   }
   function tile(label: string, className: string, callback: () => void, ariaLabel = label, toolbar = false): HTMLButtonElement {
     const button = document.createElement('button'); button.type = 'button'; button.className = `${toolbar ? 'project-library-action' : 'project-library-tile'} ${className}`;
-    button.textContent = label; button.setAttribute('aria-label', ariaLabel); button.disabled = opening || deleting || !!candidate || renaming;
+    button.textContent = label;
+    if (toolbar) button.append(libraryIcon(className === 'project-library-new-folder' ? 'folderPlus' : className === 'project-library-custom' ? 'folder' : 'plus'));
+    button.setAttribute('aria-label', ariaLabel); button.disabled = opening || deleting || !!candidate || renaming;
     button.addEventListener('click', () => { if (!disposed && expanded && !opening && !deleting && !candidate && !renaming) callback(); }); return button;
   }
   function normalizePath(path: string): string { return path.replaceAll('\\', '/').replace(/\/+$/u, '').toLowerCase(); }
@@ -154,7 +158,7 @@ export function mountProjectLibrary(container: HTMLElement, trigger: HTMLButtonE
     grid.replaceChildren(); dialog.setAttribute('aria-busy', String(loading || opening || deleting || renaming)); closeButton.disabled = opening || deleting || !!candidate || renaming;
     renderNavigation();
     actions.replaceChildren();
-    const create = tile('＋ 新建', 'project-library-new', () => { close(false); onNew(); }, '新的开始', true);
+    const create = tile('新建', 'project-library-new', () => { close(false); onNew(); }, '新的开始', true);
     const custom = tile('打开', 'project-library-custom', () => { void openProject(); }, '选择音乐文件', true);
     if (page && service.createFolder) actions.append(tile('新建文件夹', 'project-library-new-folder', () => { void newFolder(); }, '新建文件夹', true));
     if (!save) actions.append(create, custom);
@@ -203,27 +207,36 @@ export function mountProjectLibrary(container: HTMLElement, trigger: HTMLButtonE
     grid.append(item);
     const canRename = entry.kind === 'project' ? service.rename : service.renameEntry;
     const canDelete = entry.kind === 'project' ? service.remove : service.removeEntry;
-    if (!canRename && !canDelete) return;
+    const canReveal = !save && entry.kind !== 'folder' && !!service.reveal;
+    if (!canRename && !canDelete && !canReveal) return;
     item.setAttribute('aria-haspopup', 'menu');
     item.addEventListener('contextmenu', event => {
       event.preventDefault();
       if (disposed || !expanded || opening || loading || deleting || candidate || renaming || editing || naming) return;
       clearPendingOpen(); closeContextMenu();
       contextTarget = item;
-      const addAction = (label: string, action: () => void) => {
-        const button = document.createElement('button'); button.type = 'button'; button.textContent = label; button.tabIndex = -1;
+      const addAction = (label: string, icon: 'rename' | 'folder' | 'trash', action: () => void) => {
+        const button = document.createElement('button'); button.type = 'button'; button.textContent = label; button.append(libraryIcon(icon)); button.tabIndex = -1;
         button.setAttribute('role', 'menuitem'); button.setAttribute('aria-label', `${label} ${entry.name}`);
         button.addEventListener('click', () => { closeContextMenu(true); action(); });
         contextMenu.append(button);
       };
-      if (canRename) addAction('改名', () => beginRename(entry, item));
-      if (canDelete) addAction('删除', () => requestDelete(entry));
+      if (canRename) addAction('改名', 'rename', () => beginRename(entry, item));
+      if (canReveal) addAction('打开所在文件夹', 'folder', () => { void reveal(entry); });
+      if (canDelete) addAction('删除', 'trash', () => requestDelete(entry));
       contextMenu.hidden = false;
       const { width, height } = contextMenu.getBoundingClientRect();
       contextMenu.style.left = `${Math.max(0, Math.min(event.clientX, globalThis.innerWidth - width))}px`;
       contextMenu.style.top = `${Math.max(0, Math.min(event.clientY, globalThis.innerHeight - height))}px`;
       (contextMenu.firstElementChild as HTMLButtonElement).focus();
     });
+  }
+  async function reveal(entry: Exclude<ProjectLibraryEntry, { kind: 'folder' }>): Promise<void> {
+    if (disposed || opening || !service.reveal) return;
+    opening = true; error = ''; render();
+    try { await service.reveal(entry); }
+    catch (reason) { error = reason instanceof Error ? reason.message : String(reason); }
+    finally { opening = false; if (!disposed) { render(); closeButton.focus(); } }
   }
   function closeContextMenu(restoreFocus = false): void {
     if (!contextTarget) return;

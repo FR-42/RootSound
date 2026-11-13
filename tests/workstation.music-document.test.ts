@@ -60,6 +60,36 @@ test('music edits stay in the working snapshot; saving/reopening retains notes, 
   const stable = reopened.snapshot(); commitMusicDocument(reopened.library, reopened.song, reopened.score); assert.equal(reopened.snapshot(), stable);
 });
 
+test('gain curves save with their own card and compile against the current tempo', () => {
+  const f = open(createInitialProjectLibrary('曲线'));
+  const tone = f.library.listContentInfo().find(item => item.kind === 'rootsound.timbre')!;
+  const first = f.score.addPart(tone.id), second = f.score.addPart(tone.id);
+  for (const id of [first, second]) f.score.addNote(id, { startBeat: 0, durationBeats: 4, frequencyHz: 440, velocity: .7 });
+  const points = [{ beat: 0, db: -6 }, { beat: 2, db: 6 }, { beat: 4, db: 0 }];
+  f.score.setPartGainCurve(first, points);
+  f.score.setPartPerformanceCurve(first, 'pitch', [{ beat: 0, db: 0, after: 1 }, { beat: 2, db: 7, before: 6 }]);
+  f.score.setPartPerformanceCurve(first, 'velocity', [{ beat: 0, db: 10 }]);
+  f.score.setPartPerformanceCurve(first, 'sustain', [{ beat: 1, db: 1 }, { beat: 5, db: 0 }]);
+  f.score.setPartPerformanceCurve(first, 'soft', [{ beat: 0, db: 1 }]);
+  f.score.setTempo(60);
+  commitMusicDocument(f.library, f.song, f.score);
+  const reopened = open(f.snapshot()).score;
+  assert.deepEqual(reopened.read().body!.parts[0]!.gainCurve, points);
+  assert.equal(reopened.read().body!.parts[1]!.gainCurve, undefined);
+  const plan = reopened.previewPlan();
+  assert.equal(plan.events[0]!.gainCurveId, first);
+  assert.equal(plan.events[1]!.gainCurveId, undefined);
+  assert.deepEqual(plan.gainCurves?.[first], [{ atSeconds: 0, db: -6 }, { atSeconds: 2, db: 6 }, { atSeconds: 4, db: 0 }]);
+  assert.deepEqual(plan.pitchCurves?.[first], [{ atSeconds: 0, db: 0, after: 1 }, { atSeconds: 2, db: 7, before: 6 }]);
+  assert.equal(plan.events[0]!.pitchCurveId, first);
+  assert.equal(plan.events[1]!.pitchCurveId, undefined);
+  assert(Math.abs(plan.events[0]!.sound.note.velocity - .8 * .84) < 1e-8);
+  assert.equal(plan.events[0]!.sound.note.holdSeconds, 5);
+  assert.equal(plan.events[1]!.sound.note.holdSeconds, 4);
+  assert.throws(() => reopened.setPartGainCurve(first, [{ beat: 1, db: 0 }, { beat: 1, db: 2 }]), /重叠/);
+  assert.throws(() => reopened.mergeParts(first, second), /曲线不同/);
+});
+
 test('music Save As and library rename update the sole editor title without dropping notes', () => {
   const f = open(createInitialProjectLibrary('原名'));
   const tone = f.library.listContentInfo().find(item => item.kind === 'rootsound.timbre')!;

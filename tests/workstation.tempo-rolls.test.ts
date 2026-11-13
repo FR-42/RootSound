@@ -165,6 +165,31 @@ test('the last roll edge resizes alone, preserves cropped notes across reopen an
   }
 });
 
+test('deleting a roll keeps visible and hidden notes at their beats under the previous roll and is undoable', () => {
+  const { phrase: p } = fixture();
+  p.setLength(8);
+  const lower = p.addTempoSection();
+  p.setTempoSection(lower, 60);
+  p.setTempoSectionSteps(lower, 3);
+  const part = p.addPart(p.read().availableSounds[0]!.id);
+  const keep = p.addNote(part, { startBeat: 10, durationBeats: 1, durationSeconds: 1, frequencyHz: 440, velocity: .75 });
+  const hidden = p.addNote(part, { startBeat: 22, durationBeats: 1, durationSeconds: 1, frequencyHz: 660, velocity: .75 });
+  p.setLastTempoRollLength(20);
+  const before = p.read().body!;
+  p.removeTempoSection(lower);
+  const merged = p.read().body!;
+  assert.equal(merged.lengthBeats, 20);
+  assert.deepEqual(phraseTempoSpans(merged).map(span => span.tempoBpm), [120]);
+  const retained = merged.parts[0]!.notes[0]!;
+  assert.deepEqual([retained.id, retained.startBeat, retained.durationBeats, retained.durationSeconds], [keep, 10, 1, .5]);
+  assert.equal(phraseStepsAtBeat(merged, 10), phraseStepsAtBeat(before, 0));
+  assert.equal(merged.parts[0]!.hiddenNotes?.[0]?.sectionId, 'first');
+  assert.throws(() => p.removeTempoSection('first'));
+  p.undo(); assert.deepEqual(p.read().body, before); p.redo();
+  p.setLastTempoRollLength(24);
+  assert.deepEqual(p.read().body!.parts[0]!.notes.map(note => [note.id, note.startBeat]), [[keep, 10], [hidden, 22]]);
+});
+
 test('roll resolutions are independent, persist, inherit on addition and never retime notes or playback',async()=>{
   const f=fixture(),p=f.phrase;p.setLength(16);const second=p.addTempoSection(),part=p.addPart(p.read().availableSounds[0]!.id);
   p.addNote(part,{startBeat:2/3,durationBeats:.4,durationSeconds:.2,frequencyHz:440,velocity:.7});

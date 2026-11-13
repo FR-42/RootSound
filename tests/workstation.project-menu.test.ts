@@ -64,7 +64,8 @@ test('song library keeps new/import in its toolbar and files in the row list', a
     f.menu.open(); await settle();
     assert.deepEqual(f.opened, []);
     const labels = visible(f.root).filter(element => element.tagName === 'button').map(element => element.textContent);
-    assert.deepEqual(labels, ['', '＋ 新建', '打开', '×', '第一首']);
+    assert.deepEqual(labels, ['', '新建', '打开', '×', '第一首']);
+    assert.equal(f.button('新的开始').children[0]?.tagName, 'svg');
     assert(flatten(f.root).some(element => element.attributes.get('role') === 'dialog' && element.attributes.get('aria-label') === '乐曲库'));
     f.button('第一首').dispatchEvent(new Event('click')); t.mock.timers.tick(600); await settle();
     assert.deepEqual(f.opened, ['D:/RootSound/project/第一首.rootsound']);

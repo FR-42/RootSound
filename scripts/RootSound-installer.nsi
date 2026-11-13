@@ -23,6 +23,14 @@ Function FindDrive
 FunctionEnd
 
 Function .onInit
+  System::Call 'kernel32::CreateMutexW(p 0, i 0, w "Local\RootSound.Setup") p .r1 ?e'
+  Pop $0
+  ${If} $0 == 183
+  ${OrIf} $1 == 0
+    MessageBox MB_OK|MB_ICONEXCLAMATION "请先关闭其他 RootSound 安装程序。" /SD IDOK
+    SetErrorLevel 2
+    Abort
+  ${EndIf}
   ${If} $INSTDIR == ""
     ${If} ${FileExists} "D:\*.*"
       StrCpy $INSTDIR "D:\Apps\RootSound"
@@ -52,13 +60,19 @@ invalid:
 FunctionEnd
 
 Section
-  IfFileExists "$AppDirectory\resources\app\rootsound-installed" shortcut
+  IfFileExists "$AppDirectory\resources\app\rootsound-installed" verify
   ClearErrors
   SetOutPath "$AppDirectory"
   File /r "${APP_SOURCE}\*"
   IfErrors failed
+
+verify:
+  IfFileExists "$AppDirectory\RootSound.exe" 0 failed
+  IfFileExists "$AppDirectory\resources\app\runtime\dotnet.exe" 0 failed
+  IfFileExists "$AppDirectory\resources\app\host\RootSound.Host.dll" 0 failed
   CreateDirectory "$INSTDIR\project"
   IfErrors failed
+  IfFileExists "$AppDirectory\resources\app\rootsound-installed" shortcut
   FileOpen $0 "$AppDirectory\resources\app\rootsound-installed" w
   IfErrors failed
   FileClose $0
@@ -76,6 +90,14 @@ shortcut:
     CopyFiles /SILENT "$INSTDIR\RootSound.lnk" "$DESKTOP"
     IfErrors failed
   ${EndIf}
+  nsExec::ExecToLog '"$AppDirectory\resources\app\runtime\dotnet.exe" "$AppDirectory\resources\app\host\RootSound.Host.dll" --cleanup-installed-versions'
+  Pop $0
+  StrCmp $0 "0" cleanupDone
+  MessageBox MB_OK|MB_ICONEXCLAMATION "新版已安装，部分旧版文件未能删除。关闭 RootSound 后可再次运行安装包清理。" /SD IDOK
+  SetErrorLevel 3
+  Goto done
+
+cleanupDone:
   SetErrorLevel 0
   Goto done
 

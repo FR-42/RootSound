@@ -49,6 +49,7 @@ export function mountPhraseComposition(root: HTMLElement, options: {
   readMultipleTempoRolls?(): boolean;
   readDrumLanes?(): boolean;
   readWorkbench?(): boolean;
+  enableGainCurve?: boolean;
   onLearningAction?(action: LearningAction): void;
   readLessonInput?: Parameters<typeof mountMelodyWorkspace>[1]['readLessonInput'];
   mobileTouch?: Parameters<typeof mountMelodyWorkspace>[1]['mobileTouch'];
@@ -129,7 +130,10 @@ export function mountPhraseComposition(root: HTMLElement, options: {
     } while (!disposed && scope !== playbackFamilyId);
   }
   const transport = createPhraseCompositionTransport({ runtime: sound, tempoBpm: tempo, lengthBeats: length, durationSeconds: duration, readBody: playbackBody,
-    prepare: preparePlayback, readPlan: () => phrase.previewPlan(playbackBody(), { allowSilence: true }),
+    prepare: preparePlayback, readPlan() {
+      const plan = phrase.previewPlan(playbackBody(), { allowSilence: true });
+      return options.directMusic ? { ...plan, preserveNoteLevel: true } : plan;
+    },
     onChange(next) {
       const wasPlaying = state.playing; state = next; updatePlayback();
       if (next.playing && !wasPlaying) { options.onLearningAction?.('play'); if (spaceAction === 'resume-space') options.onLearningAction?.('resume-space'); spaceAction = undefined; }
@@ -593,6 +597,7 @@ export function mountPhraseComposition(root: HTMLElement, options: {
     main.hidden = true; melodyRegion.hidden = false;
     activeSection = 'melody';
     try { sectionEditor = mountMelodyWorkspace(melodyRegion, { phrase, sound, initialView: current, gridBpm: gridTempo, readPerformanceMode: options.readPerformanceMode, includeAllSections: true,
+      enableGainCurve: options.enableGainCurve,
       readMultipleTempoRolls: options.readMultipleTempoRolls, readDrumLanes: options.readDrumLanes,
       readWorkbench: options.readWorkbench, onLearningAction: options.onLearningAction, readLessonInput: options.readLessonInput,
       mobileTouch,

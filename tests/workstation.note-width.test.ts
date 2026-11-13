@@ -41,6 +41,17 @@ test('six-beat bars with a three-beat pickup preserve notes and mark the real do
   assert.throws(()=>readPhraseBody({...body(120),beatsPerBar:6.5}));
 });
 
+test('3/8 draws three eighth-note beats per bar independently of subdivision count', () => {
+  const score = { ...body(120), beatsPerBar: 3, beatUnit: 8, lengthBeats: 3 };
+  const view = { leftSeconds: 0, zoom: 4, rowHeight: 32 };
+  for (const stepsPerBeat of [3, 5]) {
+    const lines = melodyScoreGrid({ ...score, stepsPerBeat }, view, 1800, 0);
+    assert.deepEqual(lines.filter(line => line.bar).map(line => line.seconds), [0, .75, 1.5]);
+    assert.deepEqual(lines.filter(line => line.beat && !line.bar).map(line => line.seconds), [.25, .5, 1, 1.25]);
+    close(lines.find(line => line.cell && !line.beat)!.seconds, .25 / stepsPerBeat);
+  }
+});
+
 test('detail grid reveals beats, configured cells and finer cells in successive zoom levels', () => {
   for (const stepsPerBeat of [2,3,4,9]) {
     const score={...body(120),stepsPerBeat},view=initialMelodyView(score,1000);

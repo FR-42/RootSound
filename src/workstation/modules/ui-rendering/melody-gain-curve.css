@@ -1,0 +1,37 @@
+.melody-gain-curve {
+  grid-column: 2 / -1; grid-row: 1; position: relative; z-index: 8; min-width: 0; min-height: 0;
+  overflow: hidden; isolation: isolate; touch-action: none; cursor: grab;
+  background: linear-gradient(to right, transparent calc(50% - .5px), #a4c2d647 calc(50% - .5px) calc(50% + .5px), transparent calc(50% + .5px));
+}
+.melody-gain-curve[hidden] { display: none; }
+.melody-gain-curve:active { cursor: grabbing; }
+.melody-gain-curve.is-pedal { background: none; }
+.melody-gain-curve svg { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.melody-gain-curve path { fill: none; stroke: #9bd2e5; stroke-width: 1.65; vector-effect: non-scaling-stroke; stroke-linecap: round; stroke-linejoin: round; }
+.melody-gain-curve .melody-gain-point { position: absolute; z-index: 1; transform: translate(-50%, -50%); width: 22px; height: 22px; border: 0; padding: 0; background: transparent; cursor: grab; touch-action: none; }
+.melody-gain-point::after { content: ''; position: absolute; inset: 6px; border-radius: 50%; border: 1px solid #a5d9e9; background: #21333f; }
+.melody-gain-point.is-guide::after { inset: 8px; border-color: #82b5c7; background: #192732; }
+.melody-gain-point:is(:hover, :focus-visible, :active, .is-active)::after { background: #c2eef7; box-shadow: 0 0 0 3px #a5d9e944; }
+.melody-gain-point:focus-visible { outline: none; }
+.melody-gain-point:active { cursor: grabbing; }
+.melody-gain-toolbar { position: absolute; right: 10px; top: 10px; z-index: 3; display: flex; align-items: center; gap: 3px; padding: 3px; border: 1px solid #90b1c83d; border-radius: 9px; background: #18232cf5; color: #dfedf2; font-size: 12px; }
+.melody-curve-picker, .melody-curve-close { color: inherit; background-color: transparent; border: 0; border-radius: 5px; height: 27px; cursor: pointer; }
+.melody-curve-picker { color-scheme: dark; padding-inline: 7px 3px; }
+.melody-curve-picker option { background: #18232c; }
+.melody-curve-close { width: 27px; position: relative; }
+.melody-curve-close::before, .melody-curve-close::after { content: ''; position: absolute; top: 50%; left: 50%; width: 12px; height: 1.5px; background: currentColor; transform: translate(-50%, -50%) rotate(45deg); }
+.melody-curve-close::after { transform: translate(-50%, -50%) rotate(-45deg); }
+.melody-curve-picker:hover, .melody-curve-close:hover { background-color: #2c414e; }
+.melody-gain-curve output { position: absolute; z-index: 2; transform: translateX(-50%); border-radius: 5px; background: #203440; color: #e0eff3; padding: 3px 6px; font-size: 11px; white-space: nowrap; pointer-events: none; }
+.melody-console .melody-edit-gain-curve { flex: none; border: 1px solid #cadde7; border-radius: 6px; padding: 5px 9px; background: #f0f7fa; color: #30576a; }
+.melody-console .melody-edit-gain-curve[aria-pressed=true] { background: #d4eaf2; }
+.is-vertical.is-gain-editing .melody-scroll, .is-vertical.is-gain-editing .melody-drum-canvas, .is-vertical.is-gain-editing .melody-after-end { background: #10151b; }
+.is-vertical.is-gain-editing .melody-pitch-row::after { background: #b0c3d020; }
+.is-vertical.is-gain-editing .melody-pitch-row.is-accidental { background: #7696af0c; }
+.is-vertical.is-gain-editing .melody-grid-line { background: #7c98af40; }
+.is-vertical.is-gain-editing .melody-grid-line.is-bar { background: #a3c0d168; }
+.is-gain-editing .melody-note { pointer-events: none; opacity: .64; }
+.is-gain-editing .melody-quick-scroll { z-index: 9; }
+.is-gain-editing :is(.melody-note-resize, .melody-roll-end, .melody-tempo-block) { visibility: hidden; }
+.is-vertical.is-gain-editing .melody-head-handle { width: 100%; }
+.is-gain-editing .melody-playhead-time { z-index: 9; right: 18px; }

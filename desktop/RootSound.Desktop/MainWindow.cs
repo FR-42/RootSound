@@ -1,5 +1,6 @@
 using Microsoft.Web.WebView2.Core;
 using Microsoft.Web.WebView2.WinForms;
+using System.Runtime.InteropServices;
 using System.Text.Json;
 
 namespace RootSound.Desktop;
@@ -7,6 +8,9 @@ namespace RootSound.Desktop;
 internal sealed class MainWindow : Form
 {
     private const string Origin = DesktopResourceRouter.Origin;
+    private const int CaptionColorAttribute = 35;
+    private const int CaptionTextColorAttribute = 36;
+    private const uint DefaultWindowColor = 0xffffffff;
     private readonly WebView2 view = new() { Dock = DockStyle.Fill, DefaultBackgroundColor = Color.FromArgb(250, 251, 253) };
     private readonly ProjectDirectoryManager projects;
     private readonly string dataDirectory;
@@ -27,6 +31,30 @@ internal sealed class MainWindow : Form
         Shown += async (_, _) => await InitializeView();
         FormClosing += ConfirmWindowClose;
         FormClosed += (_, _) => view.Dispose();
+    }
+
+    [DllImport("dwmapi.dll", ExactSpelling = true)]
+    private static extern int DwmSetWindowAttribute(IntPtr hwnd, int attribute, in uint value, int size);
+
+    protected override void OnHandleCreated(EventArgs e)
+    {
+        base.OnHandleCreated(e);
+        UpdateCaptionColors();
+    }
+
+    protected override void OnSystemColorsChanged(EventArgs e)
+    {
+        base.OnSystemColorsChanged(e);
+        UpdateCaptionColors();
+    }
+
+    private void UpdateCaptionColors()
+    {
+        if (!IsHandleCreated || !OperatingSystem.IsWindowsVersionAtLeast(10, 0, 22000)) return;
+        var caption = SystemInformation.HighContrast ? DefaultWindowColor : (uint)ColorTranslator.ToWin32(Color.FromArgb(239, 246, 250));
+        var text = SystemInformation.HighContrast ? DefaultWindowColor : (uint)ColorTranslator.ToWin32(Color.FromArgb(53, 86, 106));
+        DwmSetWindowAttribute(Handle, CaptionColorAttribute, in caption, sizeof(uint));
+        DwmSetWindowAttribute(Handle, CaptionTextColorAttribute, in text, sizeof(uint));
     }
 
     private async void ConfirmWindowClose(object? sender, FormClosingEventArgs eventArgs)

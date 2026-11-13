@@ -1,7 +1,7 @@
 import type { ContentRecord, Draft, MaterialLibrary } from '../contracts/content.ts';
 import type { EditableFileFormat } from '../contracts/project-directory.ts';
 import type { PhraseBody } from '../contracts/phrase.ts';
-import { phraseBeatSeconds, phraseHeldSeconds, phraseSecondsBeat } from '../contracts/phrase-time.ts';
+import { phraseBarBeats, phraseBeatSeconds, phraseHeldSeconds, phraseSecondsBeat } from '../contracts/phrase-time.ts';
 import { MAX_PHRASE_BEATS } from '../contracts/phrase-limits.ts';
 import { MIN_TEMPO_BPM, MAX_TEMPO_BPM } from '../contracts/music-limits.ts';
 import { createMaterialLibrary, createProjectPackages } from '../modules/materials/public.ts';
@@ -47,9 +47,14 @@ function libraryFromScore(score: ExchangeScore): string {
         ...(note.midiOnOrder === undefined ? {} : { midiOnOrder: note.midiOnOrder }), ...(note.midiOffOrder === undefined ? {} : { midiOffOrder: note.midiOffOrder }) })) };
   });
   const first = score.tempos[0]?.bpm ?? 120;
+  const meter = score.meter ? { beatsPerBar: score.meter.numerator, beatUnit: score.meter.denominator } : {};
+  const bar = phraseBarBeats(meter);
   const body = readPhraseBody({ model: 'note-phrase', version: 1, timeUnit: 'beat', tempoBpm: first,
-    lengthBeats: Math.max(.25, score.length), stepsPerBeat: 4, ...(score.midiExpression?.length ? { midiExpression: score.midiExpression } : {}),
-    tempoSections: score.tempos.filter(point => point.beat > 0 && point.beat < score.length).map(point => ({ id: crypto.randomUUID(), startBeat: point.beat, tempoBpm: point.bpm })), parts });
+    lengthBeats: Math.max(.25, score.length), stepsPerBeat: 4, ...meter, ...(score.midiExpression?.length ? { midiExpression: score.midiExpression } : {}),
+    tempoSections: score.tempos.filter(point => point.beat > 0 && point.beat < score.length).map(point => {
+      const offset = point.beat % bar;
+      return { id: crypto.randomUUID(), startBeat: point.beat, tempoBpm: point.bpm, ...(offset > 1e-8 && bar - offset > 1e-8 ? { gridOffsetBeats: offset } : {}) };
+    }), parts });
   const phrase: ContentRecord = { id: crypto.randomUUID(), kind: 'rootsound.phrase', owner: 'phrase', schemaVersion: 1,
     revision: 1, name: score.name, dependencies: [...palette.values()].map(tone => tone.id), body };
   const song: Draft = { id: crypto.randomUUID(), kind: 'rootsound.song', owner: 'song', schemaVersion: 1, name: score.name,
@@ -107,7 +112,9 @@ export function scoreForFile(library: MaterialLibrary, body: PhraseBody, name: s
         ...(note.midiOnOrder === undefined ? {} : { midiOnOrder: note.midiOnOrder }), ...(note.midiOffOrder === undefined ? {} : { midiOffOrder: note.midiOffOrder }) })) };
   });
   if (body.parts.some(part => part.unassigned && part.notes.length)) warnings.add('未定义音色的静默音符不写入原格式；.rootsound 可以保留。');
-  return { score: { name, length: body.lengthBeats, ...(body.midiExpression?.length ? { midiExpression: structuredClone(body.midiExpression) } : {}), tempos: [{ beat: 0, bpm: body.tempoBpm },
+  const numerator = body.beatsPerBar ?? 4, denominator = body.beatUnit ?? 4;
+  const meter = numerator !== 4 || denominator !== 4 ? { numerator, denominator } : undefined;
+  return { score: { name, length: body.lengthBeats, ...(meter ? { meter } : {}), ...(body.midiExpression?.length ? { midiExpression: structuredClone(body.midiExpression) } : {}), tempos: [{ beat: 0, bpm: body.tempoBpm },
     ...(body.tempoSections ?? []).map(point => ({ beat: point.startBeat, bpm: point.tempoBpm }))], parts }, warnings: [...warnings] };
 }
 
@@ -142,6 +149,8 @@ export function createMusicFileSession(format: EditableFileFormat, bytes: Uint8A
       return { bytes: new TextEncoder().encode(createProjectPackages(stored.library, adapters(), { rootKind: 'rootsound.song' }).exportDraft(song.read().draft!.id).text), warnings: [] };
     }
     if (grid(body) !== baselineGrid) current.warnings.push('每拍细分属于简乐的编辑设置，不写入这种通用格式。音符的位置与长度会保留。');
+    if (body.parts.some(part => part.gainCurve?.length)) current.warnings.push('这种格式无法保留音色卡的音量增益曲线。另存为 .rootsound 可以保留。');
+    if (body.parts.some(part => part.performanceCurves)) current.warnings.push('另存为 .rootsound 可保留音高、力度和踏板曲线。');
     if (body.tempoSections?.some(point => point.gridOffsetBeats) && gridOffsets(body) !== baselineGridOffsets)
       current.warnings.push('这种通用格式无法保留卷帘分界处的半拍网格。另存为 .rootsound 可以保留。');
     if (format === 'midi') {

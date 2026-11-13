@@ -15,7 +15,7 @@ test('portable desktop host creates, edits without autosave, saves, reopens, cop
     const initial = await call('project.Read'); assert.equal(initial.current, null);
     const data = createInitialProjectLibrary('跨平台测试');
     const made = await call('project.Create', '跨平台测试', initial.defaultLocation, data);
-    assert.equal(made.status, 'created'); let filename = made.project.path;
+    assert.equal(made.status, 'created'); const filename = made.project.path;
     const disk = await readFile(filename, 'utf8');
     await call('project.FinishLoading'); const storage = await call('storage.Read');
     assert.equal(storage.ok, true); const working = JSON.parse(storage.value);
@@ -24,8 +24,9 @@ test('portable desktop host creates, edits without autosave, saves, reopens, cop
     assert.equal((await call('storage.WriteScoped', changed, storage.scope)).ok, true);
     assert.equal(await readFile(filename, 'utf8'), disk, 'editing must not write the project');
     assert.equal((await call('project.Read')).hasUnsavedChanges, true);
-    const save = await call('project.Save', '保存后的名字'); assert.equal(save.status, 'saved'); filename = save.project.path;
-    assert.equal(path.basename(filename), '保存后的名字.rootsound');
+    const save = await call('project.Save', '保存后的名字'); assert.equal(save.status, 'saved');
+    assert.equal(save.project.path, filename);
+    assert.equal(JSON.parse(await readFile(filename, 'utf8')).name, '保存后的名字');
     assert.notEqual(await readFile(filename, 'utf8'), disk);
     assert.equal((await call('project.List')).projects.length, 1);
     const saved = await readFile(filename, 'utf8');
@@ -34,6 +35,10 @@ test('portable desktop host creates, edits without autosave, saves, reopens, cop
     assert.equal((await call('project.Exit', 'discard', '')).status, 'exited');
     assert.equal(await readFile(filename, 'utf8'), saved);
     assert.equal((await call('storage.WriteScoped', changed, storage.scope)).ok, false, 'stale pages cannot write another session');
+    assert.deepEqual(await call('project.ResolveLibrarySongPath', filename, made.project.id), { status: 'ready', path: filename });
+    assert.equal((await call('project.ResolveLibrarySongPath', filename, '00000000-0000-0000-0000-000000000000')).status, 'error');
+    assert.equal((await call('project.Read')).current, null, 'resolving a path does not open the score');
+    assert.equal(await readFile(filename, 'utf8'), saved);
     const opened = await call('project.OpenKnown', filename); assert.equal(opened.status, 'opened');
     const current = await call('storage.Read');
     const copy = await call('project.CreateCopy', '独立副本', initial.defaultLocation, current.value); assert.equal(copy.status, 'created');
@@ -52,7 +57,7 @@ test('portable desktop host creates, edits without autosave, saves, reopens, cop
   } finally { host.close(); }
 });
 
-test('filename governs discovery/opening, saving renames atomically and conflicts or failed writes preserve the original', async () => {
+test('filename governs discovery and opening, saving keeps the path, and explicit rename rejects conflicts', async () => {
   const root = path.resolve('.test-output/release-host-fixtures'); await mkdir(root, { recursive: true });
   const directory = await mkdtemp(path.join(root, 'names-'));
   const host = new HostClient('dotnet', path.resolve('.cache/release-host/RootSound.Host.dll'), directory);
@@ -71,25 +76,33 @@ test('filename governs discovery/opening, saving renames atomically and conflict
     assert.equal((await call('project.Read')).hasUnsavedChanges, false);
     assert.equal(await readFile(filename, 'utf8'), original, 'opening cannot write metadata back to disk');
     await call('project.Save', '外部改名');
-    let envelope = JSON.parse(await readFile(filename, 'utf8')); assert.equal(envelope.name, '外部改名');
+    const envelope = JSON.parse(await readFile(filename, 'utf8')); assert.equal(envelope.name, '外部改名');
     assert.equal(JSON.parse(envelope.libraryText).drafts.find(d => d.kind === 'rootsound.song').name, '外部改名');
     const before = await readFile(filename, 'utf8');
     const occupied = path.join(defaultLocation, '冲突.rootsound'); await writeFile(occupied, '这是另一个文件');
     const renamed = renameProjectLibrary(synced, '冲突'); await call('storage.WriteScoped', renamed, stored.scope);
-    assert.equal((await call('project.Save', '冲突')).status, 'error');
-    assert.equal(await readFile(filename, 'utf8'), before); assert.equal(await readFile(occupied, 'utf8'), '这是另一个文件');
-    assert.equal((await call('project.Read')).current.path, filename);
     const invalid = JSON.parse(synced); invalid.invalidExport = { encoding: 'host-asset' };
     assert.equal((await call('storage.WriteScoped', JSON.stringify(invalid), stored.scope)).status, 'error');
     assert.equal(await readFile(filename, 'utf8'), before, 'invalid input cannot modify the source');
     assert.equal((await call('project.Read')).hasUnsavedChanges, true);
+    const save = await call('project.Save', '冲突');
+    assert.equal(save.status, 'saved'); assert.equal(save.project.path, filename);
+    const checkpoint = await readFile(filename, 'utf8'); assert.equal(JSON.parse(checkpoint).name, '冲突');
+    assert.equal(await readFile(occupied, 'utf8'), '这是另一个文件');
+    await call('project.Exit', 'discard', '');
+    const snapshot = await call('project.Inspect', filename, made.project.id);
+    assert.equal(snapshot.status, 'snapshot');
+    assert.equal((await call('project.Rename', filename, made.project.id, '冲突', renamed, snapshot.token)).status, 'error');
+    assert.equal(await readFile(filename, 'utf8'), checkpoint);
+    assert.equal(await readFile(occupied, 'utf8'), '这是另一个文件');
     for (const name of ['Case', 'case']) {
-      await call('storage.WriteScoped', renameProjectLibrary(synced, name), stored.scope);
-      const saved = await call('project.Save', name); assert.equal(saved.status, 'saved', JSON.stringify(saved));
-      assert.equal(path.basename(saved.project.path), name + '.rootsound'); filename = saved.project.path;
+      const snapshot = await call('project.Inspect', filename, made.project.id);
+      assert.equal(snapshot.status, 'snapshot');
+      const result = await call('project.Rename', filename, made.project.id, name, renameProjectLibrary(snapshot.libraryText, name), snapshot.token);
+      assert.equal(result.status, 'renamed', JSON.stringify(result));
+      assert.equal(path.basename(result.project.path), name + '.rootsound'); filename = result.project.path;
       assert.equal(JSON.parse(await readFile(filename, 'utf8')).name, name);
     }
-    await call('project.Exit', 'discard', '');
     assert.equal((await call('project.OpenKnown', filename)).status, 'opened', 'new filename remains owned and can reopen');
   } finally { host.close(); }
 });
@@ -117,6 +130,15 @@ test('project library discovers nested files, opens/renames/deletes them, and st
     const listed = await call('project.List');
     assert.deepEqual(listed.projects.map(p => p.path).sort(), [top.path, deep.path, upperPath].sort());
     assert.equal(await readFile(deep.path, 'utf8'), before, 'discovery is read only');
+    const midiPath = path.join(nested, '主题.mid');
+    const midi = Buffer.from('4d546864000000060000000101e04d54726b0000000400ff2f00', 'hex');
+    await writeFile(midiPath, midi);
+    assert.deepEqual(await call('project.ResolveLibrarySongPath', midiPath, ''), { status: 'ready', path: midiPath });
+    assert.deepEqual(await readFile(midiPath), midi);
+    assert.equal((await call('project.ResolveLibrarySongPath', excluded.path, excluded.id)).status, 'error');
+    assert.equal((await call('project.ResolveLibrarySongPath', path.join(defaultLocation, '外部链接', path.basename(excluded.path)), excluded.id)).status, 'error');
+    assert.equal((await call('project.ResolveLibrarySongPath', nested, '')).status, 'error');
+    assert.equal((await call('project.ResolveLibrarySongPath', path.join(nested, '已移动.mid'), '')).status, 'error');
     assert.equal((await call('project.OpenKnown', excluded.path)).status, 'error');
     assert.equal((await call('project.OpenKnown', path.join(defaultLocation, '外部链接', path.basename(excluded.path)))).status, 'error');
     assert.equal((await call('project.OpenKnown', deep.path)).status, 'opened');

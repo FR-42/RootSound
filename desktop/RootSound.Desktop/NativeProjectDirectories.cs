@@ -75,6 +75,28 @@ public sealed class NativeProjectDirectories
     public string DeleteLibraryEntry(string path) => Run(() =>
     { manager.DeleteLibraryEntry(path); return "{\"status\":\"ready\"}"; });
 
+    public string RevealLibrarySong(string path, string expectedId) => Run(() =>
+    {
+        string file = manager.ResolveLibrarySongPath(path, expectedId);
+        Application.OleRequired();
+        IntPtr item = ILCreateFromPathW(file);
+        if (item == IntPtr.Zero) throw new IOException("无法在文件资源管理器中找到这首乐曲。");
+        try
+        {
+            if (SHOpenFolderAndSelectItems(item, 0, IntPtr.Zero, 0) < 0)
+                throw new IOException("无法打开乐曲所在的文件夹。");
+            return "{\"status\":\"ready\"}";
+        }
+        finally { ILFree(item); }
+    });
+
+    [DllImport("shell32.dll", CharSet = CharSet.Unicode, ExactSpelling = true)]
+    private static extern IntPtr ILCreateFromPathW(string path);
+    [DllImport("shell32.dll", ExactSpelling = true)]
+    private static extern int SHOpenFolderAndSelectItems(IntPtr item, uint count, IntPtr children, uint flags);
+    [DllImport("shell32.dll", ExactSpelling = true)]
+    private static extern void ILFree(IntPtr item);
+
     public string OpenKnown(string path) => Run(() => NativeDocumentFiles.Format(path) is not null
         ? SourceResult(manager.ReadDocumentFile(path, known: true))
         : JsonSerializer.Serialize(new { status = "opened", project = manager.OpenKnown(path) }));

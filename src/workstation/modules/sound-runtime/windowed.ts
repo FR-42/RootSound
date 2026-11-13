@@ -1,5 +1,5 @@
 import { allocateGraph, createWindowedSampleCache, releaseGraph, releaseScheduledNotes, scheduleGraph, startGraphSource, type GraphResources, type SoundGraph } from './graph.ts';
-import { noteDuration, type ScheduledPreview } from './plan.ts';
+import type { ScheduledPreview } from './plan.ts';
 
 /** Device-clock lookahead; the timer only replenishes it, never supplies note timing. */
 export const SCHEDULING_LOOKAHEAD_SECONDS = .35;
@@ -74,7 +74,7 @@ export class WindowedGraph {
     const horizon = from + SCHEDULING_LOOKAHEAD_SECONDS;
     while (this.#cursor < this.#events.length && this.#events[this.#cursor]!.atSeconds <= horizon) {
       const event = this.#events[this.#cursor++]!;
-      const end = event.atSeconds + noteDuration(event.sound);
+      const end = event.atSeconds + event.duration;
       // If a background timer was delayed, recover a surviving note at its real
       // age. Entirely expired notes must not be replayed as a burst on return.
       if (end <= from) continue;

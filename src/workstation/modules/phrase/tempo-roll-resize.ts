@@ -1,6 +1,6 @@
 import type { PhraseBody, PhraseNote } from '../../contracts/phrase.ts';
 import { MAX_PHRASE_BEATS, MIN_NOTE_BEATS, MIN_NOTE_SECONDS } from '../../contracts/phrase-limits.ts';
-import { phraseBeatSeconds, phraseHeldSeconds, phraseSecondsBeat, phraseTempoBoundary, phraseTempoSpans, phraseTempoSpanAtBeat } from '../../contracts/phrase-time.ts';
+import { phraseBarBeats, phraseBeatSeconds, phraseHeldSeconds, phraseSecondsBeat, phraseTempoBoundary, phraseTempoSpans, phraseTempoSpanAtBeat } from '../../contracts/phrase-time.ts';
 
 function moveTempoBoundary(body: PhraseBody, id: string, startBeat: number, gridOnly: boolean): PhraseBody {
   const { index, upper, lower, ratio, beatShiftPerBeat, minimum, maximum } = phraseTempoBoundary(body, id);
@@ -10,7 +10,7 @@ function moveTempoBoundary(body: PhraseBody, id: string, startBeat: number, grid
   const delta = startBeat - lower.startBeat;
   if (Math.abs(delta) < 1e-10) return body;
 
-  const bar = body.beatsPerBar ?? 4;
+  const bar = phraseBarBeats(body);
   const offset = (lower.gridOffsetBeats ?? 0) + delta * ratio;
   const phase = ((offset % bar) + bar) % bar;
   const shift = delta * beatShiftPerBeat;
@@ -60,7 +60,7 @@ export function resizeTempoRoll(body: PhraseBody, id: string | undefined, startB
   const sections = body.tempoSections ?? [];
   const previousStart = sections.at(-1)?.startBeat ?? 0;
   const lengthBeats = startBeat;
-  if (!Number.isFinite(startBeat) || startBeat < previousStart + (body.beatsPerBar ?? 4) || lengthBeats > MAX_PHRASE_BEATS)
+  if (!Number.isFinite(startBeat) || startBeat < Math.max(.25, previousStart + phraseBarBeats(body)) || lengthBeats > MAX_PHRASE_BEATS)
     throw new Error('上一段至少保留一个小节，音乐总长不能超过当前长度范围。');
   if (Math.abs(lengthBeats - body.lengthBeats) < 1e-10) return body;
   const next: PhraseBody = { ...body, lengthBeats, parts: [] };

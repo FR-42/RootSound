@@ -3,6 +3,44 @@ import test from 'node:test';
 import type { SoundPlan, SoundRuntimeEvent, SoundSequencePlan } from '../../contracts/sound.ts';
 import { createBrowserSoundRuntime } from './browser.ts';
 import { FakeAudioContext, acquired, audio, close, fixture, longSample, phrase, plan } from './testing.ts';
+import { dbAmplitude } from '../../contracts/gain-curve.ts';
+
+test('card gain ramps through an already-held note without changing neighboring cards', async () => fixture(async () => {
+  const runtime = createBrowserSoundRuntime();
+  const held = { ...plan(), note: { ...plan().note, holdSeconds: 2 } };
+  const input = { ...phrase([{ atSeconds: 0, sound: held, gainCurveId: 'a' }, { atSeconds: 0, sound: held }], 3),
+    gainCurves: { a: [{ atSeconds: 0, db: -6 }, { atSeconds: 1, db: 6 }, { atSeconds: 2, db: 0 }] }, preserveNoteLevel: true } as const;
+  try {
+    const session = await runtime.preview(input), device = audio();
+    const ramps = device.gains.find(node => node.gain.changes.some(change => change.value === dbAmplitude(6)))!.gain.changes;
+    close(ramps[0]!.value, dbAmplitude(-6));
+    const at = (seconds: number) => ramps.find(change => Math.abs(change.time - session.startedAtSeconds! - seconds) < 1e-8)!.value;
+    close(at(.25), dbAmplitude(-4.125));
+    close(at(1), dbAmplitude(6));
+    close(at(2), dbAmplitude(0));
+    assert.equal(device.gains.filter(node => node.gain.changes.some(change => change.value === dbAmplitude(6))).length, 1);
+  } finally { await runtime.dispose(); }
+}));
+
+test('card pitch bends a held oscillator and sample, and seeks into the sample at its bent age', async () => fixture(async () => {
+  const runtime = createBrowserSoundRuntime();
+  const sample = longSample();
+  const held = { ...plan(), note: { ...plan().note, holdSeconds: 2 } };
+  const input: SoundSequencePlan = { ...phrase([{ atSeconds: 0, sound: sample, pitchCurveId: 'a' },
+    { atSeconds: 0, sound: held, pitchCurveId: 'a' }, { atSeconds: 0, sound: held }], 3),
+    pitchCurves: { a: [{ atSeconds: 0, db: 0 }, { atSeconds: 1, db: 12 }] }, transport: { positionSeconds: .5, rate: 1 } };
+  try {
+    await runtime.preview(input);
+    const device = audio();
+    const bent = device.oscillators.filter(node => node.detune.changes.length);
+    assert.equal(bent.length, 1);
+    close(bent[0]!.detune.changes[0]!.value, 600);
+    assert(bent[0]!.detune.changes.some(change => change.value === 1200));
+    const source = device.sampleSources.find(node => node.detune.changes.length)!;
+    assert(source.offset > sample.startSeconds + .5 * sample.playbackRate);
+    assert(source.offset < sample.startSeconds + .5 * sample.playbackRate * Math.SQRT2);
+  } finally { await runtime.dispose(); }
+}));
 
 test('listening volume works before activation and live without changing transport or note gains', async () => fixture(async () => {
   const runtime=createBrowserSoundRuntime(); runtime.setOutputLevel!(2);
@@ -379,6 +417,29 @@ test('overlapping notes are conservatively normalized while adjacent notes keep 
   const first = audio().oscillators.length;
   await assert.rejects(runtime.preview(phrase(Array.from({ length: 257 }, () => ({ atSeconds: 0, sound: loud })))), /256/);
   assert.equal(audio().oscillators.length, first);
+  await runtime.dispose();
+}));
+
+test('editing and overlapping score playback use the same note gain and pan', async () => fixture(async () => {
+  const runtime = createBrowserSoundRuntime();
+  const loud = { ...plan(), level: .9, note: { ...plan().note, velocity: 1 } };
+  const options = { pan: -.35, preserveNoteLevel: true } as const;
+  const input = { ...phrase([{ atSeconds: 0, sound: loud, pan: options.pan }, { atSeconds: .05, sound: loud }]), preserveNoteLevel: true } as const;
+  const peak = (index: number) => audio().gains[index]!.gain.changes.find(change => change.kind === 'ramp')!.value;
+  await runtime.audition(loud, options);
+  close(peak(2), .9);
+  const first = audio().gains.length;
+  await runtime.preview(input);
+  close(peak(first), .9);
+  close(peak(first + 2), .9);
+  const scoreOutput = audio().panners.at(-2)!.connections[0];
+  const before = audio().gains.length;
+  await runtime.audition(loud, options);
+  close(peak(before), .9);
+  assert.equal(audio().panners.at(-1)!.pan.changes[0]!.value, options.pan);
+  assert.equal(audio().panners.at(-1)!.connections[0], scoreOutput);
+  assert.equal(audio().gains.length, before + 2, 'matching note auditions do not duck playback');
+  assert.equal(audio().shapers.length, 1);
   await runtime.dispose();
 }));
 

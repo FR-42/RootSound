@@ -97,6 +97,11 @@
 .melody-tone-delete-actions button { padding: 6px 14px; border: 1px solid var(--border); border-radius: 4px; background: var(--surface); color: var(--text); }
 .melody-tone-delete-actions .melody-tone-delete-confirm { border-color: var(--border); color: var(--danger); }
 .melody-tone-delete-error { color: var(--danger); }
+.melody-card-menu { position: fixed; z-index: 61; min-width: 102px; padding: 4px; border: 1px solid var(--border); border-radius: 7px; background: var(--surface); box-shadow: 0 6px 18px #263b4d26; }
+.melody-card-menu[hidden] { display: none; }
+.melody-card-menu button { display: flex; align-items: center; gap: 7px; width: 100%; padding: 5px 8px; border: 0; border-radius: 4px; background: transparent; color: var(--danger); text-align: left; font-size: 12px; }
+.melody-card-menu button:is(:hover, :focus-visible) { background: var(--surface-hover); }
+.melody-card-menu svg { order: -1; width: 15px; height: 15px; }
 @media (max-width: 760px) { .melody-main { grid-template-columns: 112px minmax(0, 1fr); } .melody-shelf { padding: 8px; } .melody-console { padding: 10px; gap: 14px; } }
 .rhythm-workspace .melody-shelf { position: relative; display: block; padding: 0; overflow: hidden; }
 .rhythm-workspace .melody-shelf::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 24px; background: var(--surface); border-bottom: 1px solid var(--border); z-index: 3; }
@@ -164,17 +169,20 @@
   position: relative;
   display: grid;
   grid-template-columns: var(--melody-roll-controls-width) minmax(0, 1fr);
-  grid-template-rows: minmax(0, 1fr) 48px;
+  grid-template-rows: minmax(0, 1fr) var(--melody-keyboard-height);
 }
 .is-vertical.has-drum-strip .melody-roll {
   grid-template-columns: var(--melody-roll-controls-width) minmax(0, 1fr) var(--melody-drum-width);
 }
-.melody-drum-strip { grid-column: 3; grid-row: 1 / 3; display: grid; grid-template-rows: minmax(0, 1fr) 48px; min-height: 0; }
+.melody-drum-strip { grid-column: 3; grid-row: 1 / 3; display: grid; grid-template-rows: minmax(0, 1fr) var(--melody-keyboard-height); min-height: 0; }
 .melody-drum-strip[hidden] { display: none; }
 .melody-drum-canvas {
   position: relative;
   overflow: hidden;
-  background: repeating-linear-gradient(to right, #bac8d8 0 1px, #eef4fa 1px var(--melody-drum-lane-width));
+  --drum-grid-line: color-mix(in srgb, #bac8d8 calc(100% * var(--melody-grid-opacity, 1)), transparent);
+  --drum-grid-width: calc(1px * var(--melody-grid-thickness, 1));
+  background-color: #fff;
+  background-image: repeating-linear-gradient(to right, var(--drum-grid-line) 0 var(--drum-grid-width), transparent var(--drum-grid-width) var(--melody-drum-lane-width));
   cursor: crosshair;
   touch-action: none;
 }
@@ -270,11 +278,15 @@
 }
 
 .is-vertical .melody-tempo-dock { grid-column: 1; grid-row: 2; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 8; border-right: 1px solid var(--border); border-top: 1px solid var(--border); background: var(--surface); }
-.melody-tempo-block { display: flex; align-items: flex-start; justify-content: flex-start; padding: 2px 0 0 1px; box-sizing: border-box; }
 .melody-tempo-button, .melody-tempo-marker { width: 27px; height: 18px; padding: 0; border: 0; border-radius: 2px; background: transparent; color: var(--muted); font-size: 10px; font-variant-numeric: tabular-nums; line-height: 18px; cursor: pointer; }
 .melody-tempo-button:hover, .melody-tempo-marker:hover { color: var(--text); background: var(--surface-hover); }
 .melody-tempo-panel { position: fixed; z-index: 60; padding: 6px; display: grid; grid-template-columns: max-content max-content; gap: 6px; border: 1px solid var(--border); border-radius: 5px; color: var(--text); background: var(--surface); box-shadow: 0 5px 20px #263b4d26; }
 .melody-tempo-panel[hidden] { display: none; }
+.melody-tempo-menu { position: fixed; z-index: 61; min-width: 74px; padding: 4px; border: 1px solid var(--border); border-radius: 5px; background: var(--surface); box-shadow: 0 5px 20px #263b4d26; }
+.melody-tempo-menu[hidden] { display: none; }
+.melody-tempo-menu button { display: block; width: 100%; padding: 5px 10px; border: 0; border-radius: 3px; background: transparent; color: var(--text); text-align: left; font-size: 12px; }
+.melody-tempo-menu button:enabled:hover, .melody-tempo-menu button:focus-visible { background: var(--surface-hover); }
+.melody-tempo-menu button:disabled { color: var(--muted); opacity: .55; }
 .melody-tempo-field, .melody-tempo-grid-field { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 12px; }
 .melody-tempo-field { gap: 4px; }
 .melody-tempo-grid-field { grid-column: 1 / -1; }
@@ -294,10 +306,10 @@
 .melody-tempo-bands { position: absolute; inset: 0; pointer-events: none; }
 .melody-bpm-roll { position: absolute; left: 0; right: 0; box-sizing: border-box; border-top: 2px solid #537594; }
 .melody-bpm-roll.is-continuation { border-top: 0; }
-.melody-bpm-roll.is-alternate { background: #f2f6fa; }
-.melody-tempo-block { position: absolute; left: 0; width: calc(100% - 7px); height: 20px; z-index: 7; background: transparent; }
+.melody-tempo-block { position: absolute; left: 0; width: calc(100% - 7px); height: 20px; z-index: 7; display: grid; place-items: center; background: transparent; }
 .melody-tempo-block[hidden] { display: none; }
 .melody-tempo-marker { position: relative; cursor: ns-resize; touch-action: none; user-select: none; }
+.melody-tempo-marker.is-fixed { cursor: pointer; }
 .melody-tempo-marker.is-dragging { background: var(--surface-hover); box-shadow: 0 2px 8px #263b4d26; }
 .melody-tempo-resize-hint { position: fixed; z-index: 60; padding: 5px 8px; border: 1px solid var(--border); border-radius: 4px; background: var(--surface); color: var(--text); font-size: 11px; pointer-events: none; }
 .melody-tempo-resize-hint[hidden] { display: none; }
@@ -314,5 +326,5 @@
 .melody-note-family.is-group-dragging { opacity: .45; cursor: grabbing; }
 .melody-tone-entry.is-merge-target { outline: 2px solid var(--tone-color, #69c9b9); outline-offset: 2px; border-radius: 6px; background: #69c9b922; }
 
-.is-vertical.has-workbench .melody-roll { grid-template-rows: minmax(0, 1fr) 48px auto; }
+.is-vertical.has-workbench .melody-roll { grid-template-rows: minmax(0, 1fr) var(--melody-keyboard-height) auto; }
 .is-vertical .melody-console { grid-column: 1 / -1; grid-row: 3; min-height: 76px; }

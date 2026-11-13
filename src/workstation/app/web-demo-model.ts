@@ -9,7 +9,7 @@ import { createInitialProjectLibrary, projectName } from './project-setup.ts';
 import { openMusicDocument, commitMusicDocument } from './music-document.ts';
 import { ensureProjectMelodyTimbres, listProjectTimbres, createProjectPhraseNoteGroup, changeProjectPhraseNoteGroupTimbre } from './project-timbres.ts';
 import type { PhraseBody } from '../contracts/phrase.ts';
-import { phraseBeatSeconds, phraseHeldSeconds } from '../contracts/phrase-time.ts';
+import { phraseBarBeats, phraseBeatSeconds, phraseHeldSeconds } from '../contracts/phrase-time.ts';
 
 export const WEB_TONES = ['studio-piano', 'studio-flute', 'studio-violin', 'studio-bass', 'studio-guitar', 'studio-black-pearl-kick', 'studio-black-pearl-snare', 'studio-black-pearl-hat-closed'] as const;
 export const WEBSITE_PIANO = ['studio-piano'] as const;
@@ -18,7 +18,7 @@ export const WEB_MAX_NOTES = 2048;
 export const WEB_MAX_FILE_BYTES = 16 * 1024 * 1024;
 
 export function checkWebScore(body: PhraseBody): void {
-  const beatLimit = Math.min(WEB_MAX_BEATS, 16 * (body.beatsPerBar ?? 4));
+  const beatLimit = Math.min(WEB_MAX_BEATS, 16 * phraseBarBeats(body));
   if (body.lengthBeats > beatLimit + 1e-8) throw new Error('网页版最多支持 16 小节（4/4 下为 64 拍）。请在桌面版打开更长的音乐。');
   if (body.parts.length > 16) throw new Error('网页版最多支持 16 个音符组，请在桌面版继续编辑。');
   if (body.parts.reduce((n, part) => n + part.notes.length + (part.hiddenNotes?.length ?? 0), 0) > WEB_MAX_NOTES) throw new Error('网页版最多支持 2048 个音符，请在桌面版继续编辑。');

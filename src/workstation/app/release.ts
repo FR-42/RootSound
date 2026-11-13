@@ -1,7 +1,12 @@
 import { createDesktopPlatform } from './platform/desktop.ts';
 import { mountReleaseStudio, showReleaseStartupError } from './release-studio.ts';
+import './release-window.css';
 
 const root = document.getElementById('app')!;
+const titlebar = document.createElement('div');
+titlebar.className = 'release-window-titlebar';
+titlebar.setAttribute('aria-hidden', 'true');
+root.before(titlebar);
 async function start() {
   try {
     const platform = createDesktopPlatform(), projectDirectories = platform.projectDirectories;

@@ -29,6 +29,11 @@ Earlier wording and source IDs are preserved in [the original record](../history
 - A vertical piano roll uses horizontal pitch and vertical time. Note groups remain independently editable.
 - Keep the interface compact and transport controls centered. Tempo rolls use thin one-line labels;
   clicking opens a panel with BPM, 敲击定位 and grid count. Rolls retain independent tempo/grid settings.
+  The first label is fixed. Clicking a roll targets the BPM control to the left of the keyboard. Deleting a roll through its
+  context menu extends the preceding roll over the same beats and retains the notes. The first roll remains
+  and the setting can be turned off with one roll. The bottom resize edge has a downward fading shadow.
+- The BPM panel offers a score-wide time signature, defaulting to 4/4, independent of subdivisions.
+  Changing meter preserves note timing. Bar lines are heaviest, then beat lines, then subdivision lines.
 - Old removal of empty settings is superseded by the explicit learning/advanced-feature settings.
   Old in-editor tutorial steps are superseded by hands-on practice. The website image deck is a separate scope.
   Sources: D-2026-11-02, vertical-roll, D-2026-11-05-roll-label, hands-on-guidance.
@@ -103,9 +108,9 @@ Earlier wording and source IDs are preserved in [the original record](../history
 - The user then separated note and group selection in the vertical roll. Only group selection dims
   other groups and enables blank-space writing. Dimmed notes cannot be moved or resized. Blank drags pan with a single note selected or
   with no selection. A bright note can be moved or resized directly from any state.
-  The user later restored right-click deletion. A right click on a note deletes it, and holding the
-  right button erases all notes crossed by the pointer, including dimmed notes. A right click on blank
-  space clears selection.
+  Right-clicking a note or sweeping with the right button erases notes in the selected group, or in any
+  group when no group is selected. Dimmed notes behave like blank space. A right click on blank space
+  clears selection.
 - Without the optional workbench, only groups are selected in the vertical roll; clicking or dragging notes keeps that selection.
 - On 2026-11-10 the user enabled individual-note selection behind a default-off Workbench setting.
   Group selection opens timbre replacement, removal, volume and pan; note selection opens volume, pan and sounding time.

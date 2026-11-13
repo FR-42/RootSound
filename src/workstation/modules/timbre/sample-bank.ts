@@ -4,6 +4,7 @@ import type { PcmAudio, SampleSoundPlan, SoundPlan } from '../../contracts/sound
 import type { SampleBankTimbreBody, SampleBankZone } from '../../contracts/timbre.ts';
 import { decodePcmWav } from '../sampling/audio.ts';
 import { readSampleBankBody, selectBankZones } from './sample-bank-model.ts';
+import { quietSampleLead, sampleBassCompensation } from './sample-bank-bass.ts';
 import { defaultInstrumentInfo, DRUM_REFERENCE_FREQUENCY_HZ, unpitchedDrumKey } from './instrument-catalog.ts';
 
 type AssetZone = Omit<SampleBankZone,'sampleId'> & { asset:string; byteLength:number; sampleRate:number; channels:number; frames:number };
@@ -55,6 +56,7 @@ export function createSampleBankAudio(_library:MaterialLibrary, samples?:SampleA
   }
   const preparedRegions = new Map<string, AssetZone[]>();
   const readySources = new Map<string, Asset>();
+  const quietLeads = new WeakMap<AssetZone, number>();
   async function prepare(body: SampleBankTimbreBody, notes: readonly SoundPlan['note'][]) {
     if (body.zones) {
       if (!samples) throw new Error('工程采样尚未接入声音运行模块。');
@@ -78,15 +80,31 @@ export function createSampleBankAudio(_library:MaterialLibrary, samples?:SampleA
     const hz = frequency(body, note);
     const playedNote = drum === undefined ? note : {...note, frequencyHz: hz};
     const zones=selectBankZones<SampleBankZone | AssetZone>(body.zones ?? preparedRegions.get(body.instrument) ?? [],hz,note.velocity);
+    const percussion = drum !== undefined || defaultInstrumentInfo('',body)?.category === '打击';
+    const naturalRelease = !body.zones && !percussion;
+    const releaseLimit = naturalRelease
+      ? Math.min(.36, (body.instrument === 'studio-piano' ? .22 : .16) + note.holdSeconds * .1) : Infinity;
+    const compensation = body.zones || percussion ? undefined : sampleBassCompensation(body.instrument, hz);
     function layer(zone:SampleBankZone | AssetZone):SampleSoundPlan {
     const sourceId='sampleId' in zone ? zone.sampleId : (zone as AssetZone).asset;
     const prepared='sampleId' in zone ? samples?.readPrepared(zone.sampleId) : {id:sourceId,revision:1,audio:readySources.get(sourceId)?.audio};
     if(!prepared?.audio)throw new Error('这个乐器尚未准备，请重新试听。');
-    const percussion=drum !== undefined || defaultInstrumentInfo('',body)?.category==='打击';
     const tail=percussion&&!zone.loop?(zone.endSeconds-zone.startSeconds)/(hz/zone.rootFrequencyHz):0;
+    const releaseSeconds = Math.min(Math.max(body.releaseSeconds, zone.releaseSeconds, tail), releaseLimit);
+    let startSeconds = zone.startSeconds;
+    if (compensation && 'asset' in zone) {
+      let lead = quietLeads.get(zone);
+      if (lead === undefined) {
+        lead = quietSampleLead(prepared.audio, zone.startSeconds, zone.loop?.startSeconds ?? zone.endSeconds);
+        quietLeads.set(zone, lead);
+      }
+      startSeconds += lead * compensation.onsetMix;
+    }
     return {kind:'sample',version:1,source:{id:prepared.id,revision:prepared.revision,audio:prepared.audio},
-      startSeconds:zone.startSeconds,endSeconds:zone.endSeconds,playbackRate:hz/zone.rootFrequencyHz,
-      ...(zone.loop?{loop:zone.loop}:{}),envelope:{attackSeconds:Math.max(body.attackSeconds,zone.attackSeconds),releaseSeconds:Math.max(body.releaseSeconds,zone.releaseSeconds,tail),decaySeconds:zone.decaySeconds ?? 0,sustain:zone.sustain ?? 1},
+      startSeconds,endSeconds:zone.endSeconds,playbackRate:hz/zone.rootFrequencyHz,
+      ...(compensation ? { sampleGain: compensation.gain } : {}),
+      ...(zone.loop?{loop:zone.loop}:{}),envelope:{attackSeconds:Math.max(body.attackSeconds,zone.attackSeconds,Math.min(.003, startSeconds - zone.startSeconds)),releaseSeconds,
+        ...(naturalRelease ? { releaseShape: 'natural' as const } : {}), decaySeconds:zone.decaySeconds ?? 0,sustain:zone.sustain ?? 1},
       note:{...playedNote},level:body.level*zone.level};
     }
     const [primary,...layers]=zones.map(layer);

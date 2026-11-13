@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { createHash } from 'node:crypto';
 import { createSampleBankAudio } from '../src/workstation/modules/timbre/sample-bank.ts';
+import { quietSampleLead, sampleBassCompensation } from '../src/workstation/modules/timbre/sample-bank-bass.ts';
 import { selectBankZone } from '../src/workstation/modules/timbre/sample-bank-model.ts';
 import { createInitialProjectLibrary } from '../src/workstation/app/project-setup.ts';
 import { openMusicDocument, commitMusicDocument } from '../src/workstation/app/music-document.ts';
@@ -11,11 +12,11 @@ import { createPhraseEditor, createPhrasePlayback, createPhraseReferenceAdapter 
 import { createSongEditor, createSongReferenceAdapter } from '../src/workstation/modules/song/public.ts';
 import { createSampleAudio, createSampleReferenceAdapter, createBrowserSampleDecoder } from '../src/workstation/modules/sampling/public.ts';
 import { encodeFloatWav } from '../src/workstation/modules/sampling/audio.ts';
-import { readPreview } from '../src/workstation/modules/sound-runtime/plan.ts';
+import { noteAmplitude, readPreview } from '../src/workstation/modules/sound-runtime/plan.ts';
 import { createProjectClosePreparation } from '../src/workstation/app/project-close.ts';
 import { removeProjectTimbre } from '../src/workstation/app/project-timbres.ts';
 
-function fixture(overlap=false) {
+function fixture(overlap=false, releaseSeconds=.03) {
   let text=createInitialProjectLibrary('采样工程');
   const adapters=[createTimbreReferenceAdapter(),createPhraseReferenceAdapter(),createSongReferenceAdapter(),createSampleReferenceAdapter()];
   const library=createMaterialLibrary({read:()=>text,write:value=>{text=value;}},{project:{rootKind:'rootsound.song',adapters}});
@@ -23,13 +24,13 @@ function fixture(overlap=false) {
   const data=[.1,.2,.3].map(level=>encodeFloatWav({sampleRate:8000,channels:[Float32Array.from({length:32},(_,i)=>Math.sin(i)*level)]}));
   const names=data.map(bytes=>createHash('sha256').update(bytes).digest('hex')+'.wav');
   const zones=data.map((bytes,i)=>({keyMin:i===2?64:0,keyMax:i===2?127:63,velocityMin:i===1?64:0,velocityMax:i===0?63:127,
-    rootFrequencyHz:i===2?880:220,startSeconds:0,endSeconds:.004,attackSeconds:.001,releaseSeconds:.03,decaySeconds:.1,sustain:.8,level:1,
+    rootFrequencyHz:i===2?880:220,startSeconds:0,endSeconds:.004,attackSeconds:.001,releaseSeconds,decaySeconds:.1,sustain:.8,level:1,
     asset:names[i],byteLength:bytes.length,sampleRate:8000,channels:1,frames:32}));
   if(overlap)zones[1]!.velocityMin=0;
   const requests:string[]=[];let broken=false;
   const fetcher=(async(input:RequestInfo|URL)=>{
     const url=String(input);requests.push(url);
-    if(url.endsWith('manifest.json'))return new Response(JSON.stringify({bank:'rootsound-studio-v1',instruments:{'studio-piano':zones}}));
+    if(url.endsWith('manifest.json'))return new Response(JSON.stringify({bank:'rootsound-studio-v1',instruments:{'studio-piano':zones,'studio-flute':zones,'studio-black-pearl-ride':zones}}));
     if(broken)return new Response('',{status:404});
     const index=names.findIndex(name=>url.endsWith(name));return index>=0?new Response(new Uint8Array(data[index]!)):new Response('',{status:404});
   }) as typeof fetch;
@@ -50,6 +51,11 @@ test('overlapping recordings survive audition, mixing gain, explicit save and re
   const mix=readPreview({kind:'sequence',version:1,durationSeconds:1,events:[{atSeconds:.2,pan:-.5,sound:{...plan,level:plan.level*.25}}]});
   assert.equal(mix.events.length,2);
   for(let i=0;i<2;i++){assert.equal(mix.events[i]!.atSeconds,.2);assert.equal(mix.events[i]!.pan,-.5);assert.equal(mix.events[i]!.sound.level,audition.events[i]!.sound.level*.25);}
+  assert(audition.events.every(event => event.sound.kind === 'sample' && (event.sound.sampleGain ?? 1) > 1));
+  assert(muted.events.every(event => noteAmplitude(event.sound) === 0));
+  for (let index = 0; index < 2; index++) {
+    assert.equal(noteAmplitude(mix.events[index]!.sound), noteAmplitude(audition.events[index]!.sound) * .25);
+  }
   const part=f.phrase.addPart(f.original.id);f.phrase.addNote(part,{startBeat:0,durationBeats:1,frequencyHz:220,velocity:.3});
   commitMusicDocument(f.library,f.song,f.phrase);
   let text=f.text();const reopened=createMaterialLibrary({read:()=>text,write:value=>{text=value;}},{project:{rootKind:'rootsound.song',adapters:f.adapters}});
@@ -68,6 +74,42 @@ test('sampled voices load lazily and choose the right key and velocity recording
   const high={...low,frequencyHz:880,velocity:.9};await f.tones.prepareForSaved(f.original.id,[high]);
   const b=f.tones.planForSaved(f.original.id,high);assert.equal(b.kind==='sample'&&b.source.id,f.names[2]);assert.equal(f.requests.length,3);
   assert(readPreview(a));assert(readPreview(b));
+});
+
+test('sampled melody notes use natural release without lengthening the written note', async () => {
+  const f = fixture(true, 4);
+  const body = { model: 'sample-bank', version: 1, bank: 'rootsound-studio-v1', instrument: 'studio-piano', attackSeconds: 0, releaseSeconds: .03, level: .7 } as const;
+  await f.bank.prepare(body, [low]);
+  for (const [holdSeconds, releaseSeconds] of [[.002, .2202], [.04, .224], [.2, .24], [1, .32], [4, .36]] as const) {
+    const note = { ...low, holdSeconds };
+    const plan = f.bank.plan(body, note);
+    assert.deepEqual(plan.note, note);
+    assert(Math.abs(plan.envelope.releaseSeconds - releaseSeconds) < 1e-10);
+    assert.equal(plan.envelope.releaseShape, 'natural');
+    assert.deepEqual(plan.layers?.[0]?.envelope, plan.envelope);
+  }
+  const flute = { ...body, instrument: 'studio-flute' };
+  await f.bank.prepare(flute, [low]);
+  assert.equal(f.bank.plan(flute, low).envelope.releaseSeconds, .164);
+  assert.equal(f.bank.plan(flute, low).envelope.releaseShape, 'natural');
+  const drum = { ...body, instrument: 'studio-black-pearl-ride' };
+  await f.bank.prepare(drum, [low]);
+  assert.equal(f.bank.plan(drum, low).envelope.releaseSeconds, 4);
+  assert.equal(f.bank.plan(drum, low).envelope.releaseShape, undefined);
+});
+
+test('bass compensation is smooth across piano keys and leaves midrange, bass guitar and drums alone', () => {
+  const gain = (key: number) => sampleBassCompensation('studio-piano', 440 * 2 ** ((key - 69) / 12))?.gain ?? 1;
+  assert(gain(36) > gain(48) && gain(48) > gain(59) && gain(59) > gain(60));
+  for (const key of [24, 36, 48, 60]) assert(Math.abs(gain(key - .001) - gain(key + .001)) < .0001);
+  assert.equal(gain(60), 1);
+  assert.equal(sampleBassCompensation('studio-bass', 55), undefined);
+  assert.equal(sampleBassCompensation('studio-black-pearl-ride', 55), undefined);
+
+  const channel = Float32Array.from({ length: 800 }, (_, frame) => Math.sin(frame * .1) * (frame < 240 ? .01 : .5));
+  const onset = quietSampleLead({ sampleRate: 8000, channels: [channel] }, 0, .1);
+  assert(Math.abs(onset - .02) < 1e-8);
+  assert.equal(quietSampleLead({ sampleRate: 8000, channels: [channel] }, .035, .1), 0);
 });
 
 test('reference piano plays without project membership and creates no content, draft or history',async()=>{

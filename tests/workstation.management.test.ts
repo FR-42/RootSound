@@ -96,6 +96,17 @@ test('keyboard performance is opt-in for old preferences and persists independen
 class SettingsElement extends EventTarget {
   children: SettingsElement[] = []; parent?: SettingsElement; attributes = new Map<string, string>();
   className = ''; textContent = ''; type = ''; value = ''; checked = false;
+  style = { setProperty(name: string, value: string) { this[name] = value; } } as Record<string, string | ((name: string, value: string) => void)> & { setProperty(name: string, value: string): void };
+  classList = {
+    contains: (name: string) => this.className.split(' ').includes(name),
+    toggle: (name: string, enabled: boolean) => {
+      const names = new Set(this.className.split(' ').filter(Boolean));
+      if (enabled) names.add(name); else names.delete(name);
+      this.className = [...names].join(' ');
+    },
+    add: (name: string) => this.classList.toggle(name, true),
+    remove: (name: string) => this.classList.toggle(name, false),
+  };
   readonly tag: string;
   constructor(tag: string) { super(); this.tag = tag; }
   append(...children: SettingsElement[]) { for (const child of children) { child.parent = this; this.children.push(child); } }
@@ -143,6 +154,68 @@ test('settings expose segmented tempo without any guide and keep the settings op
     assert.equal(reopened.read().drumLanes, true);
     assert.equal(reopened.read().workbench, true);
   } finally { f.cleanup(); }
+});
+
+test('appearance settings preview until release and persist independently of song data', () => {
+  const f = settingsFixture();
+  const descriptor = Object.getOwnPropertyDescriptor(globalThis, 'window');
+  const win = new EventTarget();
+  Object.defineProperty(globalThis, 'window', { configurable: true, value: win });
+  try {
+    f.root.querySelector('.learning-settings')!.close();
+    const storage = { getItem: (key: string) => f.map.get(key) ?? null, setItem: (key: string, value: string) => { f.map.set(key, value); } };
+    const appearance = createWorkspacePreferences(storage);
+    showLearningSettings(f.root as unknown as HTMLElement, f.preferences, { appearance });
+    const settings = f.root.querySelector('.learning-settings')!;
+    const controls = settingsNodes(settings).filter(node => node.type === 'range');
+    assert.deepEqual(controls.map(input => input.attributes.get('aria-label')), ['网格线浓淡']);
+    const grid = controls[0]!;
+    assert.equal(grid.value, '100');
+    const dispatch = (target: EventTarget, type: string, data: Record<string, unknown> = {}) =>
+      target.dispatchEvent(Object.assign(new Event(type), data));
+    dispatch(grid, 'pointerdown', { button: 0, pointerId: 8, isPrimary: true });
+    assert(settings.classList.contains('is-previewing'));
+    assert(f.root.querySelector('.roll-appearance-preview'));
+    grid.value = '40';
+    dispatch(grid, 'input'); dispatch(grid, 'change');
+    assert.equal(f.root.style['--melody-grid-thickness'], '0.7');
+    assert.equal(appearance.read().rollAppearance, undefined);
+    dispatch(win, 'pointerup', { pointerId: 8 });
+    assert(!settings.classList.contains('is-previewing'));
+    assert.equal(f.root.querySelector('.roll-appearance-preview'), undefined);
+    assert.deepEqual(appearance.read().rollAppearance, { gridStrength: 40 });
+
+    dispatch(grid, 'keydown', { key: 'ArrowDown' });
+    grid.value = '39';
+    dispatch(grid, 'input'); dispatch(grid, 'change');
+    assert(settings.classList.contains('is-previewing'));
+    assert.equal(appearance.read().rollAppearance!.gridStrength, 40);
+    dispatch(win, 'keyup', { key: 'ArrowDown' });
+    assert(!settings.classList.contains('is-previewing'));
+    assert.deepEqual(createWorkspacePreferences(storage).read().rollAppearance, { gridStrength: 39 });
+
+    dispatch(grid, 'pointerdown', { button: 0, pointerId: 9, isPrimary: true });
+    grid.value = '80'; dispatch(grid, 'input');
+    dispatch(win, 'pointercancel', { pointerId: 9 });
+    assert(!settings.classList.contains('is-previewing'));
+    assert.equal(grid.value, '39');
+    assert(Math.abs(Number(f.root.style['--melody-grid-thickness']) - .695) < 1e-9);
+
+    const key = 'rootsound.workstation.preferences.v1';
+    const legacy = JSON.parse(f.map.get(key)!);
+    legacy.rollAppearance.backgroundBrightness = 20;
+    f.map.set(key, JSON.stringify(legacy));
+    const reopened = createWorkspacePreferences(storage);
+    assert.deepEqual(reopened.read().rollAppearance, { gridStrength: 39 });
+    reopened.update({ rollAppearance: { gridStrength: 38 } });
+    assert.deepEqual(JSON.parse(f.map.get(key)!).rollAppearance, { gridStrength: 38 });
+    assert.equal(f.map.get('song-data'), '完整工程原文');
+    settings.close();
+    assert.equal(f.root.querySelector('.learning-settings'), undefined);
+  } finally {
+    if (descriptor) Object.defineProperty(globalThis, 'window', descriptor); else Reflect.deleteProperty(globalThis, 'window');
+    f.cleanup();
+  }
 });
 
 test('keyboard setting migrates independently of missing or invalid retired controls without rewriting music', () => {

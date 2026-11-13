@@ -27,6 +27,7 @@ export interface SoundPlan {
   readonly envelope: {
     readonly attackSeconds: number;
     readonly releaseSeconds: number;
+    readonly releaseShape?: 'natural';
     readonly decaySeconds?: number;
     readonly sustain?: number;
   };
@@ -59,12 +60,14 @@ export interface SampleSoundPlan {
   readonly envelopeBaked?: true;
   readonly note: SoundPlan['note'];
   readonly level: number;
+  readonly sampleGain?: number;
   /** Original overlapping recording zones; flattened by the global sound runtime. */
   readonly layers?: readonly Omit<SampleSoundPlan, 'layers' | 'layerReferenceLevel'>[];
   /** Initial root gain, so later note/track/master edits also scale every layer. */
   readonly layerReferenceLevel?: number;
 }
 export type PlayableNotePlan = SoundPlan | SampleSoundPlan;
+export type SoundGainPoint = { readonly atSeconds: number; readonly db: number; readonly before?: number; readonly after?: number };
 
 /** A finite preview on one device clock; each event owns a complete sound plan. */
 export interface SoundSequencePlan {
@@ -72,16 +75,21 @@ export interface SoundSequencePlan {
   readonly version: 1;
   /** Musical extent; the runtime preserves this silence and any note release tails. */
   readonly durationSeconds: number;
+  readonly preserveNoteLevel?: true;
   /** Playback-head position and speed only. Individual sounds keep their own clock. */
   readonly transport?: { readonly positionSeconds: number; readonly rate: number };
   /** Final-mix processing. Fades include the final note's release tail. */
   readonly output?: OutputProcessingPlan;
   readonly midiExpression?: readonly TimedMidiExpressionLane[];
+  readonly gainCurves?: Readonly<Record<string, readonly SoundGainPoint[]>>;
+  readonly pitchCurves?: Readonly<Record<string, readonly SoundGainPoint[]>>;
   readonly events: readonly {
     readonly atSeconds: number;
     readonly sound: PlayableNotePlan;
     /** -1 is left, 1 is right; omitted values are centered. */
     readonly pan?: number;
+    readonly gainCurveId?: string;
+    readonly pitchCurveId?: string;
   }[];
 }
 
@@ -123,6 +131,8 @@ export type SoundRuntimeEvent =
   | { readonly type: 'session'; readonly session: PlaybackSession }
   | { readonly type: 'device'; readonly status: SoundDeviceStatus; readonly error?: string };
 
+export type SoundAuditionOptions = { pan?: number; preserveNoteLevel?: true; gainCurve?: readonly SoundGainPoint[]; pitchCurve?: readonly SoundGainPoint[]; gainCurveStartSeconds?: number };
+
 export interface SoundRuntimePort {
   /** Listening gain only; affects playback and key auditions, never export or saved notes. */
   setOutputLevel?(level: number): void;
@@ -130,7 +140,7 @@ export interface SoundRuntimePort {
   /** Resume from a direct browser gesture before asynchronous sample loading. */
   activate?(): Promise<void>;
   /** A short key/note audition on the same device, independent of the main transport. */
-  audition(plan: PlayableNotePlan): Promise<void>;
+  audition(plan: PlayableNotePlan, options?: SoundAuditionOptions): Promise<void>;
   cancelAudition(): void;
   /** Play acquired audio through the same global device/session boundary. */
   previewAudio(audio: PcmAudio): Promise<PlaybackSession>;

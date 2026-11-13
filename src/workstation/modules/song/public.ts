@@ -3,7 +3,7 @@ import type { ContentRecord, Draft, MaterialLibrary } from '../../contracts/cont
 import type { PhrasePlaybackPort } from '../../contracts/phrase.ts';
 import { phraseDurationSeconds } from '../../contracts/phrase-time.ts';
 import type { SongBody, SongClip, SongEditorPort, SongPlaybackPort, SongTempoMode, SongTrack } from '../../contracts/song.ts';
-import type { SoundSequencePlan } from '../../contracts/sound.ts';
+import type { SoundGainPoint, SoundSequencePlan } from '../../contracts/sound.ts';
 import type { PostProductionPort, PostProductionSettings } from '../../contracts/post-production.ts';
 import type { ReferenceAdapter } from '../../contracts/references.ts';
 import { MAX_SEQUENCE_EVENTS, MAX_SEQUENCE_SECONDS } from '../../contracts/playback-limits.ts';
@@ -201,6 +201,8 @@ function compileSong(body: SongBody, phrases: PhrasePlaybackPort, allowSilence =
   const phraseHasNotes = new Map<string, boolean>();
   const phrasePlans = new Map<string, SoundSequencePlan>();
   let durationSeconds = extent(body, phrases) * secondsPerBeat;
+  const gainCurves: Record<string, readonly SoundGainPoint[]> = Object.create(null);
+  const pitchCurves: Record<string, readonly SoundGainPoint[]> = Object.create(null);
   for (const track of body.tracks) {
     if (track.muted || track.level === 0 || hasSolo && !track.solo) continue;
     for (const clip of track.clips) {
@@ -222,7 +224,15 @@ function compileSong(body: SongBody, phrases: PhrasePlaybackPort, allowSilence =
       const offset = clip.startBeat * secondsPerBeat;
       durationSeconds = Math.max(durationSeconds, offset + plan.durationSeconds);
       for(const lane of plan.midiExpression??[])midiExpression.push({id:`${clip.id}:${lane.id}`,events:lane.events.map(event=>({...event,atSeconds:event.atSeconds+offset}))});
+      for (const [id, points] of Object.entries(plan.gainCurves ?? {})) {
+        gainCurves[`${clip.id}:${id}`] = points.map(point => ({ ...point, atSeconds: point.atSeconds + offset }));
+      }
+      for (const [id, points] of Object.entries(plan.pitchCurves ?? {})) {
+        pitchCurves[`${clip.id}:${id}`] = points.map(point => ({ ...point, atSeconds: point.atSeconds + offset }));
+      }
       for (const event of plan.events) events.push({ atSeconds: offset + event.atSeconds,
+        ...(event.gainCurveId === undefined ? {} : { gainCurveId: `${clip.id}:${event.gainCurveId}` }),
+        ...(event.pitchCurveId === undefined ? {} : { pitchCurveId: `${clip.id}:${event.pitchCurveId}` }),
         sound: { ...event.sound, level: event.sound.level * track.level * (clip.level ?? 1) * (body.masterLevel ?? 1) },
         pan: Math.max(-1, Math.min(1, (event.pan ?? 0) + (clip.pan ?? track.pan) + (track.panOffset ?? 0))) });
       if (events.length > MAX_SEQUENCE_EVENTS) throw new Error(`这首歌曲超过当前 ${MAX_SEQUENCE_EVENTS} 个发声音符的试听范围，请缩短编排。`);
@@ -231,7 +241,8 @@ function compileSong(body: SongBody, phrases: PhrasePlaybackPort, allowSilence =
   if (!events.length && !allowSilence) throw new Error('先放入有音符的音乐，并开启至少一条轨道，再听整首歌吧。');
   if (durationSeconds > MAX_SEQUENCE_SECONDS) throw new Error('当前歌曲试听与导出支持最长 10 分钟，请缩短编排。');
   events.sort((a, b) => a.atSeconds - b.atSeconds);
-  const plan: SoundSequencePlan = { kind: 'sequence', version: 1, durationSeconds, events, ...(midiExpression.length?{midiExpression}:{}) };
+  const plan: SoundSequencePlan = { kind: 'sequence', version: 1, durationSeconds, events, ...(Object.keys(gainCurves).length ? { gainCurves } : {}),
+    ...(Object.keys(pitchCurves).length ? { pitchCurves } : {}), ...(midiExpression.length?{midiExpression}:{}) };
   if (!body.postProduction) return plan;
   if (!postProduction) throw new Error('这首歌曲需要连接后期处理模块，原稿已保留。');
   return postProduction.apply(plan, body.postProduction);

@@ -3,6 +3,7 @@ import { MAX_AUDIO_FILE_BYTES } from '../../contracts/files.ts';
 import { allocateGraph, releaseGraph, scheduleGraph, startGraphSource, type GraphResources } from './graph.ts';
 import { readPreview, validateFrequency } from './plan.ts';
 import { WindowedGraph, WINDOWED_EVENT_THRESHOLD } from './windowed.ts';
+import { outputPeakSample } from './output-limiter.ts';
 
 function cancelled(): DOMException { return new DOMException('音频导出已取消，尚未保存文件。', 'AbortError'); }
 function abortIfNeeded(signal?: AbortSignal): void { if (signal?.aborted) throw cancelled(); }
@@ -11,7 +12,7 @@ function report(options: AudioRenderOptions, progress: number): void {
 }
 
 /** 24-bit little-endian, two interleaved channels, ordinary RIFF PCM WAV. */
-async function encodeWav(buffer: AudioBuffer, options: AudioRenderOptions): Promise<Uint8Array> {
+async function encodeWav(buffer: AudioBuffer, options: AudioRenderOptions, guardPeaks: boolean): Promise<Uint8Array> {
   const frames = buffer.length;
   const dataBytes = frames * 6;
   const padding = dataBytes % 2;
@@ -32,9 +33,7 @@ async function encodeWav(buffer: AudioBuffer, options: AudioRenderOptions): Prom
       for (let channel = 0; channel < 2; channel += 1) {
         const value = channels[channel]![frame]!;
         if (!Number.isFinite(value)) throw new Error('声音执行器产生了无效采样，尚未保存音频。');
-        // Shared graph normalization bounds the sum; clipping here handles only
-        // waveform/filter numerical overshoot and the signed PCM boundary.
-        const bounded = Math.min(1, Math.max(-1, value));
+        const bounded = guardPeaks ? outputPeakSample(value) : Math.min(1, Math.max(-1, value));
         const sample = Math.round(bounded * (bounded < 0 ? 8388608 : 8388607));
         const at = 44 + frame * 6 + channel * 3;
         bytes[at] = sample & 255;
@@ -105,7 +104,7 @@ export async function renderOffline(plan: PlayableNotePlan | SoundSequencePlan, 
     const buffer = await Promise.race([audio.startRendering(), aborted]);
     abortIfNeeded(options.signal);
     report(options, 0.85);
-    const bytes = await encodeWav(buffer, options);
+    const bytes = await encodeWav(buffer, options, plan.kind === 'sequence' && plan.preserveNoteLevel === true);
     return Object.freeze({ bytes, mimeType: 'audio/wav', extension: '.wav', sampleRate, channels: 2, bitsPerSample: 24, durationSeconds: frames / sampleRate });
   } finally {
     options.signal?.removeEventListener('abort', abort);

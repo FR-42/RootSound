@@ -159,6 +159,7 @@ export function mountStudio(root: HTMLElement, options: StudioOptions): { dispos
       workspaceState: options.workspaceState, frameNotesOnMount: frameNotes,
       mobileWeb: options.demo && options.musicGuide?.mobileWeb,
       readWorkbench: () => !options.demo && options.learning?.read().workbench === true,
+      enableGainCurve: !options.demo,
       readMultipleTempoRolls: options.demo ? () => false : options.learning ? () => options.learning!.read().multipleTempoRolls : undefined,
       readDrumLanes: () => !options.demo && options.learning?.read().drumLanes === true,
       onSettings: options.demo || options.learning ? () => settings(true) : undefined,

@@ -1,9 +1,11 @@
 import type { MaterialLibrary } from '../contracts/content.ts';
-import type { PhraseBody, PhraseEditorPort } from '../contracts/phrase.ts';
+import type { PhraseBody, PhraseEditorPort, PhraseGainPoint } from '../contracts/phrase.ts';
+import { PERFORMANCE_CURVES, type CurveKind } from '../contracts/gain-curve.ts';
 import type { SongEditorPort } from '../contracts/song.ts';
 import { readPhraseBody } from '../modules/phrase/public.ts';
 import { readSongBody } from '../modules/song/public.ts';
 import { phraseBeatSeconds, phraseHeldSeconds, phraseSecondsBeat } from '../contracts/phrase-time.ts';
+import { MAX_PHRASE_BEATS } from '../contracts/phrase-limits.ts';
 
 /** File compatibility boundary: one editable score, with no arrangement in the product. */
 export function openMusicDocument(library: MaterialLibrary, song: SongEditorPort, score: PhraseEditorPort, fileName?: string): string | undefined {
@@ -35,6 +37,7 @@ export function openMusicDocument(library: MaterialLibrary, song: SongEditorPort
   const parts: PhraseBody['parts'] = [];
   const midiExpression: NonNullable<PhraseBody['midiExpression']> = [];
   const groups = new Map<string, PhraseBody['parts'][number]>();
+  const curvePositions: { part: PhraseBody['parts'][number]; kind: CurveKind; points: (Omit<PhraseGainPoint, 'beat'> & { seconds: number })[] }[] = [];
   // Collect on the original song clock first. A legacy MIDI import's grid tempo
   // map becomes sequential BPM rolls, rather than flattening every note to bpm.
   let endSeconds = Math.max(16, body.lengthBeats) * 60 / body.tempoBpm;
@@ -49,9 +52,13 @@ export function openMusicDocument(library: MaterialLibrary, song: SongEditorPort
       beat:start+phraseBeatSeconds(source,event.beat)*source.tempoBpm/sourceBpm}))});
     const silent = track.muted || solo && !track.solo;
     for (const part of source.parts) {
-      const key = JSON.stringify([part.timbreId, !!part.unassigned,part.level,part.pan,part.midiChannelId?`${clip.id}:${part.midiChannelId}`:undefined]);
+      const key = JSON.stringify([part.timbreId, !!part.unassigned,part.level,part.pan,part.midiChannelId?`${clip.id}:${part.midiChannelId}`:undefined, part.gainCurve?.length || part.performanceCurves ? [clip.id, part.id] : undefined]);
       let target = groups.get(key);
       if (!target) { target = { ...part, id: crypto.randomUUID(), section: 'melody', ...(part.midiChannelId?{midiChannelId:`${clip.id}:${part.midiChannelId}`} : {}),notes: [] }; groups.set(key, target); parts.push(target); }
+      for (const kind of ['gain', ...PERFORMANCE_CURVES] as const) {
+        const points = kind === 'gain' ? part.gainCurve : part.performanceCurves?.[kind];
+        if (points?.length) curvePositions.push({ part: target, kind, points: points.map(({ beat, ...point }) => ({ ...point, seconds: start + phraseBeatSeconds(source, beat) * source.tempoBpm / sourceBpm })) });
+      }
       target.notes.push(...part.notes.map(note => {
         const startBeat = start + phraseBeatSeconds(source, note.startBeat) * source.tempoBpm / sourceBpm;
         const durationBeats = (phraseBeatSeconds(source, note.startBeat + note.durationBeats) - phraseBeatSeconds(source, note.startBeat)) * source.tempoBpm / sourceBpm;
@@ -81,6 +88,12 @@ export function openMusicDocument(library: MaterialLibrary, song: SongEditorPort
     note.durationBeats = phraseSecondsBeat(clock, start + note.durationBeats) - note.startBeat;
   }
   for(const lane of midiExpression)for(const event of lane.events)event.beat=phraseSecondsBeat(clock,event.beat);
+  for (const { part, kind, points } of curvePositions) {
+    const remapped = points.map(({ seconds, ...point }) => ({ ...point, beat: Math.min(MAX_PHRASE_BEATS, phraseSecondsBeat(clock, seconds)) }))
+      .filter((point, index, curve) => point.beat !== curve[index + 1]?.beat);
+    if (kind === 'gain') part.gainCurve = remapped;
+    else part.performanceCurves = { ...part.performanceCurves, [kind]: remapped };
+  }
   const music = readPhraseBody({ model: 'note-phrase', version: 1, timeUnit: 'beat', tempoBpm: bpm,
     ...(tempoSections.length ? { tempoSections } : {}), lengthBeats: clock.lengthBeats, parts, ...(midiExpression.length?{midiExpression}: {}) });
   const draft = library.createDraft({ kind: 'rootsound.phrase', owner: 'phrase', schemaVersion: 1,

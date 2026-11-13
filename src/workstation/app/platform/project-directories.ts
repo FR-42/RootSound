@@ -13,6 +13,7 @@ export interface NativeProjectDirectoriesBridge {
   CreateLibraryFolder?(path: string, name: string): Promise<unknown>;
   RenameLibraryEntry?(path: string, name: string): Promise<unknown>;
   DeleteLibraryEntry?(path: string): Promise<unknown>;
+  RevealLibrarySong?(path: string, id: string): Promise<unknown>;
   Delete?(path: string, expectedId: string): Promise<unknown>;
   Inspect?(path: string, expectedId: string): Promise<unknown>;
   Rename?(path: string, expectedId: string, name: string, libraryText: string, token: string): Promise<unknown>;
@@ -152,6 +153,9 @@ export function createDesktopProjectDirectories(bridge: NativeProjectDirectories
     } } : {}),
     ...(bridge.DeleteLibraryEntry ? { async removeEntry(path: string) {
       if ((await call(() => bridge.DeleteLibraryEntry!(path))).status !== 'ready') fail();
+    } } : {}),
+    ...(bridge.RevealLibrarySong ? { async reveal(entry: Exclude<ProjectLibraryEntry, { kind: 'folder' }>) {
+      if ((await call(() => bridge.RevealLibrarySong!(entry.path, entry.kind === 'project' ? entry.id : ''))).status !== 'ready') fail();
     } } : {}),
     async open(path) {
       if (path !== undefined && (!path.trim() || !bridge.OpenKnown)) return fail('当前窗口尚不支持直接打开这个项目，请重新打开 RootSound。');

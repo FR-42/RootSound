@@ -2,13 +2,14 @@ import type {
   PlaybackSession,
   PlaybackStatus,
   PlayableNotePlan,
+  SoundAuditionOptions,
   SoundRuntimeEvent,
   SoundRuntimePort,
   SoundSequencePlan,
   PcmAudio,
 } from '../../contracts/sound.ts';
 
-import { noteDuration, previewFingerprint, readPreview, samePreviewSamples, validateFrequency, type ScheduledPreview } from './plan.ts';
+import { previewFingerprint, readPreview, samePreviewSamples, validateFrequency, type ScheduledPreview } from './plan.ts';
 import { allocateGraph, releaseGraph, releaseScheduledNotes, scheduleGraph, startGraphSource, type GraphResources, type SoundGraph } from './graph.ts';
 import { renderOffline } from './offline.ts';
 import { readPcmAudio } from './pcm.ts';
@@ -363,9 +364,9 @@ export function createBrowserSoundRuntime(): SoundRuntimePort {
     }
   }
 
-  async function audition(input: PlayableNotePlan): Promise<void> {
+  async function audition(input: PlayableNotePlan, options?: SoundAuditionOptions): Promise<void> {
     if (disposed) throw new Error('声音运行已关闭。');
-    const preview = readPreview(input);
+    const preview = readPreview(input, { audition: options });
     if (preview.sequence) throw new Error('按键试音需要一个音符。');
     cancelAudition();
     const request = auditionSequence;
@@ -383,14 +384,13 @@ export function createBrowserSoundRuntime(): SoundRuntimePort {
         if (--voice.remaining === 0) releaseAudition(voice);
       }, listeningOutput(audio));
       const start = audio.currentTime + 0.005;
-      // Each lane is bounded to half scale during overlap. Duck the main lane
-      // smoothly before this note starts, then restore it when this lane ends.
-      ensureMainMix(audio);
-      scheduleGraph(graph, preview.normalization * (active?.session.status === 'playing' ? 0.5 : 1), start);
+      const duck = !options?.preserveNoteLevel;
+      if (duck) ensureMainMix(audio);
+      scheduleGraph(graph, preview.normalization * (duck && active?.session.status === 'playing' ? 0.5 : 1), start);
       if (audio.currentTime >= start || disposed || request !== auditionSequence) throw new Error('这次试音已取消，请重试。');
       voice.remaining = resources.oscillators.length + resources.samples.length;
       auditionVoice = voice;
-      duckMain(true, start);
+      if (duck) duckMain(true, start);
       for (const scheduled of graph.starts) startGraphSource(scheduled, start);
       deviceChanged();
     } catch (error) {
@@ -429,7 +429,7 @@ export function createBrowserSoundRuntime(): SoundRuntimePort {
       const position = Math.max(0, audio.currentTime - origin);
       const remaining = {
         ...preview,
-        events: preview.events.filter(event => event.atSeconds + noteDuration(event.sound) > position),
+        events: preview.events.filter(event => event.atSeconds + event.duration > position),
       };
       if (voice.windowed || preview.events.length > WINDOWED_EVENT_THRESHOLD) windowed = new WindowedGraph(audio, preview, resources, mainMix ?? listeningOutput(audio));
       windowed?.prime(position);
@@ -563,7 +563,7 @@ export function createBrowserSoundRuntime(): SoundRuntimePort {
     let completion: ConstantSourceNode | null = null;
     let windowed: WindowedGraph | undefined;
     try {
-      const remaining = { ...preview, events: preview.events.filter(event => event.atSeconds + noteDuration(event.sound) > fromSeconds) };
+      const remaining = { ...preview, events: preview.events.filter(event => event.atSeconds + event.duration > fromSeconds) };
       if (preview.events.length > WINDOWED_EVENT_THRESHOLD) windowed = new WindowedGraph(audio, preview, resources, mainMix ?? listeningOutput(audio));
       windowed?.prime(fromSeconds);
       const graph = windowed?.graph ?? allocateGraph(audio, remaining, resources, undefined, mainMix ?? listeningOutput(audio));

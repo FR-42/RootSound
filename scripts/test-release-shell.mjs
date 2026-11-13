@@ -42,8 +42,8 @@ async function run(){
   assert.equal(await js("document.querySelector('.guidance-invitation h2').textContent"),'是否观看引导');
   await js("document.querySelector('.guidance-skip').click()");
   await waitFor(async()=>await js("!!document.querySelector('.welcome-actions')").catch(()=>false));
-  const welcome=await js("({name:document.querySelector('.wordmark').textContent,start:document.querySelector('.welcome-actions').textContent,bridge:typeof rootSoundDesktop.storage.Read})");
-  assert.equal(welcome.name,'RootSound');assert.equal(welcome.bridge,'function');
+  const welcome=await js("({hasWordmark:!!document.querySelector('.wordmark'),start:document.querySelector('.welcome-actions button').textContent,hasArrow:!!document.querySelector('.welcome-actions button svg'),bridge:typeof rootSoundDesktop.storage.Read})");
+  assert.equal(welcome.hasWordmark,false);assert.equal(welcome.start,'开始');assert.equal(welcome.hasArrow,false);assert.equal(welcome.bridge,'function');
   const initial=await js("JSON.parse(await rootSoundDesktop.projectDirectories.Read())");
   const bundled=await js("JSON.parse(await rootSoundDesktop.projectDirectories.List()).projects.length");assert.equal(bundled,${plan.projects?.length ?? 0});
   const payload=fs.readFileSync(path.join(root,'input.json'),'utf8');
