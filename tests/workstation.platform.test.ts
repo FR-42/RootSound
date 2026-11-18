@@ -71,6 +71,28 @@ test('native storage failures and invalid responses cannot appear as an empty li
   assert.deepEqual(fixture.writes, []);
 });
 
+test('regular editor commits compare the native revision without reading the whole project again', () => {
+  const f = bridgeFixture();
+  let value: string | null = null;
+  let revision = 1, reads = 0;
+  f.bridge.storage.Read = () => { reads++; return JSON.stringify({ ok: true, value, revision: String(revision), scope: 'song' }); };
+  f.bridge.storage.WriteScopedIfUnchanged = (next, scope, expected) => {
+    if (scope !== 'song' || expected !== String(revision)) return JSON.stringify({ ok: false, error: '素材库已被其他窗口修改' });
+    value = next;
+    return JSON.stringify({ ok: true, revision: String(++revision) });
+  };
+  const storage = createDesktopPlatform(f.bridge).storage;
+  assert.equal(storage.read(), null);
+  storage.writeIfUnchanged!('first', null);
+  storage.writeIfUnchanged!('second', 'first');
+  assert.equal(reads, 1);
+  value = 'from the other window'; revision++;
+  assert.throws(() => storage.writeIfUnchanged!('stale edit', 'second'), /其他窗口修改/);
+  assert.equal(value, 'from the other window');
+  assert.equal(reads, 1);
+  assert.deepEqual(f.writes, []);
+});
+
 test('permanent changes use only the scoped atomic checkpoint bridge and never fall back to an ordinary write', () => {
   const f = bridgeFixture(); const checkpoints: Array<[string, string]> = [];
   f.bridge.storage.Read = () => JSON.stringify({ ok: true, value: null, scope: 'song-one' });

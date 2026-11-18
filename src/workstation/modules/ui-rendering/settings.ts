@@ -1,14 +1,27 @@
 import type { LearningSettings, LearningSettingsPort } from '../../contracts/guidance.ts';
 import type { WorkspacePreferencesPort } from '../../contracts/workspace.ts';
+import { createWorkspacePanel, type WorkspacePanel } from './workspace-panel.ts';
 import { mountRollAppearanceSettings } from './roll-appearance.ts';
+import { paintRangeProgress } from './range-progress.ts';
 import './workspace.css';
 import './settings.css';
 
-export function showLearningSettings(root: HTMLElement, preferences: LearningSettingsPort | undefined, options: {
-  requiresTempoRolls?: boolean; appearance?: WorkspacePreferencesPort; onChange?(): void; onReplayGuide?(): void;
-}): (() => void) | undefined {
+type LearningSettingsOptions = {
+  requiresTempoRolls?: boolean; inline?: boolean; appearance?: WorkspacePreferencesPort; onChange?(): void; onReplayGuide?(): void;
+};
+
+export function showLearningSettings(root: HTMLElement, preferences: LearningSettingsPort | undefined, options: LearningSettingsOptions): (() => void) | undefined {
   if (root.querySelector('.learning-settings')) return;
-  const dialog = document.createElement('dialog'); dialog.className = 'settings-dialog learning-settings';
+  const dialog = createWorkspacePanel(options.inline);
+  const disposeContent = mountLearningSettings(root, dialog, preferences, options);
+  const dispose = () => { disposeContent(); dialog.remove(); };
+  dialog.addEventListener('close', dispose, { once: true }); root.append(dialog); dialog.showModal();
+  return dispose;
+}
+
+export function mountLearningSettings(root: HTMLElement, dialog: WorkspacePanel, preferences: LearningSettingsPort | undefined,
+  options: LearningSettingsOptions, editorControls?: HTMLElement): () => void {
+  dialog.classList.add('settings-dialog', 'learning-settings');
   dialog.setAttribute('aria-label', '设置');
   const header = document.createElement('header'); header.className = 'learning-heading';
   const title = document.createElement('h2'); title.textContent = '设置';
@@ -20,6 +33,12 @@ export function showLearningSettings(root: HTMLElement, preferences: LearningSet
     const input = document.createElement('input'); input.type = 'checkbox'; input.checked = prefs.read()[key] === true;
     input.disabled = disabled; input.setAttribute('aria-label', name);
     const text = document.createElement('span'); text.textContent = name; label.append(input, text);
+    if (editorControls && key === 'multipleTempoRolls') {
+      label.classList.add('learning-roll-switch');
+      input.setAttribute('role', 'switch');
+      const face = document.createElement('span'); face.className = 'learning-roll-switch-face';
+      face.setAttribute('aria-hidden', 'true'); label.append(face);
+    }
     input.addEventListener('change', () => {
       problem.hidden = true;
       try { write(input.checked); options.onChange?.(); }
@@ -27,12 +46,36 @@ export function showLearningSettings(root: HTMLElement, preferences: LearningSet
     });
     return label;
   }
-  dialog.append(header);
-  if (preferences) dialog.append(
-    feature(preferences, '多卷帘', 'multipleTempoRolls', preferences.setMultipleTempoRolls, !!options.requiresTempoRolls),
-    feature(preferences, '打击音色', 'drumLanes', preferences.setDrumLanes),
-    feature(preferences, '工作台', 'workbench', preferences.setWorkbench));
+  if (editorControls) {
+    dialog.setAttribute('aria-label', editorControls.querySelector('.song-project-name')?.textContent || '设置');
+    dialog.replaceChildren(editorControls);
+  }
+  else dialog.append(header);
+  const tempoRolls = preferences && feature(preferences, '多卷帘', 'multipleTempoRolls', preferences.setMultipleTempoRolls, !!options.requiresTempoRolls);
+  if (preferences) {
+    if (tempoRolls && !editorControls) dialog.append(tempoRolls);
+    if (!options.inline) dialog.append(
+      feature(preferences, '打击音色', 'drumLanes', preferences.setDrumLanes),
+      feature(preferences, '工作台', 'workbench', preferences.setWorkbench));
+  }
   const disposeAppearance = options.appearance && mountRollAppearanceSettings(root, dialog, options.appearance, problem);
+  if (options.inline && options.appearance) {
+    const appearance = options.appearance;
+    const label = document.createElement('label'); label.className = 'learning-appearance';
+    const text = document.createElement('span'); text.textContent = '鼠标灵敏度';
+    const input = document.createElement('input'); input.type = 'range'; input.min = '0'; input.max = '100';
+    input.value = String(appearance.read().pointerSensitivity ?? 65);
+    input.setAttribute('aria-label', text.textContent);
+    paintRangeProgress(input);
+    input.addEventListener('input', () => {
+      problem.hidden = true;
+      try { appearance.update({ pointerSensitivity: Number(input.value) }); }
+      catch (error) { input.value = String(appearance.read().pointerSensitivity ?? 65); problem.textContent = String(error instanceof Error ? error.message : error); problem.hidden = false; }
+      paintRangeProgress(input);
+    });
+    label.append(text, input); dialog.append(label);
+  }
+  if (tempoRolls && editorControls) dialog.append(tempoRolls);
   if (preferences || options.appearance) dialog.append(problem);
   if (options.onReplayGuide) {
     const replay = document.createElement('button'); replay.type = 'button'; replay.className = 'secondary learning-replay-guide';
@@ -40,13 +83,11 @@ export function showLearningSettings(root: HTMLElement, preferences: LearningSet
     replay.addEventListener('click', () => { dialog.close(); options.onReplayGuide!(); });
     dialog.append(replay);
   }
-  const dispose = () => { disposeAppearance?.(); dialog.remove(); };
-  dialog.addEventListener('close', dispose, { once: true }); root.append(dialog); dialog.showModal();
-  return dispose;
+  return () => disposeAppearance?.();
 }
 
-export function showFeatureGate(root: HTMLElement, options: { onEnable(): void | Promise<void>; onCancel(): void | Promise<void> }): void {
-  const dialog = document.createElement('dialog'); dialog.className = 'settings-dialog learning-feature-gate'; dialog.setAttribute('aria-label', '工程需要高级功能');
+export function showFeatureGate(root: HTMLElement, options: { inline?: boolean; onEnable(): void | Promise<void>; onCancel(): void | Promise<void> }): void {
+  const dialog = createWorkspacePanel(options.inline); dialog.className += ' settings-dialog learning-feature-gate'; dialog.setAttribute('aria-label', '工程需要高级功能');
   const title = document.createElement('h2'); title.textContent = '这个工程使用了分段速度';
   const copy = document.createElement('p'); copy.textContent = '启用“多卷帘”后才能打开。';
   const problem = document.createElement('p'); problem.className = 'dialog-error'; problem.hidden = true;

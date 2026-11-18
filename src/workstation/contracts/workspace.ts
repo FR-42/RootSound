@@ -13,6 +13,7 @@ export interface WorkspacePreferences {
   startWorkspace: 'last' | WorkspaceId;
   lastWorkspace: WorkspaceId;
   rollAppearance?: RollAppearance;
+  pointerSensitivity?: number;
 }
 export interface WorkspacePreferencesPort {
   read(): WorkspacePreferences;

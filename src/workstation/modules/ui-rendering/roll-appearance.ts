@@ -1,4 +1,5 @@
 import { DEFAULT_ROLL_APPEARANCE, type RollAppearance, type WorkspacePreferencesPort } from '../../contracts/workspace.ts';
+import { paintRangeProgress } from './range-progress.ts';
 
 export function applyRollAppearance(root: HTMLElement, appearance: Readonly<RollAppearance>): void {
   const grid = appearance.gridStrength / 100;
@@ -54,14 +55,14 @@ function createRollPreview(root: HTMLElement): HTMLElement {
 type Gesture = { pointerId: number } | { keys: Set<string> };
 const rangeKeys = new Set(['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End', 'PageUp', 'PageDown']);
 
-export function mountRollAppearanceSettings(root: HTMLElement, dialog: HTMLDialogElement, preferences: WorkspacePreferencesPort, problem: HTMLElement): () => void {
+export function mountRollAppearanceSettings(root: HTMLElement, dialog: HTMLElement, preferences: WorkspacePreferencesPort, problem: HTMLElement): () => void {
   let saved = preferences.read().rollAppearance?.gridStrength ?? DEFAULT_ROLL_APPEARANCE.gridStrength;
   let gesture: Gesture | undefined;
   let preview: HTMLElement | undefined;
   const events = new AbortController();
 
   const label = document.createElement('label');
-  label.className = 'learning-appearance';
+  label.className = 'learning-appearance learning-grid-appearance';
   const text = document.createElement('span');
   text.textContent = '网格线浓淡';
   const input = document.createElement('input');
@@ -70,12 +71,14 @@ export function mountRollAppearanceSettings(root: HTMLElement, dialog: HTMLDialo
   input.max = '100';
   input.step = '1';
   input.value = String(saved);
+  paintRangeProgress(input);
   input.setAttribute('aria-label', text.textContent);
   label.append(text, input);
   dialog.append(label);
 
   function restore(): void {
     input.value = String(saved);
+    paintRangeProgress(input);
     applyRollAppearance(root, { gridStrength: saved });
   }
 
@@ -113,7 +116,10 @@ export function mountRollAppearanceSettings(root: HTMLElement, dialog: HTMLDialo
     else restore();
   }
 
-  input.addEventListener('input', () => applyRollAppearance(root, { gridStrength: Number(input.value) }));
+  input.addEventListener('input', () => {
+    paintRangeProgress(input);
+    applyRollAppearance(root, { gridStrength: Number(input.value) });
+  });
   input.addEventListener('change', () => { if (!gesture) save(); });
   input.addEventListener('pointerdown', event => {
     if (event.button === 0 && event.isPrimary) start({ pointerId: event.pointerId });

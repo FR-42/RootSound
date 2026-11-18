@@ -18,6 +18,17 @@ export function pcmShape(input: PcmAudio): { frames: number; bytes: number } {
 
 export interface PcmSnapshot { audio: PcmAudio; bytes: number; peak: number; hash: string }
 
+const preparedSamples = new WeakMap<PcmAudio, PcmSnapshot>();
+
+export function retainPreparedPcm(snapshot: PcmSnapshot): PcmAudio {
+  const { audio } = snapshot;
+  const handle = Object.freeze({ sampleRate: audio.sampleRate, get channels() { return audio.channels.map(channel => channel.slice()); } });
+  preparedSamples.set(handle, snapshot);
+  return handle;
+}
+
+export function preparedPcm(audio: PcmAudio): PcmSnapshot | undefined { return preparedSamples.get(audio); }
+
 /** Complete owned snapshot; the fingerprint visits every Float32 bit, including tails. */
 export function readPcmSnapshot(input: PcmAudio): PcmSnapshot {
   const { bytes } = pcmShape(input); const channels = input.channels.map(channel => new Float32Array(channel));

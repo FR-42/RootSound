@@ -97,8 +97,13 @@ export type PhraseView = {
   canUndo: boolean;
   canRedo: boolean;
 };
+export type PhraseDraftPartEdit =
+  | { kind: 'add'; timbreId: string; name: string; section?: PhraseSection; replaceEmpty?: string }
+  | { kind: 'rebind'; partId: string; timbreId: string; name: string }
+  | { kind: 'remove'; partIds: readonly string[] };
+
 export interface PhraseEditorPort {
-  read(): PhraseView;
+  read(options?: { includeCatalog?: boolean; sharedDraft?: boolean }): PhraseView;
   /** No draft or sound is silently created until the user starts a phrase. */
   create(timbreId: string): void;
   open(contentId: string): void;
@@ -141,6 +146,16 @@ export interface PhraseEditorPort {
   moveNote(partId: string, noteId: string, targetPartId: string, changes?: Partial<Omit<PhraseNote, 'id'>>): void;
   removeNote(partId: string, noteId: string): void;
   removeNotes(notes: PhraseNoteRef[]): void;
+  subscribeNoteDeletions?(listener: (ids: readonly string[], deleted: boolean) => void): () => void;
+  prepareDraftNoteEdit?(): void;
+  prepareNoteAudition?(partId: string, pitches: readonly number[]): Promise<void>;
+  editDraftNote?(draftId: string, partId: string, edit: { kind: 'add'; note: PhraseNote }
+    | { kind: 'duration'; id: string; durationBeats: number; durationSeconds?: number }
+    | { kind: 'remove'; id: string }): { draft: Draft; body: PhraseBody };
+  editDraftParts?(draftId: string, edit: PhraseDraftPartEdit): string | undefined;
+  setNoteWritesDeferred?(deferred: boolean): void;
+  hasDeferredNoteWrites?(): boolean;
+  flushNoteWrites?(): void;
   undo(): void;
   redo(): void;
   /** Full MIDI 0–127 keyboard, ascending (C−1–G9), A4=440 Hz; content remains exact Hz. */
@@ -154,6 +169,6 @@ export interface PhraseEditorPort {
   /** Reference piano remains available with no selected family, even if removed from the library. */
   previewPianoPlan(note: SoundPlan['note']): Promise<PlayableNotePlan>;
   /** A temporary body supports live gestures without changing the draft/history. */
-  previewPlan(bodyOverride?: PhraseBody, options?: { allowSilence?: boolean; midiEffects?: boolean }): SoundSequencePlan;
+  previewPlan(bodyOverride?: PhraseBody, options?: { allowSilence?: boolean; midiEffects?: boolean; editableNotes?: true }): SoundSequencePlan;
   save(mode: 'overwrite' | 'new', confirmation?: SaveConfirmation): SaveResult;
 }

@@ -4,7 +4,7 @@ import type { ProjectDirectoriesPort } from '../src/workstation/contracts/projec
 import { createDesktopProjectDirectories, type NativeProjectDirectoriesBridge } from '../src/workstation/app/platform/project-directories.ts';
 import { createDesktopPlatform, type DesktopBridge } from '../src/workstation/app/platform/desktop.ts';
 import { createInitialProjectLibrary, createProjectCopyLibrary, createProjectSetup, renameProjectLibrary } from '../src/workstation/app/project-setup.ts';
-import { createProjectClosePreparation } from '../src/workstation/app/project-close.ts';
+import { createProjectClosePreparation, createRendererCloseRequests } from '../src/workstation/app/project-close.ts';
 import { createMaterialLibrary } from '../src/workstation/modules/materials/public.ts';
 import { createTimbrePlayback, listDefaultInstruments } from '../src/workstation/modules/timbre/public.ts';
 import { createPhrasePlayback } from '../src/workstation/modules/phrase/public.ts';
@@ -318,6 +318,48 @@ test('window-close checks do not prepare a save until explicitly requested', asy
   const invalid = createProjectClosePreparation({ flush() { throw new Error('名称无效'); },
     prepareSave() { assert.fail('must not prepare a save'); }, name: () => assert.fail('must not read a title') });
   assert.deepEqual(await invalid('check'), { ready: true, canSave: false, saveMessage: '名称无效' });
+});
+
+test('the renderer answers close checks even if startup fails', async () => {
+  const requests = createRendererCloseRequests();
+  requests.begin('first', 'check');
+  assert.deepEqual(requests.read('first'), { result: null, awaitingChoice: false });
+  requests.startupFailed(new Error('采样音色无效'));
+  await Promise.resolve();
+  assert.deepEqual(requests.read('first'), {
+    result: { ready: false, canSave: false, message: '采样音色无效', startupFailed: true }, awaitingChoice: false,
+  });
+});
+
+test('a timed out close request releases its chooser and cannot complete a later request', async () => {
+  const requests = createRendererCloseRequests();
+  let pending!: (result: 'cancelled') => void;
+  let cancelled = false;
+  let choosing = false;
+  const prepareClose = createProjectClosePreparation({
+    flush() {},
+    prepareSave() { assert.fail('choosing must come first'); },
+    name: () => undefined,
+    chooseSave(signal) {
+      choosing = true;
+      return new Promise(resolve => {
+        pending = resolve;
+        signal?.addEventListener('abort', () => { cancelled = true; choosing = false; }, { once: true });
+      });
+    },
+  });
+  requests.useEditor({ prepareClose, awaitingCloseChoice: () => choosing });
+  requests.begin('save', 'save');
+  await Promise.resolve();
+  await Promise.resolve();
+  assert.equal(requests.read('save')?.awaitingChoice, true);
+  requests.cancel('save');
+  assert(cancelled);
+  requests.begin('retry', 'check');
+  pending('cancelled');
+  for (let i = 0; i < 5; i++) await Promise.resolve();
+  assert.equal(requests.read('save'), null);
+  assert.deepEqual(requests.read('retry'), { result: { ready: true, canSave: true }, awaitingChoice: false });
 });
 
 test('failed save-as cannot enter the copy or mutate its source, and a failed checkpoint is not success', async () => {

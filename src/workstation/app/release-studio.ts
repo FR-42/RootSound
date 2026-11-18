@@ -22,6 +22,7 @@ import { readTimbreImport } from './timbre-file-import.ts';
 import { importProjectTimbre } from './project-timbre-import.ts';
 import { createProjectClosePreparation } from './project-close.ts';
 import { stageMaterialStorage } from './material-library-session.ts';
+import { normalizeImportedTimbreNames } from './curated-timbre-names.ts';
 
 export interface ReleasePlatform {
   storage: MaterialStorage;
@@ -49,7 +50,7 @@ export async function mountReleaseStudio(root: HTMLElement, platform: ReleasePla
   try {
     const state = await directories?.read();
     const current = state?.current ?? platform.demoProject;
-    const staged = current ? stageMaterialStorage(platform.storage) : undefined;
+    const staged = current ? stageMaterialStorage(platform.storage, normalizeImportedTimbreNames) : undefined;
     const library = createMaterialLibrary(staged?.storage, { project: { rootKind: 'rootsound.song',
       adapters: [createTimbreReferenceAdapter(), createPhraseReferenceAdapter(), createSongReferenceAdapter(), createSampleReferenceAdapter()] } });
     const sampleAudio = createSampleAudio(library, createBrowserSampleDecoder(), platform.samplePayloads);
@@ -66,6 +67,7 @@ export async function mountReleaseStudio(root: HTMLElement, platform: ReleasePla
       if (current.format) commitMusicDocument(library, song, phrase);
       staged!.publish();
       await directories?.finishLoading?.();
+      if (directories) void runtime.activate?.().catch(() => {});
     }
     function prepareFile() {
       if (songId) commitMusicDocument(library, song, phrase);
@@ -81,19 +83,28 @@ export async function mountReleaseStudio(root: HTMLElement, platform: ReleasePla
       initialEntry: current ? 'song' : 'welcome', demo: !!platform.demoProject,
       startWithGuide: platform.demoProject?.startWithGuide,
       onFirstGuideChoice: directories && firstDesktopGuideChoice(localStorage, learning.read().guides.basics.status),
-      projectSetup: directories && createProjectSetup(directories, () => {
+      desktopPointerUx: !!directories,
+      projectSetup: directories && createProjectSetup(directories, savedDetails => {
+        if (savedDetails) sessionStorage.setItem('rootsound.saved-details.v1', 'true');
         runtime.stopAll();
         navigate?.();
       }, {
         read() { const value = platform.storage.read(); if (value === null) throw new Error('当前没有项目。'); return value; },
         songDraftId: projectId, name: () => song.readDraft()!.name,
+        renamed(name) { song.rename(name); phrase.rename(name); },
+        hasDeferredChanges: () => library.hasDeferredWrites?.() === true,
+        flushDraft: () => library.flushDeferredWrites?.(),
         async prepareSave() {
           await studio.prepareClose({ allowProjectDialog: true });
           prepareFile();
+          library.flushDeferredWrites?.();
         },
       }),
-      projectTimbres() { return listProjectTimbres(library, projectId()).map(record => ({ id: record.id, name: record.name,
-        requiresDeleteConfirmation: requiresTimbreDeleteConfirmation(record, library.listDrafts()) })); },
+      projectTimbres() {
+        const drafts = library.listDrafts().filter(draft => draft.kind === 'rootsound.timbre');
+        return listProjectTimbres(library, projectId()).map(record => ({ id: record.id, name: record.name,
+          requiresDeleteConfirmation: requiresTimbreDeleteConfirmation(record, drafts) }));
+      },
       onImportTimbre: platform.demoProject ? undefined : async () => {
         const id = projectId(); await platform.timbreFiles.sync?.(id);
         const opened = await platform.timbreFiles.open(); if (opened.status === 'cancelled') return false;
@@ -104,8 +115,9 @@ export async function mountReleaseStudio(root: HTMLElement, platform: ReleasePla
         return true;
       },
       onAddPhraseTimbre: (id, section) => addProjectPhraseTimbre(library, projectId(), phrase.read().draft!.id, id, section),
-      onCreateNoteGroup: id => createProjectPhraseNoteGroup(library, projectId(), phrase.read().draft!.id, id),
-      onChangeNoteGroupTimbre: (part, tone) => changeProjectPhraseNoteGroupTimbre(library, projectId(), phrase.read().draft!.id, part, tone),
+      onCreateNoteGroup: (id, draftId) => createProjectPhraseNoteGroup(library, projectId(), draftId, id, directories ? phrase : undefined),
+      onChangeNoteGroupTimbre: (part, tone) => changeProjectPhraseNoteGroupTimbre(library, projectId(),
+        phrase.read({ includeCatalog: false, sharedDraft: !!directories }).draft!.id, part, tone, directories ? phrase : undefined),
       onRemovePhraseTimbre: id => removeProjectTimbre(library, projectId(), id),
       onReorderTimbres: (id, index) => reorderProjectTimbres(library, projectId(), id, index),
       onRenameProject: name => { song.rename(projectName(name)); },
@@ -114,7 +126,7 @@ export async function mountReleaseStudio(root: HTMLElement, platform: ReleasePla
       prepareSave: () => { if (current?.format) throw new Error('请先保存为 .rootsound 文件。'); prepareFile(); }, name: () => song.readDraft()?.name });
     const warmup = platform.demoProject && !platform.demoProject.startWithGuide
       ? requestAnimationFrame(() => { void phrase.preparePreview().catch(() => {}); }) : undefined;
-    return { openGuide: studio.openGuide, prepareClose, dispose() {
+    return { openGuide: studio.openGuide, prepareClose, awaitingCloseChoice: studio.awaitingCloseChoice, dispose() {
       if (warmup !== undefined) cancelAnimationFrame(warmup);
       studio.dispose(); void runtime.dispose();
     } };

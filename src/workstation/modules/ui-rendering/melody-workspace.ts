@@ -10,7 +10,7 @@ import { defaultInstrumentInfo, DRUM_REFERENCE_FREQUENCY_HZ as RHYTHM_PITCH, ins
 import { attachConsoleHorizontalWheel } from './console-scroll.ts';
 import { phrasePitchRow } from './phrase-viewport.ts';
 import type { PhraseEditorViewport } from './phrase-editor-viewport.ts';
-import { buildPhraseToneColors, toneColor as defaultToneColor } from './phrase-overview-notes.ts';
+import { buildPhraseToneColors, toneColor as defaultToneColor, windowsToneColor } from './phrase-overview-notes.ts';
 import { playlistSegmentIntersectsRect } from './playlist-geometry.ts';
 import { melodyEntryKey, melodyEntryPitch, nextMelodyEntryStep } from './melody-key-entry.ts';
 import { MAX_PHRASE_BEATS, MIN_NOTE_BEATS as MIN_BEATS, MIN_NOTE_SECONDS } from '../../contracts/phrase-limits.ts';
@@ -20,16 +20,21 @@ import { formatPlayheadTime, melodyBeats, melodyClamp, melodyDuration, melodyDet
   melodyPitchTop, melodyPitchHeight, melodyPitchAt,
   melodyTimeAt, clampMelodyView, initialMelodyView, zoomMelody, melodyScoreGrid, melodyScoreGridDepth, type MelodyView } from './melody-geometry.ts';
 import './melody-workspace.css';
+import './pointer-ux.css';
+import { createWorkspacePanel, type WorkspacePanel } from './workspace-panel.ts';
+import { EDGE_COOLDOWN_MS, attachEdgeGesture, listenDesktopPointer, pointerPanVector, type PointerPanMode } from './pointer-gestures.ts';
 import { createMelodyNoteIndex, melodyFollowTarget, type IndexedMelodyNote } from './melody-note-index.ts';
 import { mountMelodyTempoRolls } from './melody-tempo-rolls.ts';
 import { mountMelodyGainCurve } from './melody-gain-curve.ts';
 import { createInstrumentIcon } from './instrument-icon.ts';
 import { libraryIcon } from './library-icon.ts';
+import { flyToneCard, mountToneHand, mountToneDeck, paintCardBacks, setMiniToneDrag,
+  showToneCardFace, slideToneCards, stopToneCardFlights, takeToneCardPicture, toneCardPositions } from './melody-tone-cards.ts';
 
 function node<K extends keyof HTMLElementTagNameMap>(tag: K, className = '', text = ''): HTMLElementTagNameMap[K] {
   const element = document.createElement(tag); element.className = className; element.textContent = text; return element;
 }
-function button(text: string, className: string, callback: () => void): HTMLButtonElement {
+function button(text: string, className: string, callback: (event: MouseEvent) => void): HTMLButtonElement {
   const element = node('button', className, text); element.type = 'button'; element.addEventListener('click', callback); return element;
 }
 function addInstrumentIcon(button: HTMLButtonElement, key: string | undefined): void {
@@ -40,12 +45,24 @@ function addInstrumentIcon(button: HTMLButtonElement, key: string | undefined): 
 }
 type NoteChanges = Partial<Omit<PhraseNote, 'id'>>;
 type Point = { x: number; y: number };
+type RollPaintRegion = {
+  start: number; end: number; origin: number; lowPitch: number; highPitch: number;
+  zoom: number; rowHeight: number; duration: number;
+};
 type Selection = { partId: string; noteId?: string };
 type LibraryIntent = { kind: 'create' } | { kind: 'replace'; partId: string };
-type Gesture = { id: number; capture: HTMLElement; base: PhraseBody; draftId: string; from: Point; last: Point; clientFrom: Point } & (
+type Gesture = { id: number; capture: HTMLElement; base: PhraseBody; draftId: string; from: Point; last: Point; clientFrom: Point; desktopClick?: boolean; button: number } & (
   { kind: 'head'; seconds: number; fromRuler: boolean; moved: boolean } | { kind: 'pan'; lastClient: Point } |
   { kind: 'erase'; refs: Map<string, { partId: string; noteId: string }>; moved: boolean; familyId?: string; sampleTime?: number; touchRight?: boolean } |
   { kind: 'note' | 'create' | 'resize'; partId: string; targetPartId?: string; note: PhraseNote; changes: NoteChanges; rawY: number; moved: boolean; drumLane?: number; auditionOnClick?: boolean; touchDrag?: boolean; dragReadyAt?: number });
+type DesktopErase = Extract<Gesture, { kind: 'erase' }> & { tapPitch?: number };
+type WheelEdit = {
+  draftId: string; partId: string; note: PhraseNote; changes: NoteChanges;
+  initialSeconds: number; minimumSeconds: number; maximumSeconds: number; stepSeconds: number;
+  seconds: number; create: boolean; remove: boolean;
+};
+type WheelAnchor = { x: number; y: number; draftId: string; partId: string; noteId: string };
+type PointerPosition = Pick<PointerEvent, 'clientX' | 'clientY' | 'timeStamp'>;
 type Mix = { partId: string; note: PhraseNote; base: PhraseBody; changes: NoteChanges; pointerId?: number };
 const DRUM_HIT_SECONDS = .05;
 const DEFAULT_DRUM_LANE_WIDTH = 14;
@@ -66,16 +83,19 @@ export function mountMelodyWorkspace(root: HTMLElement, options: {
   initialViewport?: PhraseEditorViewport;
   workspaceState?: MusicWorkspaceStatePort;
   orientation?: 'horizontal' | 'vertical';
+  desktopPointerUx?: boolean;
+  readPointerSensitivity?(): number;
+  editorSettings?: { isOpen(): boolean; setOpen(open: boolean): void };
   showPlayheadTime?: boolean;
   onViewportChange?(viewport: PhraseEditorViewport): void;
-  onChange(view?: PhraseView, preserveSounding?: boolean): void; onPreview(body?: PhraseBody): void; onSeek(seconds: number): void | Promise<void>;
+  onChange(view?: PhraseView, preserveSounding?: boolean, noteOnly?: boolean): void; onPreview(body?: PhraseBody): void; onSeek(seconds: number): void | Promise<void>;
   /** A family selection solos that family; individual note selection does not. */
   onPlaybackFamilyChange?(partId?: string): void;
   readPlayhead?(): number;
   readIsPlaying?(): boolean;
   readPerformanceMode?(): boolean;
   listTimbres(): Array<{ id: string; name: string; requiresDeleteConfirmation?: boolean }>; onAddTimbre(id: string): string;
-  onCreateNoteGroup?(id: string): string;
+  onCreateNoteGroup?(id: string, draftId: string): string;
   onChangeNoteGroupTimbre?(partId: string, timbreId: string): void;
   onRemoveTimbre?(id: string): void;
   onImportTimbre?(): Promise<boolean>;
@@ -90,11 +110,16 @@ export function mountMelodyWorkspace(root: HTMLElement, options: {
   onLearningAction?(action: LearningAction): void;
   readLessonInput?(): 'locked' | 'pan' | 'draw' | 'zoom' | 'edit';
   mobileTouch?: { readRightButton(): boolean };
-}): { refresh(view?: PhraseView): void; dispose(): void; flush(): void; setPlayhead(seconds: number, playing?: boolean, displaySeconds?: number): void; isStepInputActive(): boolean; readViewport(): PhraseEditorViewport; frameNotes(reserveEndSpace?: boolean): void; previewTempoRate(value?: number, sectionId?: string): void } {
-  const { phrase, sound } = options; let current = options.initialView ?? phrase.read(); let disposed = false;
+}): { refresh(view?: PhraseView): void; dispose(): void; flush(persist?: boolean, writeDraft?: boolean): void; setPlayhead(seconds: number, playing?: boolean, displaySeconds?: number, frameTime?: number): void; isStepInputActive(): boolean; cancelInteraction(): boolean; settingsVisibilityChanged(): void; readViewport(): PhraseEditorViewport; frameNotes(reserveEndSpace?: boolean): void; previewTempoRate(value?: number, sectionId?: string): void } {
+  const { phrase, sound } = options;
+  const readEditor = () => options.desktopPointerUx ? phrase.read({ includeCatalog: false, sharedDraft: true }) : phrase.read();
+  let current = options.initialView ?? readEditor(); let disposed = false;
   const rhythm = options.section === 'rhythm';
   const vertical = options.orientation === 'vertical';
   const drumRoll = vertical && !rhythm;
+  const pointerUx = vertical && !rhythm && options.desktopPointerUx === true;
+  const windowsPalette = pointerUx && document.documentElement?.classList.contains('windows-desktop-colors');
+  const unassignedColor = windowsPalette ? '#a99b9e' : '#b6bcc4';
   const keys: KeyboardPitch[] = phrase.keyboard().slice(); if (!vertical) keys.reverse();
   const restored = options.workspaceState?.read();
   let requestedDrumLanes = restored?.drumLanes;
@@ -114,43 +139,80 @@ export function mountMelodyWorkspace(root: HTMLElement, options: {
   const workbenchEnabled = () => options.readWorkbench?.() === true;
   let selection = vertical && !workbenchEnabled() && initialSelection?.noteId ? undefined : initialSelection;
   let gesture: Gesture | undefined; let mix: Mix | undefined;
+  let wheelEdit: WheelEdit | undefined;
+  let wheelAnchor: WheelAnchor | undefined;
+  let wheelScrollPoint: Point | undefined;
+  let dragSample: PointerPosition | undefined;
+  let dragFrame = 0;
+  let wheelTimer = 0, wheelFrame = 0, edgeFrame = 0, edgeLastTime = 0;
+  let highlightedKey: HTMLButtonElement | undefined;
+  let auditionPitch: number | undefined;
+  let auditionPitchTimer = 0;
+  let toneCardsOpen = false;
+  let toneRevealBand: { top: number; bottom: number } | undefined;
+  let panMode: PointerPanMode = 'ready';
+  let desktopErase: DesktopErase | undefined;
+  let hoveredToneId: string | undefined;
+  let toneCooldownUntil = 0;
+  let pointerPan = { x: 0, y: 0 };
   let gainPartId: string | undefined;
   let gainDraft: { kind: CurveKind; points: PhraseGainPoint[] } | undefined;
   let playbackFamilyId: string | undefined;
-  let playheadSeconds = restored?.playheadSeconds ?? 0; let library: HTMLDialogElement | undefined; let observer: ResizeObserver | undefined;
+  let playheadSeconds = restored?.playheadSeconds ?? 0; let library: WorkspacePanel | undefined; let observer: ResizeObserver | undefined;
   let playheadPlaying = false;
+  let displayedPlayheadSeconds = playheadSeconds;
   let clockFrame = -1;
   let entryOctave = restored?.entryOctave ?? 4;
   let entryToneId: string | undefined = vertical ? selection?.partId : restored?.entryToneId;
   let deleteToneArmed: { partId: string; at: number } | undefined;
   let libraryRefresh: (() => void) | undefined; let libraryError: HTMLElement | undefined;
-  let draggedGroup: { id: string; draftId: string } | undefined;
+  let draggedGroup: { id: string; draftId: string; from: Point; card: HTMLButtonElement; pinned: boolean } | undefined;
   let suppressGroupClickUntil = 0;
   let draggedTone: { id: string; draftId: string } | undefined; let suppressLibraryClickUntil = 0;
-  let toneDeleteDialog: HTMLDialogElement | undefined; let toneDeleteDraftId: string | undefined;
+  let toneDeleteDialog: WorkspacePanel | undefined; let toneDeleteDraftId: string | undefined;
   let resetToneOrder: (() => void) | undefined;
   let noticeTimer = 0; const addedParts = new Set<string>(); const noteNodes = new Map<string, HTMLButtonElement>();
+  const noteLayers = new Map<HTMLElement, Map<string, HTMLElement>>();
+  const noteRects = new WeakMap<HTMLElement, { x: number; y: number; width: number; height: number }>();
+  const noteHighlights = new Map<HTMLElement, HTMLCanvasElement>();
+  let highlightFrame = 0;
+  let noteLayerSelection: string | undefined;
+  let noteLayerHover: string | undefined;
+  const toneEntries = new Map<string, { entry: HTMLElement; card: HTMLButtonElement; appearance: string }>();
   const noteLabels = new WeakMap<HTMLButtonElement, string>();
   const noteAppearance = new WeakMap<HTMLButtonElement, string>();
   const gridNodes: HTMLElement[] = [];
   let gridSnapTimes: number[] = [];
   const drumGridNodes: HTMLElement[] = [];
   let headWidth = 1;
+  let rollPitchWidth = 0;
+  let rollRegion: RollPaintRegion | undefined;
+  let drawnGrid = '';
+  let drawnNotes: RollPaintRegion | undefined;
+  let drawnNoteBody: PhraseBody | undefined;
+  let drawnNoteAppearance = '';
+  let drawnNoteWidth = 0;
+  const retainedGridLines = new Map<HTMLElement, Map<number, HTMLElement>>();
+  let layerOffset = NaN;
   let viewportFrame = 0;
+  let zoomBounds: { pitch: number; time: number } | undefined;
+  let pendingPitchOffset: number | undefined;
   let previewFrame = 0;
   let indexedBody: PhraseBody | undefined;
   let noteIndex: ReturnType<typeof createMelodyNoteIndex> | undefined;
   let lastSoundingNotes: readonly IndexedMelodyNote[] | undefined;
-  const pitchRows = new Map<number, number>();
+  const cachedPitchRows = new Map<number, number>();
   function pitchRow(frequency: number): number {
-    let row = pitchRows.get(frequency);
-    if (row === undefined) { row = phrasePitchRow(frequency, keys); pitchRows.set(frequency, row); }
+    let row = cachedPitchRows.get(frequency);
+    if (row === undefined) { row = phrasePitchRow(frequency, keys); cachedPitchRows.set(frequency, row); }
     return row;
   }
   let followResumeAt = 0;
+  let lastFollowFrame: { time: number; seconds: number; zoom: number } | undefined;
   let browseLastSeconds = view.leftSeconds, browseLastAt = -Infinity, browseSince = 0, browseDistance = 0;
-  let quickHideTimer = 0, quickHover = false, quickFocused = false;
+  let quickHideTimer = 0, handHoverTimer = 0, quickHover = false, quickFocused = false;
   let quickThumbTop = 0, quickThumbHeight = 28, quickTrackHeight = 1;
+  let measureQuickTrack = true;
   let quickDescription = '';
   let quickDrag: { id: number; top: number; grab: number } | undefined;
   let keyPan: { id: number; capture: HTMLElement; fromX: number; offset: number; moved: boolean } | undefined;
@@ -164,6 +226,7 @@ export function mountMelodyWorkspace(root: HTMLElement, options: {
   let pinchFrame = 0;
   const sounding = new Set<string>();
   const keyNodes: HTMLButtonElement[] = [];
+  const pitchRows: HTMLElement[] = [];
   let soundingKeys = new Map<number, string>();
   let toneColors = new Map<string, string>();
   let toneNames = new Map<string, string>();
@@ -171,6 +234,7 @@ export function mountMelodyWorkspace(root: HTMLElement, options: {
   let instrumentKeys = new Map<string, string>();
   const drumKeys = new Map<string, number>();
   const page = node('div', 'melody-workspace'); const main = node('div', 'melody-main'); const shelf = node('aside', 'melody-shelf');
+  const pointerArea = root.closest<HTMLElement>('.music-editor') ?? main;
   let cardMenuTarget: { card: HTMLButtonElement; id: string } | undefined;
   const cardMenu = node('div', 'melody-card-menu');
   cardMenu.hidden = true; cardMenu.setAttribute('role', 'menu');
@@ -183,6 +247,35 @@ export function mountMelodyWorkspace(root: HTMLElement, options: {
   deleteCard.append(libraryIcon('trash')); cardMenu.append(deleteCard); page.append(cardMenu);
   page.classList.toggle('rhythm-workspace', rhythm);
   page.classList.toggle('is-vertical', vertical);
+  let keyboardHeight = 48;
+  let toneKeyboardInset = 0;
+  function sizeDesktopKeyboard(): void {
+    const height = Math.round(melodyClamp(window.innerHeight * .12, 100, 148));
+    if (keyboardHeight === height) return;
+    keyboardHeight = height;
+    page.style.setProperty('--melody-keyboard-height', `${height}px`);
+    if (pointerArea !== main) pointerArea.style.setProperty('--melody-keyboard-height', `${height}px`);
+  }
+  const toneHand = pointerUx ? node('div', 'melody-tone-hand') : shelf;
+  const handMotion = pointerUx ? mountToneHand(toneHand) : undefined;
+  let toggleToneDeck: (() => void) | undefined;
+  const tonePile = pointerUx ? button('', 'melody-add-tone melody-add-note-family melody-tone-pile', () => {
+    if (toggleToneDeck) toggleToneDeck(); else openLibrary();
+  }) : undefined;
+  if (pointerUx) {
+    page.classList.add('has-pointer-roll');
+    sizeDesktopKeyboard();
+    const handMask = node('div', 'melody-tone-hand-mask');
+    const backs = node('span', 'melody-card-backs');
+    backs.setAttribute('aria-hidden', 'true');
+    paintCardBacks(backs, 7);
+    const empty = node('span', 'melody-tone-pile-empty', '×');
+    empty.setAttribute('aria-hidden', 'true');
+    tonePile!.append(backs, empty);
+    tonePile!.setAttribute('aria-label', '添加音色');
+    tonePile!.setAttribute('aria-expanded', 'false');
+    handMask.append(toneHand); shelf.append(handMask, tonePile!);
+  }
   shelf.setAttribute('aria-label', rhythm ? '音色栏' : '音符栏');
   const roll = node('div', 'melody-roll'); const rulerRow = node('div', 'melody-ruler-row'); const ruler = node('div', 'melody-ruler');
   const headHandle = button('', 'melody-head-handle', () => {}); headHandle.setAttribute('aria-label', rhythm ? '节奏播放线' : '旋律播放线'); headHandle.setAttribute('role', 'slider');
@@ -231,15 +324,29 @@ export function mountMelodyWorkspace(root: HTMLElement, options: {
   const removeConsoleWheel = vertical ? () => {} : attachConsoleHorizontalWheel(console);
   if (vertical) shelf.setAttribute('aria-label', '音色栏');
   const notice = node('div', 'melody-notice'); notice.hidden = true; notice.setAttribute('role', 'status'); page.append(main, notice); root.replaceChildren(page);
-  const audition = createPhraseAudition(phrase, sound, () => selection?.partId, message => report(message), vertical);
+  const pinnedTone = pointerUx ? node('div', 'melody-pinned-tone') : undefined;
+  if (pinnedTone) { pinnedTone.hidden = true; main.append(pinnedTone); }
+  const audition = createPhraseAudition(phrase, sound, () => selection?.partId, message => report(message), vertical, pointerUx ? () => current : undefined);
+  const toneEdges = pointerUx ? { left: node('div', 'melody-tone-edge is-left'), right: node('div', 'melody-tone-edge is-right') } : undefined;
+  const toneShortcut = pointerUx ? button('', 'pointer-keyboard-entry melody-tone-shortcut', toggleToneCards) : undefined;
+  if (toneEdges && toneShortcut) {
+    for (const edge of Object.values(toneEdges)) edge.setAttribute('aria-hidden', 'true');
+    toneShortcut.setAttribute('aria-label', '音色栏');
+    toneShortcut.append(libraryIcon('musicLibrary'));
+    toneShortcut.setAttribute('aria-expanded', 'false');
+    page.prepend(toneShortcut);
+    pointerArea.append(toneEdges.left, toneEdges.right);
+    shelf.inert = true;
+  }
   const toneTrash = node('div', 'melody-tone-trash'); toneTrash.hidden = true; toneTrash.setAttribute('role', 'region'); toneTrash.setAttribute('aria-label', '移除音色');
   const trashIcon = document.createElementNS('http://www.w3.org/2000/svg', 'svg'); trashIcon.setAttribute('viewBox', '0 0 24 24'); trashIcon.setAttribute('aria-hidden', 'true');
   const trashPath = document.createElementNS('http://www.w3.org/2000/svg', 'path'); trashPath.setAttribute('d', 'M4 6h16M9 6V3h6v3M6 6l1 15h10l1-15M10 10v7m4-7v7');
   for (const [key, value] of Object.entries({ fill: 'none', stroke: 'currentColor', 'stroke-width': '1.6', 'stroke-linecap': 'round', 'stroke-linejoin': 'round' })) trashPath.setAttribute(key, value);
   trashIcon.append(trashPath); toneTrash.append(trashIcon); page.append(toneTrash);
-  const width = () => Math.max(1, vertical ? scroll.clientHeight - 48 : canvas.clientWidth || scroll.clientWidth - (rhythm ? 0 : 64));
+  const width = () => Math.max(1, vertical ? scroll.clientHeight - keyboardHeight : canvas.clientWidth || scroll.clientWidth - (rhythm ? 0 : 64));
   const pitchSpan = () => vertical ? scroll.clientWidth : scroll.clientHeight;
-  const pitchOffset = () => vertical ? scroll.scrollLeft : scroll.scrollTop;
+  const pitchOffset = () => pendingPitchOffset ?? (vertical ? scroll.scrollLeft : scroll.scrollTop);
+  const noteArea = (target: Node) => canvas.contains(target) || drumCanvas.contains(target);
   const drumOrigin = () => pitchOffset() + pitchSpan();
   const drumLaneAt = (y: number) => melodyClamp(visibleDrumLanes - 1 - Math.floor((y - drumOrigin()) / drumLaneWidth), 0, visibleDrumLanes - 1);
   const body = () => tempoPreview ?? current.body;
@@ -302,7 +409,8 @@ export function mountMelodyWorkspace(root: HTMLElement, options: {
     gainPartId = id; gainDraft = undefined;
     page.classList.toggle('is-gain-editing', !!id);
     keyboard.inert = !!id; drumKeyboard.inert = !!id; notes.inert = !!id; drumNotes.inert = !!id;
-    tempoDock.inert = !!id; shelf.inert = !!id;
+    tempoDock.inert = !!id; shelf.inert = !!id || (pointerUx && (!toneCardsOpen || options.editorSettings?.isOpen() === true));
+    if (pinnedTone) pinnedTone.inert = !!id;
     paintShelf(); paintConsole(); paintViewport(); scheduleViewport();
     if (id) scroll.focus({ preventScroll: true });
     else console.querySelector<HTMLButtonElement>('.melody-edit-gain-curve')?.focus({ preventScroll: true });
@@ -348,12 +456,17 @@ export function mountMelodyWorkspace(root: HTMLElement, options: {
     const safe = { ...next, leftSeconds: Number.isFinite(next.leftSeconds) ? next.leftSeconds : 0,
       rowHeight: Number.isFinite(next.rowHeight) ? next.rowHeight : rhythm ? 72 : 32 };
     // Leave room after the last roll to reach and pull its actual lower edge.
-    const clamped = clampMelodyView(safe, vertical ? duration + 6 / melodyClamp(safe.zoom, .25, 256) : duration);
+    const clamped = clampMelodyView(safe, vertical ? duration + 6 / melodyClamp(safe.zoom, .25, 256) : duration, pointerUx ? .5 : 0);
+    if (pointerUx && safe.zoom === view.zoom) {
+      const left = -4 / clamped.zoom;
+      const right = Math.max(clamped.leftSeconds, Math.min(view.leftSeconds, duration - 4 / view.zoom));
+      clamped.leftSeconds = melodyClamp(safe.leftSeconds, left, right);
+    }
     return rhythm ? { ...clamped, rowHeight: melodyClamp(safe.rowHeight, 48, 120) } : clamped;
   }
   function maximumTop(): number {
     const height = rhythm ? Math.max(1, visibleParts().length) * view.rowHeight + 52 : melodyPitchTop(keys, keys.length, view.rowHeight);
-    return Math.max(0, height - Math.max(0, pitchSpan()));
+    return Math.max(0, height - Math.max(0, pointerUx && rollPitchWidth ? rollPitchWidth : pitchSpan()));
   }
   function setTop(top: number): void { const next = melodyClamp(Number.isFinite(top) ? top : 0, 0, maximumTop()); if (vertical) scroll.scrollLeft = next; else scroll.scrollTop = next; }
   function readViewport(): PhraseEditorViewport { return { ...view, top: melodyClamp(pitchOffset(), 0, maximumTop()) }; }
@@ -374,17 +487,39 @@ export function mountMelodyWorkspace(root: HTMLElement, options: {
     }
   }
   function reportViewport(remember = true): void {
-    setTop(pitchOffset()); if (!viewportReady || disposed) return;
+    if (!pointerUx) setTop(pitchOffset());
+    if (!viewportReady || disposed) return;
     if (remember) persistWorkspace();
-    const next = readViewport();
+    const next = pointerUx ? { ...view, top: pitchOffset() } : readViewport();
     if (lastViewport && next.leftSeconds === lastViewport.leftSeconds && next.zoom === lastViewport.zoom && next.top === lastViewport.top && next.rowHeight === lastViewport.rowHeight) return;
     lastViewport = next; options.onViewportChange?.({ ...next });
   }
   function paintViewport(remember = true, updateHead = true): void {
     cancelAnimationFrame(viewportFrame); viewportFrame = 0;
     if (disposed) return;
+    const zooming = zoomBounds !== undefined;
+    zoomBounds = undefined;
+    const zoomOffset = pendingPitchOffset;
+    if (zoomOffset !== undefined) paintRows();
     if (rhythm) paintShelf();
-    paintGrid(); paintNotes(undefined, updateHead); gainCurve?.paint(); paintQuickScroll(); reportViewport(remember);
+    const value = body();
+    const reuse = pointerUx && !!value && !tempoRatePreview && !!rollPitchWidth
+      && drawnNoteBody === value && drawnNotes === currentRollRegion(value, zooming)
+      && !desktopErase && !mix && !wheelEdit && !(gesture && 'note' in gesture);
+    if (reuse) {
+      moveRollLayers();
+      scheduleNoteHighlights();
+      paintRollOverlays(value, headWidth);
+      if (updateHead) positionHead();
+    } else {
+      paintGrid(zooming);
+      paintNotes(undefined, updateHead);
+    }
+    if (zoomOffset !== undefined) {
+      setTop(zoomOffset);
+      pendingPitchOffset = undefined;
+    }
+    gainCurve?.paint(); paintQuickScroll(); reportViewport(remember);
   }
   function scheduleViewport(): void {
     if (!viewportFrame) viewportFrame = requestAnimationFrame(() => paintViewport());
@@ -393,16 +528,21 @@ export function mountMelodyWorkspace(root: HTMLElement, options: {
     return seconds >= view.leftSeconds && seconds <= view.leftSeconds + 8 / view.zoom;
   }
   function manualNavigation(fromQuick = false): void {
+    wheelAnchor = undefined;
     // Browsing away pauses following; small pans and returning resume it.
-    if (vertical) followResumeAt = headInView() ? 0 : performance.now() + 30_000;
     if (!vertical) return;
     const now = performance.now(), delta = Math.abs(view.leftSeconds - browseLastSeconds);
+    followResumeAt = now + (headInView() ? pointerUx ? 900 : 0 : 30_000);
+    lastFollowFrame = undefined;
     browseLastSeconds = view.leftSeconds;
     if (!fromQuick && delta > 0) {
       if (now - browseLastAt > 700) { browseSince = now; browseDistance = 0; }
       browseLastAt = now;
-      browseDistance += delta * melodyScale(view, width(), melodyDuration(body()!));
-      if (browseDistance >= width() * .75 || now - browseSince >= 600 && browseDistance >= 48) revealQuickScroll();
+      const viewportWidth = pointerUx && headWidth > 1 ? headWidth : width();
+      browseDistance += delta * melodyScale(view, viewportWidth, melodyDuration(body()!));
+      if (quick.hidden && (browseDistance >= viewportWidth * .75 || now - browseSince >= 600 && browseDistance >= 48)) {
+        quick.hidden = false; measureQuickTrack = true;
+      }
     }
     if (!quick.hidden) deferQuickHide();
   }
@@ -411,7 +551,6 @@ export function mountMelodyWorkspace(root: HTMLElement, options: {
     if (quickDrag || quickHover || quickFocused) return;
     quickHideTimer = window.setTimeout(() => { quick.hidden = true; quickHint.hidden = true; }, 2000);
   }
-  function revealQuickScroll(): void { quick.hidden = false; deferQuickHide(); }
   function paintQuickHint(): void {
     if (quickHint.hidden !== quick.hidden) quickHint.hidden = quick.hidden;
     const duration = melodyDuration(body()!);
@@ -427,7 +566,7 @@ export function mountMelodyWorkspace(root: HTMLElement, options: {
   function paintQuickScroll(): void {
     if (!vertical || quick.hidden || !body()) return;
     const duration = melodyDuration(body()!) + 6 / view.zoom, span = 8 / view.zoom, maximum = Math.max(0, duration - span);
-    quickTrackHeight = Math.max(1, quick.clientHeight);
+    if (!pointerUx || measureQuickTrack) { quickTrackHeight = Math.max(1, quick.clientHeight); measureQuickTrack = false; }
     quickThumbHeight = Math.min(quickTrackHeight, Math.max(28, quickTrackHeight * Math.min(1, span / duration)));
     quickThumbTop = maximum ? melodyClamp(view.leftSeconds / maximum, 0, 1) * (quickTrackHeight - quickThumbHeight) : 0;
     quickThumb.style.height = `${quickThumbHeight}px`; quickThumb.style.transform = `translateY(${quickThumbTop}px)`;
@@ -453,7 +592,7 @@ export function mountMelodyWorkspace(root: HTMLElement, options: {
     if (libraryError) { libraryError.textContent = message; libraryError.hidden = !message; }
     window.clearTimeout(noticeTimer); noticeTimer = window.setTimeout(() => { if (!disposed) notice.hidden = true; }, 6000);
   }
-  function notify(preserveSounding = false): void { if (!disposed) options.onChange(current, preserveSounding); }
+  function notify(preserveSounding = false, noteOnly = false): void { if (!disposed) options.onChange(current, preserveSounding, noteOnly); }
   function preview(value?: PhraseBody): void {
     cancelAnimationFrame(previewFrame); previewFrame = 0;
     if (!disposed) options.onPreview(value);
@@ -461,7 +600,7 @@ export function mountMelodyWorkspace(root: HTMLElement, options: {
   function previewEdit(): void {
     // Idle editing needs no full-score audio copy. During playback, coalesce
     // pointer events and compile only the latest change at the next frame.
-    if (options.readIsPlaying?.() === false) return;
+    if (options.readIsPlaying?.() === false || (pointerUx && options.readIsPlaying)) return;
     if (!options.readIsPlaying) { preview(displayedBody()); return; }
     if (!previewFrame) previewFrame = requestAnimationFrame(() => { previewFrame = 0; preview(displayedBody()); });
   }
@@ -516,7 +655,7 @@ export function mountMelodyWorkspace(root: HTMLElement, options: {
   }
   function partLabel(value: PhrasePart): string { return value.unassigned ? '未定义' : rhythm ? value.name : toneNames.get(value.timbreId) ?? value.name; }
   function toneColor(id: string): string {
-    return toneColors.get(id) ?? defaultToneColor(id);
+    return toneColors.get(id) ?? (windowsPalette ? windowsToneColor(id) : defaultToneColor(id));
   }
   function editingFamilyId(): string | undefined {
     return vertical && selection?.noteId ? undefined : selection?.partId;
@@ -552,9 +691,181 @@ export function mountMelodyWorkspace(root: HTMLElement, options: {
         || voice.model !== 'basic-synth' || voice.character !== 'warm' || voice.attackSeconds !== .025 || voice.releaseSeconds !== .55 || voice.level !== .65;
     });
   }
-  function choose(next: Selection): void { if (gainPartId || !safeFlush()) return; selection = next; entryToneId = !rhythm && !next.noteId ? next.partId : undefined; deleteToneArmed = undefined; audition.sync(current); paintShelf(); syncDrumStrip(); paintNotes(); paintConsole(); persistWorkspace(); if (!next.noteId) options.onLearningAction?.('select-group'); }
+  function choose(next: Selection, moveCards?: () => void): void {
+    if (gainPartId || !safeFlush()) return;
+    const repaintNotes = !pointerUx || selection?.noteId !== next.noteId;
+    wheelAnchor = undefined;
+    if (pointerUx) suspendRollPointer();
+    selection = next; entryToneId = !rhythm && !next.noteId ? next.partId : undefined; deleteToneArmed = undefined;
+    audition.sync(current); paintShelf(); syncDrumStrip(); paintConsole();
+    moveCards?.();
+    if (repaintNotes) paintNotes();
+    persistWorkspace();
+    if (!next.noteId) options.onLearningAction?.('select-group');
+  }
+  function syncPlaybackFamily(): void {
+    const next = hoveredToneId ?? (selection && !selection.noteId ? part()?.id : undefined);
+    if (next === playbackFamilyId) return;
+    playbackFamilyId = next;
+    lastSoundingNotes = undefined;
+    options.onPlaybackFamilyChange?.(next);
+  }
+  function showHoveredTone(id?: string): void {
+    if (hoveredToneId === id) return;
+    hoveredToneId = id;
+    syncPlaybackFamily();
+    scheduleNoteHighlights();
+  }
+  function paintNoteLayer(layer: HTMLElement, id: string, selected: string | undefined): void {
+    const dim = !!selected && selected !== id;
+    if (layer.inert !== dim) layer.inert = dim;
+    layer.classList.toggle('is-dim', dim);
+    layer.classList.toggle('is-current-tone', id === selected);
+    layer.classList.toggle('is-tone-preview', id === hoveredToneId);
+    layer.classList.toggle('is-tone-preview-dim', !!hoveredToneId && id !== hoveredToneId);
+  }
+  function syncNoteLayers(selected = editingFamilyId()): void {
+    if (noteLayerSelection === selected && noteLayerHover === hoveredToneId) return;
+    for (const layers of noteLayers.values()) for (const [id, layer] of layers) paintNoteLayer(layer, id, selected);
+    noteLayerSelection = selected;
+    noteLayerHover = hoveredToneId;
+  }
+  function scheduleNoteHighlights(): void {
+    if (!pointerUx || highlightFrame) return;
+    if (!hoveredToneId && !editingFamilyId() && !noteLayerSelection && !noteLayerHover) return;
+    highlightFrame = requestAnimationFrame(() => {
+      highlightFrame = 0;
+      if (disposed) return;
+      const selected = editingFamilyId();
+      const hovered = hoveredToneId;
+      const active = hovered ?? selected;
+      const offset = pitchOffset();
+      syncNoteLayers(selected);
+      for (const parent of [notes, drumNotes]) {
+        const layer = active ? noteLayers.get(parent)?.get(active) : undefined;
+        let highlight = noteHighlights.get(parent);
+        if (!layer || !rollPitchWidth || !headWidth || !Number.isFinite(layerOffset)) {
+          if (highlight) highlight.hidden = true;
+          continue;
+        }
+        if (!highlight) {
+          highlight = node('canvas', 'melody-note-highlights');
+          highlight.setAttribute('aria-hidden', 'true');
+          parent.append(highlight);
+          noteHighlights.set(parent, highlight);
+        }
+        const width = parent === notes ? rollPitchWidth : visibleDrumLanes * drumLaneWidth;
+        const x = parent === notes ? offset : 0, y = -layerOffset;
+        const ratio = window.devicePixelRatio || 1;
+        const pixelsWide = Math.round(width * ratio), pixelsHigh = Math.round(headWidth * ratio);
+        if (highlight.width !== pixelsWide) highlight.width = pixelsWide;
+        if (highlight.height !== pixelsHigh) highlight.height = pixelsHigh;
+        highlight.style.width = `${width}px`;
+        highlight.style.height = `${headWidth}px`;
+        highlight.style.translate = `${x}px ${y}px`;
+        highlight.hidden = false;
+        const drawing = highlight.getContext?.('2d');
+        if (!drawing) continue;
+        drawing.setTransform(ratio, 0, 0, ratio, 0, 0);
+        drawing.clearRect(0, 0, width, headWidth);
+        const voice = part(active);
+        const color = !voice || voice.unassigned ? unassignedColor : toneColor(voice.timbreId);
+        drawing.strokeStyle = windowsPalette ? `color-mix(in srgb, ${color} 35%, #fffdf7)`
+          : `color-mix(in srgb, ${color} 76%, #294458)`;
+        drawing.lineWidth = 1;
+        drawing.beginPath();
+        for (const block of layer.children) {
+          const rect = noteRects.get(block as HTMLElement);
+          if (!rect || rect.x + rect.width <= x || rect.x >= x + width || rect.y + rect.height <= y || rect.y >= y + headWidth) continue;
+          if (windowsPalette) {
+            if (rect.width < 2 || rect.height < 2) continue;
+            drawing.roundRect(rect.x - x + 1, rect.y - y + 1, rect.width - 2, rect.height - 2, .5);
+          } else drawing.roundRect(rect.x - x + .5, rect.y - y + .5,
+            Math.max(0, rect.width - 1), Math.max(0, rect.height - 1), 2);
+        }
+        if (!windowsPalette && hovered && hovered !== selected) {
+          drawing.shadowColor = `color-mix(in srgb, ${color} 35%, transparent)`;
+          drawing.shadowBlur = 6;
+        } else drawing.shadowBlur = 0;
+        drawing.stroke();
+      }
+    });
+  }
+  function noteLayer(parent: HTMLElement, id: string): HTMLElement {
+    if (!pointerUx) return parent;
+    let layers = noteLayers.get(parent);
+    if (!layers) noteLayers.set(parent, layers = new Map());
+    let layer = layers.get(id);
+    if (!layer) {
+      layer = node('div', 'melody-tone-note-layer');
+      paintNoteLayer(layer, id, editingFamilyId());
+      layers.set(id, layer);
+      parent.append(layer);
+    }
+    return layer;
+  }
+  function noteDimmed(block: HTMLElement): boolean {
+    if (!pointerUx) return block.classList.contains('is-dim');
+    const selected = editingFamilyId();
+    return !!selected && block.dataset.partId !== selected;
+  }
+  function returnToneCard(picture: ReturnType<typeof takeToneCardPicture>, id: string): void {
+    const target = toneHand.querySelector<HTMLElement>(`[data-part-id="${id}"] .melody-note-family`);
+    flyToneCard(picture, target, main, 'return');
+  }
+  function clearToneCard(release?: DragEvent): void {
+    const id = editingFamilyId();
+    if (!id || !safeFlush()) return;
+    stopToneCardFlights(main);
+    const previous = toneCardsOpen ? toneCardPositions(toneHand) : undefined;
+    const card = pinnedTone?.querySelector<HTMLElement>('.melody-note-family');
+    const outgoing = card && takeToneCardPicture(card, release);
+    selection = undefined; entryToneId = undefined; deleteToneArmed = undefined;
+    audition.sync(current); paintShelf(); syncDrumStrip(); paintConsole();
+    if (previous) slideToneCards(toneHand, previous);
+    if (outgoing) returnToneCard(outgoing, id);
+    else scroll.focus({ preventScroll: true });
+    persistWorkspace();
+    options.onLearningAction?.('deselect');
+  }
+  function activateToneCard(card: HTMLButtonElement, id: string): void {
+    if (!pointerUx) { choose({ partId: id }); scroll.focus({ preventScroll: true }); return; }
+    if (options.editorSettings?.isOpen() || !part(id)) return;
+    const selected = editingFamilyId();
+    if (selected === id) {
+      clearToneCard();
+      return;
+    }
+    if (!toneCardsOpen) return;
+    stopToneCardFlights(main);
+    const previous = toneCardPositions(toneHand);
+    const incoming = takeToneCardPicture(card);
+    const pinned = pinnedTone?.querySelector<HTMLElement>('.melody-note-family');
+    const outgoing = pinned && takeToneCardPicture(pinned);
+    choose({ partId: id }, () => {
+      slideToneCards(toneHand, previous);
+      if (outgoing && selected) returnToneCard(outgoing, selected);
+      flyToneCard(incoming, pinnedTone?.querySelector<HTMLElement>('.melody-note-family'), main, 'pin');
+      scroll.focus({ preventScroll: true });
+      prepareVisibleTone(id);
+    });
+  }
+  function prepareVisibleTone(id: string): void {
+    const record = current.availableSounds.find(sound => sound.id === part(id)?.timbreId)?.body;
+    if (!record || typeof record !== 'object' || Array.isArray(record) || record.model !== 'sample-bank' || record.zones) return;
+    const first = Math.max(0, melodyPitchAt(keys, pitchOffset(), view.rowHeight));
+    const last = Math.min(keys.length - 1, melodyPitchAt(keys, pitchOffset() + pitchSpan(), view.rowHeight));
+    void phrase.prepareNoteAudition?.(id, keys.slice(first, last + 1).map(key => key.frequencyHz)).catch(() => {});
+  }
+  function changeGroupTimbre(partId: string, timbreId: string): void {
+    if (options.onChangeNoteGroupTimbre) options.onChangeNoteGroupTimbre(partId, timbreId);
+    else phrase.setPartTimbre(partId, timbreId);
+  }
   function endGroupDrag(): void {
-    if (draggedGroup) suppressGroupClickUntil = Date.now() + 250;
+    if (draggedGroup) {
+      suppressGroupClickUntil = Date.now() + 250;
+      draggedGroup.card.classList.remove('is-group-dragging');
+    }
     draggedGroup = undefined;
     for (const entry of shelf.querySelectorAll('.melody-tone-entry')) entry.classList.remove('is-merge-target');
     for (const card of shelf.querySelectorAll('.melody-note-family')) card.classList.remove('is-group-dragging');
@@ -563,15 +874,37 @@ export function mountMelodyWorkspace(root: HTMLElement, options: {
     closeCardMenu();
     const editingFamily = editingFamilyId();
     canvas.classList.toggle('is-write-mode', !!editingFamily);
-    const nextPlaybackFamily = !gainPartId && selection && !selection.noteId ? part()?.id : undefined;
-    if (nextPlaybackFamily !== playbackFamilyId) {
-      playbackFamilyId = nextPlaybackFamily; options.onPlaybackFamilyChange?.(playbackFamilyId);
-    }
-    shelf.replaceChildren();
+    hoveredToneId = undefined;
+    syncPlaybackFamily();
+    scheduleNoteHighlights();
+    if (!pointerUx) toneHand.replaceChildren();
+    const hand: HTMLElement[] = [];
+    let pinned: HTMLElement | undefined;
+    const present = new Set<string>();
     for (const [index, value] of visibleParts().entries()) {
-      const entry = node('div', 'melody-tone-entry');
       const label = partLabel(value);
-      const card = button(label, rhythm ? 'melody-tone' : 'melody-tone melody-note-family', () => { if (!disposed && Date.now() >= suppressGroupClickUntil) { choose({ partId: value.id }); scroll.focus({ preventScroll: true }); } });
+      const color = toneColor(value.timbreId);
+      const selected = editingFamily === value.id;
+      const appearance = JSON.stringify([value.timbreId, label, color, value.unassigned, instrumentKeys.get(value.timbreId)]);
+      if (pointerUx) {
+        present.add(value.id);
+        const saved = toneEntries.get(value.id);
+        if (saved?.appearance === appearance) {
+          const wasSelected = saved.card.classList.contains('is-selected');
+          if (wasSelected !== selected) {
+            saved.card.classList.toggle('is-selected', selected);
+            saved.card.setAttribute('aria-pressed', String(selected));
+          }
+          if (selected) pinned = saved.entry;
+          else hand.push(saved.entry);
+          continue;
+        }
+        saved?.entry.remove();
+      }
+      const entry = node('div', 'melody-tone-entry');
+      const card = button(label, rhythm ? 'melody-tone' : 'melody-tone melody-note-family', () => {
+        if (!disposed && Date.now() >= suppressGroupClickUntil) activateToneCard(card, value.id);
+      });
       if (!rhythm) card.title = label;
       if (!options.readLessonInput) {
         card.setAttribute('aria-haspopup', 'menu');
@@ -594,31 +927,44 @@ export function mountMelodyWorkspace(root: HTMLElement, options: {
         card.replaceChildren(node('span', 'melody-drum-family-kit', label.slice(0, separator)),
           node('span', '', label.slice(separator + 3)));
       } else if (instrumentIcons && !value.unassigned) addInstrumentIcon(card, instrumentKeys.get(value.timbreId));
-      card.dataset.partId = value.id; card.style.setProperty('--tone-color', toneColor(value.timbreId)); card.classList.toggle('is-selected', editingFamily === value.id);
+      if (pointerUx) showToneCardFace(card);
+      card.dataset.partId = value.id; card.style.setProperty('--tone-color', color); card.classList.toggle('is-selected', selected);
       if (vertical) {
-        card.setAttribute('aria-pressed', String(editingFamily === value.id));
-        card.addEventListener('dblclick', () => openLibrary({ kind: 'replace', partId: value.id }));
+        card.setAttribute('aria-pressed', String(selected));
+        if (!pointerUx) card.addEventListener('dblclick', () => openLibrary({ kind: 'replace', partId: value.id }));
       }
       card.classList.toggle('is-unassigned', !!value.unassigned);
       if (!rhythm) {
-        card.draggable = !value.unassigned;
+        card.draggable = pointerUx || !value.unassigned;
         card.addEventListener('dragstart', event => {
-          if (disposed || !current.draft || !event.dataTransfer || value.unassigned || !safeFlush()) { event.preventDefault(); return; }
-          audition.cancel(); draggedGroup = { id: value.id, draftId: current.draft.id };
+          if (disposed || !current.draft || !event.dataTransfer || (!pointerUx && value.unassigned) || !safeFlush()) { event.preventDefault(); return; }
+          audition.cancel(); draggedGroup = { id: value.id, draftId: current.draft.id, from: { x: event.clientX, y: event.clientY }, card,
+            pinned: pinnedTone?.contains(card) === true };
           event.dataTransfer.setData(GROUP_DRAG_TYPE, value.id); event.dataTransfer.effectAllowed = 'move';
+          if (pointerUx && !draggedGroup.pinned) setMiniToneDrag(event.dataTransfer, card);
           card.classList.add('is-group-dragging');
         });
         const accepts = () => {
-          if (disposed || !draggedGroup || draggedGroup.draftId !== current.draft?.id || draggedGroup.id === value.id) return false;
+          if (disposed || !draggedGroup || draggedGroup.pinned || draggedGroup.draftId !== current.draft?.id || draggedGroup.id === value.id) return false;
           const source = part(draggedGroup.id), target = part(value.id);
           return !!source && !!target && !source.unassigned && !target.unassigned && source.timbreId === target.timbreId;
         };
+        const replacement = () => pointerUx && draggedTone && draggedTone.draftId === current.draft?.id && part(value.id) ? draggedTone : undefined;
         entry.addEventListener('dragover', event => {
-          if (!accepts() || !event.dataTransfer) return;
+          if ((!accepts() && !replacement()) || !event.dataTransfer) return;
           event.preventDefault(); event.stopPropagation(); event.dataTransfer.dropEffect = 'move'; entry.classList.add('is-merge-target');
         });
         entry.addEventListener('dragleave', () => entry.classList.remove('is-merge-target'));
         entry.addEventListener('drop', event => {
+          const tint = replacement();
+          if (tint && event.dataTransfer?.getData(TIMBRE_DRAG_TYPE) === tint.id) {
+            event.preventDefault(); event.stopPropagation(); endToneDrag();
+            if (!safeFlush()) return;
+            try { changeGroupTimbre(value.id, tint.id); refresh(undefined, !pointerUx, 'rebind'); notify(); }
+            catch (error) { report(error instanceof Error ? error.message : String(error)); }
+            return;
+          }
+          if (pointerUx && !accepts()) return;
           event.preventDefault(); event.stopPropagation();
           const source = draggedGroup;
           const valid = accepts() && event.dataTransfer?.getData(GROUP_DRAG_TYPE) === source?.id;
@@ -626,11 +972,17 @@ export function mountMelodyWorkspace(root: HTMLElement, options: {
           if (!valid || !source || !safeFlush()) return;
           try {
             phrase.mergeParts(source.id, value.id); addedParts.delete(source.id);
-            selection = { partId: value.id }; entryToneId = value.id; deleteToneArmed = undefined;
+            if (selection?.partId === source.id) selection = undefined;
+            if (entryToneId === source.id) entryToneId = undefined;
+            deleteToneArmed = undefined;
             refresh(); persistWorkspace(); notify();
           } catch (error) { report(error instanceof Error ? error.message : String(error)); }
         });
         card.addEventListener('dragend', endGroupDrag);
+      }
+      if (pointerUx) {
+        entry.dataset.partId = value.id;
+        toneEntries.set(value.id, { entry, card, appearance });
       }
       entry.append(card);
       if (!vertical) {
@@ -643,12 +995,33 @@ export function mountMelodyWorkspace(root: HTMLElement, options: {
         const top = 24 + index * view.rowHeight - scroll.scrollTop; const bottom = Math.min(24 + scroll.clientHeight, shelf.clientHeight - 44);
         entry.style.top = `${top}px`; entry.style.height = `${view.rowHeight}px`; entry.style.clipPath = `inset(${Math.max(0, 24 - top)}px 0 ${Math.max(0, top + view.rowHeight - bottom)}px 0)`; card.dataset.rowIndex = String(index); card.style.height = `${view.rowHeight}px`;
       }
-      shelf.append(entry);
+      if (pointerUx) {
+        if (selected) pinned = entry;
+        else hand.push(entry);
+      } else toneHand.append(entry);
+    }
+    if (tonePile) {
+      for (const [id, view] of toneEntries) if (!present.has(id)) {
+        view.entry.remove();
+        toneEntries.delete(id);
+      }
+      if (pinned && pinned.parentElement !== pinnedTone) pinnedTone!.append(pinned);
+      const orderChanged = toneHand.children.length !== hand.length || hand.some((entry, index) => toneHand.children[index] !== entry);
+      if (orderChanged) {
+        hand.forEach((entry, index) => {
+          if (toneHand.children[index] !== entry) toneHand.insertBefore(entry, toneHand.children[index] ?? null);
+        });
+        handMotion?.update(hand);
+      }
+      if (pinnedTone) pinnedTone.hidden = !pinned;
+      toneHand.classList.toggle('is-dense', hand.length > 7);
+      paintEntryRange();
+      return;
     }
     const add = button('+', rhythm ? 'melody-add-tone' : 'melody-add-tone melody-add-note-family', () => openLibrary());
     const addLabel = rhythm || vertical ? '添加音色' : '新建总音符';
     add.setAttribute('aria-label', addLabel);
-    if (vertical) {
+    if (vertical && !pointerUx) {
       const mark = node('span', 'melody-add-tone-icon', '+');
       mark.setAttribute('aria-hidden', 'true');
       add.replaceChildren(mark, node('span', '', addLabel));
@@ -660,14 +1033,25 @@ export function mountMelodyWorkspace(root: HTMLElement, options: {
     if (disposed || library || toneDeleteDialog || !safeFlush()) return;
     if (!rhythm && intent.kind === 'replace' && !part(intent.partId)) { report('找不到这个总音符，请重新选择。'); return; }
     const openedDraftId = current.draft?.id;
-    const dialog = node('dialog', 'melody-tone-library'); library = dialog; dialog.setAttribute('aria-label', '音色库');
+    if (pointerUx && !toneCardsOpen) {
+      options.editorSettings?.setOpen(false);
+      setToneCards(true);
+    }
+    const dialog = createWorkspacePanel(pointerUx); dialog.className += ' melody-tone-library'; library = dialog; dialog.setAttribute('aria-label', '音色库');
     const heading = node('div', 'melody-library-heading'); const close = button('→', 'melody-library-close', dismiss); close.setAttribute('aria-label', '关闭音色库');
     const libraryTitle = node('h2', '', '音色库');
     if (instrumentIcons) libraryTitle.append(libraryIcon('score'));
     heading.append(libraryTitle, close); const tiles = node('div', 'melody-library-grid'); const error = node('p', 'melody-library-error'); error.hidden = true;
-    let category = '全部'; let query = '';
-    const tools = node('div', 'melody-library-tools');
-    const search = node('input', 'melody-library-search'); search.type = 'search'; search.placeholder = '搜索音色'; search.setAttribute('aria-label', '搜索音色');
+    const deckRow = pointerUx ? node('div', 'melody-library-deck') : undefined;
+    const deck = deckRow ? (() => {
+      const left = node('div', 'melody-card-backs is-left'), right = node('div', 'melody-card-backs is-right');
+      left.setAttribute('aria-hidden', 'true'); right.setAttribute('aria-hidden', 'true');
+      deckRow.tabIndex = 0; deckRow.setAttribute('aria-label', '音色库');
+      deckRow.append(left, tiles, right);
+      return mountToneDeck(main, deckRow, tiles, left, right);
+    })() : undefined;
+    let category = '全部';
+    const tools = deck ? undefined : node('div', 'melody-library-tools');
     const categories = node('div', 'melody-library-categories');
     const categoryButtons = new Map<string, HTMLButtonElement>();
     function libraryEntries() {
@@ -680,8 +1064,7 @@ export function mountMelodyWorkspace(root: HTMLElement, options: {
       }));
     }
     function filteredTimbres(entries: ReturnType<typeof libraryEntries>) {
-      return entries.filter(({ timbre, info, group }) => (category === '全部' || group === category)
-        && (!query || `${timbre.name} ${info?.aliases ?? ''} ${info?.category ?? ''} ${group}`.toLocaleLowerCase().includes(query)));
+      return category === '全部' ? entries : entries.filter(({ group }) => group === category);
     }
     function selectCategory(value: string): void {
       category = value; libraryRefresh?.();
@@ -702,10 +1085,17 @@ export function mountMelodyWorkspace(root: HTMLElement, options: {
         item.classList.toggle('is-active', selected); item.setAttribute('aria-pressed', String(selected));
       }
     }
-    search.addEventListener('input', () => { query = search.value.trim().toLocaleLowerCase(); libraryRefresh?.(); });
-    tools.append(search, categories);
+    tools?.append(categories);
     let importing = false;
+    let importControl: HTMLButtonElement | undefined;
     const cards = new Map<string, HTMLElement>();
+    function updateDeckCards(): void {
+      for (const [id, frame] of cards) {
+        const tile = frame.querySelector('.melody-library-tone') as HTMLElement;
+        tile.style.setProperty('--tone-color', toneColor(id));
+        tile.setAttribute('aria-disabled', 'false');
+      }
+    }
     type ToneOrder = { id: string; source: number; target: number; ids: string[]; rectangles: DOMRect[]; scrollTop: number };
     let order: ToneOrder | undefined;
     const resetOrder = () => {
@@ -735,12 +1125,13 @@ export function mountMelodyWorkspace(root: HTMLElement, options: {
       if (!active() || !order || !draggedTone || !event.dataTransfer) return;
       event.preventDefault(); event.stopPropagation(); const completed = order;
       const matches = event.dataTransfer.getData(TIMBRE_DRAG_TYPE) === completed.id
-        && phrase.read().draft?.id === openedDraftId;
+        && readEditor().draft?.id === openedDraftId;
       endToneDrag();
       if (!matches) return;
       try {
         const currentIds = filteredTimbres(libraryEntries()).map(({ timbre }) => timbre.id);
-        if (currentIds.length !== completed.ids.length || currentIds.some((id, index) => id !== completed.ids[index])) throw new Error('音色库刚刚发生变化，请重新拖动。');
+        const relevantIds = deck ? currentIds.filter(id => completed.ids.includes(id)) : currentIds;
+        if (relevantIds.length !== completed.ids.length || relevantIds.some((id, index) => id !== completed.ids[index])) throw new Error('音色库刚刚发生变化，请重新拖动。');
         if (completed.source !== completed.target) {
           const target = options.listTimbres().findIndex(timbre => timbre.id === completed.ids[completed.target]);
           options.onReorderTimbres?.(completed.id, target); refresh(); notify();
@@ -750,28 +1141,40 @@ export function mountMelodyWorkspace(root: HTMLElement, options: {
     libraryError = error;
     libraryRefresh = () => {
       if (draggedTone) endToneDrag();
-      const entries = libraryEntries(); paintCategories(entries);
-      cards.clear(); tiles.replaceChildren();
+      const entries = libraryEntries();
+      if (tools) paintCategories(entries);
+      cards.clear(); if (!deck) tiles.replaceChildren();
+      importControl?.remove();
+      const selectedTimbres = new Set(visibleParts().filter(part => !part.unassigned).map(part => part.timbreId));
       for (const { timbre, info, group } of filteredTimbres(entries)) {
-        const uses = sectionParts().filter(part => part.timbreId === timbre.id); const selected = uses.some(part => !part.unassigned && visibleParts().some(visible => visible.id === part.id));
+        const selected = selectedTimbres.has(timbre.id);
         const frame = node('div', 'melody-library-card'); frame.draggable = true; frame.dataset.timbreId = timbre.id;
-        frame.title = `${group} · ${timbre.name}${info && 'program' in info ? ` · GM ${info.program! + 1}` : ''}`;
+        if (!deck) frame.title = `${group} · ${timbre.name}`;
         const tile = button(timbre.name, 'melody-library-tone', () => {
-          if (disposed || library !== dialog || draggedTone || Date.now() < suppressLibraryClickUntil || !safeFlush()) return;
+          if (disposed || library !== dialog || dialog.inert || draggedTone || Date.now() < suppressLibraryClickUntil || !safeFlush()) return;
           try {
             error.hidden = true; error.textContent = '';
             if (!rhythm) {
-              if (!openedDraftId || phrase.read().draft?.id !== openedDraftId) throw new Error('当前音乐已改变，请重新打开音色库。');
+              const snapshot = readEditor();
+              if (!openedDraftId || snapshot.draft?.id !== openedDraftId) throw new Error('当前音乐已改变，请重新打开音色库。');
               let id: string;
               if (intent.kind === 'replace') {
-                if (options.onChangeNoteGroupTimbre) options.onChangeNoteGroupTimbre(intent.partId, timbre.id);
-                else phrase.setPartTimbre(intent.partId, timbre.id);
+                changeGroupTimbre(intent.partId, timbre.id);
                 id = intent.partId;
               }
-              else id = options.onCreateNoteGroup ? options.onCreateNoteGroup(timbre.id) : phrase.addPart(timbre.id, 'melody');
-              current = phrase.read(); if (!part(id)) throw new Error('这个总音符暂时无法创建，请重试。');
+              else id = options.onCreateNoteGroup ? options.onCreateNoteGroup(timbre.id, openedDraftId) : phrase.addPart(timbre.id, 'melody');
+              current = readEditor(); if (!part(id)) throw new Error('这个总音符暂时无法创建，请重试。');
+              if (deck && intent.kind === 'create') {
+                const previous = toneCardPositions(toneHand);
+                const incoming = takeToneCardPicture(tile);
+                addedParts.add(id); refresh(current, false, 'empty'); updateDeckCards(); notify();
+                slideToneCards(toneHand, previous);
+                flyToneCard(incoming, toneHand.querySelector<HTMLElement>(`[data-part-id="${id}"] .melody-note-family`), main, 'deal');
+                options.onLearningAction?.('add-group');
+                return;
+              }
               addedParts.add(id); selection = { partId: id }; entryToneId = id; deleteToneArmed = undefined;
-              dismiss(); refresh(); notify(); scroll.focus({ preventScroll: true }); if (intent.kind === 'create') options.onLearningAction?.('add-group'); return;
+              dismiss(); refresh(current); notify(); scroll.focus({ preventScroll: true }); if (intent.kind === 'create') options.onLearningAction?.('add-group'); return;
             }
             const matches = sectionParts().filter(part => part.timbreId === timbre.id);
             if (matches.length) phrase.setPartsVisible(matches.map(part => part.id), !selected);
@@ -782,30 +1185,42 @@ export function mountMelodyWorkspace(root: HTMLElement, options: {
           } catch (reason) { error.hidden = false; error.textContent = reason instanceof Error ? reason.message : String(reason); }
         });
         if (instrumentIcons) addInstrumentIcon(tile, info?.key);
+        if (deck) showToneCardFace(tile);
         tile.dataset.timbreId = timbre.id; if (rhythm) { tile.setAttribute('aria-pressed', String(selected)); tile.classList.toggle('is-on-shelf', selected); }
-        const play = button('▶', 'melody-tone-preview melody-library-preview', () => { if (!disposed && library === dialog) void audition.requestTimbre(timbre.id); });
-        play.setAttribute('aria-label', `试听${timbre.name}`); frame.append(tile, play);
+        frame.append(tile);
+        if (!deck) {
+          const play = button('▶', 'melody-tone-preview melody-library-preview', () => { if (!disposed && library === dialog) void audition.requestTimbre(timbre.id); });
+          play.setAttribute('aria-label', `试听${timbre.name}`); frame.append(play);
+        }
         frame.addEventListener('dragstart', event => {
           if (disposed || library !== dialog || !event.dataTransfer || !current.draft) { event.preventDefault(); return; }
-          audition.cancel(); draggedTone = { id: timbre.id, draftId: current.draft.id }; event.dataTransfer.setData(TIMBRE_DRAG_TYPE, timbre.id); event.dataTransfer.effectAllowed = 'move'; toneTrash.hidden = false;
+          audition.cancel(); draggedTone = { id: timbre.id, draftId: current.draft.id }; event.dataTransfer.setData(TIMBRE_DRAG_TYPE, timbre.id); event.dataTransfer.effectAllowed = 'move';
+          if (!deck) toneTrash.hidden = false;
+          if (deck) setMiniToneDrag(event.dataTransfer, tile);
           if (options.onReorderTimbres) {
-            const ids = [...cards.keys()]; const rectangles = ids.map(id => cards.get(id)!.getBoundingClientRect());
+            const ids = deck ? [...tiles.children].map(card => (card as HTMLElement).dataset.timbreId!) : [...cards.keys()];
+            const rectangles = ids.map(id => cards.get(id)!.getBoundingClientRect());
             order = { id: timbre.id, source: ids.indexOf(timbre.id), target: ids.indexOf(timbre.id), ids, rectangles, scrollTop: tiles.scrollTop };
             const rect = frame.getBoundingClientRect();
-            event.dataTransfer.setDragImage?.(frame, Math.max(0, event.clientX - rect.left), Math.max(0, event.clientY - rect.top));
+            if (!deck) event.dataTransfer.setDragImage?.(frame, Math.max(0, event.clientX - rect.left), Math.max(0, event.clientY - rect.top));
             frame.classList.add('is-library-dragging');
           }
         });
-        frame.addEventListener('dragend', () => { if (library === dialog) endToneDrag(); }); cards.set(timbre.id, frame); tiles.append(frame);
+        frame.addEventListener('dragend', () => { if (library === dialog) endToneDrag(); }); cards.set(timbre.id, frame);
+        if (!deck) tiles.append(frame);
       }
-      if (options.onImportTimbre) {
+      if (deck) {
+        updateDeckCards();
+        deck.setCards([...cards.values()]);
+      }
+      if (!deck && options.onImportTimbre) {
         const add = button('+', 'melody-library-import', () => {
           if (disposed || library !== dialog || importing || !safeFlush()) return;
           importing = true; add.disabled = true; add.setAttribute('aria-busy', 'true'); error.hidden = true;
           void Promise.resolve().then(() => options.onImportTimbre!()).then(imported => {
             if (!imported || disposed || library !== dialog) return;
-            query = ''; search.value = ''; category = '自定义';
-            current = phrase.read(); refresh(); notify();
+            category = '自定义';
+            refresh(); notify();
           }).catch(reason => {
             if (disposed || library !== dialog) return;
             error.hidden = false; error.textContent = reason instanceof Error ? reason.message : String(reason);
@@ -814,22 +1229,48 @@ export function mountMelodyWorkspace(root: HTMLElement, options: {
             if (!disposed && library === dialog) libraryRefresh?.();
           });
         });
-        add.setAttribute('aria-label', '导入音色文件'); add.title = '导入音色文件'; add.disabled = importing; tiles.append(add);
+        add.setAttribute('aria-label', '导入音色文件'); add.title = '导入音色文件'; add.disabled = importing;
+        importControl = add; tiles.append(add);
       }
     };
     let closed = false;
     function cleanup() {
       if (closed) return; closed = true; toneDeleteDialog?.close();
       if (library === dialog) { library = undefined; libraryRefresh = undefined; libraryError = undefined; }
+      toggleToneDeck = undefined;
+      deck?.dispose();
+      if (deck) stopToneCardFlights(main);
+      tonePile?.classList.remove('is-library-spread');
+      tonePile?.setAttribute('aria-expanded', 'false');
+      tonePile?.setAttribute('aria-label', '添加音色');
+      page.classList.remove('is-tone-library-open');
       endToneDrag(); resetToneOrder = undefined; audition.cancel(); page.append(toneTrash); dialog.remove();
     }
     function dismiss() { dialog.close(); cleanup(); }
-    libraryRefresh(); dialog.append(heading, tools, tiles, error, toneTrash); dialog.addEventListener('close', cleanup); root.append(dialog); dialog.showModal();
+    libraryRefresh();
+    if (deckRow) dialog.append(deckRow, error);
+    else dialog.append(heading, tools!, tiles, error, toneTrash);
+    if (deck && options.editorSettings) dialog.addEventListener('cancel', event => {
+      event.preventDefault(); options.editorSettings!.setOpen(true);
+    });
+    dialog.addEventListener('close', cleanup); (pointerUx ? main : root).append(dialog); dialog.showModal();
+    deckRow?.focus({ preventScroll: true });
+    deck?.resize();
+    if (deck && tonePile) {
+      tonePile.classList.add('is-library-spread');
+      tonePile.setAttribute('aria-expanded', 'true');
+      tonePile.setAttribute('aria-label', '收起音色库');
+      page.classList.add('is-tone-library-open');
+      toggleToneDeck = () => deck.toggle(tonePile, dismiss);
+      deck.dealFrom(tonePile);
+    }
   }
-  function endToneDrag(): void { resetToneOrder?.(); if (draggedTone) suppressLibraryClickUntil = Date.now() + 250; draggedTone = undefined; toneTrash.hidden = true; toneTrash.classList.remove('is-over'); }
-  toneTrash.addEventListener('dragover', event => { if (!draggedTone) return; event.preventDefault(); toneTrash.classList.add('is-over'); if (event.dataTransfer) event.dataTransfer.dropEffect = 'move'; });
-  toneTrash.addEventListener('dragleave', () => toneTrash.classList.remove('is-over'));
-  toneTrash.addEventListener('drop', event => {
+  const toneRemovalTarget: HTMLElement = tonePile ?? toneTrash;
+  function endToneDrag(): void { resetToneOrder?.(); if (draggedTone) suppressLibraryClickUntil = Date.now() + 250; draggedTone = undefined; toneTrash.hidden = true; toneRemovalTarget.classList.remove('is-over'); }
+  toneRemovalTarget.addEventListener('dragover', event => { if (!draggedTone) return; event.preventDefault(); toneRemovalTarget.classList.add('is-over'); if (event.dataTransfer) event.dataTransfer.dropEffect = 'move'; });
+  toneRemovalTarget.addEventListener('dragleave', () => toneRemovalTarget.classList.remove('is-over'));
+  toneRemovalTarget.addEventListener('drop', event => {
+    if (!draggedTone) return;
     event.preventDefault(); event.stopPropagation(); const dragged = draggedTone;
     if (!dragged || disposed || toneDeleteDialog || current.draft?.id !== dragged.draftId || event.dataTransfer?.getData(TIMBRE_DRAG_TYPE) !== dragged.id) { endToneDrag(); return; }
     const timbre = options.listTimbres().find(timbre => timbre.id === dragged.id);
@@ -847,7 +1288,7 @@ export function mountMelodyWorkspace(root: HTMLElement, options: {
   }
   function confirmRemoveTone(id: string, name: string, draftId: string): void {
     if (toneDeleteDialog || disposed) return;
-    const owner = library; const warning = node('dialog', 'melody-tone-delete-dialog');
+    const owner = library; const warning = createWorkspacePanel(pointerUx); warning.className += ' melody-tone-delete-dialog';
     toneDeleteDialog = warning; toneDeleteDraftId = draftId; warning.setAttribute('aria-label', '移除音色确认');
     warning.append(node('h2', '', '移除这个音色？'), node('p', '', '“' + name + '”'), node('p', '', '已有音符会保留为未定义音色。'));
     const error = node('p', 'melody-tone-delete-error'); error.hidden = true;
@@ -867,7 +1308,34 @@ export function mountMelodyWorkspace(root: HTMLElement, options: {
       if (toneDeleteDialog === warning) { toneDeleteDialog = undefined; toneDeleteDraftId = undefined; }
       warning.remove();
     });
-    root.append(warning); warning.showModal();
+    (pointerUx ? library ?? main : root).append(warning); warning.showModal();
+  }
+  function positionPitch(key: HTMLButtonElement, row: HTMLElement, index: number): void {
+    const start = melodyPitchTop(keys, index, view.rowHeight);
+    const size = melodyPitchHeight(keys, index, view.rowHeight);
+    if (!vertical) {
+      key.style.top = row.style.top = `${start}px`;
+      key.style.height = row.style.height = `${size}px`;
+      return;
+    }
+    row.style.left = `${start}px`;
+    row.style.width = `${size}px`;
+    if (!pointerUx) {
+      key.style.left = row.style.left;
+      key.style.width = row.style.width;
+      return;
+    }
+    if (keys[index]!.accidental) {
+      key.style.left = `${start + size * .07}px`;
+      key.style.width = `${size * .86}px`;
+      return;
+    }
+    const before = keys[index - 1]?.accidental ? melodyPitchHeight(keys, index - 1, view.rowHeight) / 2 : 0;
+    const after = keys[index + 1]?.accidental ? melodyPitchHeight(keys, index + 1, view.rowHeight) / 2 : 0;
+    key.style.left = `${start - before}px`;
+    key.style.width = `${size + before + after}px`;
+    key.style.setProperty('--key-notch-left', `${before * .86}px`);
+    key.style.setProperty('--key-notch-right', `${after * .86}px`);
   }
   function paintRows(): void {
     if (rhythm) {
@@ -877,18 +1345,32 @@ export function mountMelodyWorkspace(root: HTMLElement, options: {
     }
     const pitchLength = melodyPitchTop(keys, keys.length, view.rowHeight);
     world.style.height = vertical ? '100%' : `${pitchLength}px`; if (vertical) world.style.width = `${pitchLength}px`;
+    if (pointerUx && pitchRows.length === keys.length) {
+      keys.forEach((pitch, index) => {
+        const key = keyNodes[index]!, row = pitchRows[index]!;
+        positionPitch(key, row, index);
+        if (/^C-?\d+$/u.test(pitch.label)) {
+          const stacked = view.rowHeight < 22;
+          if (key.classList.contains('is-stacked-label') !== stacked) {
+            key.classList.toggle('is-stacked-label', stacked);
+            key.textContent = stacked ? `C\n${pitch.label.slice(1)}` : pitch.label;
+          }
+        }
+      });
+      return;
+    }
     keyboard.replaceChildren(); rows.replaceChildren();
-    keyNodes.length = 0;
+    keyNodes.length = pitchRows.length = 0;
     keys.forEach((pitch, index) => {
       const octaveLabel = /^C(-?\d+)$/u.exec(pitch.label);
-      const key = button(vertical ? octaveLabel ? pitch.label : '' : pitch.label, 'melody-key', () => {
-        if (!disposed && drumKey(part()) === undefined && performance.now() >= suppressKeyClickUntil) void audition.requestKeyboard(pitch.frequencyHz);
+      const key = button(vertical ? octaveLabel ? pitch.label : '' : pitch.label, 'melody-key', event => {
+        if (disposed || drumKey(part()) !== undefined || performance.now() < suppressKeyClickUntil) return;
+        if (!pointerUx) void audition.requestKeyboard(pitch.frequencyHz);
+        else if (!event.detail) auditionColumn(pitch.frequencyHz);
       });
       key.dataset.pitchLabel = pitch.label;
       if (vertical && octaveLabel && view.rowHeight < 22) { key.textContent = `C\n${octaveLabel[1]}`; key.classList.add('is-stacked-label'); }
       key.classList.toggle('is-accidental', pitch.accidental);
-      const start = `${melodyPitchTop(keys, index, view.rowHeight)}px`, size = `${melodyPitchHeight(keys, index, view.rowHeight)}px`;
-      if (vertical) { key.style.left = start; key.style.width = size; } else { key.style.top = start; key.style.height = size; }
       key.dataset.frequencyHz = String(pitch.frequencyHz);
       key.setAttribute('aria-label', `${pitch.label} ${Number(pitch.frequencyHz.toFixed(2))} Hz`);
       keyNodes.push(key);
@@ -896,7 +1378,12 @@ export function mountMelodyWorkspace(root: HTMLElement, options: {
       if (flash !== undefined) { key.style.setProperty('--key-flash-color', flash); key.classList.add('is-sounding'); }
       keyboard.append(key);
       const row = node('div', 'melody-pitch-row'); row.classList.toggle('is-accidental', pitch.accidental);
-      if (vertical) { row.style.left = start; row.style.width = size; } else { row.style.top = start; row.style.height = size; } rows.append(row);
+      positionPitch(key, row, index); rows.append(row);
+      pitchRows.push(row);
+      if (index === auditionPitch) {
+        key.classList.add('is-auditioning');
+        row.classList.add('is-auditioning');
+      }
     });
     paintEntryRange();
   }
@@ -907,7 +1394,8 @@ export function mountMelodyWorkspace(root: HTMLElement, options: {
       const midi = Math.round(69 + 12 * Math.log2(Number(key.dataset.frequencyHz) / 440));
       const active = armed && Math.floor(midi / 12) - 1 === entryOctave;
       key.classList.toggle('is-entry-range', active);
-      key.title = `${key.dataset.pitchLabel ?? ''}${active ? ' · 键盘输入音区 · Z / X 切换' : ''}`;
+      const title = `${key.dataset.pitchLabel ?? ''}${active ? ' · 键盘输入音区 · Z / X 切换' : ''}`;
+      if (key.title !== title) key.title = title;
     }
   }
   function noteRect(note: PhraseNote, voice: PhrasePart, value: PhraseBody, canvasWidth = width(), rhythmRows?: Map<string, number>) {
@@ -929,24 +1417,93 @@ export function mountMelodyWorkspace(root: HTMLElement, options: {
       : undefined;
     paintGrid();
   }
-  function paintGrid(): void {
+  function currentRollRegion(score: PhraseBody, zooming = false): RollPaintRegion {
+    const span = 8 / view.zoom, duration = melodyDuration(score);
+    const pitch = pitchOffset();
+    const enoughPitch = rollRegion && pitch >= rollRegion.lowPitch && pitch + rollPitchWidth <= rollRegion.highPitch;
+    if (rollRegion?.duration === duration && rollRegion.zoom === view.zoom && rollRegion.rowHeight === view.rowHeight && enoughPitch
+      && Math.max(0, view.leftSeconds) >= rollRegion.start && (rollRegion.end >= duration || view.leftSeconds + span <= rollRegion.end - span * .2)) return rollRegion;
+
+    const noteCount = score.parts.reduce((sum, voice) => sum + voice.notes.length, 0);
+    const fullScore = duration <= 3 * span && noteCount <= 2400;
+    const stride = span * .5;
+    const denseZoom = zooming && noteCount > 2400;
+    const start = fullScore ? 0 : Math.max(0, denseZoom ? view.leftSeconds - span * .12 : Math.floor(view.leftSeconds / stride) * stride - stride);
+    const notesPerScreen = noteCount * span / Math.max(span, duration);
+    const screens = melodyClamp(1050 / Math.max(1, notesPerScreen), 2.25, 5);
+    const end = fullScore ? duration : Math.max(start + stride, Math.min(duration, denseZoom ? view.leftSeconds + span * 1.28 : start + screens * span));
+    const pitchStride = Math.max(1, rollPitchWidth * .5);
+    const lowPitch = noteCount <= 2400 ? -Infinity : denseZoom ? pitch - pitchStride * .35 : Math.floor(pitch / pitchStride) * pitchStride - pitchStride;
+    const highPitch = noteCount <= 2400 ? Infinity : denseZoom ? pitch + rollPitchWidth + pitchStride * .35 : lowPitch + pitchStride * 5;
+    const origin = fullScore ? 0 : Math.floor(start / (span * 32)) * span * 32;
+    return rollRegion = { start, end, origin, lowPitch, highPitch, zoom: view.zoom, rowHeight: view.rowHeight, duration };
+  }
+  function moveRollLayers(): void {
+    const offset = rollRegion ? (rollRegion.origin - view.leftSeconds) * melodyScale(view, headWidth, rollRegion.duration) : 0;
+    if (offset === layerOffset) return;
+    layerOffset = offset;
+    const translate = offset ? `0 ${offset}px` : '';
+    for (const layer of [grid, notes, drumGrid, drumNotes]) layer.style.translate = translate;
+    scheduleNoteHighlights();
+  }
+  function paintRollOverlays(value: PhraseBody, canvasWidth: number): void {
+    const duration = melodyDuration(value);
+    const scale = melodyScale(view, canvasWidth, duration);
+    tempoRolls?.paint(value, { scale, height: canvasWidth });
+    const endX = (duration - view.leftSeconds) * scale;
+    const hidden = endX > canvasWidth;
+    if (afterEnd.hidden !== hidden) afterEnd.hidden = hidden;
+    if (drumEnd.hidden !== hidden) drumEnd.hidden = hidden;
+    if (hidden) return;
+    const offset = `${Math.max(0, endX)}px`;
+    if (vertical) {
+      if (afterEnd.style.top !== offset) afterEnd.style.top = offset;
+      if (drumEnd.style.top !== offset) drumEnd.style.top = offset;
+    } else if (afterEnd.style.left !== offset) afterEnd.style.left = offset;
+  }
+  function paintGrid(zooming = false): void {
     const value = tempoRatePreview ?? body();
-    tempoRolls?.paint(value);
-    if (!value) { grid.replaceChildren(); drumGrid.replaceChildren(); gridNodes.length = drumGridNodes.length = 0; gridSnapTimes = []; return; }
+    if (!value) {
+      tempoRolls?.paint(value);
+      drawnGrid = ''; rollRegion = drawnNotes = undefined; drawnNoteBody = undefined; retainedGridLines.clear(); moveRollLayers();
+      grid.replaceChildren(); drumGrid.replaceChildren(); gridNodes.length = drumGridNodes.length = 0; gridSnapTimes = [];
+      return;
+    }
     // Read layout before changing any lines. Reading clientWidth after each
     // append/style write otherwise forces a fresh layout for every grid line.
-    const canvasWidth = width(); headWidth = canvasWidth;
+    const cachedSize = pointerUx && zooming && rollPitchWidth > 0;
+    const canvasWidth = cachedSize ? headWidth : width(); headWidth = canvasWidth;
     const duration = melodyDuration(value); const scale = melodyScale(view, canvasWidth, duration);
     const detailPixels = revealConfiguredGrid ? 0 : 48;
-    const lines = value.tempoSections?.length ? melodyScoreGrid(value, view, canvasWidth, detailPixels)
-      : melodyDetailGrid(duration, vertical ? value.tempoBpm : options.gridBpm(), phraseStepsPerBeat(value), view, canvasWidth, phraseBarBeats(value), value.pickupBeats ?? 0, detailPixels, phraseMeterBeatLength(value));
     const pixelRatio = window.devicePixelRatio || 1;
     const pixelScale = pixelRatio / Math.max(1, Math.round(pixelRatio));
+    let region: RollPaintRegion | undefined;
+    if (pointerUx) {
+      const nextPitchWidth = cachedSize ? rollPitchWidth : pitchSpan();
+      if (nextPitchWidth !== rollPitchWidth) { rollPitchWidth = nextPitchWidth; rollRegion = undefined; }
+      region = currentRollRegion(body() ?? value, zooming);
+      moveRollLayers();
+    }
+    paintRollOverlays(value, canvasWidth);
+    const paintView = region ? { ...view, leftSeconds: region.start } : view;
+    const paintSeconds = region ? region.end - region.start : 8 / view.zoom;
+    const tempo = vertical ? value.tempoBpm : options.gridBpm();
+    const steps = phraseStepsPerBeat(value), beatsPerBar = phraseBarBeats(value), beatSize = phraseMeterBeatLength(value);
+    if (region) {
+      const key = JSON.stringify([region.start, region.end, region.origin, scale, pixelScale, tempo, steps, beatsPerBar, beatSize,
+        duration, detailPixels, value.pickupBeats, value.tempoSections, drumStrip.hidden]);
+      if (key === drawnGrid) return;
+      drawnGrid = key;
+    }
+    const lines = value.tempoSections?.length ? melodyScoreGrid(value, paintView, canvasWidth, detailPixels, paintSeconds)
+      : melodyDetailGrid(duration, tempo, steps, paintView, canvasWidth, beatsPerBar, value.pickupBeats ?? 0, detailPixels, beatSize, paintSeconds);
     const pixels = new Map<number, (typeof lines)[number]>();
     const weight = (line: (typeof lines)[number]) => line.bar ? 3 : line.beat ? 2 : 1;
     for (const line of lines) {
-      const pixel = Math.round((line.seconds - view.leftSeconds) * scale * pixelScale);
-      if (pixel < 0 || pixel >= canvasWidth * pixelScale) continue;
+      const relative = (line.seconds - paintView.leftSeconds) * scale * pixelScale;
+      if (region ? relative < -.51 || relative > paintSeconds * scale * pixelScale + .51
+        : Math.round(relative) < 0 || Math.round(relative) >= canvasWidth * pixelScale) continue;
+      const pixel = Math.round((line.seconds - (region?.origin ?? paintView.leftSeconds)) * scale * pixelScale);
       const previous = pixels.get(pixel);
       if (!previous || weight(line) > weight(previous)) pixels.set(pixel, line);
     }
@@ -954,6 +1511,10 @@ export function mountMelodyWorkspace(root: HTMLElement, options: {
     const grids = drumStrip.hidden ? [[grid, gridNodes] as const] : [[grid, gridNodes] as const, [drumGrid, drumGridNodes] as const];
     for (const [layer, elements] of grids) {
       layer.style.setProperty('--melody-grid-stroke', `${1 / pixelScale}px`);
+      if (region) {
+        updateRetainedGrid(layer, pixels, pixelScale);
+        continue;
+      }
       let index = 0;
       for (const [pixel, line] of pixels) {
         let element = elements[index++];
@@ -965,56 +1526,88 @@ export function mountMelodyWorkspace(root: HTMLElement, options: {
       }
       while (elements.length > index) elements.pop()!.remove();
     }
-    const endX = (duration - view.leftSeconds) * scale; afterEnd.hidden = endX > canvasWidth;
-    if (vertical) afterEnd.style.top = `${Math.max(0, endX)}px`; else afterEnd.style.left = `${Math.max(0, endX)}px`;
-    drumEnd.hidden = afterEnd.hidden; drumEnd.style.top = afterEnd.style.top;
   }
-  function paintNotes(onlyNoteId?: string, updateHead = true): void {
-    const activeEdit = mix ?? (gesture && 'note' in gesture ? gesture : undefined);
+  function updateRetainedGrid(layer: HTMLElement, pixels: Map<number, { beat: boolean; bar: boolean; cell: boolean }>, pixelScale: number): void {
+    let retained = retainedGridLines.get(layer);
+    if (!retained) { retained = new Map(); retainedGridLines.set(layer, retained); }
+    for (const [pixel, element] of retained) {
+      if (!pixels.has(pixel)) { element.remove(); retained.delete(pixel); }
+    }
+    for (const [pixel, line] of pixels) {
+      let element = retained.get(pixel);
+      if (!element) { element = node('i', 'melody-grid-line'); layer.append(element); retained.set(pixel, element); }
+      const classes = `melody-grid-line${line.beat || line.bar ? ' is-beat' : ''}${line.cell ? ' is-cell' : ''}`;
+      if (element.className !== classes) element.className = classes;
+      const top = `${pixel / pixelScale}px`;
+      if (element.style.top !== top) element.style.top = top;
+    }
+  }
+  function paintNotes(onlyNoteId?: string, updateHead = true, committed = false, retainGeometry = false): void {
+    const activeEdit = mix ?? (gesture && 'note' in gesture ? gesture : wheelEdit);
     // During one-note gestures the rest of the score does not need copying.
     const value = onlyNoteId || gainPartId ? body() : displayedBody(); const seen = new Set<string>();
     if (!value || !viewportReady) return;
-    const canvasWidth = width(); headWidth = canvasWidth;
-    const pitchStart = pitchOffset() - view.rowHeight;
-    const pitchEnd = pitchStart + pitchSpan() + 2 * view.rowHeight;
+    const region = pointerUx ? rollRegion : undefined;
+    const canvasWidth = region ? headWidth : width(); headWidth = canvasWidth;
+    const pitchStart = region?.lowPitch ?? pitchOffset() - view.rowHeight;
+    const pitchEnd = region?.highPitch ?? pitchStart + pitchSpan() + 2 * view.rowHeight;
+    const timeStart = region?.start ?? view.leftSeconds, timeEnd = region?.end ?? view.leftSeconds + 8 / view.zoom;
+    const originShift = (view.leftSeconds - (region?.origin ?? timeStart)) * melodyScale(view, canvasWidth, melodyDuration(value));
     const rowParts = rhythm ? visibleParts(value) : [];
     const rhythmRows = rhythm ? new Map(rowParts.map((part, index) => [part.id, index])) : undefined;
     const editingFamily = editingFamilyId();
     const selectedTimbreId = editingFamily ? part(editingFamily)?.timbreId : undefined;
     const active = gesture;
+    const workbench = workbenchEnabled();
+    const appearanceKey = region && !activeEdit && !active ? [canvasWidth, view.zoom, view.rowHeight, pointerUx ? undefined : editingFamily, selection?.noteId, gainPartId, visibleDrumLanes, drumLaneWidth, workbench].join('/') : '';
+    const reuseGeometry = !!appearanceKey && (drawnNoteBody === value || retainGeometry) && drawnNotes && drawnNotes.origin === region?.origin
+      && drawnNotes.zoom === view.zoom && drawnNotes.rowHeight === view.rowHeight && drawnNoteWidth === canvasWidth;
+    const reuseNotes = reuseGeometry && drawnNoteBody === value && drawnNoteAppearance === appearanceKey;
     const originalDragRow = rhythm && active?.kind === 'note'
       ? visibleParts(active.base).findIndex(part => part.id === active.partId) : undefined;
     if (indexedBody !== value) { indexedBody = value; noteIndex = createMelodyNoteIndex(value, sectionParts(value)); }
     let candidates = onlyNoteId ? [noteIndex!.byId.get(onlyNoteId)].filter((entry): entry is NonNullable<typeof entry> => !!entry)
-      : noteIndex!.visible(view.leftSeconds, view.leftSeconds + 8 / view.zoom);
+      : noteIndex!.visible(timeStart, timeEnd);
     if (onlyNoteId && activeEdit && activeEdit.note.id === onlyNoteId) {
       const voice = part('targetPartId' in activeEdit && activeEdit.targetPartId || activeEdit.partId);
       if (voice) candidates = [{ voice, note: { ...activeEdit.note, ...activeEdit.changes }, start: 0, end: 0 }];
-    } else if (!onlyNoteId && selection?.noteId && !candidates.some(entry => entry.note.id === selection?.noteId)) {
+    } else if (!onlyNoteId && wheelEdit) {
+      const editing = wheelEdit;
+      candidates = candidates.filter(entry => entry.note.id !== editing.note.id);
+      const voice = part(editing.partId);
+      if (!editing.remove && voice) {
+        const note = { ...editing.note, ...editing.changes };
+        const start = melodySeconds(note.startBeat, value);
+        candidates.push({ voice, note, start, end: start + phraseHeldSeconds(value, note) });
+      }
+    }
+    if (!onlyNoteId && selection?.noteId && selection.noteId !== wheelEdit?.note.id && !candidates.some(entry => entry.note.id === selection?.noteId)) {
       const selected = noteIndex!.byId.get(selection.noteId); if (selected) candidates.push(selected);
     }
     for (const { voice, note, start, end } of candidates) {
       if (gainPartId && voice.id !== gainPartId) continue;
       // Dragging/mixing changes one note. Leave every unrelated DOM block
       // untouched, including its position, color and selection classes.
-      if (note.startBeat >= value!.lengthBeats || note.startBeat + note.durationBeats <= 0 || active?.kind === 'erase' && active.refs.has(note.id)) continue;
+      if (note.startBeat >= value!.lengthBeats || note.startBeat + note.durationBeats <= 0 || (active?.kind === 'erase' && active.refs.has(note.id) || desktopErase?.refs.has(note.id))) continue;
       const key = drumKey(voice);
       const lane = key === undefined ? undefined : drumLane(note, key);
       if (lane !== undefined && lane >= visibleDrumLanes) continue;
       const row = lane === undefined ? pitchRow(note.frequencyHz) : -1;
-      if (!onlyNoteId && note.id !== selection?.noteId && !(active && 'note' in active && active.note.id === note.id)) {
-        if (start > view.leftSeconds + 8 / view.zoom || end < view.leftSeconds) continue;
+      if ((!onlyNoteId || committed) && note.id !== selection?.noteId && !(active && 'note' in active && active.note.id === note.id)) {
+        if (start > timeEnd || end < timeStart) continue;
         // Keep one pitch of overscan; selected/dragged notes remain mounted.
         const top = rhythm ? (rhythmRows!.get(voice.id) ?? 0) * view.rowHeight : row * view.rowHeight;
         if (lane === undefined && (top > pitchEnd || top + view.rowHeight < pitchStart)) continue;
       }
       seen.add(note.id); let block = noteNodes.get(note.id);
+      if (block && reuseNotes && !onlyNoteId) continue;
+      const updateGeometry = !block || !reuseGeometry || !!onlyNoteId || lane !== undefined && !reuseNotes;
       if (!block) {
         block = button('', 'melody-note', () => {}); block.append(node('span', 'melody-note-resize'));
         block.classList.toggle('is-sounding', sounding.has(note.id));
         noteNodes.set(note.id, block);
       }
-      const layer = lane === undefined ? notes : drumNotes;
+      const layer = noteLayer(lane === undefined ? notes : drumNotes, voice.id);
       if (block.parentElement !== layer) layer.append(block);
       const name = partLabel(voice);
       const label = lane !== undefined ? `${name} · 打击 ${lane + 1}` : rhythm ? name : `${name} ${keys[row]?.label ?? ''}`;
@@ -1023,42 +1616,59 @@ export function mountMelodyWorkspace(root: HTMLElement, options: {
         block.dataset.noteId = note.id; block.dataset.partId = voice.id; block.setAttribute('aria-label', label);
         noteLabels.set(block, labelKey);
       }
-      const rect = lane === undefined ? noteRect(note, voice, value!, canvasWidth, rhythmRows) : drumRect(note, lane, value!, canvasWidth);
-      let top = rect.y;
-      if (lane === undefined && active?.kind === 'note' && active.note.id === note.id) {
-        top = rhythm ? originalDragRow! * view.rowHeight + 7 + active.rawY
-          : melodyPitchTop(keys, phrasePitchRow(active.note.frequencyHz, keys), view.rowHeight) + 1 + active.rawY;
-        if (active.touchDrag && active.moved) {
-          const leftOfFinger = active.last.y - rect.height - 16;
-          top = Math.max(pitchOffset(), Math.min(top, leftOfFinger));
+      if (updateGeometry) {
+        const rect = lane === undefined ? noteRect(note, voice, value!, canvasWidth, rhythmRows) : drumRect(note, lane, value!, canvasWidth);
+        let top = rect.y;
+        if (lane === undefined && active?.kind === 'note' && active.note.id === note.id) {
+          top = rhythm ? originalDragRow! * view.rowHeight + 7 + active.rawY
+            : melodyPitchTop(keys, phrasePitchRow(active.note.frequencyHz, keys), view.rowHeight) + 1 + active.rawY;
+          if (active.touchDrag && active.moved) {
+            const leftOfFinger = active.last.y - rect.height - 16;
+            top = Math.max(pitchOffset(), Math.min(top, leftOfFinger));
+          }
         }
+        const timePosition = rect.x + originShift;
+        if (pointerUx) noteRects.set(block, { x: top, y: timePosition, width: rect.height, height: rect.width });
+        const left = `${vertical ? top : timePosition}px`, y = `${vertical ? timePosition : top}px`;
+        const width = `${vertical ? rect.height : rect.width}px`, height = `${vertical ? rect.width : rect.height}px`;
+        if (block.style.left !== left) block.style.left = left;
+        if (block.style.top !== y) block.style.top = y;
+        if (block.style.width !== width) block.style.width = width;
+        if (block.style.height !== height) block.style.height = height;
       }
-      const left = `${vertical ? top : rect.x}px`, y = `${vertical ? rect.x : top}px`;
-      const width = `${vertical ? rect.height : rect.width}px`, height = `${vertical ? rect.width : rect.height}px`;
-      if (block.style.left !== left) block.style.left = left;
-      if (block.style.top !== y) block.style.top = y;
-      if (block.style.width !== width) block.style.width = width;
-      if (block.style.height !== height) block.style.height = height;
-      const color = voice.unassigned ? '#b6bcc4' : toneColor(voice.timbreId);
-      const inactive = !!editingFamily && selection?.noteId !== note.id && (rhythm ? selectedTimbreId !== voice.timbreId : editingFamily !== voice.id);
+      const color = voice.unassigned ? unassignedColor : toneColor(voice.timbreId);
+      const inactive = !pointerUx && !!editingFamily && selection?.noteId !== note.id && (rhythm ? selectedTimbreId !== voice.timbreId : editingFamily !== voice.id);
       const drawing = active?.kind === 'create' && active.note.id === note.id;
-      const selected = (!vertical || workbenchEnabled()) && (selection?.noteId === note.id || drawing);
+      const selected = (!vertical || workbench) && (selection?.noteId === note.id || drawing);
       const dragging = !!active && 'note' in active && active.note.id === note.id && (active.dragReadyAt === undefined || active.moved);
       const appearance = `${color}/${!!voice.unassigned}/${inactive}/${selected}/${dragging}/${drawing}`;
       if (noteAppearance.get(block) !== appearance) {
         block.style.setProperty('--tone-color', color); block.classList.toggle('is-unassigned', !!voice.unassigned);
-        block.classList.toggle('is-dim', inactive); block.setAttribute('aria-disabled', String(inactive)); block.tabIndex = inactive ? -1 : 0;
+        if (!pointerUx) {
+          block.classList.toggle('is-dim', inactive); block.setAttribute('aria-disabled', String(inactive)); block.tabIndex = inactive ? -1 : 0;
+        }
         block.classList.toggle('is-selected', selected); block.classList.toggle('is-dragging', dragging); block.classList.toggle('is-drawing', drawing);
         noteAppearance.set(block, appearance);
       }
     }
     if (!onlyNoteId) {
+      drawnNoteAppearance = appearanceKey;
+      drawnNoteWidth = appearanceKey ? canvasWidth : 0;
+      drawnNotes = region;
+      drawnNoteBody = value;
       for (const [id, element] of noteNodes) if (!seen.has(id)) { element.remove(); noteNodes.delete(id); }
       lastSoundingNotes = undefined;
+    } else if (committed && !seen.has(onlyNoteId)) {
+      noteNodes.get(onlyNoteId)?.remove();
+      noteNodes.delete(onlyNoteId);
     }
+    for (const layers of noteLayers.values()) for (const [id, layer] of layers) {
+      if (!layer.children.length) { layer.remove(); layers.delete(id); }
+    }
+    scheduleNoteHighlights();
     if (updateHead) positionHead();
   }
-  function positionHead(displaySeconds = playheadSeconds): void {
+  function positionHead(displaySeconds = pointerUx && playheadPlaying ? displayedPlayheadSeconds : playheadSeconds): void {
     if (!quick.hidden) paintQuickHint();
     const value = body(); if (!value) return;
     // The resize observer/viewport paints maintain headWidth. The audio-clock
@@ -1069,14 +1679,16 @@ export function mountMelodyWorkspace(root: HTMLElement, options: {
     const x = (seconds - view.leftSeconds) * scale;
     const hidden = x < 0 || x > headWidth;
     if (head.hidden !== hidden) head.hidden = headHandle.hidden = hidden;
-    const coordinate = melodyClamp((visualPosition - view.leftSeconds) * scale, 0, headWidth - 1);
+    const pixel = melodyClamp((visualPosition - view.leftSeconds) * scale, 0, headWidth - 1);
+    const coordinate = pointerUx ? Math.round(pixel * 1000) / 1000 : pixel;
     // Compositor translation avoids relayout on every audio-clock frame.
     const axis = vertical ? 'translateY' : 'translateX';
     if (!hidden) {
       const transform = `${axis}(${coordinate}px)`;
-      head.style.transform = transform;
-      if (!drumStrip.hidden) drumHead.style.transform = transform;
-      headHandle.style.transform = `${axis}(${coordinate - 7}px)`;
+      if (head.style.transform !== transform) head.style.transform = transform;
+      if (!drumStrip.hidden && drumHead.style.transform !== transform) drumHead.style.transform = transform;
+      const handleTransform = `${axis}(${coordinate - 7}px)`;
+      if (headHandle.style.transform !== handleTransform) headHandle.style.transform = handleTransform;
     }
     if (!drumStrip.hidden && drumHead.hidden !== hidden) drumHead.hidden = hidden;
     const frame = Math.floor(seconds * 30);
@@ -1092,7 +1704,8 @@ export function mountMelodyWorkspace(root: HTMLElement, options: {
             headHandle.setAttribute('aria-valuetext', text);
           }
         }
-        headTime.style.transform = coordinate < 19 ? `translateY(${coordinate + 4}px)` : `translateY(calc(${coordinate}px - 100% - 3px))`;
+        const timeTransform = coordinate < 19 ? `translateY(${coordinate + 4}px)` : `translateY(calc(${coordinate}px - 100% - 3px))`;
+        if (headTime.style.transform !== timeTransform) headTime.style.transform = timeTransform;
       }
     }
   }
@@ -1154,13 +1767,16 @@ export function mountMelodyWorkspace(root: HTMLElement, options: {
         const input = node('input'); input.type = 'range'; input.min = property === 'level' ? '0' : '-1'; input.max = '1'; input.step = '.01'; input.value = String(voice[property] ?? (property === 'level' ? 1 : 0)); input.setAttribute('aria-label', label);
         const output = node('output'); output.textContent = String(Math.round(Number(input.value) * 100));
         input.addEventListener('input', () => { output.textContent = String(Math.round(Number(input.value) * 100)); });
-        input.addEventListener('change', () => { if (!safeFlush()) return; try { phrase.setPartMix(voice.id, { [property]: Number(input.value) }); refresh(); notify(true); } catch (error) { report(String(error)); } });
+        input.addEventListener('change', () => { if (!safeFlush()) return; try { phrase.setPartMix(voice.id, { [property]: Number(input.value) }); refreshNoteEdit([voice.id]); notify(true); } catch (error) { report(String(error)); } });
         field(label, input, output);
       }
       if (rhythm) paintShelf(); return;
     }
     slider('音量', 'level', note.level ?? 1, 0); slider('声像', 'pan', note.pan ?? 0, -1);
-    if (vertical) { numberField('发音时间 / 秒', phraseHeldSeconds(body()!, note), 'durationBeats'); return; }
+    if (vertical) {
+      if (!pointerUx) numberField('发音时间 / 秒', phraseHeldSeconds(body()!, note), 'durationBeats');
+      return;
+    }
     if (!rhythm) { const pitch = node('select'); pitch.setAttribute('aria-label', '音高');
     const exact = keys.some(key => key.frequencyHz === note.frequencyHz);
     if (!exact) { const option = node('option', '', `${Number(note.frequencyHz.toFixed(2))} Hz`); option.value = String(note.frequencyHz); pitch.append(option); }
@@ -1174,8 +1790,45 @@ export function mountMelodyWorkspace(root: HTMLElement, options: {
     try { if (Object.keys(active.changes).length) { phrase.updateNote(active.partId, active.note.id, active.changes); rememberLength(active.partId, active.note, active.changes); } preview(); refresh(); if (Object.keys(active.changes).length) notify(true); }
     catch (error) { preview(); const failure = error instanceof Error ? error : new Error(String(error)); report(failure.message); refresh(); return failure; }
   }
-  function refresh(snapshot?: PhraseView): void {
-    if (disposed) return; if (vertical && !workbenchEnabled() && selection?.noteId) selection = undefined; const previous = part(); current = snapshot ?? phrase.read(); const next = body();
+  function refreshNoteEdit(affectedParts: readonly string[], noteIds?: readonly string[], edited?: PhraseView): void {
+    const oldBody = body();
+    const snapshot = edited ?? readEditor();
+    if (!pointerUx || !oldBody || affectedParts.some(id => drumKey(part(id)) !== undefined)) { refresh(snapshot); return; }
+    const previous = visibleParts().map(voice => voice.id);
+    const next = visibleParts(snapshot.body).map(voice => voice.id);
+    if (!snapshot.body || previous.length !== next.length || previous.some((id, index) => id !== next[index])
+      || selection?.noteId || editingFamilyId() !== playbackFamilyId || current.draft?.id !== snapshot.draft?.id) { refresh(snapshot); return; }
+    current = snapshot;
+    if (!edited) phrase.prepareDraftNoteEdit?.();
+    audition.sync(current);
+    let patched = !!(noteIds && noteIndex && indexedBody === oldBody && drawnNoteBody === oldBody && !tempoPreview && !gesture);
+    if (patched) {
+      const updated = new Map<string, { voice: PhrasePart; note: PhraseNote }>();
+      const ids = new Set(noteIds);
+      for (const voice of sectionParts(snapshot.body)) {
+        if (affectedParts.includes(voice.id)) for (const note of voice.notes) if (ids.has(note.id)) updated.set(note.id, { voice, note });
+      }
+      patched = noteIds!.every(id => {
+        const entry = updated.get(id);
+        return noteIndex!.replace(snapshot.body!, id, entry?.voice, entry?.note);
+      });
+    }
+    if (patched) {
+      indexedBody = drawnNoteBody = snapshot.body;
+      for (const id of noteIds!) paintNotes(id, false, true);
+      if (!playheadPlaying && !edited) positionHead();
+    } else paintNotes(undefined, !playheadPlaying);
+    if (!patched) paintConsole();
+    persistWorkspace();
+  }
+  function refresh(snapshot?: PhraseView, refreshLibrary = true, cardEdit?: 'empty' | 'rebind'): void {
+    if (disposed) return;
+    if (vertical && !workbenchEnabled() && selection?.noteId) selection = undefined;
+    const previous = part(), previousColors = toneColors, oldBody = drawnNoteBody, previousDrumLanes = visibleDrumLanes;
+    const previousDrumKeys = cardEdit === 'rebind' ? new Map(drumKeys) : undefined;
+    current = snapshot ?? readEditor();
+    const next = body();
+    if (pointerUx && next) phrase.prepareDraftNoteEdit?.();
     if (toneDeleteDialog && current.draft?.id !== toneDeleteDraftId) toneDeleteDialog.close();
     // The view already contains project-scoped sound names. Re-listing the
     // complete project here re-read/validated the same records on every edit.
@@ -1205,11 +1858,30 @@ export function mountMelodyWorkspace(root: HTMLElement, options: {
     }
     if (selection?.noteId && !picked()) selection = { partId: selection.partId };
     if (entryToneId && !part(entryToneId)) entryToneId = undefined;
-    toneColors = buildPhraseToneColors(next?.parts.map(value => value.timbreId) ?? []);
+    toneColors = buildPhraseToneColors(next?.parts.map(value => value.timbreId) ?? [], windowsPalette);
     if (gainPartId && (!part(gainPartId) || !workbenchEnabled())) { gainCurve?.finish(false); setGainMode(); }
-    if (next) view = clampView(view, melodyDuration(next)); audition.sync(current); paintShelf(); syncDrumStrip(); if (rhythm) paintRows(); paintGrid(); paintNotes(); gainCurve?.paint(); if (!mix) paintConsole();
+    if (next) view = clampView(view, melodyDuration(next));
+    audition.sync(current); paintShelf(); syncDrumStrip();
+    if (rhythm) paintRows();
+    const retainGeometry = pointerUx && cardEdit && next && oldBody && oldBody === indexedBody && noteIndex && drawnNotes === rollRegion
+      && !viewportFrame && !gainPartId && !selection?.noteId && visibleDrumLanes === previousDrumLanes
+      && next.parts.filter(voice => voice.notes.length).every(voice => {
+        const before = oldBody.parts.find(part => part.id === voice.id);
+        if (cardEdit === 'empty') return before === voice;
+        return before?.notes === voice.notes && previousDrumKeys?.get(before.timbreId) === drumKeys.get(voice.timbreId);
+      });
+    if (retainGeometry && cardEdit === 'empty' && next.parts.every(voice => !voice.notes.length
+      || previousColors.get(voice.timbreId) === toneColors.get(voice.timbreId))) indexedBody = drawnNoteBody = next;
+    else {
+      drawnNoteAppearance = '';
+      if (!retainGeometry) paintGrid();
+      paintNotes(undefined, true, false, !!retainGeometry);
+    }
+    gainCurve?.paint(); if (!mix) paintConsole();
     extend.disabled = !next || next.lengthBeats + phraseBarBeats(next) * (vertical ? 4 : 1) > MAX_PHRASE_BEATS;
-    extend.title = extend.disabled ? '已达当前长度上限' : vertical ? '新增钢琴卷帘' : '增加一个小节'; libraryRefresh?.(); reportViewport(); persistWorkspace();
+    extend.title = extend.disabled ? '已达当前长度上限' : vertical ? '新增钢琴卷帘' : '增加一个小节';
+    if (refreshLibrary) libraryRefresh?.();
+    reportViewport(); persistWorkspace();
   }
   function deleteToneNotes(): void {
     if (!safeFlush()) return; const voice = part(); if (!voice) return;
@@ -1229,10 +1901,15 @@ export function mountMelodyWorkspace(root: HTMLElement, options: {
   function requestRemoveFamily(id: string, fromCardMenu = false): void {
     if (disposed || toneDeleteDialog || !safeFlush()) return;
     const voice = part(id); if (!voice) return;
-    const remove = () => { try { phrase.removePart(id); addedParts.delete(id); deleteToneArmed = undefined; refresh(); notify(); } catch(error) { report(error instanceof Error ? error.message : String(error)); } };
     const noteCount = voice.notes.length + (voice.hiddenNotes?.length ?? 0);
-    if (!noteCount && !fromCardMenu) { remove(); return; }
-    const draftId=current.draft!.id, warning=node('dialog','melody-tone-delete-dialog');
+    const remove = () => {
+      try {
+        phrase.removePart(id); addedParts.delete(id); deleteToneArmed = undefined;
+        refresh(undefined, true, noteCount === 0 ? 'empty' : undefined); notify();
+      } catch(error) { report(error instanceof Error ? error.message : String(error)); }
+    };
+    if (!noteCount && (pointerUx || !fromCardMenu)) { remove(); return; }
+    const draftId=current.draft!.id, warning=createWorkspacePanel(pointerUx); warning.className += ' melody-tone-delete-dialog';
     toneDeleteDialog=warning; toneDeleteDraftId=draftId;
     const question = fromCardMenu ? '删除这张音色卡？' : '移除这组音符？';
     warning.setAttribute('aria-label', question);
@@ -1243,12 +1920,12 @@ export function mountMelodyWorkspace(root: HTMLElement, options: {
     const cancelRemoval = button('取消','melody-tone-delete-cancel',()=>warning.close());
     actions.append(cancelRemoval,button(fromCardMenu ? '删除' : '移除','melody-tone-delete-confirm',()=>{
       warning.close();
-      if (!disposed && phrase.read().draft?.id === draftId) {
+      if (!disposed && readEditor().draft?.id === draftId) {
         remove();
         if (fromCardMenu) scroll.focus({ preventScroll: true });
       }
     }));
-    warning.append(actions); warning.addEventListener('close',()=>{if(toneDeleteDialog===warning){toneDeleteDialog=undefined;toneDeleteDraftId=undefined;}warning.remove();}); root.append(warning);warning.showModal();
+    warning.append(actions); warning.addEventListener('close',()=>{if(toneDeleteDialog===warning){toneDeleteDialog=undefined;toneDeleteDraftId=undefined;}warning.remove();}); (pointerUx ? main : root).append(warning);warning.showModal();
     cancelRemoval.focus({ preventScroll: true });
   }
   function extendMeasure(): void {
@@ -1270,37 +1947,59 @@ export function mountMelodyWorkspace(root: HTMLElement, options: {
     active.seconds = melodyTimeAt(view, headWidth, melodyDuration(active.base), active.from.x + delta);
     positionHead();
   }
-  function begin(event: PointerEvent, headGesture = false): void {
-    const target = event.target as HTMLElement;
-    const curvePan = !!gainPartId && !headGesture && event.button === 0 && !!gainCurve?.layer.contains(target);
+  function begin(event: PointerEvent, headGesture = false, mouseButton = event.button, target = event.target as HTMLElement): void {
+    const pendingToneHit = pointerUx && noteLayerSelection !== editingFamilyId();
+    if (zoomBounds || pendingToneHit) {
+      if (zoomBounds) paintViewport();
+      if (pendingToneHit) syncNoteLayers();
+      target = (document.elementFromPoint?.(event.clientX, event.clientY) as HTMLElement | null) ?? target;
+    }
+    const curvePan = !!gainPartId && !headGesture && mouseButton === 0 && !!gainCurve?.layer.contains(target);
     if (gainPartId && !headGesture && !curvePan) return;
     const inDrumStrip = !drumStrip.hidden && drumCanvas.contains(target);
-    const touchRight = event.pointerType === 'touch' && event.button === 0 && !headGesture && (canvas.contains(target) || inDrumStrip)
+    const touchRight = event.pointerType === 'touch' && mouseButton === 0 && !headGesture && (canvas.contains(target) || inDrumStrip)
       && !!options.mobileTouch?.readRightButton();
-    const button = touchRight ? 2 : event.button;
-    if (disposed || library || (button !== 0 && button !== 1 && button !== 2)) return;
+    const button = touchRight ? 2 : mouseButton;
+    if (disposed || (pointerUx ? pointerOverlayOpen(true, false) : library) || (button !== 0 && button !== 1 && button !== 2)) return;
     const mode = options.readLessonInput?.() ?? 'edit';
     const hitNote = target.closest<HTMLElement>('.melody-note');
-    const dimmed = !headGesture && hitNote?.classList.contains('is-dim');
-    const block = vertical && dimmed ? undefined : hitNote;
+    const dimmed = !headGesture && !!hitNote && noteDimmed(hitNote);
+    const block = (vertical && dimmed) || (button === 0 && hitNote?.dataset.noteId && desktopErase?.refs.has(hitNote.dataset.noteId)) ? undefined : hitNote;
     if (mode === 'locked' || (!touchRight && ((mode !== 'edit' && block) || (mode === 'pan' && button !== 0)))) return;
     if (dimmed && !vertical) { event.preventDefault(); event.stopPropagation(); return; }
+    if (pointerUx && event.pointerType === 'mouse' && button === 1) {
+      stopRollPointer();
+      const position = rollPanVector(event.clientX, event.clientY);
+      setPanMode(panMode !== 'off' ? 'off' : position.x || position.y ? 'waiting' : 'ready');
+      return;
+    }
     const key = target.closest<HTMLElement>('.melody-key');
     if (key && !headGesture) {
-      if (vertical && button === 0 && safeFlush()) {
+      if (vertical && !(pointerUx && event.pointerType === 'mouse') && button === 0 && safeFlush()) {
         event.preventDefault(); keyPan = { id: event.pointerId, capture: key, fromX: event.clientX, offset: pitchOffset(), moved: false };
         key.setPointerCapture?.(event.pointerId);
       }
       return;
     }
-    event.preventDefault(); if (!safeFlush()) return; const value = body(); if (!value) return; scroll.focus({ preventScroll: true }); panMoved = false;
-    const from = point(event); const base = { id: event.pointerId, capture: headGesture ? ruler : curvePan ? gainCurve!.layer : inDrumStrip ? drumCanvas : scroll, base: value, draftId: current.draft!.id, from, last: from, clientFrom: { x: event.clientX, y: event.clientY } };
+    const desktopCanvas = pointerUx && event.pointerType === 'mouse' && !headGesture && !curvePan && (canvas.contains(target) || inDrumStrip);
+    if (pointerUx && event.pointerType === 'mouse') suspendRollPointer();
+    if (desktopCanvas && button === 2) {
+      beginDesktopErase(event, block ?? undefined, !hitNote ? inDrumStrip ? RHYTHM_PITCH : pitchAt(event) : undefined);
+      return;
+    }
+    if (!desktopCanvas) event.preventDefault();
+    if (!safeFlush()) return; const value = body(); if (!value) return; scroll.focus({ preventScroll: true }); panMoved = false;
+    const from = point(event);
+    const desktopClick = desktopCanvas && button === 0 ? true : undefined;
+    const capture = desktopCanvas && desktopErase ? desktopErase.capture
+      : curvePan ? gainCurve!.layer : inDrumStrip ? drumCanvas : headGesture && ruler.contains(target) ? ruler : scroll;
+    const base = { id: event.pointerId, capture, base: value, draftId: current.draft!.id, from, last: from, clientFrom: { x: event.clientX, y: event.clientY }, desktopClick, button };
     if (tempoRolls && !headGesture && button === 0 && (canvas.contains(target) || inDrumStrip) && from.x >= 0 && from.x < width()) {
       tempoRolls.selectAt(melodyTimeAt(view, width(), melodyDuration(value), from.x));
     }
     if (headGesture) {
       gesture = { ...base, kind: 'head', seconds: playheadSeconds, fromRuler: ruler.contains(target), moved: false };
-      ruler.setPointerCapture?.(event.pointerId);
+      capture.setPointerCapture?.(event.pointerId);
       moveHead(gesture, event);
       return;
     }
@@ -1324,19 +2023,20 @@ export function mountMelodyWorkspace(root: HTMLElement, options: {
         }
       }
     }
-    else if (curvePan || button === 1 || event.altKey || (!block && !editingFamilyId())) gesture = { ...base, kind: 'pan', lastClient: { x: event.clientX, y: event.clientY } };
+    else if (curvePan || button === 1 || desktopClick && !block || !desktopClick && (event.altKey || !block && !editingFamilyId())) gesture = { ...base, kind: 'pan', lastClient: { x: event.clientX, y: event.clientY } };
     else {
       const voice = block ? part(block.dataset.partId) : rhythm ? visibleParts(value)[Math.floor(from.y / view.rowHeight)] : part(); const note = voice?.notes.find(item => item.id === block?.dataset.noteId);
       const drum = drumKey(voice);
       if (block && voice && note) {
-        if (!vertical || workbenchEnabled()) { selection = { partId: voice.id, noteId: note.id }; entryToneId = undefined; audition.sync(current); }
-        const bounds = block.getBoundingClientRect();
-        const resizing = drum === undefined && (!!target.closest('.melody-note-resize') || (vertical ? event.clientY >= bounds.bottom - Math.min(7, bounds.height * .25) : event.clientX >= bounds.right - Math.min(7, bounds.width * .25)));
-        const dragReadyAt = vertical && event.pointerType === 'mouse' ? event.timeStamp + NOTE_DRAG_HOLD_MS : undefined;
-        const auditionOnClick = dragReadyAt !== undefined || options.readIsPlaying?.() === true;
+        if (!desktopClick && (!vertical || workbenchEnabled())) { selection = { partId: voice.id, noteId: note.id }; entryToneId = undefined; audition.sync(current); }
+        const bounds = pointerUx ? undefined : block.getBoundingClientRect();
+        const resizing = !!bounds && drum === undefined && (!!target.closest('.melody-note-resize')
+          || (vertical ? event.clientY >= bounds.bottom - Math.min(7, bounds.height * .25) : event.clientX >= bounds.right - Math.min(7, bounds.width * .25)));
+        const dragReadyAt = !desktopClick && vertical && event.pointerType === 'mouse' ? event.timeStamp + NOTE_DRAG_HOLD_MS : undefined;
+        const auditionOnClick = !desktopClick && (dragReadyAt !== undefined || options.readIsPlaying?.() === true);
         gesture = { ...base, kind: resizing ? 'resize' : 'note', partId: voice.id, note, changes: {}, rawY: 0, moved: false, auditionOnClick,
           drumLane: drum === undefined ? undefined : drumLane(note, drum), touchDrag: vertical && !!options.mobileTouch && event.pointerType === 'touch', dragReadyAt };
-        if (!auditionOnClick) void audition.requestNote(voice.id, note, value);
+        if (!auditionOnClick && !desktopClick) void audition.requestNote(voice.id, note, value);
       } else if (voice) {
         if (inDrumStrip !== (drum !== undefined)) return;
         const canvasWidth = width(), duration = melodyDuration(value);
@@ -1356,10 +2056,47 @@ export function mountMelodyWorkspace(root: HTMLElement, options: {
     }
     if (gesture) gesture.capture.setPointerCapture?.(event.pointerId);
     if (gesture?.kind === 'create') paintNotes(gesture.note.id);
-    else { paintShelf(); paintNotes(); paintConsole(); } persistWorkspace();
+    else if (!desktopClick) { paintShelf(); paintNotes(); paintConsole(); } persistWorkspace();
   }
-  function erase(from: Point, to: Point): void {
-    const active = gesture; if (!active || active.kind !== 'erase') return;
+  function beginDesktopErase(event: PointerEvent, block: HTMLElement | undefined, tapPitch: number | undefined): void {
+    if (desktopErase || pointerOverlayOpen(true, false) || finishWheelEdit()) return;
+    const base = body(), draftId = current.draft?.id;
+    if (!base || !draftId) return;
+    const from = point(event), familyId = editingFamilyId();
+    const refs = new Map<string, { partId: string; noteId: string }>();
+    const partId = block?.dataset.partId, noteId = block?.dataset.noteId;
+    const leftNote = gesture && 'note' in gesture ? gesture.note.id : undefined;
+    if (noteId && noteId !== leftNote && partId && (!familyId || familyId === partId)) refs.set(noteId, { partId, noteId });
+    const capture = gesture?.capture ?? scroll;
+    desktopErase = { kind: 'erase', id: event.pointerId, capture, base, draftId, from, last: from,
+      clientFrom: { x: event.clientX, y: event.clientY }, refs, moved: false, familyId, tapPitch, button: 2 };
+    document.addEventListener('pointerrawupdate', eraseRaw);
+    if (refs.size) paintNotes();
+  }
+  function finishDesktopErase(commit: boolean, event?: PointerEvent): void {
+    const active = desktopErase;
+    if (!active) return;
+    if (event) erasePath(active, event);
+    desktopErase = undefined;
+    document.removeEventListener('pointerrawupdate', eraseRaw);
+    cancelAnimationFrame(eraseFrame); eraseFrame = 0;
+    if (!gesture && active.capture.hasPointerCapture?.(active.id)) active.capture.releasePointerCapture(active.id);
+    if (commit && current.draft?.id === active.draftId) {
+      const editingNote = gesture && 'note' in gesture ? gesture.note.id : undefined;
+      const removals = Array.from(active.refs.values()).filter(ref => ref.noteId !== editingNote);
+      if (removals.length) {
+        try {
+          phrase.removeNotes(removals);
+          if (selection?.noteId && active.refs.has(selection.noteId) && selection.noteId !== editingNote) selection = { partId: selection.partId };
+          refreshNoteEdit([...new Set(removals.map(ref => ref.partId))], removals.map(ref => ref.noteId)); notify(true); options.onLearningAction?.('delete-note');
+          return;
+        } catch (error) { report(error instanceof Error ? error.message : String(error)); }
+      } else if (!active.refs.size && !active.moved && active.tapPitch !== undefined) auditionColumn(active.tapPitch);
+    }
+    if (active.refs.size) paintNotes();
+  }
+  function erase(from: Point, to: Point, active = gesture): void {
+    if (!active || active.kind !== 'erase') return;
     if (vertical) {
       const distance = Math.hypot(to.x - from.x, to.y - from.y);
       if (!distance) return;
@@ -1373,7 +2110,8 @@ export function mountMelodyWorkspace(root: HTMLElement, options: {
       const scale = melodyScale(view, canvasWidth, melodyDuration(active.base));
       if (indexedBody !== active.base) { indexedBody = active.base; noteIndex = createMelodyNoteIndex(active.base, sectionParts(active.base)); }
       for (const { voice, note } of noteIndex!.visible(view.leftSeconds + Math.max(0, start - (visibleDrumLanes ? MIN_DRUM_HIT_HEIGHT : 0)) / scale, view.leftSeconds + end / scale)) {
-        if ((active.familyId && voice.id !== active.familyId) || active.refs.has(note.id) || note.startBeat >= active.base.lengthBeats) continue;
+        if ((active.familyId && voice.id !== active.familyId) || active.refs.has(note.id) || note.startBeat >= active.base.lengthBeats
+          || (active === desktopErase && gesture && 'note' in gesture && gesture.note.id === note.id)) continue;
         const key = drumKey(voice);
         const lane = key === undefined ? undefined : drumLane(note, key);
         if (lane !== undefined && lane >= visibleDrumLanes) continue;
@@ -1405,7 +2143,9 @@ export function mountMelodyWorkspace(root: HTMLElement, options: {
     for (const sample of samples?.length ? samples : [event]) {
       if (active.sampleTime !== undefined && sample.timeStamp < active.sampleTime) continue;
       const next = point(sample);
-      erase(active.last, next);
+      const hit = active === desktopErase && document.elementFromPoint?.(sample.clientX, sample.clientY);
+      if (!hit || noteArea(hit)) erase(active.last, next, active);
+      else active.moved = true;
       active.last = next;
       if (Number.isFinite(sample.timeStamp)) active.sampleTime = sample.timeStamp;
     }
@@ -1416,8 +2156,8 @@ export function mountMelodyWorkspace(root: HTMLElement, options: {
   }
   function eraseRaw(event: Event): void {
     const pointer = event as PointerEvent;
-    const active = gesture;
-    if (active?.kind !== 'erase' || active.id !== pointer.pointerId) return;
+    const active = desktopErase ?? gesture;
+    if (active?.kind !== 'erase' || active.id !== pointer.pointerId || desktopErase && !(pointer.buttons & 2)) return;
     erasePath(active, pointer);
   }
   function touchSpan() {
@@ -1461,7 +2201,7 @@ export function mountMelodyWorkspace(root: HTMLElement, options: {
     }
     const previous = view;
     if (pinch.axis !== 'x' && span.y !== pinch.y) {
-      view = zoomMelody(view, width(), melodyDuration(value), point(span).x, Math.max(24, span.y) / Math.max(24, pinch.y));
+      view = zoomMelody(view, width(), melodyDuration(value), point(span).x, Math.max(24, span.y) / Math.max(24, pinch.y), pointerUx ? .5 : 0);
     }
     if (pinch.axis !== 'y' && span.x !== pinch.x) {
       zoomPitchAt(span.clientX, Math.max(24, span.x) / Math.max(24, pinch.x));
@@ -1472,7 +2212,32 @@ export function mountMelodyWorkspace(root: HTMLElement, options: {
     if (view.zoom !== previous.zoom) options.onLearningAction?.('zoom-y');
     if (view.rowHeight !== previous.rowHeight) options.onLearningAction?.('zoom-x');
   }
+  let desktopButtons = 0;
+  let desktopPointerId: number | undefined;
+  function updateDesktopButtons(event: PointerEvent, target = event.target): void {
+    const pressed = event.buttons & ~desktopButtons, released = desktopButtons & ~event.buttons;
+    desktopButtons = event.buttons;
+    if (released & 2) finishDesktopErase(true, event);
+    if (gesture && released & (gesture.button === 0 ? 1 : gesture.button === 1 ? 4 : 2)) up(event);
+    if (!(pressed & 7)) return;
+    const hit = (document.elementFromPoint?.(event.clientX, event.clientY) ?? target) as HTMLElement;
+    if (!hit || !noteArea(hit)) return;
+    if (pressed & 4) begin(event, false, 1, hit);
+    if (pressed & 1) begin(event, hit === head || hit === drumHead, 0, hit);
+    if (pressed & 2) begin(event, false, 2, hit);
+  }
+  function mouseChord(event: MouseEvent): void {
+    if (desktopPointerId === undefined || event.buttons === desktopButtons) return;
+    const pointer = new PointerEvent('pointermove', { pointerId: desktopPointerId, pointerType: 'mouse',
+      button: event.button, buttons: event.buttons, clientX: event.clientX, clientY: event.clientY,
+      ctrlKey: event.ctrlKey, metaKey: event.metaKey, shiftKey: event.shiftKey, altKey: event.altKey });
+    updateDesktopButtons(pointer, event.target);
+  }
   function move(event: PointerEvent): void {
+    if (pointerUx && event.pointerType === 'mouse' && typeof event.buttons === 'number') {
+      updateDesktopButtons(event);
+      if (desktopErase?.id === event.pointerId && event.buttons & 2) erasePath(desktopErase, event);
+    }
     if (touches?.has(event.pointerId)) {
       touches.set(event.pointerId, { x: event.clientX, y: event.clientY });
       if (touches.size >= 2) {
@@ -1499,6 +2264,37 @@ export function mountMelodyWorkspace(root: HTMLElement, options: {
       if (!active.touchRight && typeof event.buttons === 'number' && !(event.buttons & 2)) finish(true);
       return;
     }
+    if (!startsDrag(active, event)) return;
+    if (active.kind === 'note' && active.desktopClick === false) {
+      dragSample = event;
+      if (!dragFrame) dragFrame = requestAnimationFrame(() => flushNoteDrag(true));
+    } else moveGesture(active, event);
+  }
+  function startsDrag(active: Gesture, position: PointerPosition): boolean {
+    if (!active.desktopClick) return true;
+    if (Math.hypot(position.clientX - active.clientFrom.x, position.clientY - active.clientFrom.y) <= 4) return false;
+    active.desktopClick = false;
+    return true;
+  }
+  function flushNoteDrag(apply: boolean, final?: PointerPosition): void {
+    if (dragFrame) cancelAnimationFrame(dragFrame);
+    dragFrame = 0;
+    const sample = final ?? dragSample;
+    dragSample = undefined;
+    if (apply && sample && gesture && startsDrag(gesture, sample)) moveGesture(gesture, sample, !final);
+  }
+  function moveGesture(active: Gesture, event: PointerPosition, paint = true): void {
+    if (active.kind === 'pan') {
+      const client = { x: event.clientX, y: event.clientY };
+      const before = view.leftSeconds, pitch = pitchOffset(), duration = melodyDuration(active.base);
+      const scale = melodyScale(view, pointerUx ? headWidth : width(), duration);
+      view = clampView({ ...view, leftSeconds: before + (vertical ? active.lastClient.y - client.y : active.lastClient.x - client.x) / scale }, duration);
+      setTop(pitch + (vertical ? active.lastClient.x - client.x : active.lastClient.y - client.y)); active.lastClient = client;
+      panMoved ||= before !== view.leftSeconds || pitch !== pitchOffset();
+      manualNavigation(); scheduleViewport();
+      return;
+    }
+    if (active.kind === 'head') return;
     const now = point(event);
     if (active.kind === 'create') {
       if (active.drumLane !== undefined) return;
@@ -1511,14 +2307,6 @@ export function mountMelodyWorkspace(root: HTMLElement, options: {
       active.changes = { durationSeconds: seconds, durationBeats: melodyClamp(phraseHeldBeats(active.base, active.note.startBeat, seconds), MIN_BEATS, active.base.lengthBeats - active.note.startBeat) };
       paintNotes(active.note.id);
     }
-    else if (active.kind === 'pan') {
-      const client = { x: event.clientX, y: event.clientY };
-      const beforeSeconds = view.leftSeconds, beforeOffset = pitchOffset();
-      view = clampView({ ...view, leftSeconds: view.leftSeconds + (vertical ? active.lastClient.y - client.y : active.lastClient.x - client.x) / melodyScale(view, width(), melodyDuration(active.base)) }, melodyDuration(active.base));
-      setTop(pitchOffset() + (vertical ? active.lastClient.x - client.x : active.lastClient.y - client.y)); active.lastClient = client;
-      panMoved ||= beforeSeconds !== view.leftSeconds || beforeOffset !== pitchOffset();
-      manualNavigation(); scheduleViewport();
-    }
     else if (active.kind === 'erase') { erase(active.last, now); active.last = now; }
     else {
       if (active.dragReadyAt !== undefined && event.timeStamp < active.dragReadyAt) return;
@@ -1527,7 +2315,7 @@ export function mountMelodyWorkspace(root: HTMLElement, options: {
       const positionMoved = lane === undefined ? Math.abs(now.y - active.from.y) > 1 : lane !== active.drumLane;
       active.moved ||= timeMoved || positionMoved;
       if (active.dragReadyAt !== undefined && !active.moved) return;
-      const scale = melodyScale(view, width(), melodyDuration(active.base)); const delta = (now.x - active.from.x) / scale; const limit = active.base.lengthBeats;
+      const scale = melodyScale(view, pointerUx ? headWidth : width(), melodyDuration(active.base)); const delta = (now.x - active.from.x) / scale; const limit = active.base.lengthBeats;
       if (active.kind === 'resize') {
         const seconds = melodyClamp(phraseHeldSeconds(active.base, active.note) + delta, MIN_NOTE_SECONDS, 96);
         active.changes = { durationSeconds: seconds, durationBeats: melodyClamp(phraseHeldBeats(active.base, active.note.startBeat, seconds), MIN_BEATS, limit - active.note.startBeat) };
@@ -1538,7 +2326,8 @@ export function mountMelodyWorkspace(root: HTMLElement, options: {
           : active.note.startBeat;
         const seconds = phraseHeldSeconds(active.base, active.note);
         active.changes = {
-          ...(startBeat === active.note.startBeat ? {} : { startBeat, durationSeconds: seconds, durationBeats: melodyClamp(phraseHeldBeats(active.base, startBeat, seconds), MIN_BEATS, limit - startBeat) }),
+          ...(startBeat === active.note.startBeat ? {} : { startBeat, ...(seconds <= 96 ? { durationSeconds: seconds } : {}),
+            durationBeats: melodyClamp(phraseHeldBeats(active.base, startBeat, seconds), MIN_BEATS, limit - startBeat) }),
           ...(lane === active.drumLane ? {} : { drumLane: lane }),
         };
       } else {
@@ -1558,23 +2347,26 @@ export function mountMelodyWorkspace(root: HTMLElement, options: {
           if (Math.abs(startBeat - active.note.startBeat) > 1e-10) {
             const seconds = phraseHeldSeconds(active.base, active.note);
             active.changes.startBeat = startBeat;
-            active.changes.durationSeconds = seconds;
+            if (seconds <= 96) active.changes.durationSeconds = seconds;
             active.changes.durationBeats = melodyClamp(phraseHeldBeats(active.base, startBeat, seconds), MIN_BEATS, limit - startBeat);
           }
         }
       }
       active.last = now;
-      if (!options.readIsPlaying) previewEdit();
-      paintNotes(active.note.id);
+      if (paint) {
+        if (!options.readIsPlaying) previewEdit();
+        paintNotes(active.note.id);
+      }
     }
   }
   function finish(commit: boolean, releasedAt?: number): Error | undefined {
+    flushNoteDrag(commit);
     const active = gesture; gesture = undefined; if (!active) return;
     if (vertical && active.kind === 'erase') {
       document.removeEventListener('pointerrawupdate', eraseRaw);
       cancelAnimationFrame(eraseFrame); eraseFrame = 0;
     }
-    if (active.capture.hasPointerCapture?.(active.id)) active.capture.releasePointerCapture(active.id);
+    if (!desktopErase && active.capture.hasPointerCapture?.(active.id)) active.capture.releasePointerCapture(active.id);
     if (active.kind === 'head') {
       if (commit && current.draft?.id === active.draftId) {
         playheadSeconds = active.seconds;
@@ -1585,9 +2377,16 @@ export function mountMelodyWorkspace(root: HTMLElement, options: {
       positionHead();
       return;
     }
+    if (commit && releasedAt !== undefined && active.desktopClick && current.draft?.id === active.draftId) {
+      if (active.kind === 'note') { void audition.requestNote(active.partId, active.note, active.base); return; }
+      playheadSeconds = melodyTimeAt(view, width(), melodyDuration(active.base), active.from.x);
+      void options.onSeek(playheadSeconds);
+      positionHead(); persistWorkspace();
+    }
     if (active.kind === 'pan') { reportViewport(); if (commit && panMoved) options.onLearningAction?.('pan'); return; }
     if (active.kind === 'create' && !commit) { paintNotes(); return; }
-    if ((active.kind === 'note' || active.kind === 'resize') && !active.moved && (active.dragReadyAt !== undefined || options.readIsPlaying)) {
+    if ((active.kind === 'note' || active.kind === 'resize') && !active.moved
+      && (active.desktopClick !== undefined || active.dragReadyAt !== undefined || options.readIsPlaying)) {
       paintNotes(active.note.id);
       const withinClickWindow = active.dragReadyAt === undefined || (releasedAt !== undefined && releasedAt < active.dragReadyAt);
       if (commit && active.auditionOnClick && withinClickWindow && current.draft?.id === active.draftId) {
@@ -1629,7 +2428,12 @@ export function mountMelodyWorkspace(root: HTMLElement, options: {
         } else if ((active.kind === 'note' || active.kind === 'resize') && active.moved) {
           const changes = { ...active.changes };
           if (active.drumLane !== undefined && !Object.keys(changes).length) { preview(); paintNotes(active.note.id); return; }
-          if (changes.startBeat !== undefined) { const lastStart = lastNoteStart(active.base); changes.startBeat = lastStart === undefined ? active.note.startBeat : melodyClamp(changes.startBeat, 0, lastStart); changes.durationBeats = melodyClamp(phraseHeldBeats(active.base, changes.startBeat, changes.durationSeconds!), MIN_BEATS, active.base.lengthBeats - changes.startBeat); }
+          if (changes.startBeat !== undefined) {
+            const lastStart = lastNoteStart(active.base);
+            changes.startBeat = lastStart === undefined ? active.note.startBeat : melodyClamp(changes.startBeat, 0, lastStart);
+            const seconds = changes.durationSeconds ?? phraseHeldSeconds(active.base, active.note);
+            changes.durationBeats = melodyClamp(phraseHeldBeats(active.base, changes.startBeat, seconds), MIN_BEATS, active.base.lengthBeats - changes.startBeat);
+          }
           const targetPartId = rhythm ? active.targetPartId ?? active.partId : active.partId;
           if (targetPartId !== active.partId) {
             phrase.moveNote(active.partId, active.note.id, targetPartId, changes); selection = { partId: targetPartId, noteId: active.note.id };
@@ -1644,34 +2448,441 @@ export function mountMelodyWorkspace(root: HTMLElement, options: {
         }
       }
     } catch (error) { failure = error instanceof Error ? error : new Error(String(error)); report(failure.message); }
-    preview(); refresh(); if (changed) notify(true);
+    preview();
+    if (changed) {
+      if ('note' in active) {
+        if (created && created.id !== active.note.id) {
+          noteNodes.get(active.note.id)?.remove();
+          noteNodes.delete(active.note.id);
+        }
+        const affected = active.kind === 'note' && active.targetPartId ? [active.partId, active.targetPartId] : [active.partId];
+        refreshNoteEdit(affected, [created?.id ?? active.note.id]);
+      } else refresh();
+      notify(true);
+    } else if (!pointerUx) refresh();
+    else if ('note' in active) paintNotes(active.note.id, !playheadPlaying);
     if (learningAction) options.onLearningAction?.(learningAction);
     if (created && !failure && active.kind === 'create') void audition.requestNote(active.partId, created, body() ?? active.base);
     return failure;
   }
-  function flush(persist = true): void { if (disposed) return; if (persist) gainCurve?.finish(true); tempoRolls?.flush(); const failure = finish(true) ?? commitMix(); if (persist) persistWorkspace(true); if (failure) throw failure; }
+  function flush(persist = true, writeDraft = persist): void {
+    if (disposed) return;
+    if (persist) { gainCurve?.finish(true); finishDesktopErase(true); }
+    tempoRolls?.flush();
+    const failure = finishWheelEdit() ?? finish(true) ?? commitMix();
+    if (failure) throw failure;
+    if (writeDraft) phrase.flushNoteWrites?.();
+    if (persist) persistWorkspace(true);
+  }
   function safeFlush(): boolean { try { flush(false); return true; } catch { return false; } }
+  function pointerOverlayOpen(blockForSettings = true, blockForLibrary = true): boolean {
+    const inlineSelector = `.workspace-inline-panel[open]${blockForSettings ? '' : ':not(.song-editor-controls)'}${blockForLibrary ? '' : ':not(.melody-tone-library)'}`;
+    return !!(blockForLibrary && library || toneDeleteDialog || document.querySelector(`dialog[open], ${inlineSelector}, .project-library-overlay:not([hidden])`));
+  }
+  function pointerRollBusy(): boolean {
+    return disposed || options.editorSettings?.isOpen() === true
+      || !!(gesture || desktopErase || mix || draggedGroup || draggedTone || quickDrag || drumDividerDrag || cardMenuTarget || gainPartId)
+      || pointerOverlayOpen(true, false);
+  }
+  function toggleToneCards(): void {
+    if (options.editorSettings?.isOpen()) {
+      options.editorSettings.setOpen(false);
+      if (!toneCardsOpen) setToneCards(true);
+      return;
+    }
+    setToneCards(!toneCardsOpen);
+  }
+  function measureToneRevealBand(): void {
+    const frame = main.getBoundingClientRect();
+    const rollBottom = scroll.getBoundingClientRect().bottom;
+    const inset = Math.max(0, frame.bottom - rollBottom);
+    if (inset !== toneKeyboardInset) {
+      toneKeyboardInset = inset;
+      page.style.setProperty('--tone-keyboard-inset', `${inset}px`);
+    }
+    const bottom = rollBottom - keyboardHeight;
+    toneRevealBand = { top: bottom - melodyClamp(frame.height * .15, 90, 180), bottom };
+    handMotion?.measure();
+  }
+  function resetToneHover(): void {
+    toneHand.classList.remove('is-revealed');
+    showHoveredTone();
+  }
+  function trackTonePointer(event: PointerEvent): void {
+    if (!toneRevealBand || event.pointerType !== 'mouse' || event.buttons || draggedGroup || draggedTone || toneDeleteDialog) return;
+    const card = (event.target as HTMLElement)?.closest?.<HTMLElement>('.melody-note-family');
+    const overHand = !!card && toneHand.contains(card);
+    toneHand.classList.toggle('is-revealed', overHand
+      || event.clientY >= toneRevealBand.top && event.clientY < toneRevealBand.bottom);
+    showHoveredTone(overHand || card && pinnedTone?.contains(card) ? card?.dataset.partId : undefined);
+  }
+  function scrollToneHand(event: WheelEvent): void {
+    if (!toneCardsOpen || options.editorSettings?.isOpen() || gainPartId || draggedGroup || draggedTone || toneDeleteDialog) return;
+    if ((event.target as HTMLElement)?.closest?.('.melody-library-deck, .project-library, .workspace-inline-panel')) return;
+    if (handMotion?.wheel(event)) {
+      showHoveredTone();
+      window.clearTimeout(handHoverTimer);
+      handHoverTimer = window.setTimeout(() => {
+        if (disposed || !toneCardsOpen || options.editorSettings?.isOpen()) return;
+        const card = document.elementFromPoint(event.clientX, event.clientY)?.closest<HTMLElement>('.melody-note-family');
+        if (card && toneHand.contains(card)) showHoveredTone(card.dataset.partId);
+      }, 230);
+    }
+  }
+  function syncToneVisibility(): void {
+    const covered = options.editorSettings?.isOpen() === true;
+    const open = toneCardsOpen && !covered;
+    page.classList.toggle('is-tone-settings-covered', covered);
+    shelf.inert = !open || !!gainPartId;
+    if (library) library.inert = covered;
+    if (pinnedTone) pinnedTone.inert = covered;
+    page.classList.toggle('is-tone-shelf-open', open);
+    toneShortcut?.setAttribute('aria-expanded', String(open));
+    if (open) measureToneRevealBand();
+    else { toneRevealBand = undefined; resetToneHover(); }
+  }
+  function settingsVisibilityChanged(): void {
+    if (!pointerUx) return;
+    syncToneVisibility();
+    if (options.editorSettings?.isOpen()) {
+      stopToneCardFlights(main);
+      suspendRollPointer();
+    }
+    resetToneEdges();
+  }
+  function setToneCards(open: boolean): void {
+    toneCardsOpen = open;
+    if (!open) { library?.close(); stopToneCardFlights(main); }
+    syncToneVisibility();
+    resetToneEdges();
+    stopRollPointer();
+  }
+  function pointerPitchIndex(event: Pick<PointerEvent, 'clientX'>): number | undefined {
+    const offset = event.clientX - scroll.getBoundingClientRect().left + pitchOffset();
+    if (offset < 0 || offset >= melodyPitchTop(keys, keys.length, view.rowHeight)) return undefined;
+    return melodyPitchAt(keys, offset, view.rowHeight);
+  }
+  function pitchAt(event: Pick<PointerEvent, 'clientX'>): number | undefined {
+    const index = pointerPitchIndex(event);
+    return index === undefined ? undefined : keys[index]?.frequencyHz;
+  }
+  function highlightColumn(index?: number): void {
+    const next = index === undefined ? undefined : keyNodes[index];
+    if (next === highlightedKey) return;
+    highlightedKey?.classList.remove('is-pointer-pitch');
+    highlightedKey = next;
+    highlightedKey?.classList.add('is-pointer-pitch');
+  }
+  function highlightAuditionPitch(index?: number): void {
+    if (index === auditionPitch) return;
+    if (auditionPitch !== undefined) {
+      keyNodes[auditionPitch]?.classList.remove('is-auditioning');
+      pitchRows[auditionPitch]?.classList.remove('is-auditioning');
+    }
+    auditionPitch = index;
+    if (index !== undefined) {
+      keyNodes[index]?.classList.add('is-auditioning');
+      pitchRows[index]?.classList.add('is-auditioning');
+    }
+  }
+  function auditionColumn(frequencyHz: number): void {
+    audition.prepareColumn(frequencyHz)();
+    if (frequencyHz === RHYTHM_PITCH && drumKey(part()) !== undefined) return;
+    highlightAuditionPitch(pitchRow(frequencyHz));
+    window.clearTimeout(auditionPitchTimer);
+    auditionPitchTimer = window.setTimeout(() => highlightAuditionPitch(), 180);
+  }
+  const panKeys = new Set<string>();
+  let panVelocity = { x: 0, y: 0 };
+  let precisePitch: number | undefined;
+  let rollPointerVisited = false;
+  let pointerMotion: { x: number; y: number; time: number } | undefined;
+  let pointerSlowTimer = 0;
+  let previewPitchTimer = 0;
+  let previewPitch = '';
+  function preparePointerPitch(index?: number): void {
+    const voice = index === undefined ? undefined : part(editingFamilyId());
+    const pitch = index === undefined ? undefined : keys[index]?.frequencyHz;
+    const key = voice && !voice.unassigned && pitch ? `${voice.id}/${voice.timbreId}/${pitch}` : '';
+    if (key === previewPitch) return;
+    previewPitch = key;
+    window.clearTimeout(previewPitchTimer);
+    if (key && voice && pitch) {
+      previewPitchTimer = window.setTimeout(() => {
+        if (editingFamilyId() === voice.id && part(voice.id)?.timbreId === voice.timbreId) {
+          void phrase.previewNotePlan(voice.id, { frequencyHz: pitch, holdSeconds: .35, velocity: .75 }).catch(() => {});
+        }
+      }, 75);
+    }
+  }
+  let panCursor = { x: 0, y: 0 };
+  const rollPanVector = (x: number, y: number) => pointerPanVector(x, y, window.innerWidth, window.innerHeight, options.readPointerSensitivity?.() ?? .65);
+  let panIndicatorMoving = false;
+  function showPanMode(): void {
+    document.dispatchEvent?.(new CustomEvent<PointerPanMode>('rootsound-pan-mode', { detail: panMode }));
+  }
+  function setPanMode(next: PointerPanMode): void {
+    if (panMode === next) return;
+    panMode = next;
+    showPanMode();
+  }
+  function showPanDirection(x: number, y: number): void {
+    if (!panIndicatorMoving && !x && !y) return;
+    panIndicatorMoving = !!(x || y);
+    document.dispatchEvent?.(new CustomEvent('rootsound-pan', { detail: { x, y, clientX: panCursor.x, clientY: panCursor.y } }));
+  }
+  function suspendRollPointer(): void {
+    if (panMode === 'ready') setPanMode('waiting');
+    stopRollPointer();
+  }
+  function panPosition(x: number, y: number): void {
+    if (panMode === 'off') return;
+    panCursor = { x, y };
+    const next = rollPanVector(x, y);
+    if (panMode === 'waiting') {
+      if (!next.x && !next.y) setPanMode('ready');
+      return;
+    }
+    if (pointerSlowTimer) return;
+    pointerPan = next;
+    if (!edgeFrame && (pointerPan.x || pointerPan.y || panVelocity.x || panVelocity.y)) edgeFrame = requestAnimationFrame(tickPointerPan);
+  }
+  function tickPointerPan(time: number): void {
+    edgeFrame = 0;
+    const value = body();
+    if (!value || panMode !== 'ready' || desktopButtons || panKeys.size || pointerRollBusy()) { stopRollPointer(); return; }
+    const elapsed = edgeLastTime ? Math.min(40, Math.max(0, time - edgeLastTime)) : 16;
+    edgeLastTime = time;
+    const ease = 1 - Math.exp(-elapsed / 66);
+    panVelocity = { x: panVelocity.x + (pointerPan.x - panVelocity.x) * ease, y: panVelocity.y + (pointerPan.y - panVelocity.y) * ease };
+    if (!pointerPan.x && !pointerPan.y && Math.hypot(panVelocity.x, panVelocity.y) < .012) {
+      stopRollPointer();
+      return;
+    }
+    const pitch = pitchOffset(), seconds = view.leftSeconds, duration = melodyDuration(value);
+    const speed = 1.9 + (options.readPointerSensitivity?.() ?? .65) * .95;
+    const previous = precisePitch ?? pitch;
+    const pitchLimit = rollPitchWidth ? Math.max(0, keys.length * view.rowHeight - rollPitchWidth) : maximumTop();
+    precisePitch = melodyClamp(previous + panVelocity.x * elapsed * speed, 0, pitchLimit);
+    if (precisePitch !== previous) scroll.scrollLeft = precisePitch;
+    view = clampView({ ...view, leftSeconds: seconds + panVelocity.y * elapsed * speed / melodyScale(view, headWidth, duration) }, duration);
+    if (pitchOffset() !== pitch || view.leftSeconds !== seconds) {
+      manualNavigation();
+      paintViewport();
+    }
+    showPanDirection(precisePitch !== previous ? panVelocity.x : 0, view.leftSeconds !== seconds ? panVelocity.y : 0);
+    if (precisePitch !== previous || view.leftSeconds !== seconds || (!pointerPan.x && !pointerPan.y)) edgeFrame = requestAnimationFrame(tickPointerPan);
+    else { edgeLastTime = 0; precisePitch = undefined; }
+  }
+  function stopRollPointer(): void {
+    cancelAnimationFrame(edgeFrame); edgeFrame = edgeLastTime = 0;
+    pointerPan = panVelocity = { x: 0, y: 0 };
+    precisePitch = undefined;
+    showPanDirection(0, 0);
+    highlightColumn();
+  }
+  function trackRollPointer(event: PointerEvent): void {
+    if (event.pointerType !== 'mouse') return;
+    if (wheelScrollPoint && !atScrollPoint(event)) wheelScrollPoint = undefined;
+    if (wheelAnchor && !atWheelAnchor(event)) wheelAnchor = undefined;
+    const target = event.target as HTMLElement;
+    rollPointerVisited = (roll.contains(target) || !!target.closest('.song-topbar'))
+      && !target.closest('.melody-roll-end, .melody-tempo-marker, .melody-tempo-dock, .melody-console');
+    const { clientX: x, clientY: y, timeStamp: time } = event;
+    const previous = pointerMotion;
+    pointerMotion = { x, y, time };
+    const busy = !rollPointerVisited || event.buttons || panKeys.size || pointerRollBusy();
+    const index = !busy && canvas.contains(target) ? pointerPitchIndex(event) : undefined;
+    preparePointerPitch(index);
+    if (busy || panMode === 'off') { stopRollPointer(); return; }
+    const elapsed = previous ? time - previous.time : NaN;
+    if (previous && elapsed > 0 && elapsed < 110
+      && Math.hypot(x - previous.x, y - previous.y) > Math.max(window.innerWidth, window.innerHeight) * .0014 * Math.max(8, elapsed)) {
+      window.clearTimeout(pointerSlowTimer);
+      stopRollPointer();
+      pointerSlowTimer = window.setTimeout(() => {
+        pointerSlowTimer = 0;
+        if (rollPointerVisited && !desktopButtons && !panKeys.size && !pointerRollBusy()) panPosition(panCursor.x, panCursor.y);
+      }, 90);
+    }
+    highlightColumn(index);
+    panPosition(x, y);
+  }
+  function atScrollPoint({ clientX, clientY }: Pick<MouseEvent, 'clientX' | 'clientY'>): boolean {
+    return wheelScrollPoint?.x === clientX && wheelScrollPoint.y === clientY;
+  }
+  function atWheelAnchor({ clientX, clientY }: Pick<MouseEvent, 'clientX' | 'clientY'>): boolean {
+    return wheelAnchor?.x === clientX && wheelAnchor.y === clientY && wheelAnchor.draftId === current.draft?.id;
+  }
+  function finishWheelEdit(commit = true): Error | undefined {
+    const active = wheelEdit;
+    wheelEdit = undefined;
+    window.clearTimeout(wheelTimer); wheelTimer = 0;
+    cancelAnimationFrame(wheelFrame); wheelFrame = 0;
+    if (!active || current.draft?.id !== active.draftId) return;
+    const anchor = wheelAnchor?.noteId === active.note.id ? wheelAnchor : undefined;
+    if (!commit || active.create && active.remove) {
+      if (!commit && anchor) wheelAnchor = undefined;
+      paintNotes(undefined, !playheadPlaying);
+      return;
+    }
+    if (!active.create && !active.remove && Math.abs(active.initialSeconds - active.seconds) <= 1e-9) return;
+    let changedId = active.note.id;
+    let edited: PhraseView | undefined;
+    try {
+      if (phrase.editDraftNote) {
+        const edit = active.remove ? { kind: 'remove' as const, id: changedId }
+          : active.create ? { kind: 'add' as const, note: { ...active.note, ...active.changes } }
+            : { kind: 'duration' as const, id: changedId, durationBeats: active.changes.durationBeats!, durationSeconds: active.changes.durationSeconds };
+        const result = phrase.editDraftNote(active.draftId, active.partId, edit);
+        const matchingTones = result.body.parts.every((voice, index) => voice.timbreId === body()?.parts[index]?.timbreId);
+        if (matchingTones) edited = { ...current, ...result, changed: true, canUndo: true, canRedo: false };
+      } else if (active.remove) {
+        phrase.removeNote(active.partId, active.note.id);
+      } else if (active.create) {
+        const { id: _id, ...note } = { ...active.note, ...active.changes };
+        changedId = phrase.addNote(active.partId, note);
+        const block = noteNodes.get(active.note.id);
+        noteNodes.delete(active.note.id);
+        if (block) noteNodes.set(changedId, block);
+      } else {
+        phrase.updateNote(active.partId, active.note.id, active.changes);
+      }
+      if (active.remove) {
+        if (selection?.noteId === active.note.id) selection = { partId: active.partId };
+      } else if (active.create) {
+        if (anchor) anchor.noteId = changedId;
+      } else {
+        rememberLength(active.partId, active.note, active.changes);
+      }
+    } catch (error) {
+      if (anchor) wheelAnchor = undefined;
+      const failure = error instanceof Error ? error : new Error(String(error));
+      report(failure.message);
+      paintNotes(undefined, !playheadPlaying);
+      return failure;
+    }
+    refreshNoteEdit([active.partId], [changedId], edited);
+    notify(true, !!edited);
+  }
+  function editWithWheel(event: WheelEvent, pinned: string | undefined): boolean {
+    if (!Number.isFinite(event.deltaY)) return false;
+    const anchor = atWheelAnchor(event) ? wheelAnchor : undefined;
+    const anchored = anchor && (pinned === undefined || anchor.partId === pinned) ? anchor : undefined;
+    const target = anchored ? null : (document.elementFromPoint
+      ? document.elementFromPoint(event.clientX, event.clientY)
+      : event.target) as HTMLElement | null;
+    if (!anchored && (!target || !noteArea(target) || target.closest('.melody-roll-end, .melody-tempo-marker, .melody-playhead'))) return false;
+    let active = wheelEdit;
+    const candidate = target?.closest<HTMLElement>('.melody-note');
+    const centered = candidate && !noteDimmed(candidate)
+      && (pinned === undefined || candidate.dataset.partId === pinned)
+      && !(active?.remove && active.note.id === candidate.dataset.noteId) ? candidate : undefined;
+    const hitId = anchored?.noteId ?? centered?.dataset.noteId;
+    const hitPart = anchored?.partId ?? centered?.dataset.partId;
+    if (active && active.note.id !== hitId) {
+      if (finishWheelEdit()) return true;
+      active = undefined;
+    }
+    const value = body(), draftId = current.draft?.id;
+    if (!value || !draftId) return false;
+    if (!active) {
+      const voice = hitPart ? part(hitPart) : undefined;
+      const indexed = hitId ? noteIndex?.byId.get(hitId) : undefined;
+      const existing = hitId && voice && indexed?.voice.id === voice.id ? indexed.note : hitId ? voice?.notes.find(note => note.id === hitId) : undefined;
+      if (hitId && !existing) return !!anchored;
+      const writer = existing ? voice : pinned && event.deltaY > 0 ? part(pinned) : undefined;
+      if (!writer || !existing && (writer.unassigned || drumKey(writer) !== undefined || !canvas.contains(target))) return false;
+      const duration = melodyDuration(value);
+      const position = existing ? undefined : point(event);
+      const limit = position && lastNoteStart(value);
+      const frequencyHz = existing?.frequencyHz ?? pitchAt(event);
+      const scale = melodyScale(view, headWidth, duration);
+      if (!existing && (limit === undefined || frequencyHz === undefined || !position
+        || position.x < Math.max(0, -view.leftSeconds * scale) || position.x >= Math.min(headWidth, (duration - view.leftSeconds) * scale))) return false;
+      const startBeat = existing?.startBeat ?? noteStartAt(value, melodyTimeAt(view, headWidth, duration, position!.x), limit!, scale);
+      const extent = drawExtent(value, startBeat);
+      const start = melodySeconds(startBeat, value);
+      const available = duration - start;
+      const minimum = Math.max(MIN_NOTE_SECONDS, melodySeconds(startBeat + MIN_BEATS, value) - start);
+      if (!existing && available + 1e-9 < minimum) return false;
+      const initial = existing ? phraseHeldSeconds(value, existing)
+        : melodyClamp(noteLengths.get(writer.id) ?? extent.cell, minimum, Math.max(minimum, extent.maximum));
+      const note = existing ?? { id: crypto.randomUUID(), startBeat, frequencyHz: frequencyHz!, velocity: .75,
+        durationSeconds: initial, durationBeats: Math.min(value.lengthBeats - startBeat, phraseHeldBeats(value, startBeat, initial)) };
+      active = { draftId, partId: writer.id, note, changes: {}, initialSeconds: initial, seconds: initial,
+        minimumSeconds: minimum, maximumSeconds: Math.max(minimum, initial, extent.maximum), stepSeconds: Math.max(minimum, extent.cell / 2),
+        create: !existing, remove: false };
+      wheelEdit = active;
+      if (active.create) void audition.requestNewNote(writer.id, note);
+    }
+    if (!anchored) wheelAnchor = { x: event.clientX, y: event.clientY, draftId, partId: active.partId, noteId: active.note.id };
+    const units = event.deltaMode === 1 ? 3 : event.deltaMode === 2 ? 1 : 100;
+    const amount = melodyClamp(event.deltaY / units, -4, 4);
+    if (!active.remove) {
+      if (amount < 0 && active.seconds <= active.minimumSeconds + 1e-9) active.remove = true;
+      else {
+        const first = active.create && active.changes.durationBeats === undefined;
+        const steps = first ? Math.max(0, amount - 1) : amount;
+        const held = melodyClamp(active.seconds + steps * active.stepSeconds, active.minimumSeconds, active.maximumSeconds);
+        active.seconds = held;
+        active.changes = { durationBeats: melodyClamp(phraseHeldBeats(value, active.note.startBeat, held), MIN_BEATS, value.lengthBeats - active.note.startBeat),
+          ...(held <= 96 ? { durationSeconds: held } : {}) };
+      }
+    }
+    if (active.remove && !active.create) { finishWheelEdit(); return true; }
+    if (!wheelFrame) wheelFrame = requestAnimationFrame(() => {
+      wheelFrame = 0;
+      if (!wheelEdit) return;
+      if (wheelEdit.remove) { noteNodes.get(wheelEdit.note.id)?.remove(); noteNodes.delete(wheelEdit.note.id); }
+      else paintNotes(wheelEdit.note.id, !playheadPlaying);
+    });
+    window.clearTimeout(wheelTimer);
+    wheelTimer = window.setTimeout(finishWheelEdit, 260);
+    return true;
+  }
   function zoomPitchAt(client: number, factor: number): void {
-    const bounds = scroll.getBoundingClientRect();
-    const y = client - (vertical ? bounds.left : bounds.top);
+    const origin = pointerUx ? getZoomBounds().pitch : vertical ? scroll.getBoundingClientRect().left : scroll.getBoundingClientRect().top;
+    const y = client - origin;
     const row = (pitchOffset() + y) / view.rowHeight;
     const rowHeight = melodyClamp(view.rowHeight * factor, rhythm ? 48 : 12, rhythm ? 120 : 44);
     if (rowHeight === view.rowHeight) return;
     view = { ...view, rowHeight };
-    paintRows(); setTop(row * rowHeight - y);
+    const offset = row * rowHeight - y;
+    if (pointerUx) pendingPitchOffset = melodyClamp(offset, 0, maximumTop());
+    else { paintRows(); setTop(offset); }
+  }
+  function getZoomBounds() {
+    return zoomBounds ??= { pitch: scroll.getBoundingClientRect().left, time: canvas.getBoundingClientRect().top };
   }
   function wheel(event: WheelEvent): void {
-    if (disposed || !body() || library || root.querySelector('dialog[open]') || document.querySelector('dialog[open]')) return;
+    if (disposed || !body() || (!pointerUx && (library || root.querySelector('dialog[open]') || document.querySelector('dialog[open]')))) return;
     event.preventDefault();
     const mode = options.readLessonInput?.() ?? 'edit';
-    if (mode === 'locked' || ((mode === 'pan' || mode === 'draw') && (event.ctrlKey || event.metaKey)) || (mode !== 'edit' && event.altKey) || !safeFlush()) return;
+    if (mode === 'locked' || ((mode === 'pan' || mode === 'draw') && (event.ctrlKey || event.metaKey)) || (mode !== 'edit' && event.altKey)) return;
+    const target = event.target as HTMLElement | null;
+    const control = event.ctrlKey || event.metaKey;
+    if (pointerUx) {
+      suspendRollPointer();
+      if (gesture || desktopErase || mix || draggedGroup || pointerOverlayOpen(true, false)) return;
+      if (wheelScrollPoint && !atScrollPoint(event)) wheelScrollPoint = undefined;
+      if (wheelAnchor && !atWheelAnchor(event)) wheelAnchor = undefined;
+      if (!control) {
+        if (zoomBounds) paintViewport();
+        const pinned = !pinnedTone?.hidden ? editingFamilyId() : undefined;
+        if (!wheelScrollPoint && mode === 'edit' && !gainPartId && !event.shiftKey && event.deltaY && editWithWheel(event, pinned)) return;
+        if (pinned) return;
+        if (!event.shiftKey && event.deltaY) wheelScrollPoint = { x: event.clientX, y: event.clientY };
+      }
+      wheelAnchor = undefined;
+    }
+    if (!safeFlush()) return;
     const value = body(); if (!value) return;
     const previousView = { ...view }, previousOffset = pitchOffset(), previousDrumWidth = drumLaneWidth;
-    const target = event.target as HTMLElement | null;
     const hoveredNote = target?.closest?.<HTMLElement>('.melody-note');
     const hoveredPartId = hoveredNote?.dataset.partId;
-    const partId = vertical ? (hoveredNote?.classList.contains('is-dim') ? undefined : hoveredPartId) : selection?.partId;
-    const adjustsDuration = gainPartId ? false : vertical ? event.altKey
+    const partId = vertical ? (hoveredNote && noteDimmed(hoveredNote) ? undefined : hoveredPartId) : selection?.partId;
+    const adjustsDuration = gainPartId || pointerUx ? false : vertical ? event.altKey
       : !event.altKey && hoveredNote?.dataset.noteId === selection?.noteId && hoveredPartId === partId;
     const note = adjustsDuration && partId
       ? (vertical ? part(partId)?.notes.find(note => note.id === hoveredNote?.dataset.noteId) : picked()) : undefined;
@@ -1691,7 +2902,6 @@ export function mountMelodyWorkspace(root: HTMLElement, options: {
       catch (error) { report(error instanceof Error ? error.message : String(error)); }
       return;
     }
-    const control = event.ctrlKey || event.metaKey;
     const pitchZoom = control && (vertical ? event.shiftKey : !event.shiftKey);
     const timeZoom = control && (vertical ? !event.shiftKey : event.shiftKey);
     if (pitchZoom && visibleDrumLanes && target && drumStrip.contains(target)) {
@@ -1699,7 +2909,12 @@ export function mountMelodyWorkspace(root: HTMLElement, options: {
       drumLaneWidth = melodyClamp(drumLaneWidth * Math.exp(-event.deltaY * .002), MIN_DRUM_LANE_WIDTH, limit);
       syncDrumStrip();
     } else if (pitchZoom) zoomPitchAt(vertical ? event.clientX : event.clientY, Math.exp(-event.deltaY * .002));
-    else if (timeZoom) { const rowHeight = view.rowHeight; view = zoomMelody(view, width(), melodyDuration(value), point(event).x, Math.exp(-event.deltaY * .002)); if (rhythm) view.rowHeight = rowHeight; }
+    else if (timeZoom) {
+      const rowHeight = view.rowHeight;
+      const coordinate = pointerUx ? event.clientY - getZoomBounds().time : point(event).x;
+      view = zoomMelody(view, pointerUx ? headWidth : width(), melodyDuration(value), coordinate, Math.exp(-event.deltaY * .002), pointerUx ? .5 : 0);
+      if (rhythm) view.rowHeight = rowHeight;
+    }
     else if (vertical) {
       setTop(pitchOffset() + (event.shiftKey ? event.deltaX || event.deltaY : event.deltaX || 0));
       if (!event.shiftKey) view = clampView({ ...view, leftSeconds: view.leftSeconds + event.deltaY / melodyScale(view, width(), melodyDuration(value)) }, melodyDuration(value));
@@ -1707,8 +2922,9 @@ export function mountMelodyWorkspace(root: HTMLElement, options: {
     else if (!event.shiftKey && !event.deltaX) setTop(pitchOffset() + event.deltaY);
     else view = clampView({ ...view, leftSeconds: view.leftSeconds + (event.deltaX || event.deltaY) / melodyScale(view, width(), melodyDuration(value)) }, melodyDuration(value));
     manualNavigation(); scheduleViewport();
-    if (view.zoom !== previousView.zoom || view.rowHeight !== previousView.rowHeight || view.leftSeconds !== previousView.leftSeconds || pitchOffset() !== previousOffset || drumLaneWidth !== previousDrumWidth)
-      options.onLearningAction?.(pitchZoom ? vertical ? 'zoom-x' : 'zoom-y' : timeZoom ? vertical ? 'zoom-y' : 'zoom-x'
+    const moved = view.zoom !== previousView.zoom || view.rowHeight !== previousView.rowHeight || view.leftSeconds !== previousView.leftSeconds
+      || pitchOffset() !== previousOffset || drumLaneWidth !== previousDrumWidth;
+    if (moved) options.onLearningAction?.(pitchZoom ? vertical ? 'zoom-x' : 'zoom-y' : timeZoom ? vertical ? 'zoom-y' : 'zoom-x'
         : event.shiftKey || (event.deltaX && !event.deltaY) ? 'scroll-x' : 'scroll-y');
   }
   function isEditable(target: EventTarget | null | undefined): boolean {
@@ -1767,7 +2983,18 @@ export function mountMelodyWorkspace(root: HTMLElement, options: {
     revealEntry(step.seconds, drum === undefined ? pitch : undefined);
     return true;
   }
+  function cancelInteraction(): boolean {
+    if (cardMenuTarget) { closeCardMenu(true); return true; }
+    if (tempoRolls?.cancelInteraction()) return true;
+    if (gesture || desktopErase) { finishDesktopErase(false); finish(false); return true; }
+    if (wheelEdit) { finishWheelEdit(false); return true; }
+    if (mix) { mix = undefined; preview(); refresh(); return true; }
+    if (gainPartId) { gainCurve?.finish(false); setGainMode(); return true; }
+    if (toneCardsOpen && !options.editorSettings) { setToneCards(false); scroll.focus({ preventScroll: true }); return true; }
+    return false;
+  }
   function keydown(event: KeyboardEvent): void {
+    if (event.defaultPrevented) return;
     if (cardMenuTarget) {
       if (event.key === 'Escape' || event.key === 'Tab') {
         if (event.key === 'Escape') event.preventDefault();
@@ -1777,9 +3004,10 @@ export function mountMelodyWorkspace(root: HTMLElement, options: {
     }
     if (root.closest('[inert]') || options.readLessonInput && options.readLessonInput() !== 'edit') return;
     const rangeUndo = event.key === 'Backspace' && event.target instanceof HTMLInputElement && event.target.type === 'range';
-    if (disposed || library || event.isComposing || event.keyCode === 229 || isEditable(event.target) && !rangeUndo || root.querySelector('dialog[open]') || document.querySelector('dialog[open]')) return;
+    if (disposed || event.isComposing || event.keyCode === 229 || isEditable(event.target) && !rangeUndo
+      || pointerOverlayOpen(true, !pointerUx)) return;
     const key = event.key.toLowerCase();
-    if (gainPartId && key === 'escape') { event.preventDefault(); gainCurve?.finish(false); setGainMode(); return; }
+    if (key === 'escape') { if (cancelInteraction()) event.preventDefault(); return; }
     if (gainPartId && key === 'delete') { event.preventDefault(); return; }
     if (key !== 'delete') deleteToneArmed = undefined;
     if (key === 'backspace' && !event.ctrlKey && !event.metaKey && !event.altKey && !event.shiftKey) {
@@ -1793,7 +3021,7 @@ export function mountMelodyWorkspace(root: HTMLElement, options: {
       const timeAxis = vertical ? !horizontal : horizontal;
       const forward = event.key === 'ArrowRight' || event.key === 'ArrowDown';
       if (event.ctrlKey && timeAxis) {
-        const rowHeight = view.rowHeight; view = zoomMelody(view, width(), melodyDuration(value), width() / 2, forward !== vertical ? 1.15 : 1 / 1.15); if (rhythm) view.rowHeight = rowHeight;
+        const rowHeight = view.rowHeight; view = zoomMelody(view, width(), melodyDuration(value), width() / 2, forward !== vertical ? 1.15 : 1 / 1.15, pointerUx ? .5 : 0); if (rhythm) view.rowHeight = rowHeight;
       } else if (event.ctrlKey) {
         const row = (pitchOffset() + pitchSpan() / 2) / view.rowHeight;
         view.rowHeight = melodyClamp(view.rowHeight * (forward === vertical ? 1.15 : 1 / 1.15), rhythm ? 48 : 12, rhythm ? 120 : 44); paintRows();
@@ -1803,7 +3031,6 @@ export function mountMelodyWorkspace(root: HTMLElement, options: {
       manualNavigation(); paintViewport(); return;
     }
     if (!gainPartId && typeStep(event, key)) return;
-    if (key === 'escape') { event.preventDefault(); if (gesture) finish(false); else if (mix) { mix = undefined; preview(); refresh(); } return; }
     if (event.ctrlKey || event.metaKey) {
       if (key === 'z' || key === 'y') { event.preventDefault(); if (!safeFlush()) return; try { const redo = key === 'y' || event.shiftKey; if (redo ? current.canRedo : current.canUndo) { historyMove(redo); if (!redo) options.onLearningAction?.('undo'); } } catch (error) { report(String(error)); } } return;
     }
@@ -1835,10 +3062,13 @@ export function mountMelodyWorkspace(root: HTMLElement, options: {
     reportViewport();
   }
   const up = (event: PointerEvent) => {
+    if (pointerUx && event.pointerType === 'mouse') desktopButtons = event.buttons ?? 0;
+    if (desktopErase?.id === event.pointerId && event.button === 2) finishDesktopErase(true, event);
     endTouch(event);
     if (keyPan?.id === event.pointerId) finishKeyPan();
     if (quickDrag?.id === event.pointerId) finishQuickScroll();
     if (gesture?.id === event.pointerId) {
+      if (event.pointerType === 'mouse' && gesture.desktopClick !== undefined) flushNoteDrag(true, event);
       if (vertical && gesture.kind === 'erase' && (event.button === 2 || gesture.touchRight)) {
         if (gesture.touchRight || !options.readLessonInput || options.readLessonInput() === 'edit') erase(gesture.last, point(event));
         else gesture.moved ||= Math.hypot(event.clientX - gesture.clientFrom.x, event.clientY - gesture.clientFrom.y) > 4;
@@ -1847,10 +3077,122 @@ export function mountMelodyWorkspace(root: HTMLElement, options: {
     }
     if (mix?.pointerId === event.pointerId) commitMix();
   };
-  const cancel = (event: PointerEvent) => { endTouch(event); if (keyPan?.id === event.pointerId) finishKeyPan(true); if (quickDrag?.id === event.pointerId) finishQuickScroll(); if (gesture?.id === event.pointerId) finish(false); if (mix?.pointerId === event.pointerId) { mix = undefined; preview(); refresh(); } };
-  const resize = () => { if (!disposed) { closeCardMenu(); syncDrumStrip(); setTop(pitchOffset()); scheduleViewport(); } };
-  scroll.addEventListener('pointerdown', event => { if (!startTouch(event)) begin(event, event.target === head && event.button === 0); });
-  drumCanvas.addEventListener('pointerdown', event => { if (!startTouch(event)) begin(event, event.target === drumHead && event.button === 0); });
+  const cancel = (event: PointerEvent) => { if (desktopErase?.id === event.pointerId) finishDesktopErase(false); endTouch(event); if (keyPan?.id === event.pointerId) finishKeyPan(true); if (quickDrag?.id === event.pointerId) finishQuickScroll(); if (gesture?.id === event.pointerId) finish(false); if (mix?.pointerId === event.pointerId) { mix = undefined; preview(); refresh(); } };
+  const resize = () => {
+    if (disposed) return;
+    if (pointerUx) {
+      sizeDesktopKeyboard();
+      if (toneCardsOpen && !options.editorSettings?.isOpen()) measureToneRevealBand();
+    }
+    rollPitchWidth = 0; rollRegion = undefined; measureQuickTrack = true;
+    closeCardMenu(); syncDrumStrip(); setTop(pitchOffset()); scheduleViewport();
+  };
+  const toneGestures = toneEdges ? (['left', 'right'] as const).filter(side => side === 'left' || options.editorSettings).map(side =>
+    attachEdgeGesture(pointerArea, side, {
+      enabled: () => !disposed && !panKeys.size && Date.now() >= toneCooldownUntil
+        && (side !== 'left' || !options.editorSettings?.isOpen())
+        && !(gesture || desktopErase || wheelEdit || mix || draggedGroup || draggedTone || quickDrag || drumDividerDrag || cardMenuTarget || gainPartId)
+        && !pointerOverlayOpen(false, false),
+      open(y) {
+        const settingsOpen = options.editorSettings?.isOpen(), cardsOpen = toneCardsOpen;
+        suspendRollPointer();
+        if (side === 'left') toggleToneCards();
+        else options.editorSettings?.setOpen(!settingsOpen);
+        if (cardsOpen === toneCardsOpen && settingsOpen === options.editorSettings?.isOpen()) return;
+        toneCooldownUntil = Date.now() + EDGE_COOLDOWN_MS;
+        if (!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
+          const edge = toneEdges[side];
+          edge.style.setProperty('--tone-edge-y', `${y * 100}%`);
+          edge.animate?.([{ opacity: .5 }, { opacity: 0 }], { duration: 160, easing: 'ease-out' });
+        }
+      },
+    })) : [];
+  function resetToneEdges(): void { for (const edge of toneGestures) edge.reset(); }
+  function canDropGroupForDeletion(event: DragEvent): boolean {
+    if (!draggedGroup || !toneCardsOpen) return false;
+    const dy = event.clientY - draggedGroup.from.y;
+    const pile = tonePile?.getBoundingClientRect();
+    const keys = main.getBoundingClientRect();
+    const keyboardBottom = keys.bottom - toneKeyboardInset;
+    return !!(pile && event.clientX - draggedGroup.from.x > 18 && event.clientX >= pile.left && event.clientX <= pile.right
+      && event.clientY >= pile.top && event.clientY <= pile.bottom)
+      || (dy > 18 && event.clientX >= keys.left && event.clientX <= keys.right
+        && event.clientY >= keyboardBottom - keyboardHeight && event.clientY <= keyboardBottom);
+  }
+  if (pointerUx) {
+    main.addEventListener('dragover', event => {
+      if (!event.dataTransfer || !draggedGroup || draggedGroup.draftId !== current.draft?.id || options.editorSettings?.isOpen() || toneDeleteDialog
+        || (!draggedGroup.pinned && !canDropGroupForDeletion(event))) return;
+      event.preventDefault(); event.dataTransfer.dropEffect = 'move';
+    });
+    main.addEventListener('drop', event => {
+      const source = draggedGroup;
+      if (!source || source.draftId !== current.draft?.id || options.editorSettings?.isOpen() || toneDeleteDialog
+        || (!source.pinned && !canDropGroupForDeletion(event)) || event.dataTransfer?.getData(GROUP_DRAG_TYPE) !== source.id) return;
+      event.preventDefault(); endGroupDrag();
+      if (source.pinned && editingFamilyId() === source.id) clearToneCard(event);
+      else if (!source.pinned) requestRemoveFamily(source.id, true);
+    });
+  }
+  const leaveRollPointer = () => {
+    wheelAnchor = undefined;
+    preparePointerPitch();
+    window.clearTimeout(pointerSlowTimer); pointerSlowTimer = 0;
+    if (!gesture) finishDesktopErase(true);
+    stopRollPointer();
+  };
+  const resetPointerPan = () => {
+    desktopButtons = 0; desktopPointerId = undefined; rollPointerVisited = false; previousNativePosition = undefined;
+    pointerMotion = undefined; window.clearTimeout(pointerSlowTimer); pointerSlowTimer = 0;
+    wheelAnchor = undefined;
+    finishDesktopErase(false); panKeys.clear(); suspendRollPointer();
+  };
+  const pausePanOnKey = (event: KeyboardEvent) => { panKeys.add(event.code || event.key); wheelAnchor = undefined; resetToneEdges(); suspendRollPointer(); };
+  const releasePanKey = (event: KeyboardEvent) => panKeys.delete(event.code || event.key);
+  const pausePanOnWheel = () => { resetToneEdges(); suspendRollPointer(); };
+  const stopOnPress = (event: PointerEvent) => {
+    if (event.pointerType === 'mouse') { desktopButtons = event.buttons; desktopPointerId = event.pointerId; }
+    wheelAnchor = undefined;
+    resetToneEdges();
+    if (event.button === 1) stopRollPointer(); else suspendRollPointer();
+  };
+  let previousNativePosition: { x: number; y: number } | undefined;
+  const removeNativePan = pointerUx ? listenDesktopPointer(sample => {
+    const moved = sample.dx || sample.dy || previousNativePosition?.x !== sample.x || previousNativePosition?.y !== sample.y;
+    previousNativePosition = sample;
+    if (sample.pressed || sample.held) { stopRollPointer(); return; }
+    if (!moved) return;
+    if (panMode === 'off' || !rollPointerVisited || desktopButtons || panKeys.size || pointerRollBusy()) return;
+    const exterior = sample.x <= 0 || sample.x >= 1 || sample.y <= 0 || sample.y >= 1;
+    if (exterior) panPosition(sample.clientX * window.innerWidth, sample.clientY * window.innerHeight);
+    else if (sample.clientY < 0 || sample.clientY > 1 || sample.clientX < 0 || sample.clientX > 1) stopRollPointer();
+  }, resetPointerPan) : undefined;
+  if (pointerUx) {
+    showPanMode();
+    pointerArea.addEventListener('pointermove', trackTonePointer);
+    pointerArea.addEventListener('wheel', scrollToneHand, { capture: true, passive: false });
+    pointerArea.addEventListener('pointerleave', resetToneHover);
+    pointerArea.addEventListener('pointermove', trackRollPointer);
+    pointerArea.addEventListener('pointerleave', leaveRollPointer);
+    document.addEventListener('pointerdown', stopOnPress, true);
+    document.addEventListener('mousedown', mouseChord, true);
+    document.addEventListener('wheel', pausePanOnWheel, { passive: true, capture: true });
+    document.addEventListener('mouseup', mouseChord, true);
+    document.addEventListener('keydown', pausePanOnKey, true);
+    document.addEventListener('keyup', releasePanKey, true);
+    window.addEventListener('blur', resetPointerPan);
+  }
+  const beginRoll = (event: PointerEvent) => {
+    if (pointerUx && event.pointerType === 'mouse') desktopButtons = event.buttons ?? (event.button === 0 ? 1 : event.button === 1 ? 4 : 2);
+    if (!startTouch(event)) begin(event, (event.target === head || event.target === drumHead) && event.button === 0);
+  };
+  scroll.addEventListener('pointerdown', beginRoll);
+  if (pointerUx) {
+    const blockMiddleDefault = (event: MouseEvent) => { if (event.button === 1) event.preventDefault(); };
+    roll.addEventListener('mousedown', blockMiddleDefault);
+    roll.addEventListener('auxclick', blockMiddleDefault);
+  }
+  drumCanvas.addEventListener('pointerdown', beginRoll);
   drumCanvas.addEventListener('contextmenu', event => event.preventDefault());
   drumStrip.addEventListener('wheel', wheel, { passive: false });
   drumDivider.addEventListener('pointerdown', event => {
@@ -1880,6 +3222,14 @@ export function mountMelodyWorkspace(root: HTMLElement, options: {
     if (safeFlush()) setDrumLanes(visibleDrumLanes + (event.key === 'ArrowLeft' ? 1 : -1));
   });
   ruler.addEventListener('pointerdown', event => { if (event.button === 0) begin(event, true); });
+  if (pointerUx) keyboard.addEventListener('auxclick', event => {
+    if (disposed || event.button !== 2 || drumKey(part()) !== undefined || pointerOverlayOpen(true, false)) return;
+    const key = (event.target as HTMLElement).closest('.melody-key') as HTMLElement | null;
+    const frequencyHz = Number(key?.dataset.frequencyHz);
+    if (!Number.isFinite(frequencyHz)) return;
+    event.preventDefault();
+    auditionColumn(frequencyHz);
+  });
   scroll.addEventListener('contextmenu', event => event.preventDefault()); scroll.addEventListener('wheel', wheel, { passive: false }); ruler.addEventListener('wheel', wheel, { passive: false });
   if (rhythm) shelf.addEventListener('wheel', wheel, { passive: false });
   quick.addEventListener('pointerdown', event => {
@@ -1903,9 +3253,13 @@ export function mountMelodyWorkspace(root: HTMLElement, options: {
     view = clampView({ ...view, leftSeconds: event.key === 'Home' ? 0 : event.key === 'End' ? maximum : view.leftSeconds + delta }, melodyDuration(body()!));
     manualNavigation(true); scheduleViewport();
   });
-  const scrolled = () => { if (!disposed) { setTop(pitchOffset()); scheduleViewport(); } };
+  const scrolled = () => {
+    if (disposed || pointerUx && edgeFrame) return;
+    if (!pointerUx) setTop(pitchOffset());
+    scheduleViewport();
+  };
   scroll.addEventListener('scroll', scrolled);
-  const lost = (event: PointerEvent) => { if (keyPan?.id === event.pointerId) finishKeyPan(true); if (gesture?.id === event.pointerId) finish(false); };
+  const lost = (event: PointerEvent) => { if (desktopErase?.id === event.pointerId) finishDesktopErase(false); if (keyPan?.id === event.pointerId) finishKeyPan(true); if (gesture?.id === event.pointerId) finish(false); };
   gainCurve?.layer.addEventListener('lostpointercapture', lost);
   keyboard.addEventListener('lostpointercapture', lost);
   scroll.addEventListener('lostpointercapture', lost); ruler.addEventListener('lostpointercapture', lost); drumCanvas.addEventListener('lostpointercapture', lost);
@@ -1931,7 +3285,9 @@ export function mountMelodyWorkspace(root: HTMLElement, options: {
   const centre = picked()?.frequencyHz ?? (frequencies.length ? vertical ? Math.sqrt(lowFrequency * highFrequency) : frequencies[Math.floor(frequencies.length / 2)]! : 261.625565);
   setTop(restorePitchOffset ?? (rhythm ? 0 : melodyPitchTop(keys, phrasePitchRow(centre, keys), view.rowHeight) - Math.max(view.rowHeight, pitchSpan()) / 2));
   if (rhythm) paintShelf(); viewportReady = true; paintNotes(); reportViewport();
-  return { refresh, flush, isStepInputActive, readViewport, previewTempoRate, frameNotes(reserveEndSpace = false) {
+  const restoredTone = pointerUx && editingFamilyId();
+  if (restoredTone) prepareVisibleTone(restoredTone);
+  return { refresh, flush, isStepInputActive, cancelInteraction, settingsVisibilityChanged, readViewport, previewTempoRate, frameNotes(reserveEndSpace = false) {
     const value = body(); if (!value) return;
     const trailingSeconds = reserveEndSpace ? phraseBarBeats(value) * 60 / phraseTempoAtBeat(value, value.lengthBeats) : 0;
     view = { ...view, leftSeconds: 0, zoom: 8 / Math.max(2, melodyDuration(value) + trailingSeconds + .3), rowHeight: 28 };
@@ -1942,19 +3298,38 @@ export function mountMelodyWorkspace(root: HTMLElement, options: {
       paintRows(); setTop(Math.max(0, (low - 2) * view.rowHeight));
     }
     paintViewport(); reportViewport();
-  }, setPlayhead(seconds, playing = false, displaySeconds = seconds) { if (!disposed) {
+  }, setPlayhead(seconds, playing = false, displaySeconds = seconds, frameTime?: number) { if (!disposed) {
     const playbackChanged = playheadPlaying !== playing;
     const positionChanged = playheadSeconds !== seconds;
-    playheadPlaying = playing; playheadSeconds = seconds;
+    playheadPlaying = playing; playheadSeconds = seconds; displayedPlayheadSeconds = displaySeconds;
     if (playbackChanged) page.classList.toggle('is-playing', playing);
     if (!playing && (playbackChanged || positionChanged)) persistWorkspace();
-    if (headInView()) followResumeAt = 0;
-    if (vertical && playing && !gesture && !mix && !quickDrag && !keyPan && !drumDividerDrag && !tempoRolls?.isDragging() && body() && performance.now() >= followResumeAt) {
-      const span = 8 / view.zoom, duration = melodyDuration(body()!);
-      const target = melodyFollowTarget(seconds, view.leftSeconds, span, duration, span * 2 / Math.max(1, headWidth));
-      // Following may leave blank space after the ending so the last page also
-      // puts the head at the top. Manual navigation retains its normal bounds.
-      if (target !== undefined) { view = { ...view, leftSeconds: target }; browseLastSeconds = target; paintViewport(false, false); }
+    if (pointerUx ? playbackChanged && playing : headInView()) followResumeAt = 0;
+    const now = frameTime ?? performance.now();
+    const canFollow = vertical && playing && !gesture && !desktopErase && !wheelEdit && !mix && !quickDrag && !keyPan
+      && !drumDividerDrag && !pinch && !edgeFrame && !tempoRolls?.isDragging() && !!body() && now >= followResumeAt;
+    if (!canFollow || frameTime === undefined || playbackChanged) lastFollowFrame = undefined;
+    if (canFollow) {
+      const span = 8 / view.zoom;
+      let target: number | undefined;
+      if (pointerUx) {
+        const previous = lastFollowFrame;
+        lastFollowFrame = { time: now, seconds: displaySeconds, zoom: view.zoom };
+        if (previous?.zoom === view.zoom) {
+          const elapsed = melodyClamp(now - previous.time, 0, 40);
+          const center = displaySeconds - span / 2;
+          const error = view.leftSeconds - (previous.seconds - span / 2);
+          target = center + (Math.abs(error) * headWidth / span < .35 ? 0 : error * Math.exp(-elapsed / 140));
+        }
+      } else {
+        target = melodyFollowTarget(seconds, view.leftSeconds, span, melodyDuration(body()!), span * 2 / Math.max(1, headWidth));
+      }
+      if (target !== undefined && target !== view.leftSeconds) {
+        wheelAnchor = undefined;
+        view = { ...view, leftSeconds: target };
+        browseLastSeconds = target;
+        paintViewport(false, false);
+      }
     }
     if (gesture?.kind !== 'head') positionHead(displaySeconds);
     const onsets = playing && noteIndex && (body()?.masterLevel ?? 1) > 0
@@ -1987,8 +3362,33 @@ export function mountMelodyWorkspace(root: HTMLElement, options: {
     for (const id of sounding) if (!nextSounding.has(id)) { noteNodes.get(id)?.classList.remove('is-sounding'); sounding.delete(id); }
     for (const id of nextSounding) if (!sounding.has(id)) { noteNodes.get(id)?.classList.add('is-sounding'); sounding.add(id); }
   } }, dispose() {
-    if (disposed) return; endGroupDrag(); finishKeyPan(true); finish(false); mix = undefined; gainCurve?.dispose(); persistWorkspace(true); preview(); audition.cancel(); tempoRolls?.dispose(); disposed = true; closeCardMenu(); toneDeleteDialog?.close(); library?.close(); observer?.disconnect(); removeConsoleWheel(); window.clearTimeout(noticeTimer); window.clearTimeout(workspaceTimer);
-    window.clearTimeout(quickHideTimer); quickDrag = undefined;
+    if (disposed) return; endGroupDrag(); finishKeyPan(true); finishDesktopErase(false); finish(false); mix = undefined; gainCurve?.dispose(); persistWorkspace(true); preview(); audition.cancel(); tempoRolls?.dispose(); disposed = true; closeCardMenu(); toneDeleteDialog?.close(); library?.close(); observer?.disconnect(); removeConsoleWheel(); window.clearTimeout(noticeTimer); window.clearTimeout(workspaceTimer);
+    window.clearTimeout(quickHideTimer); window.clearTimeout(handHoverTimer); handMotion?.dispose(); quickDrag = undefined;
+    cancelAnimationFrame(highlightFrame);
+    for (const edge of toneGestures) edge.dispose();
+    if (toneEdges) { toneEdges.left.remove(); toneEdges.right.remove(); }
+    removeNativePan?.();
+    if (pointerUx) {
+      pointerArea.removeEventListener('pointermove', trackTonePointer);
+      pointerArea.removeEventListener('wheel', scrollToneHand, true);
+      pointerArea.removeEventListener('pointerleave', resetToneHover);
+      pointerArea.removeEventListener('pointermove', trackRollPointer);
+      pointerArea.removeEventListener('pointerleave', leaveRollPointer);
+      if (pointerArea !== main) pointerArea.style.setProperty('--melody-keyboard-height', '');
+      document.removeEventListener('pointerdown', stopOnPress, true);
+      document.removeEventListener('mousedown', mouseChord, true);
+      document.removeEventListener('wheel', pausePanOnWheel, true);
+      document.removeEventListener('mouseup', mouseChord, true);
+      document.removeEventListener('keydown', pausePanOnKey, true);
+      document.removeEventListener('keyup', releasePanKey, true);
+      window.removeEventListener('blur', resetPointerPan);
+      window.clearTimeout(pointerSlowTimer);
+      window.clearTimeout(previewPitchTimer);
+      window.clearTimeout(auditionPitchTimer);
+      stopRollPointer();
+      setPanMode('off');
+    }
+    window.clearTimeout(wheelTimer); cancelAnimationFrame(wheelFrame); cancelAnimationFrame(edgeFrame);
     cancelAnimationFrame(viewportFrame); viewportFrame = 0;
     cancelAnimationFrame(pinchFrame); pinchFrame = 0; touches?.clear(); pinch = undefined;
     scroll.removeEventListener('scroll', scrolled);

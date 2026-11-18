@@ -1,9 +1,10 @@
+import { createWorkspacePanel } from './workspace-panel.ts';
 import './project-save-as.css';
 
 export function showProjectNameDialog(root: HTMLElement, titleText: string, suggestedName: string, actionText: string,
-  submit: (name: string) => Promise<void>): Promise<boolean> {
+  submit: (name: string) => Promise<void>, inline = false): Promise<boolean> {
   return new Promise(resolve => {
-    const dialog = document.createElement('dialog'); dialog.className = 'project-copy-dialog';
+    const dialog = createWorkspacePanel(inline); dialog.className += ' project-copy-dialog';
     const form = document.createElement('form'); form.noValidate = true;
     const heading = document.createElement('div'); heading.className = 'library-heading';
     const title = document.createElement('h2'); title.textContent = titleText;

@@ -2,7 +2,7 @@ import {readMidiExpressionMessage,MAX_MIDI_EXPRESSION_EVENTS,type TimedMidiExpre
 import type { BasicWaveform, PcmAudio, SampleSoundPlan, SoundPlan, SoundAuditionOptions, SoundGainPoint } from '../../contracts/sound.ts';
 import { CURVE_LIMITS, dbAmplitude, gainAtTime, GAIN_CURVE_LIMIT_DB, MAX_GAIN_CURVE_POINTS, sampleGainCurve, segmentAfter } from '../../contracts/gain-curve.ts';
 import type { OutputProcessingPlan } from '../../contracts/post-production.ts';
-import { pcmShape, readPcmSnapshot, samePcm, type PcmSnapshot } from './pcm.ts';
+import { pcmShape, preparedPcm, readPcmSnapshot, samePcm, type PcmSnapshot } from './pcm.ts';
 import { MAX_SEQUENCE_EVENTS, MAX_SEQUENCE_SECONDS } from '../../contracts/playback-limits.ts';
 
 const WAVEFORMS: readonly BasicWaveform[] = ['sine', 'triangle', 'sawtooth', 'square', 'noise'];
@@ -19,7 +19,7 @@ export type SampleSourceSnapshot = SampleSoundPlan['source'] & {
 };
 export type ScheduledSound = SoundPlan | (Omit<SampleSoundPlan, 'source'> & { source: SampleSourceSnapshot });
 export type ScheduledPitch = { points: readonly SoundGainPoint[]; distance: readonly number[] };
-type ScheduledEvent = { atSeconds: number; sound: ScheduledSound; pan?: number; songAtSeconds?: number;
+type ScheduledEvent = { atSeconds: number; sound: ScheduledSound; pan?: number; songAtSeconds?: number; noteId?: string; groupId?: string;
   gainCurve?: readonly SoundGainPoint[]; pitchCurve?: ScheduledPitch; duration: number };
 
 export interface ScheduledPreview {
@@ -28,6 +28,9 @@ export interface ScheduledPreview {
   readonly normalization: number;
   readonly sequence: boolean;
   readonly samples: readonly SampleSourceSnapshot[];
+  readonly deletedNotes?: Set<string>;
+  readonly groupIds?: readonly string[];
+  readonly soloGroupId?: string;
   readonly midiExpression?: readonly TimedMidiExpressionLane[];
   readonly output?: OutputProcessingPlan;
   readonly transport?: { readonly positionSeconds: number; readonly rate: number };
@@ -201,13 +204,16 @@ function sourceReader(previous?: ScheduledPreview): { read(value: unknown): Samp
   return { sources, read(value) {
     const source = object(value, '采样声源'); fields(source, ['id', 'revision', 'audio'], '采样声源');
     if (typeof source.id !== 'string' || !source.id.trim() || source.id.length > 4096 || !Number.isSafeInteger(source.revision) || (source.revision as number) < 1) throw new Error('采样声源的身份或版本无效。');
-    const audio = source.audio as PcmAudio; const shape = pcmShape(audio); const identity = JSON.stringify([source.id, source.revision]);
+    const input = source.audio as PcmAudio;
+    const prepared = preparedPcm(input);
+    const audio = prepared?.audio ?? input; const identity = JSON.stringify([source.id, source.revision]);
     const existing = identities.get(identity);
     if (existing) {
       if (existing.input !== audio && !samePcm(audio, existing.source.audio)) throw new Error('同一个采样声源版本包含不同的声音内容，请重新生成播放计划。');
       return existing.source;
     }
-    let snapshot = snapshots.get(audio);
+    const shape = prepared ? { frames: audio.channels[0]!.length, bytes: prepared.bytes } : pcmShape(audio);
+    let snapshot = prepared ?? snapshots.get(audio);
     if (!snapshot) {
       const reusable = previousSources.get(identity);
       if (reusable && samePcm(audio, reusable.audio)) snapshot = { audio: reusable.audio, bytes: shape.bytes, peak: reusable.peak, hash: reusable.hash };
@@ -235,7 +241,7 @@ export function previewFingerprint(preview: ScheduledPreview): string {
     if (!curves.has(points)) curves.set(points, curves.size);
     return curves.get(points);
   };
-  return JSON.stringify({ durationSeconds: preview.durationSeconds, normalization: preview.normalization, sequence: preview.sequence, output: preview.output, midiExpression:preview.midiExpression,
+  return JSON.stringify({ durationSeconds: preview.durationSeconds, normalization: preview.normalization, sequence: preview.sequence, editableNotes: !!preview.deletedNotes, output: preview.output, midiExpression:preview.midiExpression,
     events: preview.events.map(({ gainCurve, pitchCurve, ...event }) => {
       return { ...event, gainCurve: curveIndex(gainCurve), pitchCurve: curveIndex(pitchCurve?.points), sound: event.sound.kind === 'sample' ? { ...event.sound, source: event.sound.source.key } : event.sound };
     }), gainCurves: [...curves.keys()] });
@@ -302,8 +308,10 @@ export function readPreview(value: unknown, options: { allowEmptySequence?: bool
     };
   }
   if (input.version !== 1) throw new Error('当前声音运行仅支持第 1 版音乐试听计划。');
-  fields(input, ['kind', 'version', 'durationSeconds', 'events', 'output', 'transport', 'midiExpression', 'preserveNoteLevel', 'gainCurves', 'pitchCurves'], '音乐试听计划');
+  fields(input, ['kind', 'version', 'durationSeconds', 'events', 'output', 'transport', 'midiExpression', 'preserveNoteLevel', 'editableNotes', 'gainCurves', 'pitchCurves', 'soloGroupId'], '音乐试听计划');
+  if (input.soloGroupId !== undefined && (typeof input.soloGroupId !== 'string' || !input.soloGroupId || input.soloGroupId.length > 1024)) throw new Error('播放音色标识无效。');
   if (input.preserveNoteLevel !== undefined && input.preserveNoteLevel !== true) throw new Error('音乐试听音量设置无效。');
+  if (input.editableNotes !== undefined && input.editableNotes !== true) throw new Error('音乐试听计划无效。');
   let output: OutputProcessingPlan | undefined;
   if (input.output !== undefined) {
     const settings = object(input.output, '输出处理'); fields(settings, ['level', 'fadeInSeconds', 'fadeOutSeconds'], '输出处理');
@@ -378,12 +386,14 @@ export function readPreview(value: unknown, options: { allowEmptySequence?: bool
   const boundaries: { time: number; amplitude: number; sources: number }[] = [];
   const expanded=Array.from(input.events).flatMap((raw:unknown)=>{
     const event=object(raw,'音乐音符');
-    fields(event,['atSeconds','sound','pan','gainCurveId','pitchCurveId'],'音乐音符');
+    fields(event,['atSeconds','sound','pan','gainCurveId','pitchCurveId','noteId','groupId'],'音乐音符');
     return recordingLayers(event.sound).map(sound=>({...event,sound}));
   });
   const scheduled = Array.from(expanded, (raw: unknown) => {
     const event = object(raw, '音乐音符');
-    fields(event, ['atSeconds', 'sound', 'pan', 'gainCurveId', 'pitchCurveId'], '音乐音符');
+    fields(event, ['atSeconds', 'sound', 'pan', 'gainCurveId', 'pitchCurveId', 'noteId', 'groupId'], '音乐音符');
+    if (event.groupId !== undefined && (typeof event.groupId !== 'string' || !event.groupId || event.groupId.length > 1024)) throw new Error('音符的音色分组无效。');
+    if (event.noteId !== undefined && (typeof event.noteId !== 'string' || !event.noteId)) throw new Error('音符标识无效。');
     const songAtSeconds = number(event.atSeconds, '音符开始时间（秒）', 0, duration);
     if (songAtSeconds >= duration) throw new Error('音符必须在音乐结束前开始。');
     let atSeconds = songAtSeconds;
@@ -409,7 +419,7 @@ export function readPreview(value: unknown, options: { allowEmptySequence?: bool
     const sourceCount = sound.kind === 'sample' ? 1 : sound.sources.length;
     boundaries.push({ time: atSeconds, amplitude, sources: sourceCount });
     boundaries.push({ time: end, amplitude: -amplitude, sources: -sourceCount });
-    return { atSeconds, sound, duration: sounding, ...(pan === undefined ? {} : { pan }), ...(gainCurve?.points.length ? { gainCurve: gainCurve.points } : {}),
+    return { atSeconds, sound, duration: sounding, ...(typeof event.groupId === 'string' ? { groupId: event.groupId } : {}), ...(typeof event.noteId === 'string' && input.editableNotes ? { noteId: event.noteId } : {}), ...(pan === undefined ? {} : { pan }), ...(gainCurve?.points.length ? { gainCurve: gainCurve.points } : {}),
       ...(pitchCurve ? { pitchCurve } : {}), ...(transport ? { songAtSeconds } : {}) };
   });
   // Treat sub-nanosecond rounding differences as simultaneous only for the peak bound;
@@ -435,7 +445,11 @@ export function readPreview(value: unknown, options: { allowEmptySequence?: bool
     while (onsets[index]!.time - onsets[begin]!.time > .35) upcomingSources -= onsets[begin++]!.sources;
     if (upcomingSources > MAX_LOOKAHEAD_SOURCES) throw new Error('音符过于密集：任意 0.35 秒内最多支持 4096 个波形声源，请减少极短音符。');
   }
-  return { ...(midiExpression?{midiExpression}:{}), events: scheduled, durationSeconds, normalization: input.preserveNoteLevel ? 1 : 1 / peak, sequence: true, samples: sampleReader.sources, ...(output ? { output } : {}), ...(transport ? { transport, transportClock } : {}) };
+  const groupIds = [...new Set(scheduled.flatMap(event => event.groupId === undefined ? [] : [event.groupId]))];
+  if (groupIds.length > 2048) throw new Error('播放音色分组数量超出范围。');
+  return { ...(midiExpression?{midiExpression}:{}), events: scheduled, durationSeconds, normalization: input.preserveNoteLevel ? 1 : 1 / peak, sequence: true, samples: sampleReader.sources,
+    ...(groupIds.length ? { groupIds } : {}), ...(typeof input.soloGroupId === 'string' ? { soloGroupId: input.soloGroupId } : {}),
+    ...(input.editableNotes ? { deletedNotes: new Set<string>() } : {}), ...(output ? { output } : {}), ...(transport ? { transport, transportClock } : {}) };
 }
 
 

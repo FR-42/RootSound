@@ -54,6 +54,52 @@ function baseBody(timbreId = 'sound-a'): PhraseBody {
     parts: [{ id: 'part-a', name: '一个声音', timbreId, notes: [{ id: 'note-a', ...note() }] }] };
 }
 
+test('deferred note writes preserve undo and leave a failed publication retryable', () => {
+  const f = fixture();
+  const id = start(f), original = f.raw(), count = f.writes();
+  f.phrase.setNoteWritesDeferred?.(true);
+  const added = f.phrase.addNote(id, note());
+  f.phrase.updateNote(id, added, { durationBeats: 2 });
+  assert(f.phrase.hasDeferredNoteWrites?.());
+  assert.equal(f.raw(), original);
+  assert.equal(f.writes(), count);
+  assert.equal(f.phrase.read().body!.parts[0]!.notes[0]!.durationBeats, 2);
+  f.fail();
+  assert.throws(() => f.phrase.flushNoteWrites?.(), /磁盘写入失败/u);
+  assert(f.phrase.hasDeferredNoteWrites?.());
+  assert.equal(f.raw(), original);
+  f.fail(false);
+  f.phrase.setNoteWritesDeferred?.(false);
+  f.phrase.flushNoteWrites?.();
+  assert.equal(f.writes(), count + 1);
+  assert(!f.phrase.hasDeferredNoteWrites?.());
+  f.phrase.undo(); assert.equal(f.phrase.read().body!.parts[0]!.notes[0]!.durationBeats, 1);
+  f.phrase.undo(); assert.deepEqual(f.phrase.read().body!.parts[0]!.notes, []);
+});
+
+test('single-note draft edits share the score, preserve undo and publish the last edit when flushed', () => {
+  const f = fixture();
+  const part = start(f), draft = f.phrase.read().draft!.id;
+  const add = (id: string, startBeat: number) => f.phrase.editDraftNote!(draft, part, { kind: 'add', note: { id, ...note({ startBeat }) } });
+  f.phrase.prepareDraftNoteEdit!();
+  const before = f.raw();
+  const first = add('first', 0), second = add('second', 2);
+  assert.equal(f.raw(), before);
+  assert.equal(first.body.parts[0]!.notes.length, 1);
+  assert.equal(first.body.parts[0]!.notes[0], second.body.parts[0]!.notes[0]);
+  assert(Object.isFrozen(second.body.parts[0]!.notes));
+  assert.throws(() => add('first', 1), /重复/);
+  f.phrase.editDraftNote!(draft, part, { kind: 'duration', id: 'second', durationBeats: 2 });
+  f.fail(); assert.throws(() => f.phrase.flushNoteWrites!(), /磁盘写入失败/);
+  assert.equal(f.raw(), before);
+  f.fail(false); f.phrase.flushNoteWrites!();
+  const reopened = createMaterialLibrary(f.storage);
+  const restored = createPhraseEditor(reopened, createTimbrePlayback(reopened));
+  assert.deepEqual(restored.read().body!.parts[0]!.notes.map(item => [item.id, item.durationBeats]), [['first', 1], ['second', 2]]);
+  restored.undo(); assert.deepEqual(restored.read().body!.parts[0]!.notes.map(item => item.durationBeats), [1, 1]);
+  restored.undo(); assert.deepEqual(restored.read().body!.parts[0]!.notes.map(item => item.id), ['first']);
+});
+
 test('older phrases default to four cells without rewriting omitted metadata, and invalid subdivision never changes a draft', () => {
   assert.equal(PHRASE_STEPS_PER_BEAT, 4); assert.equal(phraseStepsPerBeat(), 4); assert.equal(phraseStepsPerBeat({}), 4);
   const legacy = readPhraseBody(baseBody()); assert.equal(phraseStepsPerBeat(legacy), 4); assert.equal(Object.hasOwn(legacy, 'stepsPerBeat'), false);
@@ -834,8 +880,9 @@ test('group mix multiplies note gain, offsets pan, survives reopening and mergin
   assert.deepEqual(reopened.previewPlan(), mixed);
   const target = f.phrase.addPart(f.first.id);
   f.phrase.mergeParts(id, target);
-  assert.deepEqual(f.phrase.previewPlan(), mixed);
+  assert.deepEqual(f.phrase.previewPlan(), { ...mixed, events: mixed.events.map(event => ({ ...event, groupId: target })) });
   f.phrase.undo();
+  assert.equal(f.phrase.previewPlan().events[0]!.groupId, id);
   assert.equal(f.phrase.read().body!.parts.find(part => part.id === id)!.level, .4);
   assert.throws(() => f.phrase.setPartMix(id, { level: 2 }));
 });

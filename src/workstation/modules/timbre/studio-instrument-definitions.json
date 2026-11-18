@@ -32,6 +32,14 @@
     "program": 24
   },
   {
+    "key": "studio-steel-guitar",
+    "name": "木吉他",
+    "category": "拨弦",
+    "libraryGroup": "吉他",
+    "midi": 57,
+    "program": 25
+  },
+  {
     "key": "studio-violin",
     "name": "独奏小提琴",
     "category": "弦乐",

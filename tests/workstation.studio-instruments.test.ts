@@ -42,3 +42,40 @@ test('every curated voice reads real PCM through the desktop playback path', asy
   const piano = await tones.previewPianoPlan({ frequencyHz: 440, holdSeconds: .35, velocity: .75 });
   assert(piano.kind === 'sample' && piano.source.audio.channels.length === 2);
 });
+
+test('steel guitar recordings cover pitches and dynamics, reuse prepared audio and survive reopening', async () => {
+  let text = createInitialProjectLibrary('木吉他');
+  const storage = { read: () => text, write: (value: string) => { text = value; } };
+  const requests: string[] = [];
+  const fetcher = (async (url: string) => {
+    requests.push(url);
+    return new Response(readFileSync(`public${url}`));
+  }) as typeof fetch;
+  const library = createMaterialLibrary(storage);
+  const guitar = library.listContent().find(item => item.name === '木吉他')!;
+  const bank = createSampleBankAudio(library, undefined, fetcher);
+  const tones = createTimbrePlayback(library, undefined, undefined, bank, true);
+  assert.equal(requests.length, 0);
+  for (const pitch of [40, 45, 57, 64, 76, 85]) for (const velocity of [.2, .75, .97]) {
+    const note = { frequencyHz: 440 * 2 ** ((pitch - 69) / 12), holdSeconds: .08, velocity };
+    await tones.prepareForSaved(guitar.id, [note]);
+    const plan = tones.planForSaved(guitar.id, note);
+    assert(plan.kind === 'sample');
+    assert.deepEqual(plan.note, note);
+    assert(plan.source.audio.channels.some(channel => channel.some(value => Math.abs(value) > .001)));
+    assert(plan.envelope.attackSeconds < .01);
+    assert(plan.envelope.releaseSeconds > .03 && plan.envelope.releaseSeconds <= .36);
+    const count: number = requests.length;
+    await tones.prepareForSaved(guitar.id, [note]);
+    assert.equal(requests.length, count);
+    assert.equal(tones.planForSaved(guitar.id, note).kind, 'sample');
+  }
+  const reopened = createMaterialLibrary(storage);
+  const restored = reopened.readContent(guitar.id)!;
+  assert.deepEqual(restored, guitar);
+  const coldBank = createSampleBankAudio(reopened, undefined, fetcher);
+  const coldTones = createTimbrePlayback(reopened, undefined, undefined, coldBank, true);
+  const note = { frequencyHz: 220, holdSeconds: .3, velocity: .75 };
+  await coldTones.prepareForSaved(guitar.id, [note]);
+  assert(readPreview(coldTones.planForSaved(guitar.id, note)).samples.length > 0);
+});

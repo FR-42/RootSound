@@ -1,6 +1,6 @@
 import { readFile, writeFile, mkdir, mkdtemp } from 'node:fs/promises';
 import path from 'node:path';
-import { spawn } from 'node:child_process';
+import { spawn, execFileSync } from 'node:child_process';
 import { createInitialProjectLibrary } from '../src/workstation/app/project-setup.ts';
 import { createMaterialLibrary } from '../src/workstation/modules/materials/public.ts';
 import { createPhraseEditor, createPhrasePlayback } from '../src/workstation/modules/phrase/public.ts';
@@ -9,6 +9,10 @@ import { createTimbrePlayback } from '../src/workstation/modules/timbre/public.t
 import { openMusicDocument, commitMusicDocument } from '../src/workstation/app/music-document.ts';
 
 const plan = JSON.parse(await readFile('.cache/release-package-plan.json', 'utf8'));
+if (plan.windowsNative) {
+  execFileSync('pwsh', ['-NoProfile', '-File', path.resolve('scripts/Test-NativeRelease.ps1')], { stdio: 'inherit', windowsHide: true });
+  process.exit(0);
+}
 await mkdir('.test-output/release-shell', { recursive: true });
 const directory = await mkdtemp(path.resolve('.test-output/release-shell/case-'));
 let text = createInitialProjectLibrary('发布集成检查');

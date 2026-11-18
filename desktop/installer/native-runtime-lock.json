@@ -1,0 +1,17 @@
+{
+  "dotnetVersion": "9.0.22",
+  "webviewVersion": "157.0.4341.60",
+  "downloads": [
+    {
+      "file": "windowsdesktop-runtime-9.0.22-win-x64.zip",
+      "url": "https://builds.dotnet.microsoft.com/dotnet/WindowsDesktop/9.0.22/windowsdesktop-runtime-9.0.22-win-x64.zip",
+      "sha512": "05512f6c2f7b27858dbfe9c89fd84046a9fee466ef930762b1f83885ae158ab5d0ea666cb4ab0039c978429c4c162c8dfde97847dba8a1c4499c012ac836f580"
+    },
+    {
+      "file": "WebView2-157.0.4341.60-x64.cab",
+      "url": "https://msedge.sf.dl.delivery.mp.microsoft.com/filestreamingservice/files/9d6605ff-c172-41a1-8116-e1bb02b93a01/Microsoft.WebView2.FixedVersionRuntime.157.0.4341.60.x64.cab",
+      "sha256": "1bad3df802a4c21f6b271cf3cd640912056291e3915b86fa7577a18899f761b9"
+    }
+  ],
+  "webviewDirectory": "webview-157.0.4341.60\\Microsoft.WebView2.FixedVersionRuntime.157.0.4341.60.x64"
+}

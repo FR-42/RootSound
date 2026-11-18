@@ -41,7 +41,7 @@ internal static class StreamingWorkspaceCodec
         return null;
     }
 
-    internal static Workspace Read(Stream stream, SessionPayloadStore? payloads, bool metadataOnly = false)
+    internal static Workspace Read(Stream stream, SessionPayloadStore? payloads, bool metadataOnly = false, bool omitAssetData = false)
     {
         using var reader = new StreamReader(stream, Utf8, true, 16 * 1024, leaveOpen: true);
         var parser = new Parser(reader, null, allowHostAssets: false);
@@ -62,7 +62,7 @@ internal static class StreamingWorkspaceCodec
                 }
                 else
                 {
-                    var innerParser = new Parser(inner, payloads, allowHostAssets: false);
+                    var innerParser = new Parser(inner, payloads, allowHostAssets: false, omitAssetData: omitAssetData);
                     JsonNode? value = innerParser.Value(); innerParser.End();
                     library = value?.ToJsonString() ?? throw new InvalidDataException("工程资料库为空。");
                     ProjectDirectoryManager.ValidateLibrary(library);
@@ -90,6 +90,11 @@ internal static class StreamingWorkspaceCodec
     internal static void ValidateTokens(string text, SessionPayloadStore? payloads)
     {
         using var document = JsonDocument.Parse(text);
+        ValidateTokens(document.RootElement, payloads);
+    }
+
+    internal static void ValidateTokens(JsonElement root, SessionPayloadStore? payloads)
+    {
         void Visit(JsonElement node, bool sampleAudio = false)
         {
             if (node.ValueKind == JsonValueKind.Object)
@@ -104,7 +109,7 @@ internal static class StreamingWorkspaceCodec
             }
             else if (node.ValueKind == JsonValueKind.Array) foreach (var child in node.EnumerateArray()) Visit(child);
         }
-        Visit(document.RootElement);
+        Visit(root);
     }
 
     internal static void Write(Stream stream, JsonObject metadata, string library, SessionPayloadStore? payloads)
@@ -201,7 +206,7 @@ internal static class StreamingWorkspaceCodec
         else writer.Write(node?.ToJsonString() ?? "null");
     }
 
-    private sealed class Parser(TextReader reader, SessionPayloadStore? payloads, bool allowHostAssets, bool discardStrings = false)
+    private sealed class Parser(TextReader reader, SessionPayloadStore? payloads, bool allowHostAssets, bool discardStrings = false, bool omitAssetData = false)
     {
         private int depth;
         private void Space() { while (reader.Peek() is ' ' or '\t' or '\r' or '\n') reader.Read(); }
@@ -229,7 +234,7 @@ internal static class StreamingWorkspaceCodec
                 Space(); int first = reader.Peek();
                 if (first == '"')
                 {
-                    if (!discardStrings || field == "format") return JsonValue.Create(String());
+                    if ((!discardStrings || field == "format") && !(omitAssetData && field == "data")) return JsonValue.Create(String());
                     Expect('"'); using var skipped = new JsonStringReader(reader); char[] buffer = new char[4096];
                     while (skipped.Read(buffer, 0, buffer.Length) > 0) { }
                     return JsonValue.Create("");

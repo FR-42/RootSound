@@ -73,6 +73,8 @@ export interface DraftEditOptions {
   remember: true;
   /** Reject changes if validation used an older draft snapshot. */
   expected: Draft;
+  expectedToken?: string;
+  deferStorage?: boolean;
 }
 
 /** A caller supplies complete records and their identities; storage knows no musical structure. */
@@ -116,6 +118,7 @@ export type SaveResult =
 export interface MaterialStorage {
   read(): string | null;
   write(value: string): void;
+  writeIfUnchanged?(value: string, expected: string | null): void;
   /** Irreversible changes also replace the session's discard checkpoint atomically. */
   writePermanent?(value: string): void;
 }
@@ -127,14 +130,22 @@ export interface MaterialLibrary {
   commitTransaction(transaction: MaterialTransaction): MaterialTransactionResult;
   createDraft(input: (NewContent | { sourceId: string }) & { projectRootId?: string }): Draft;
   readDraft(id: string): Draft | undefined;
+  readDraftView?(id: string): Draft | undefined;
+  isDraftChanged?(id: string): boolean;
+  editDraftBody?(id: string, body: JsonValue, expectedToken: string, references?: {
+    dependencies: string[];
+    retainContent?: string;
+  }): Draft;
   listDrafts(): Draft[];
   /** Plain external writes invalidate history; remembered edits persist history atomically. */
   updateDraft(id: string, changes: DraftChanges, options?: DraftEditOptions): Draft;
+  hasDeferredWrites?(): boolean;
+  flushDeferredWrites?(): void;
   readDraftHistory(id: string): DraftHistory;
-  readDraftHistoryStep?(id: string, direction: 'undo' | 'redo'): DraftSnapshot | undefined;
+  readDraftHistoryStep?(id: string, direction: 'undo' | 'redo', shared?: boolean): DraftSnapshot | undefined;
   readDraftHistoryStatus?(id: string): { canUndo: boolean; canRedo: boolean };
   /** Callers validate ordinary targets; transaction targets restore their entire validated patch atomically. */
-  travelDraft(id: string, direction: 'undo' | 'redo', expected: Draft): Draft;
+  travelDraft(id: string, direction: 'undo' | 'redo', expected: Draft, deferredToken?: string): Draft;
   readContent(id: string): ContentRecord | undefined;
   readContentInfo(id: string): ContentInfo | undefined;
   listContentInfo(): ContentInfo[];

@@ -9,6 +9,7 @@ import { createPhraseEditor } from '../src/workstation/modules/phrase/public.ts'
 import { createTimbreEditor, createTimbrePlayback, prepareImportedTimbre, readEditableTimbreBody } from '../src/workstation/modules/timbre/public.ts';
 import { createDefaultPatch } from '../src/workstation/modules/timbre/spectral/model.mjs';
 import { clampMelodyView, melodyGrid, melodyNoteRect, melodyScale, melodyTimeAt, zoomMelody } from '../src/workstation/modules/ui-rendering/melody-geometry.ts';
+import { createEdgeGesture, createEdgeSwipe, pointerPanVector } from '../src/workstation/modules/ui-rendering/pointer-gestures.ts';
 import { attachConsoleHorizontalWheel } from '../src/workstation/modules/ui-rendering/console-scroll.ts';
 const hook = registerHooks({ load(url, context, next) { return url.endsWith('.css') ? { format: 'module', source: '', shortCircuit: true } : next(url, context); } });
 const { mountMelodyWorkspace } = await import('../src/workstation/modules/ui-rendering/melody-workspace.ts');
@@ -32,17 +33,29 @@ class Element {
     toggle: (name: string, value?: boolean) => { const on = value ?? !this.classList.contains(name); if (on) this.classList.add(name); else this.classList.remove(name); return on; },
   };
   append(...nodes: Element[]) { nodes.forEach(child => { child.remove(); child.parentElement = this; this.children.push(child); }); }
+  get firstElementChild() { return this.children[0]; }
+  get lastElementChild() { return this.children.at(-1); }
+  get childElementCount() { return this.children.length; }
+  insertBefore(child: Element, before: Element | null) {
+    if (child === before) return;
+    child.remove(); child.parentElement = this;
+    this.children.splice(before ? this.children.indexOf(before) : this.children.length, 0, child);
+  }
   replaceChildren(...nodes: Element[]) { this.textContent = ''; this.append(...nodes); }
+  prepend(child: Element) { child.remove(); child.parentElement = this; this.children.unshift(child); }
   remove() { if (this.parentElement) this.parentElement.children = this.parentElement.children.filter(child => child !== this); this.parentElement = undefined; }
   contains(other: Element): boolean { return other === this || this.children.some(child => child.contains(other)); }
   setAttribute(name: string, value: string) { this.attributes.set(name, value); }
-  matches(selector: string): boolean { if (selector[0] === '.') return this.classList.contains(selector.slice(1)); const match = /^([a-z]+)(?:\[([^\]]+)\])?$/u.exec(selector); return !!match && this.tagName.toLowerCase() === match[1] && (!match[2] || this.attributes.has(match[2])); }
+  removeAttribute(name: string) { this.attributes.delete(name); }
+  matches(selector: string): boolean { if (selector === '.melody-note:not(.is-dim)') return this.classList.contains('melody-note') && !this.classList.contains('is-dim'); if (selector[0] === '.') return this.classList.contains(selector.slice(1)); const match = /^([a-z]+)(?:\[([^\]]+)\])?$/u.exec(selector); return !!match && this.tagName.toLowerCase() === match[1] && (!match[2] || this.attributes.has(match[2])); }
   closest<T = Element>(selector: string): T | undefined { let item: Element | undefined = this; while (item) { if (item.matches(selector)) return item as T; item = item.parentElement; } }
   querySelectorAll(selector: string): Element[] { return this.children.flatMap(child => [...(child.matches(selector) ? [child] : []), ...child.querySelectorAll(selector)]); }
   querySelector(selector: string) { return this.querySelectorAll(selector)[0]; }
   addEventListener(type: string, callback: (event: Event) => void) { this.listeners.set(type, [...this.listeners.get(type) ?? [], callback]); }
   removeEventListener(type: string, callback: (event: Event) => void) { this.listeners.set(type, (this.listeners.get(type) ?? []).filter(value => value !== callback)); }
   emit(type: string, values: Record<string, unknown> = {}) { const event = { type, target: this, pointerId: 1, clientX: 0, clientY: 0, button: 0, altKey: false, shiftKey: false, ctrlKey: false, metaKey: false, key: '', repeat: false, deltaX: 0, deltaY: 0, preventDefault() {}, stopPropagation() {}, ...values } as Event; for (const listener of this.listeners.get(type) ?? []) listener(event); return event; }
+  click() { this.emit('click'); }
+  dispatchEvent(event: { type: string; detail?: unknown }) { this.emit(event.type, { detail: event.detail }); return true; }
   setPointerCapture(id: number) { this.captures.add(id); } hasPointerCapture(id: number) { return this.captures.has(id); } releasePointerCapture(id: number) { this.captures.delete(id); }
   focus() { (globalThis.document as unknown as Document).activeElement = this; }
   showModal() { this.attributes.set('open', ''); } close() { this.attributes.delete('open'); this.emit('close'); }
@@ -59,17 +72,22 @@ class Element {
   }
 }
 class Input extends Element {} class Select extends Element {} class TextArea extends Element {}
-class Document extends Element { activeElement?: Element; createElement(tag: string) { return tag === 'input' ? new Input(tag) : tag === 'select' ? new Select(tag) : new Element(tag); } createElementNS(_namespace: string, tag: string) { return new Element(tag); } }
+class Document extends Element {
+  activeElement?: Element;
+  createElement(tag: string) { return tag === 'input' ? new Input(tag) : tag === 'select' ? new Select(tag) : new Element(tag); }
+  createElementNS(_namespace: string, tag: string) { return new Element(tag); }
+  dispatchEvent(event: { type: string; detail?: unknown }) { this.emit(event.type, { detail: event.detail }); return true; }
+}
 function dom() {
-  const document = new Document(); const window = new Element(); const timers: ReturnType<typeof setTimeout>[] = [];
+  const document = new Document(); const window = new Element(); const desktopHost = new EventTarget(); const timers: ReturnType<typeof setTimeout>[] = [];
   const frames = new Map<number, FrameRequestCallback>(); let frameId = 0;
-  Object.assign(window, { setTimeout(callback: () => void, delay: number) { const timer = setTimeout(callback, delay); timer.unref(); timers.push(timer); return Number(timer); }, clearTimeout });
+  Object.assign(window, { chrome: { webview: desktopHost }, innerWidth: 1000, innerHeight: 640, setTimeout(callback: () => void, delay: number) { const timer = setTimeout(callback, delay); timer.unref(); timers.push(timer); return Number(timer); }, clearTimeout });
   const values = { document, window, requestAnimationFrame: (callback: FrameRequestCallback) => { frames.set(++frameId, callback); return frameId; }, cancelAnimationFrame: (id: number) => { frames.delete(id); }, HTMLElement: Element, HTMLInputElement: Input, HTMLSelectElement: Select, HTMLTextAreaElement: TextArea };
   const previous = new Map<string, PropertyDescriptor | undefined>(); for (const [key, value] of Object.entries(values)) { previous.set(key, Object.getOwnPropertyDescriptor(globalThis, key)); Object.defineProperty(globalThis, key, { value, writable: true, configurable: true }); }
-  return { document, flushFrames() { const pending = [...frames]; frames.clear(); for (const [, callback] of pending) callback(performance.now()); }, restore() { timers.forEach(clearTimeout); frames.clear(); for (const [key, descriptor] of previous) if (descriptor) Object.defineProperty(globalThis, key, descriptor); else Reflect.deleteProperty(globalThis, key); } };
+  return { document, desktopHost, flushFrames() { const pending = [...frames]; frames.clear(); for (const [, callback] of pending) callback(performance.now()); }, restore() { timers.forEach(clearTimeout); frames.clear(); for (const [key, descriptor] of previous) if (descriptor) Object.defineProperty(globalThis, key, descriptor); else Reflect.deleteProperty(globalThis, key); } };
 }
 async function settle() { for (let index = 0; index < 10; index++) await Promise.resolve(); }
-function fixture(config: { voices?: number; notes?: boolean; placeholder?: boolean; customized?: boolean; fixedGridBpm?: boolean; initialViewport?: PhraseEditorViewport; performance?: boolean; confirmDeletion?: boolean; includeAllSections?: boolean; legacyRhythm?: boolean; onImportTimbre?(): Promise<boolean>; onReorderTimbres?(id: string, targetIndex: number): void; onRemoveTimbre?(id: string): void } = {}) {
+function fixture(config: { desktopPointerUx?: boolean; voices?: number; notes?: boolean; placeholder?: boolean; customized?: boolean; fixedGridBpm?: boolean; initialViewport?: PhraseEditorViewport; performance?: boolean; confirmDeletion?: boolean; includeAllSections?: boolean; legacyRhythm?: boolean; onImportTimbre?(): Promise<boolean>; onReorderTimbres?(id: string, targetIndex: number): void; onRemoveTimbre?(id: string): void } = {}) {
   const environment = dom(); const library = createMaterialLibrary(); const timbre = createTimbreEditor(library); const voices: Array<{ id: string; name: string; requiresDeleteConfirmation?: boolean }> = [];
   for (let index = 0; index < (config.voices ?? 2); index++) { if (index) timbre.create(); timbre.rename(config.placeholder && !index ? '乐句 1 音色' : `音色 ${index + 1}`); if (config.customized) timbre.setLevel(.4); const saved = timbre.save('new'); if (saved.status !== 'saved') throw new Error('voice'); voices.push(saved.content); }
   if (config.confirmDeletion) for (const voice of voices) voice.requiresDeleteConfirmation = true;
@@ -80,19 +98,868 @@ function fixture(config: { voices?: number; notes?: boolean; placeholder?: boole
   const beforeMount = phrase.read().draft; const tokenBeforeMount = library.currentToken();
   const root = new Element('main'); const previews: Array<PhraseBody | undefined> = []; const auditions: PlayableNotePlan[] = []; const seeks: number[] = []; let changes = 0; let lastChange: PhraseView | undefined; const viewports: PhraseEditorViewport[] = [];
   const sound = { async audition(plan: PlayableNotePlan) { auditions.push(plan); }, cancelAudition() {} } as unknown as SoundRuntimePort;
+  let settingsOpen = false;
+  const playbackFamilies: Array<string | undefined> = [];
   const workspace = mountMelodyWorkspace(root as unknown as HTMLElement, { phrase, sound, gridBpm: () => config.fixedGridBpm ? 120 : phrase.read().body!.tempoBpm,
-    initialViewport: config.initialViewport, includeAllSections: config.includeAllSections, onViewportChange(value) { viewports.push(value); }, readPerformanceMode: () => !!config.performance,
-    onImportTimbre: config.onImportTimbre,
+    initialViewport: config.initialViewport, includeAllSections: config.includeAllSections,
+    orientation: config.desktopPointerUx ? 'vertical' : undefined, desktopPointerUx: config.desktopPointerUx, onViewportChange(value) { viewports.push(value); }, readPerformanceMode: () => !!config.performance,
+    editorSettings: config.desktopPointerUx ? { isOpen: () => settingsOpen, setOpen: open => { settingsOpen = open; workspace.settingsVisibilityChanged(); } } : undefined,
+    onImportTimbre: config.onImportTimbre, onPlaybackFamilyChange(id) { playbackFamilies.push(id); },
     onReorderTimbres: config.onReorderTimbres, onRemoveTimbre: config.onRemoveTimbre,
     onPreview(value) { previews.push(value); }, onChange(view) { changes++; lastChange = view; }, onSeek(value) { seeks.push(value); }, listTimbres: () => voices,
     onAddTimbre(id) { return phrase.read().body!.parts.find(value => value.timbreId === id)?.id ?? phrase.addPart(id); } });
   const scroll = root.querySelector('.melody-scroll')!; const canvas = root.querySelector('.melody-canvas')!;
   function pointAt(beat: number, frequency = 440) { const keys = phrase.keyboard().slice().reverse(); const row = keys.findIndex(key => Math.abs(key.frequencyHz - frequency) < .01); return { clientX: 212 + beat * 50, clientY: 100 + row * 24 + 12 - scroll.scrollTop }; }
-  function selectTone(id = partId) { root.querySelectorAll('.melody-tone').find(value => value.dataset.partId === id)!.emit('click'); }
+  function openTones() {
+    if (config.desktopPointerUx && !root.querySelector('.melody-workspace')!.classList.contains('is-tone-shelf-open'))
+      root.querySelector('.melody-tone-shortcut')!.emit('click');
+  }
+  function selectTone(id = partId) { openTones(); root.querySelectorAll('.melody-tone').find(value => value.dataset.partId === id)!.emit('click'); }
   function block(id: string) { return root.querySelectorAll('.melody-note').find(value => value.dataset.noteId === id)!; }
-  return { ...environment, root, library, phrase, workspace, previews, auditions, seeks, voices, scroll, canvas, partId, legacyRhythmId, beforeMount, tokenBeforeMount, selectTone, pointAt, block, viewports, changes: () => changes,
+  return { ...environment, root, library, phrase, workspace, previews, auditions, seeks, voices, scroll, canvas, partId, legacyRhythmId, beforeMount, tokenBeforeMount, selectTone, openTones, settingsOpen: () => settingsOpen, pointAt, block, viewports, playbackFamilies, changes: () => changes,
     lastChange: () => lastChange, cleanup() { workspace.dispose(); environment.restore(); } };
 }
+
+test('edge intent starts at the actual border and requires a continued outward push', () => {
+  const edge = createEdgeGesture();
+  assert.equal(edge.move(.999, 100, 0, 0).progress, 0);
+  assert.equal(edge.move(1, 100, 0, 20).open, false);
+  assert.equal(edge.move(1, 0, 30, 30).open, false);
+  assert(edge.move(1, 10, 1, 40).progress > 0);
+  assert.equal(edge.move(1, -2, 0, 50).progress, 0);
+  assert.equal(edge.move(1, 14, 0, 60).open, false);
+  assert.equal(edge.move(1, 12, 0, 70).open, true);
+  assert.equal(edge.move(1.02, 30, 0, 80).open, false);
+  edge.move(.95, -60, 0, 90);
+  assert.equal(edge.move(1.01, 80, 0, 100).open, false);
+  assert.equal(edge.move(1.02, 35, 0, 110).open, true);
+});
+
+test('hover solos immediately, overrides the pinned tone and restores it without changing the score', () => {
+  const f=fixture({desktopPointerUx:true,notes:true,legacyRhythm:true,includeAllSections:true});
+  try {
+    const main=f.root.querySelector('.melody-main')!;
+    const hover=(id?:string)=>{
+      const target=id ? f.root.querySelectorAll('.melody-note-family').find(card=>card.dataset.partId===id)! : f.canvas;
+      main.emit('pointermove',{target,pointerType:'mouse',clientX:500,clientY:500,buttons:0});
+    };
+    f.openTones();hover(f.legacyRhythmId!);assert.equal(f.playbackFamilies.at(-1),f.legacyRhythmId);
+    hover();assert.equal(f.playbackFamilies.at(-1),undefined);
+    f.selectTone();assert.equal(f.playbackFamilies.at(-1),f.partId);
+    const score=f.phrase.read().body,changes=f.changes(),previews=f.previews.length;
+    for(let i=0;i<30;i++){hover(f.legacyRhythmId!);assert.equal(f.playbackFamilies.at(-1),f.legacyRhythmId);hover();assert.equal(f.playbackFamilies.at(-1),f.partId);}
+    assert.equal(f.changes(),changes);assert.equal(f.previews.length,previews);assert.deepEqual(f.phrase.read().body,score);
+    hover(f.legacyRhythmId!);f.root.querySelector('.melody-tone-shortcut')!.emit('click');
+    assert.equal(f.playbackFamilies.at(-1),f.partId);
+    f.selectTone();assert.equal(f.playbackFamilies.at(-1),undefined);
+    f.openTones();hover(f.legacyRhythmId!);main.emit('pointerleave');assert.equal(f.playbackFamilies.at(-1),undefined);
+  } finally { f.cleanup(); }
+});
+
+test('desktop pans above time zero, preserves the zoom anchor and never draws notes in the leading margin', () => {
+  const f=fixture({desktopPointerUx:true,notes:true,initialViewport:{leftSeconds:0,zoom:2,top:1300,rowHeight:24}});
+  try {
+    const before=f.phrase.read().body;
+    f.scroll.emit('wheel',{target:f.canvas,deltaY:-120,clientX:500,clientY:260});
+    assert(f.workspace.readViewport().leftSeconds<0);
+    f.scroll.emit('wheel',{target:f.canvas,deltaY:-80,ctrlKey:true,clientX:500,clientY:260});
+    assert(f.workspace.readViewport().leftSeconds<0);
+    const view=f.workspace.readViewport();assert(view.leftSeconds>=-4/view.zoom);
+    f.selectTone();
+    f.scroll.emit('wheel',{target:f.canvas,deltaY:100,clientX:500,clientY:101});
+    assert.deepEqual(f.phrase.read().body,before);
+  } finally { f.cleanup(); }
+});
+
+test('the tone drawer accepts a lighter diagonal push only after reaching the edge', () => {
+  const edge = createEdgeGesture(true);
+  assert.equal(edge.move(.999, 50, 0, 0).open, false);
+  assert.equal(edge.move(1, 40, 0, 20).open, false);
+  assert.equal(edge.move(1, 0, 15, 30).open, false);
+  for (let time = 50; time <= 490; time += 20) assert.equal(edge.move(1, 2, 1, time).open, false);
+  assert.equal(edge.move(1, 21, 20, 510).open, true);
+});
+
+test('a side swipe qualifies on arrival and discards slow, vertical and reversed travel', () => {
+  const edge = createEdgeSwipe();
+  assert(!edge.move(.45, .3, 0));
+  assert(!edge.move(.81, .34, 75));
+  assert(!edge.move(.89, .37, 102));
+  assert(edge.move(.96, .37, 108));
+
+  edge.reset();
+  assert(!edge.move(.70, .3, 0));
+  assert(!edge.move(.78, .3, 90));
+  assert(!edge.move(.90, .3, 280));
+  assert(!edge.move(.96, .3, 335));
+
+  edge.reset();
+  assert(!edge.move(.68, .2, 0));
+  assert(!edge.move(.96, .45, 70));
+  assert(!edge.move(.96, .45, 100));
+
+  edge.reset();
+  assert(!edge.move(.73, .3, 0));
+  assert(!edge.move(.93, .3, 48));
+  assert(!edge.move(.88, .3, 72));
+  assert(!edge.move(.96, .3, 110));
+});
+
+test('the native left edge opens the tone drawer only on a continued push', () => {
+  const f = fixture({ desktopPointerUx: true });
+  const page = f.root.querySelector('.melody-workspace')!;
+  const open = () => page.classList.contains('is-tone-shelf-open');
+  const push = (x: number, dx: number, held = false) => f.desktopHost.dispatchEvent(new MessageEvent('message', {
+    data: { type: 'rootsound-pointer', x, y: .5, clientX: x, clientY: .5, dx, dy: 0, pressed: false, held },
+  }));
+  try {
+    push(.004, -60); assert(!open());
+    push(0, -60); assert(!open());
+    push(0, 0); assert(!open());
+    push(0, -35, true); assert(!open());
+    push(0, -35); assert(!open());
+    push(0, -8); assert(!open());
+    push(0, -14); assert(open());
+  } finally { f.cleanup(); }
+});
+
+test('left and right swipes toggle their views and pulse only when the shared cooldown admits them', t => {
+  let time = 1000;
+  t.mock.method(performance, 'now', () => time);
+  t.mock.method(Date, 'now', () => time);
+  const f = fixture({ desktopPointerUx: true });
+  const page = f.root.querySelector('.melody-workspace')!;
+  const open = () => page.classList.contains('is-tone-shelf-open');
+  const pulses: string[] = [];
+  for (const edge of f.root.querySelectorAll('.melody-tone-edge')) {
+    Object.assign(edge, { animate() { pulses.push(edge.classList.contains('is-left') ? 'left' : 'right'); } });
+  }
+  const move = (x: number, dx: number, delay = 20, held = false) => {
+    time += delay;
+    f.desktopHost.dispatchEvent(new MessageEvent('message', {
+      data: { type: 'rootsound-pointer', x, y: .6, clientX: x, clientY: .6, dx, dy: 0, pressed: false, held },
+    }));
+  };
+  try {
+    move(.22, 0);
+    move(.14, -80, 220);
+    move(.04, -100, 195);
+    move(.04, 0);
+    assert(!open()); assert.deepEqual(pulses, []);
+
+    move(.51, 410);
+    move(.04, -470, 60, true);
+    assert(!open()); assert.deepEqual(pulses, []);
+    move(.50, 400);
+    move(.04, -460, 45);
+    assert(open()); assert.deepEqual(pulses, ['left']);
+
+    move(.50, 460, 200);
+    move(.96, 460);
+    assert(!f.settingsOpen()); assert.deepEqual(pulses, ['left']);
+
+    move(.50, -460, 281);
+    move(.96, 460);
+    assert(f.settingsOpen()); assert(!open()); assert.deepEqual(pulses, ['left', 'right']);
+    assert.equal(f.root.querySelectorAll('.melody-tone-edge')[1]!.style['--tone-edge-y'], '60%');
+
+    move(.50, -460, 1000);
+    move(.04, -460);
+    assert(f.settingsOpen()); assert(!open()); assert.deepEqual(pulses, ['left', 'right']);
+
+    move(.50, 460);
+    move(.96, 460);
+    assert(!f.settingsOpen()); assert(open()); assert.deepEqual(pulses, ['left', 'right', 'right']);
+  } finally { f.cleanup(); }
+});
+
+test('an uninterrupted swipe stays consumed beyond the cooldown, even with position panning off', t => {
+  let time = 1000;
+  t.mock.method(performance, 'now', () => time);
+  t.mock.method(Date, 'now', () => time);
+  const f = fixture({ desktopPointerUx: true });
+  const page = f.root.querySelector('.melody-workspace')!;
+  const open = () => page.classList.contains('is-tone-shelf-open');
+  const push = (x: number, dx: number, delay = 16) => {
+    time += delay;
+    f.desktopHost.dispatchEvent(new MessageEvent('message', {
+      data: { type: 'rootsound-pointer', x, y: .5, clientX: x, clientY: .5, dx, dy: 0, pressed: false, held: false },
+    }));
+  };
+  try {
+    f.scroll.emit('pointerdown', { target: f.canvas, pointerType: 'mouse', button: 1, buttons: 4, clientX: 500, clientY: 320 });
+    f.document.emit('pointerup', { target: f.canvas, pointerType: 'mouse', button: 1, buttons: 0 });
+    push(.5, 0);
+    push(0, -500);
+    assert(open());
+    for (let index = 0; index < 7; index++) {
+      push(0, -25, 90);
+      assert(open());
+    }
+    push(.50, 500);
+    push(0, -500);
+    assert(!open());
+  } finally { f.cleanup(); }
+});
+
+test('wheel input and host focus loss cancel an incomplete browser swipe', t => {
+  let time = 1000;
+  t.mock.method(performance, 'now', () => time);
+  const f = fixture({ desktopPointerUx: true });
+  const main = f.root.querySelector('.melody-main')!;
+  const move = (clientX: number) => {
+    time += 30;
+    main.emit('pointermove', { target: f.canvas, pointerType: 'mouse', clientX, clientY: 260 });
+  };
+  try {
+    move(450); move(800);
+    f.document.emit('wheel', { target: f.canvas, deltaY: 20 });
+    move(960);
+    assert(!f.settingsOpen());
+    move(470); move(810);
+    f.desktopHost.dispatchEvent(new MessageEvent('message', { data: { type: 'rootsound-pointer-reset' } }));
+    move(960);
+    assert(!f.settingsOpen());
+    move(500); move(960);
+    assert(f.settingsOpen());
+  } finally { f.cleanup(); }
+});
+
+test('roll panning has a neutral center and accelerates towards and beyond each edge', () => {
+  const pan = (x: number) => pointerPanVector(x, 320, 800, 640, .65).x;
+  assert.equal(pan(400), 0);
+  assert(pan(630) > 0 && pan(630) < .12);
+  assert(pan(730) > pan(630));
+  assert.equal(pan(800), 1);
+  assert.equal(pan(960), 1);
+  assert.equal(pan(-10), -1);
+  const diagonal = pointerPanVector(700, 420, 800, 640, .65);
+  assert(Math.abs(diagonal.x / diagonal.y - 3) < 1e-10);
+});
+
+test('left click auditions a note, right click deletes it, and blank clicks keep their own actions', async () => {
+  const f = fixture({ desktopPointerUx: true, notes: true,
+    initialViewport: { leftSeconds: 0, zoom: 1, top: 1300, rowHeight: 24 } });
+  try {
+    f.selectTone();
+    const noteId = f.phrase.read().body!.parts[0]!.notes[0]!.id;
+    const note = f.block(noteId), box = note.getBoundingClientRect();
+    const position = { target: note, pointerType: 'mouse', clientX: box.left + box.width / 2, clientY: box.top + box.height / 2, timeStamp: 50 };
+    f.scroll.emit('pointerdown', position);
+    f.document.emit('pointerup', { ...position, timeStamp: 65 });
+    await settle();
+    assert.equal(f.seeks.length, 0);
+    assert.equal(f.auditions.length, 1);
+    assert.equal(f.auditions[0]!.note.frequencyHz, 440);
+    f.scroll.emit('pointerdown', { ...position, button: 2 });
+    f.document.emit('pointerup', { ...position, button: 2, timeStamp: 85 });
+    assert.equal(f.phrase.read().body!.parts[0]!.notes.length, 0);
+    assert.equal(f.auditions.length, 1);
+
+    const blank = { ...position, target: f.canvas, clientX: 412, clientY: 145, button: 2, timeStamp: 100 };
+    f.scroll.emit('pointerdown', blank);
+    f.document.emit('pointerup', { ...blank, timeStamp: 110 });
+    await new Promise<void>(resolve => setImmediate(resolve));
+    assert.equal(f.auditions.length, 2);
+    const blankPitch = f.auditions[1]!.note.frequencyHz;
+    const keys = f.root.querySelectorAll('.melody-key');
+    const rows = f.root.querySelectorAll('.melody-pitch-row');
+    const blankIndex = keys.findIndex(key => Number(key.dataset.frequencyHz) === blankPitch);
+    assert(keys[blankIndex]?.classList.contains('is-auditioning'));
+    assert(rows[blankIndex]?.classList.contains('is-auditioning'));
+    const keyIndex = keys.findIndex(key => Number(key.dataset.frequencyHz) === 440);
+    const key = keys[keyIndex]!;
+    key.emit('click', { detail: 1 });
+    await settle();
+    assert.equal(f.auditions.length, 2);
+    f.root.querySelector('.melody-keys')!.emit('auxclick', { target: key, button: 2 });
+    await settle();
+    assert.equal(f.auditions.length, 3);
+    assert.equal(f.auditions[2]!.note.frequencyHz, 440);
+    assert(key.classList.contains('is-auditioning'));
+    assert(rows[keyIndex]?.classList.contains('is-auditioning'));
+    assert(!rows[blankIndex]?.classList.contains('is-auditioning'));
+    assert.equal(f.seeks.length, 0);
+    f.scroll.emit('pointerdown', { ...blank, button: 0, buttons: 1, timeStamp: 120 });
+    f.document.emit('pointerup', { ...blank, button: 0, buttons: 0, timeStamp: 130 });
+    assert.equal(f.seeks.length, 1);
+    f.phrase.undo();
+    assert.equal(f.phrase.read().body!.parts[0]!.notes[0]!.id, noteId);
+  } finally { f.cleanup(); }
+});
+
+test('right-button audition and left click work in either press order, and left drag pans without seeking', async () => {
+  const f = fixture({ desktopPointerUx: true,
+    initialViewport: { leftSeconds: 1, zoom: 2, top: 1300, rowHeight: 24 } });
+  try {
+    f.selectTone();
+    const keyboardHeight = Number.parseFloat(f.root.querySelector('.melody-workspace')!.style['--melody-keyboard-height']!);
+    const pixelsPerSecond = (f.scroll.clientHeight - keyboardHeight) / 4;
+    const point = { target: f.canvas, pointerType: 'mouse', clientX: 412, clientY: 145, timeStamp: 50 };
+    const move = (buttons: number, clientY: number, timeStamp: number) =>
+      f.document.emit('pointermove', { ...point, buttons, clientY, timeStamp });
+    f.scroll.emit('pointerdown', { ...point, button: 0, buttons: 1 });
+    move(3, 145, 60);
+    move(2, 145, 70);
+    f.document.emit('pointerup', { ...point, button: 2, buttons: 0, timeStamp: 80 });
+
+    f.scroll.emit('pointerdown', { ...point, button: 2, buttons: 2, timeStamp: 100 });
+    move(3, 145, 110);
+    move(1, 145, 120);
+    f.document.emit('pointerup', { ...point, button: 0, buttons: 0, timeStamp: 130 });
+    await new Promise<void>(resolve => setImmediate(resolve));
+
+    assert.deepEqual(f.seeks, [1 + 45 / pixelsPerSecond, 1 + 45 / pixelsPerSecond]);
+    assert.equal(f.auditions.length, 2);
+    f.scroll.emit('pointerdown', { ...point, button: 0, buttons: 1, timeStamp: 160 });
+    move(1, 203, 170);
+    f.document.emit('pointerup', { ...point, button: 0, buttons: 0, clientY: 203, timeStamp: 180 });
+    assert(f.workspace.readViewport().leftSeconds < 1);
+    assert.equal(f.seeks.length, 2);
+    assert.equal(f.phrase.read().body!.parts[0]!.notes.length, 0);
+  } finally { f.cleanup(); }
+});
+
+test('a quick left drag owns its note while the right button is held', () => {
+  const f = fixture({ desktopPointerUx: true, notes: true,
+    initialViewport: { leftSeconds: 0, zoom: 1, top: 1300, rowHeight: 24 } });
+  try {
+    f.selectTone();
+    const before = f.phrase.read().body!.parts[0]!.notes[0]!;
+    const block = f.block(before.id), box = block.getBoundingClientRect();
+    const from = { target: block, pointerType: 'mouse', clientX: box.left + box.width / 2, clientY: box.bottom - 2 };
+    f.scroll.emit('pointerdown', { ...from, button: 0, buttons: 1, timeStamp: 100 });
+    f.document.emit('pointermove', { ...from, button: 2, buttons: 3, timeStamp: 105 });
+    const moved = { ...from, target: f.canvas, clientX: from.clientX + 48 };
+    f.document.emit('pointermove', { ...moved, buttons: 3, timeStamp: 115 });
+    f.document.emit('pointermove', { ...moved, button: 2, buttons: 1, timeStamp: 120 });
+    f.document.emit('pointerup', { ...moved, button: 0, buttons: 0, timeStamp: 130 });
+    const [after] = f.phrase.read().body!.parts[0]!.notes;
+    assert.equal(after?.id, before.id);
+    assert.notEqual(after?.frequencyHz, before.frequencyHz);
+    assert.equal(f.seeks.length, 0);
+  } finally { f.cleanup(); }
+});
+
+test('middle-click toggles position panning and leaves hand dragging available', () => {
+  const f = fixture({ desktopPointerUx: true, initialViewport: { leftSeconds: 1, zoom: 2, top: 1300, rowHeight: 24 } });
+  try {
+    const main = f.root.querySelector('.melody-main')!;
+    const nearEdge = { target: f.canvas, pointerType: 'mouse', clientX: 820, clientY: 320 };
+    const middle = (clientX = nearEdge.clientX) => {
+      f.scroll.emit('pointerdown', { ...nearEdge, clientX, button: 1, buttons: 4 });
+      f.document.emit('pointerup', { ...nearEdge, clientX, button: 1, buttons: 0 });
+    };
+    middle();
+    const before = f.scroll.scrollLeft;
+    main.emit('pointermove', nearEdge); f.flushFrames();
+    assert.equal(f.scroll.scrollLeft, before);
+    f.scroll.emit('pointerdown', { ...nearEdge, button: 0, buttons: 1 });
+    f.document.emit('pointermove', { ...nearEdge, clientX: 785, buttons: 1 });
+    f.document.emit('pointerup', { ...nearEdge, clientX: 785, button: 0, buttons: 0 });
+    assert(f.scroll.scrollLeft > before);
+    assert.equal(f.seeks.length, 0);
+    middle();
+    const afterDrag = f.scroll.scrollLeft;
+    main.emit('pointermove', nearEdge); f.flushFrames();
+    assert.equal(f.scroll.scrollLeft, afterDrag, 'moving near an edge after release cannot re-arm position panning');
+    main.emit('pointermove', { ...nearEdge, clientX: 500 }); f.flushFrames();
+    assert.equal(f.scroll.scrollLeft, afterDrag, 'returning to the center arms panning without moving the roll');
+    main.emit('pointermove', nearEdge); f.flushFrames();
+    assert(f.scroll.scrollLeft > afterDrag);
+    middle(); middle(500);
+    const afterToggle = f.scroll.scrollLeft;
+    main.emit('pointermove', nearEdge); f.flushFrames();
+    assert(f.scroll.scrollLeft > afterToggle, 'enabling in the center is immediately ready');
+  } finally { f.cleanup(); }
+});
+
+test('a fast pointer movement interrupts auto-pan until the pointer slows down', t => {
+  const f = fixture({ desktopPointerUx: true, initialViewport: { leftSeconds: 1, zoom: 2, top: 1300, rowHeight: 24 } });
+  try {
+    let resume: (() => void) | undefined;
+    const schedule = window.setTimeout.bind(window);
+    t.mock.method(window, 'setTimeout', (callback: () => void, delay: number) => {
+      if (delay !== 90) return schedule(callback, delay);
+      resume = callback;
+      return 90;
+    });
+    const main = f.root.querySelector('.melody-main')!;
+    const move = (clientX: number, timeStamp: number) => main.emit('pointermove', { target: f.canvas, pointerType: 'mouse', clientX, clientY: 320, timeStamp });
+    move(640, 1000); f.flushFrames();
+    const position = f.scroll.scrollLeft;
+    move(825, 1010); f.flushFrames();
+    assert.equal(f.scroll.scrollLeft, position);
+    f.flushFrames();
+    assert.equal(f.scroll.scrollLeft, position);
+    assert(resume); resume(); f.flushFrames();
+    assert(f.scroll.scrollLeft > position);
+  } finally { f.cleanup(); }
+});
+
+test('desktop roll reuses note and grid geometry across a pan and shows newly visible notes after a jump', () => {
+  const f = fixture({ desktopPointerUx: true, notes: true,
+    initialViewport: { leftSeconds: 0, zoom: 2, top: 1300, rowHeight: 24 } });
+  try {
+    f.phrase.setLength(128);
+    const [later] = f.phrase.addNotes(f.partId, [{ startBeat: 80, durationBeats: .5, frequencyHz: 440, velocity: .7 }]);
+    f.workspace.refresh();
+    const original = f.phrase.read().body!.parts[0]!.notes.find(note => note.id !== later)!;
+    const block = f.block(original.id), noteLayer = f.root.querySelector('.melody-notes')!, grid = f.root.querySelector('.melody-grid')!;
+    const keyboardHeight = Number.parseFloat(f.root.querySelector('.melody-workspace')!.style['--melody-keyboard-height']!);
+    const pixelsPerSecond = (f.scroll.clientHeight - keyboardHeight) / 4;
+    const top = block.style.top, line = grid.children[0], gridTop = line!.style.top;
+    f.scroll.emit('wheel', { target: f.scroll, deltaY: 20 });
+    f.flushFrames();
+    assert.equal(f.block(original.id), block);
+    assert.equal(block.style.top, top);
+    assert.equal(grid.children[0], line);
+    assert.equal(line!.style.top, gridTop);
+    assert.equal(noteLayer.style.translate, '0 -20px');
+    assert.equal(grid.style.translate, noteLayer.style.translate);
+    f.scroll.emit('wheel', { target: f.scroll, deltaY: pixelsPerSecond * 38 });
+    f.flushFrames();
+    assert(f.block(later!));
+    assert.equal(f.block(original.id), undefined);
+    const layerY = Number.parseFloat(noteLayer.style.translate.split(' ')[1] ?? '0');
+    assert(Math.abs(Number.parseFloat(f.block(later!).style.top!) + layerY - (40 - f.workspace.readViewport().leftSeconds) * pixelsPerSecond) < 1e-7);
+  } finally { f.cleanup(); }
+});
+
+test('desktop edges restore the existing deck and pin after settings, and respect the cooldown', t => {
+  let now = 50000;
+  t.mock.method(Date, 'now', () => now);
+  const f = fixture({ desktopPointerUx: true, voices: 10 });
+  try {
+    const main = f.root.querySelector('.melody-main')!;
+    const editor = f.root.querySelector('.melody-workspace')!;
+    const shelfOpen = () => editor.classList.contains('is-tone-shelf-open');
+    const sample = (x: number, dx: number) => {
+      f.desktopHost.dispatchEvent(new MessageEvent('message', { data: { type: 'rootsound-pointer',
+        x, y: .4, clientX: x, clientY: .4, dx, dy: 0, held: false, pressed: false } }));
+    };
+    const push = (x: number) => { sample(.5, x ? 40 : -40); sample(x, x ? 60 : -60); sample(x, x ? 1 : -1); };
+    push(0); assert(shelfOpen());
+    main.emit('pointermove', { target: f.canvas, pointerType: 'mouse', clientX: 600, clientY: 360 });
+    assert(shelfOpen());
+    push(1); assert(!f.settingsOpen());
+    now += 1001;
+    push(1); assert(f.settingsOpen()); assert(!shelfOpen());
+    now += 1001;
+    f.document.emit('keydown', { key: 'Shift', code: 'ShiftLeft' });
+    push(0); assert(f.settingsOpen());
+    f.document.emit('keyup', { key: 'Shift', code: 'ShiftLeft' });
+    push(0); assert(f.settingsOpen()); assert(!shelfOpen());
+    push(1); assert(shelfOpen()); assert(!f.settingsOpen());
+    f.selectTone();
+    const pinned = f.root.querySelector('.melody-pinned-tone')!;
+    assert(shelfOpen()); assert(!pinned.hidden);
+    const pile = f.root.querySelector('.melody-tone-pile')!;
+    pile.emit('click');
+    const library = f.root.querySelector('.melody-tone-library')!;
+    const deck = library.querySelector('.melody-library-deck')!;
+    deck.emit('wheel', { deltaY: 120 });
+    const first = deck.querySelector('.melody-library-card');
+    now += 1001;
+    push(1); assert(f.settingsOpen()); assert(!shelfOpen()); assert(!pinned.hidden);
+    now += 1001;
+    push(1); assert(!f.settingsOpen()); assert(shelfOpen());
+    assert.equal(f.root.querySelector('.melody-tone-library'), library);
+    assert.equal(pile.attributes.get('aria-expanded'), 'true');
+    assert.equal(deck.querySelector('.melody-library-card'), first);
+    f.selectTone(); assert(shelfOpen()); assert(pinned.hidden);
+    now += 1001;
+    push(0); assert(!shelfOpen()); assert.equal(f.root.querySelector('.melody-tone-library'), undefined);
+    now += 1001; push(1); assert(f.settingsOpen());
+    now += 1001; push(1); assert(!f.settingsOpen()); assert(!shelfOpen());
+    f.selectTone(); assert(!pinned.hidden);
+    f.root.querySelector('.melody-tone-shortcut')!.emit('click');
+    pinned.querySelector('.melody-note-family')!.emit('click');
+    assert(!shelfOpen()); assert(pinned.hidden);
+  } finally { f.cleanup(); }
+});
+
+test('the keyboard deck pages by one and adds more than ten cards while preserving a pinned group', () => {
+  const f = fixture({ desktopPointerUx: true, notes: true, voices: 12 });
+  try {
+    f.selectTone();
+    f.openTones();
+    const pile = f.root.querySelector('.melody-tone-pile')!;
+    pile.emit('click');
+    const deck = f.root.querySelector('.melody-library-deck')!;
+    assert.equal(f.root.querySelector('.melody-library-search'), undefined);
+    assert.equal(f.root.querySelector('.melody-library-tools'), undefined);
+    assert.equal(f.root.querySelector('.melody-library-preview'), undefined);
+    const shown = () => deck.querySelectorAll('.melody-library-card').map(card => card.dataset.timbreId);
+    const initial = shown();
+    assert.equal(initial.length, 7);
+    deck.emit('wheel', { deltaY: 120 });
+    assert.deepEqual(shown().slice(0, -1), initial.slice(1));
+    deck.emit('wheel', { deltaY: -120 });
+    assert.deepEqual(shown(), initial);
+    const firstCard = deck.querySelector('.melody-library-tone')!;
+    for (let index = 0; index < 12; index++) deck.querySelector('.melody-library-tone')!.emit('click');
+    assert.equal(deck.querySelector('.melody-library-tone'), firstCard);
+    assert.equal(f.phrase.read().body!.parts.length, 13);
+    assert.equal(f.root.querySelector('.melody-tone-hand')!.children.length, 12);
+    assert.equal(pile.attributes.get('aria-expanded'), 'true');
+    assert.equal(deck.querySelector('.melody-library-tone')!.attributes.get('aria-disabled'), 'false');
+    const group = f.phrase.read().body!.parts.find(part => part.id === f.partId)!;
+    const replacement = deck.querySelectorAll('.melody-library-card')[1]!;
+    const transfer = toneTransfer();
+    replacement.emit('dragstart', { dataTransfer: transfer });
+    f.root.querySelector('.melody-pinned-tone')!.querySelector('.melody-tone-entry')!.emit('drop', { dataTransfer: transfer });
+    const updated = f.phrase.read().body!.parts.find(part => part.id === group.id)!;
+    assert.equal(updated.timbreId, replacement.dataset.timbreId);
+    assert.deepEqual(updated.notes, group.notes);
+    assert.equal(f.phrase.read().body!.parts.length, 13);
+  } finally { f.cleanup(); }
+});
+
+test('a large hand scrolls through a clipped fan without changing music or rebuilding cards', () => {
+  const f = fixture({ desktopPointerUx: true, notes: true, voices: 24 });
+  try {
+    for (const voice of f.voices.slice(1)) f.phrase.addPart(voice.id);
+    f.workspace.refresh(); f.openTones();
+    const hand = f.root.querySelector('.melody-tone-hand')!, main = f.root.querySelector('.melody-main')!;
+    const cards = [...hand.children], original = f.phrase.read().body;
+    assert.equal(cards.length, 24); assert.equal(hand.dataset.handStart, '0');
+    assert(cards.at(-1)!.classList.contains('is-hand-hidden'));
+    const before = cards[0]!.style['--hand-x'];
+    main.emit('wheel', { deltaY: 100, deltaMode: 0, clientX: 500, clientY: 300 }); f.flushFrames();
+    assert.equal(hand.dataset.handStart, '1'); assert.notEqual(cards[0]!.style['--hand-x'], before);
+    assert.deepEqual(hand.children, cards); assert.deepEqual(f.phrase.read().body, original);
+    for (let index = 0; index < 30; index++) main.emit('wheel', { deltaY: 200, deltaMode: 0, clientX: 500, clientY: 300 });
+    f.flushFrames(); assert.equal(Number(hand.dataset.handStart), 24 - Number(hand.dataset.handSlots));
+    assert.equal(cards.at(-1)!.classList.contains('is-hand-hidden'), false);
+    assert.equal(hand.querySelector('.melody-card-backs'), undefined);
+  } finally { f.cleanup(); }
+});
+
+test('desktop cards reveal near the keyboard, select by click, and confirm populated deletions', t => {
+  let now = 50000;
+  t.mock.method(Date, 'now', () => now);
+  const f = fixture({ desktopPointerUx: true, notes: true });
+  const empty = f.phrase.addPart(f.voices[1]!.id);
+  f.workspace.refresh();
+  try {
+    f.openTones();
+    const page = f.root.querySelector('.melody-workspace')!;
+    const main = f.root.querySelector('.melody-main')!;
+    const hand = f.root.querySelector('.melody-tone-hand')!;
+    const pin = f.root.querySelector('.melody-pinned-tone')!;
+    main.emit('pointermove', { target: f.canvas, pointerType: 'mouse', clientX: 430, clientY: 350 });
+    assert(hand.classList.contains('is-revealed'));
+    assert(pin.hidden);
+    main.emit('pointermove', { target: f.canvas, pointerType: 'mouse', clientX: 430, clientY: 220 });
+    assert(!hand.classList.contains('is-revealed'));
+    const drag = (id: string, endY: number) => {
+      const card = f.root.querySelectorAll('.melody-note-family').find(card => card.dataset.partId === id)!;
+      const dataTransfer = toneTransfer();
+      card.emit('dragstart', { dataTransfer, clientX: 430, clientY: 422 });
+      main.emit('drop', { dataTransfer, clientX: 430, clientY: endY });
+      card.emit('dragend', { dataTransfer });
+      now += 251;
+    };
+    drag(f.partId, 312);
+    assert(pin.hidden);
+    f.selectTone();
+    f.flushFrames();
+    assert(page.classList.contains('is-tone-shelf-open'));
+    assert(!pin.hidden);
+    const note = f.phrase.read().body!.parts.find(part => part.id === f.partId)!.notes[0]!;
+    assert(f.block(note.id).parentElement?.classList.contains('is-current-tone'));
+    const pinnedCard = pin.querySelector('.melody-note-family')!;
+    const transfer = toneTransfer();
+    pinnedCard.emit('dragstart', { dataTransfer: transfer, clientX: 240, clientY: 140 });
+    pinnedCard.emit('dragend', { dataTransfer: transfer });
+    assert(!pin.hidden);
+    now += 251;
+    pinnedCard.emit('dragstart', { dataTransfer: transfer, clientX: 240, clientY: 140 });
+    main.emit('drop', { dataTransfer: transfer, clientX: 620, clientY: 479 });
+    pinnedCard.emit('dragend', { dataTransfer: transfer });
+    assert(pin.hidden);
+    assert(page.classList.contains('is-tone-shelf-open'));
+    assert(hand.children.some(entry => entry.dataset.partId === f.partId));
+    assert.equal(f.root.querySelector('.melody-tone-delete-dialog'), undefined);
+    assert.deepEqual(f.phrase.read().body!.parts.find(part => part.id === f.partId)!.notes, [note]);
+    f.openTones();
+    drag(empty, 478);
+    assert.equal(f.root.querySelector('.melody-tone-delete-dialog'), undefined);
+    assert(!f.phrase.read().body!.parts.some(part => part.id === empty));
+    drag(f.partId, 478);
+    const warning = f.root.querySelector('.melody-tone-delete-dialog')!;
+    assert(warning);
+    warning.querySelector('.melody-tone-delete-cancel')!.emit('click');
+    assert.deepEqual(f.phrase.read().body!.parts.find(part => part.id === f.partId)!.notes, [note]);
+  } finally { f.cleanup(); }
+});
+
+test('automatic panning under the open hand and deck pauses only while over the cards', () => {
+  const f = fixture({ desktopPointerUx: true, initialViewport: { leftSeconds: 1, zoom: 2, top: 1300, rowHeight: 24 } });
+  try {
+    const main = f.root.querySelector('.melody-main')!;
+    f.openTones();
+    f.root.querySelector('.melody-tone-pile')!.emit('click');
+    const card = f.root.querySelector('.melody-library-tone')!;
+    const move = (target: Element) => main.emit('pointermove', { target, pointerType: 'mouse', clientX: 970, clientY: 320 });
+    const start = f.scroll.scrollLeft;
+    move(f.canvas); f.flushFrames();
+    const moved = f.scroll.scrollLeft;
+    assert(moved > start);
+    move(card); f.flushFrames();
+    assert.equal(f.scroll.scrollLeft, moved);
+    move(f.canvas); f.flushFrames();
+    assert(f.scroll.scrollLeft > moved);
+    assert.equal(f.root.querySelector('.melody-library-tone'), card);
+  } finally { f.cleanup(); }
+});
+
+test('keys, wheels and mouse presses suspend position panning until the center is crossed', () => {
+  const f = fixture({ desktopPointerUx: true, initialViewport: { leftSeconds: 1, zoom: 2, top: 1300, rowHeight: 24 } });
+  try {
+    const main = f.root.querySelector('.melody-main')!;
+    const modes: string[] = [];
+    f.document.addEventListener('rootsound-pan-mode', event => modes.push((event as Event & { detail: string }).detail));
+    const move = (clientX = 820) => main.emit('pointermove', { target: f.canvas, pointerType: 'mouse', clientX, clientY: 320 });
+    const before = f.scroll.scrollLeft;
+    move(); f.flushFrames();
+    const running = f.scroll.scrollLeft;
+    assert(running > before);
+    f.document.emit('keydown', { key: 'q' });
+    move(); f.flushFrames();
+    assert.equal(f.scroll.scrollLeft, running);
+    f.document.emit('keyup', { key: 'q' });
+    f.flushFrames();
+    assert.equal(f.scroll.scrollLeft, running);
+    move(); f.flushFrames();
+    assert.equal(f.scroll.scrollLeft, running);
+    assert.deepEqual(modes, ['waiting']);
+    move(500); move(); f.flushFrames();
+    assert(f.scroll.scrollLeft > running);
+    assert.deepEqual(modes, ['waiting', 'ready']);
+    const after = f.scroll.scrollLeft;
+    f.scroll.emit('wheel', { target: f.canvas, deltaY: 20 });
+    move(); f.flushFrames();
+    assert.equal(f.scroll.scrollLeft, after);
+    assert.equal(modes.at(-1), 'waiting');
+    move(500); move(); f.flushFrames();
+    assert(f.scroll.scrollLeft > after);
+    f.document.emit('pointerdown', { button: 0, pointerType: 'mouse', buttons: 1 });
+    assert.equal(modes.at(-1), 'waiting');
+  } finally { f.cleanup(); }
+});
+
+test('desktop wheel keeps a newly added note until the pointer moves to an existing note', () => {
+  const f = fixture({ desktopPointerUx: true, notes: true,
+    initialViewport: { leftSeconds: 0, zoom: 1, top: 1300, rowHeight: 24 } });
+  try {
+    const notes = () => f.phrase.read().body!.parts[0]!.notes;
+    const existingId = notes()[0]!.id;
+    f.selectTone();
+    const original = structuredClone(notes());
+    const position = { clientX: 412, clientY: 180 };
+    let hit = f.canvas;
+    Object.assign(f.document, { elementFromPoint: () => hit });
+    f.scroll.emit('wheel', { target: f.canvas, deltaY: 100, ...position });
+    f.flushFrames();
+    assert.equal(f.root.querySelectorAll('.melody-note').length, 2);
+    hit = f.block(existingId);
+    f.scroll.emit('wheel', { target: f.block(existingId), deltaY: 100, ...position });
+    f.workspace.flush();
+    assert.equal(notes().length, 2);
+    assert.deepEqual(notes().find(note => note.id === existingId), original[0]);
+    f.scroll.emit('wheel', { target: f.canvas, deltaY: 100, ...position, clientY: position.clientY + 1 });
+    f.workspace.flush();
+    assert(notes().find(note => note.id === existingId)!.durationSeconds! > original[0]!.durationSeconds!);
+    f.phrase.undo(); f.phrase.undo(); f.workspace.refresh();
+    assert.deepEqual(notes(), original);
+  } finally { f.cleanup(); }
+});
+
+test('the unpinned wheel pans over blank space, and a pinned card routes the wheel to note editing', () => {
+  const f = fixture({ desktopPointerUx: true, notes: true,
+    initialViewport: { leftSeconds: 0, zoom: 1, top: 1300, rowHeight: 24 } });
+  try {
+    const notes = () => f.phrase.read().body!.parts[0]!.notes;
+    const existing = notes()[0]!;
+    const pinned = f.root.querySelector('.melody-pinned-tone')!;
+    const wheel = (target: Element, clientY: number, extra = {}) => f.scroll.emit('wheel', { target, deltaY: 100, clientX: 412, clientY, ...extra });
+    assert.equal(pinned.hidden, true);
+    wheel(f.block(existing.id), 180); f.workspace.flush();
+    assert(notes()[0]!.durationSeconds! > existing.durationSeconds!);
+    const before = f.workspace.readViewport();
+    wheel(f.canvas, 210); f.workspace.flush();
+    assert.equal(notes().length, 1);
+    const panned = f.workspace.readViewport();
+    assert(panned.leftSeconds > before.leftSeconds);
+    f.selectTone();
+    assert.equal(pinned.hidden, false);
+    wheel(f.canvas, 220, { deltaY: -100 });
+    wheel(f.scroll, 220, { shiftKey: true });
+    wheel(f.canvas, 220, { deltaY: 0, deltaX: 300 });
+    assert.deepEqual(f.workspace.readViewport(), panned);
+    wheel(f.canvas, 220); f.workspace.flush();
+    assert.equal(notes().length, 2);
+    assert.deepEqual(f.workspace.readViewport(), panned);
+  } finally { f.cleanup(); }
+});
+
+test('desktop wheel creates at a blank center even when the circle touches a note and the event still targets it', () => {
+  const f = fixture({ desktopPointerUx: true, notes: true,
+    initialViewport: { leftSeconds: 0, zoom: 1, top: 1300, rowHeight: 24 } });
+  try {
+    const notes = () => f.phrase.read().body!.parts[0]!.notes;
+    const note = notes()[0]!, box = f.block(note.id).getBoundingClientRect();
+    f.selectTone();
+    Object.assign(f.document, { elementFromPoint: () => f.canvas });
+    const position = { target: f.block(note.id), clientX: box.left + box.width / 2 - f.scroll.scrollLeft, clientY: box.bottom + 8 };
+    const view = f.workspace.readViewport();
+    f.scroll.emit('wheel', { ...position, deltaY: 100, timeStamp: 1000 });
+    f.workspace.flush();
+    assert.deepEqual(f.workspace.readViewport(), view);
+    assert.equal(notes().length, 2);
+    assert.deepEqual(notes().find(item => item.id === note.id), note);
+  } finally { f.cleanup(); }
+});
+
+test('blank wheel scrolling stays locked until the pointer actually moves', () => {
+  const f = fixture({ desktopPointerUx: true, notes: true,
+    initialViewport: { leftSeconds: 0, zoom: 1, top: 1300, rowHeight: 24 } });
+  try {
+    const notes = () => f.phrase.read().body!.parts[0]!.notes;
+    const note = notes()[0]!, block = f.block(note.id), box = block.getBoundingClientRect();
+    const position = { clientX: box.left + box.width / 2 - f.scroll.scrollLeft, clientY: box.top - 16 };
+    f.scroll.emit('wheel', { ...position, target: f.canvas, deltaY: 20, timeStamp: 1000 });
+    const first = f.workspace.readViewport().leftSeconds;
+    assert(first > 0);
+    f.scroll.emit('wheel', { ...position, target: block, deltaY: 2, timeStamp: 1120 });
+    f.scroll.emit('wheel', { ...position, target: block, deltaY: 2, timeStamp: 1340 });
+    f.workspace.flush();
+    assert(f.workspace.readViewport().leftSeconds > first);
+    assert.deepEqual(notes(), [note]);
+    f.scroll.emit('wheel', { ...position, target: block, deltaY: 10_000, timeStamp: 8100 });
+    const limit = f.workspace.readViewport().leftSeconds;
+    f.scroll.emit('wheel', { ...position, target: block, deltaY: 100, timeStamp: 61_000 });
+    f.workspace.flush();
+    assert.equal(f.workspace.readViewport().leftSeconds, limit);
+    assert.deepEqual(notes(), [note]);
+    const moved = { ...position, clientY: position.clientY + 1, target: block };
+    f.root.querySelector('.melody-main')!.emit('pointermove', { ...moved, pointerType: 'mouse' });
+    f.scroll.emit('wheel', { ...moved, deltaY: 100, timeStamp: 61_002 });
+    f.workspace.flush();
+    assert(notes()[0]!.durationSeconds! > note.durationSeconds!);
+  } finally { f.cleanup(); }
+});
+
+test('desktop follow eases to the center, holds the line and gives manual scrolling priority', () => {
+  const f = fixture({ desktopPointerUx: true, notes: true,
+    initialViewport: { leftSeconds: 0, zoom: 1, top: 1300, rowHeight: 24 } });
+  try {
+    const head = f.root.querySelector('.melody-playhead')!;
+    const headY = () => Number(head.style.transform!.slice('translateY('.length, -3));
+    const stamp = performance.now();
+    const token = f.library.currentToken();
+    f.workspace.setPlayhead(0, true, 0, stamp);
+    assert.equal(f.workspace.readViewport().leftSeconds, 0);
+    f.workspace.setPlayhead(.016, true, .016, stamp + 16);
+    assert(f.workspace.readViewport().leftSeconds < 0);
+    assert(headY() > 0 && headY() < 80);
+    for (let frame = 2; frame <= 80; frame++) f.workspace.setPlayhead(frame * .016, true, frame * .016, stamp + frame * 16);
+    const centered = headY();
+    const middle = f.workspace.readViewport().leftSeconds;
+    assert(Math.abs(1.28 - middle - 4) < .01);
+    f.workspace.setPlayhead(1.296, true, 1.296, stamp + 81 * 16);
+    assert(Math.abs(headY() - centered) < .01);
+    assert(f.workspace.readViewport().leftSeconds > middle);
+
+    f.scroll.emit('wheel', { target: f.canvas, clientX: 850, clientY: 275, deltaY: 35 });
+    const browsed = f.workspace.readViewport().leftSeconds;
+    const browsedAt = performance.now();
+    f.workspace.setPlayhead(1.5, true, 1.5, browsedAt + 300);
+    assert.equal(f.workspace.readViewport().leftSeconds, browsed);
+    f.workspace.setPlayhead(2.1, true, 2.1, browsedAt + 950);
+    assert.equal(f.workspace.readViewport().leftSeconds, browsed);
+    f.workspace.setPlayhead(2.116, true, 2.116, browsedAt + 966);
+    assert.notEqual(f.workspace.readViewport().leftSeconds, browsed);
+    assert.equal(f.library.currentToken(), token);
+  } finally { f.cleanup(); }
+});
+
+test('a sounding note can be edited while playback continues', () => {
+  const f = fixture({ desktopPointerUx: true, notes: true,
+    initialViewport: { leftSeconds: 0, zoom: 1, top: 1300, rowHeight: 24 } });
+  try {
+    f.selectTone();
+    const before = structuredClone(f.phrase.read().body!.parts[0]!.notes);
+    f.workspace.setPlayhead(1.25, true);
+    const block = f.block(before[0]!.id);
+    f.scroll.emit('wheel', { target: block, deltaY: 100, clientX: 412, clientY: 156 });
+    f.workspace.flush();
+    const [note] = f.phrase.read().body!.parts[0]!.notes;
+    assert.equal(note?.id, before[0]!.id);
+    assert(note!.durationSeconds! > before[0]!.durationSeconds!);
+  } finally { f.cleanup(); }
+});
+
+test('desktop wheel holds a shrinking note through deletion and a pause until the pointer moves', () => {
+  const f = fixture({ desktopPointerUx: true, notes: true, initialViewport: { leftSeconds: 0, zoom: 1, top: 1300, rowHeight: 24 } });
+  try {
+    const notes = () => f.phrase.read().body!.parts[0]!.notes;
+    const id = notes()[0]!.id;
+    const otherId = f.phrase.addNote(f.partId, { startBeat: 4, durationBeats: 1, durationSeconds: .5, frequencyHz: 440, velocity: .75 });
+    const other = notes().find(note => note.id === otherId)!;
+    f.phrase.updateNote(f.partId, id, { durationSeconds: .045, durationBeats: .09 });
+    f.workspace.refresh();
+    f.selectTone();
+    const location = { clientX: 412, clientY: 190 };
+    let hit = f.block(id);
+    Object.assign(f.document, { elementFromPoint: () => hit });
+    f.scroll.emit('wheel', { target: f.block(id), deltaY: -100, ...location });
+    f.workspace.flush();
+    assert(notes().find(note => note.id === id)!.durationSeconds! < .01);
+    hit = f.block(otherId);
+    f.scroll.emit('wheel', { target: f.canvas, deltaY: -1, ...location });
+    f.flushFrames();
+    f.workspace.flush();
+    assert.deepEqual(notes(), [other]);
+
+    f.scroll.emit('wheel', { target: f.block(otherId), deltaY: 100, ...location });
+    hit = f.canvas;
+    f.scroll.emit('wheel', { target: f.canvas, deltaY: 100, ...location });
+    f.workspace.flush();
+    assert.deepEqual(notes(), [other]);
+
+    hit = f.block(otherId);
+    f.scroll.emit('wheel', { target: f.canvas, deltaY: 100, ...location, clientX: location.clientX + 1 });
+    f.workspace.flush();
+    assert.equal(notes().length, 1);
+    assert.equal(notes()[0]!.id, otherId);
+    assert(notes()[0]!.durationSeconds! > other.durationSeconds!);
+  } finally { f.cleanup(); }
+});
+
+test('a long imported note can be shortened and moved past the explicit-seconds limit', () => {
+  const f = fixture({ desktopPointerUx: true, initialViewport: { leftSeconds: 0, zoom: 1, top: 1300, rowHeight: 24 } });
+  try {
+    f.phrase.setLength(256);
+    const id = f.phrase.addNote(f.partId, { startBeat: 2, durationBeats: 220, frequencyHz: 440, velocity: .7 });
+    f.workspace.refresh();
+    f.scroll.emit('wheel', { target: f.block(id), clientX: 412, clientY: 190, deltaY: -100 });
+    f.workspace.flush();
+    const after = f.phrase.read().body!.parts[0]!.notes[0]!;
+    assert(after.durationBeats < 220 && after.durationBeats > 200);
+    assert.equal(after.durationSeconds, undefined);
+    const target = f.block(id), box = target.getBoundingClientRect();
+    const point = { target, pointerType: 'mouse', clientX: box.left + box.width / 2, clientY: box.top + 20 };
+    f.scroll.emit('pointerdown', { ...point, buttons: 1, timeStamp: 200 });
+    f.document.emit('pointerup', { ...point, clientY: point.clientY + 28, buttons: 0, timeStamp: 212 });
+    const moved = f.phrase.read().body!.parts[0]!.notes[0]!;
+    assert(moved.startBeat > after.startBeat);
+    assert(Math.abs(moved.durationBeats - after.durationBeats) < 1e-8);
+    assert.equal(moved.durationSeconds, undefined);
+  } finally { f.cleanup(); }
+});
 
 test('melody seconds geometry keeps held widths while BPM moves four-cell beat lines', () => {
   const body: PhraseBody = { model: 'note-phrase', version: 1, timeUnit: 'beat', tempoBpm: 120, lengthBeats: 16, parts: [] };
@@ -643,7 +1510,7 @@ test('a failed custom tone removal keeps its warning retryable and an externally
 
 
 
-test('group merge drag preserves both note sets, selects target and is one undo step', () => {
+test('group merge drag preserves both note sets without selecting the target and is one undo step', () => {
   const f = fixture({ notes: true });
   try {
     const source = f.phrase.addPart(f.voices[0]!.id);
@@ -660,12 +1527,43 @@ test('group merge drag preserves both note sets, selects target and is one undo 
     const after = f.phrase.read().body!;
     assert.equal(after.parts.length, 1);
     assert.deepEqual(after.parts[0]!.notes, before.parts.flatMap(part => part.notes));
-    assert.equal(f.root.querySelector('.melody-note-family')!.classList.contains('is-selected'), true);
+    assert.equal(f.root.querySelector('.melody-note-family')!.classList.contains('is-selected'), false);
     assert.equal(f.changes(), 1);
     f.phrase.undo(); assert.deepEqual(f.phrase.read().body, before);
     f.phrase.redo(); assert.deepEqual(f.phrase.read().body, after);
   } finally { f.cleanup(); }
 });
+
+for (const desktop of [false, true]) for (const selected of ['none', 'target', 'other', 'source'] as const) {
+  if (desktop && selected === 'source') continue;
+  test(`card merge preserves ${selected} selection in ${desktop ? 'desktop hand' : 'horizontal roll'}`, t => {
+    let now = 10000; t.mock.method(Date, 'now', () => now);
+    const f = fixture({ desktopPointerUx: desktop, notes: true });
+    try {
+      const source = f.phrase.addPart(f.voices[0]!.id), other = f.phrase.addPart(f.voices[1]!.id);
+      f.phrase.addNote(source, { startBeat: 4, durationBeats: .5, frequencyHz: 220, velocity: .4 });
+      f.workspace.refresh(); f.openTones();
+      const chosen = selected === 'target' ? f.partId : selected === 'source' ? source : selected === 'other' ? other : undefined;
+      if (chosen) f.selectTone(chosen);
+      const before = structuredClone(f.phrase.read().body!);
+      const find = (id: string) => f.root.querySelectorAll('.melody-note-family').find(card => card.dataset.partId === id)!;
+      const transfer = toneTransfer(); find(source).emit('dragstart', { dataTransfer: transfer });
+      find(f.partId).parentElement!.emit('drop', { dataTransfer: transfer });
+      assert.equal(f.phrase.read().body!.parts.length, 2);
+      assert.deepEqual(f.phrase.read().body!.parts.find(part => part.id === f.partId)!.notes,
+        before.parts.filter(part => part.id !== other).flatMap(part => part.notes));
+      const expected = selected === 'source' ? undefined : chosen;
+      const chosenCards = () => f.root.querySelectorAll('.melody-note-family').filter(card => card.classList.contains('is-selected')).map(card => card.dataset.partId);
+      assert.deepEqual(chosenCards(), expected ? [expected] : []);
+      find(f.partId).emit('click'); assert.deepEqual(chosenCards(), expected ? [expected] : [], 'drop must suppress its follow-up click');
+      f.phrase.undo(); f.workspace.refresh(); assert.deepEqual(f.phrase.read().body, before);
+      f.phrase.redo(); f.workspace.refresh(); assert.equal(f.phrase.read().body!.parts.length, 2);
+      assert.deepEqual(chosenCards(), expected ? [expected] : []);
+      now += 251;
+      find(f.partId).emit('click'); assert.deepEqual(chosenCards(), desktop && expected === f.partId ? [] : [f.partId], 'an intentional later click keeps normal selection behavior');
+    } finally { f.cleanup(); }
+  });
+}
 
 test('group merge drag rejects different tones, itself, foreign payloads and stale drafts', () => {
   const f = fixture({ notes: true });

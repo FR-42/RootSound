@@ -1,5 +1,4 @@
 import { studioBank, studioInstrumentForMidi } from '../modules/timbre/instrument-catalog.ts';
-import generalMidi from '../modules/timbre/general-midi.json' with { type: 'json' };
 import type { ContentRecord, Draft } from '../contracts/content.ts';
 import type { MidiNote } from '../contracts/midi.ts';
 import type { PhraseBody } from '../contracts/phrase.ts';
@@ -19,9 +18,6 @@ const MAX_TRACKS = 128;
 const MAX_CLIPS = 512;
 const MAX_BEATS = 1024;
 const EPSILON = 1e-8;
-
-const PROGRAM_NAMES = generalMidi.programs;
-const DRUM_NAMES: Record<number, string> = generalMidi.drums;
 
 function cleanName(value: string, fallback: string): string {
   return [...value.replace(/[\u0000-\u001f\u007f]/gu, '').trim().normalize('NFC')].slice(0, 60).join('') || fallback;
@@ -44,15 +40,16 @@ function noteDuration(note: MidiNote): number {
 function reject(message: string): never { throw new Error(`${message}，尚未创建工程，原 MIDI 文件已保留。`); }
 
 function voices() {
-  const names=new Set<string>();const used=new Map<string,ContentRecord>();
+  const used=new Map<string,ContentRecord>();
   function obtain(note:MidiNote):ContentRecord {
     const drum=note.channel===9,key=drum?`drum-${note.pitch}`:`program-${note.program}`;
     const existing=used.get(key);if(existing)return existing;
+    const instrument=studioInstrumentForMidi(note.program,drum?note.pitch:undefined);
     const body:SampleBankTimbreBody={model:'sample-bank',version:1,bank:studioBank,
-      instrument:studioInstrumentForMidi(note.program,drum?note.pitch:undefined).key,attackSeconds:0,releaseSeconds:.03,level:.7,
+      instrument:instrument.key,attackSeconds:0,releaseSeconds:.03,level:.7,
       ...(drum?{midiDrum:note.pitch}:{midiProgram:note.program})};
     const record:ContentRecord={id:crypto.randomUUID(),kind:'rootsound.timbre',owner:'timbre',schemaVersion:1,revision:1,
-      name:reserve(names,drum?DRUM_NAMES[note.pitch]??`打击音 ${note.pitch}`:PROGRAM_NAMES[note.program]??`音色 ${note.program+1}`),dependencies:[],body};
+      name:instrument.name,dependencies:[],body};
     createTimbreReferenceAdapter().slots(record);used.set(key,record);return record;
   }
   return {obtain,contents:()=>[...used.values()]};

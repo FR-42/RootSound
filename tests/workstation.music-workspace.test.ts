@@ -45,13 +45,25 @@ class Element {
     toggle: (name: string, force?: boolean) => { const on = force ?? !this.classList.contains(name); if (on) this.classList.add(name); else this.classList.remove(name); return on; },
   };
   append(...nodes: Element[]): void { for (const child of nodes) { child.remove(); child.parentElement = this; this.children.push(child); } }
+  insertBefore(child: Element, before: Element | null): void {
+    if (child === before) return;
+    child.remove();
+    child.parentElement = this;
+    const index = before === null ? this.children.length : this.children.indexOf(before);
+    this.children.splice(index, 0, child);
+  }
   replaceChildren(...nodes: Element[]): void { this.textContent = ''; this.append(...nodes); }
+  prepend(child: Element): void { child.remove(); child.parentElement = this; this.children.unshift(child); }
   remove(): void { if (this.parentElement) this.parentElement.children = this.parentElement.children.filter(child => child !== this); this.parentElement = undefined; }
   setAttribute(key: string, value: string): void { this.attributes.set(key, value); }
+  hasAttribute(key: string): boolean { return this.attributes.has(key); }
+  removeAttribute(key: string): void { this.attributes.delete(key); }
+  dispatchEvent(event: Event): boolean { return !this.emit(event.type).defaultPrevented; }
   showModal(): void { this.attributes.set('open', ''); }
   close(): void { this.attributes.delete('open'); this.emit('close'); }
   click(): void { this.emit('click'); }
   matches(selector: string): boolean {
+    if (selector === '.melody-note:not(.is-dim)') return this.classList.contains('melody-note') && !this.classList.contains('is-dim');
     if (selector.startsWith('.')) return this.classList.contains(selector.slice(1));
     const match = /^([a-z][a-z0-9]*)(?:\[([^\]]+)\])?$/u.exec(selector);
     return !!match && this.tagName.toLowerCase() === match[1] && (!match[2] || this.attributes.has(match[2]));
@@ -95,6 +107,7 @@ function installDom() {
   const frames = new Map<number, FrameRequestCallback>(); let serial = 0;
   Object.assign(window, { innerWidth: 1280, innerHeight: 850, setTimeout(callback: () => void, delay: number) { const timer = setTimeout(callback, delay); timer.unref(); timers.push(timer); return Number(timer); }, clearTimeout });
   const replacements = { document, window, HTMLElement: Element, HTMLInputElement: Input, HTMLSelectElement: Select, HTMLTextAreaElement: TextArea,
+    getComputedStyle(element: Element) { return { opacity: element.hidden ? '0' : '1' }; },
     Node: Element, requestAnimationFrame(callback: FrameRequestCallback) { frames.set(++serial, callback); return serial; }, cancelAnimationFrame(id: number) { frames.delete(id); } };
   const previous = new Map<string, PropertyDescriptor | undefined>();
   for (const [key, value] of Object.entries(replacements)) { previous.set(key, Object.getOwnPropertyDescriptor(globalThis, key)); Object.defineProperty(globalThis, key, { configurable: true, writable: true, value }); }
@@ -182,13 +195,12 @@ test('unified music opens in the piano roll, plays and tracks unsaved changes th
     const category = (name: string) => root.querySelectorAll('.melody-library-category').find(item => item.textContent === name)!;
     category('钢琴').emit('click'); assert.equal(root.querySelectorAll('.melody-library-tone').length, availableInstruments.filter(item=>item.category==='键盘').length);
     assert.equal(category('录音室鼓 A'), undefined);
-    category('全部').emit('click'); const search = root.querySelector('.melody-library-search')!;
-    search.value = '管弦长笛'; search.emit('input');
-    assert.equal(root.querySelectorAll('.melody-library-tone').length, 1);
-    assert.equal(root.querySelector('.melody-library-tone')!.textContent, '管弦长笛');
-    root.querySelector('.melody-library-preview')!.emit('click'); await settle();
+    category('木管').emit('click');
+    assert.equal(root.querySelector('.melody-tone-library')!.querySelector('input'), undefined);
+    const flute = root.querySelectorAll('.melody-library-tone').find(card => card.textContent === '管弦长笛')!;
+    flute.parentElement!.querySelector('.melody-library-preview')!.emit('click'); await settle();
     assert(root.querySelector('.melody-tone-library'), 'audition must not choose or close the library');
-    root.querySelector('.melody-library-tone')!.emit('click'); await settle();
+    flute.emit('click'); await settle();
     assert.equal(root.querySelector('.melody-tone-library'), undefined);
     assert.equal(saves, 0);
     root.querySelector('.melody-scroll')!.emit('pointerdown', { button: 2, pointerId: 91, clientX: 400, clientY: 300 });
@@ -240,22 +252,26 @@ test('only family selection changes the playback scope, and clicking a note keep
   phrase.preparePreview = async body => { prepared.push(body!.parts.map(part => part.id)); if (delayed) { delayed = false; await readiness; } await prepare(body); };
   const before = text, plans: SoundSequencePlan[] = [];
   const auditions: Parameters<SoundRuntimePort['audition']>[] = [];
-  const session = (plan: SoundSequencePlan) => { plans.push(plan); return { id: 'selected-play', status: 'playing', durationSeconds: plan.durationSeconds }; };
+  let soloGroup: string | undefined;
+  const session = (plan: SoundSequencePlan) => { plans.push(plan); soloGroup = plan.soloGroupId; return { id: 'selected-play', status: 'playing', durationSeconds: plan.durationSeconds }; };
   const sound = { preview: async (plan: SoundSequencePlan) => session(plan), update: (_id: string, plan: SoundSequencePlan) => session(plan),
+    setSoloGroup(_id: string, id?: string) { soloGroup = id; },
     position: () => .25, stop() {}, stopAll() {}, cancelAudition() {}, async audition(...args: Parameters<SoundRuntimePort['audition']>) { auditions.push(args); }, subscribe: () => () => {} } as unknown as SoundRuntimePort;
   const root = new Element('main');
   const shell = mountPhraseComposition(root as unknown as HTMLElement, { phrase, sound, directMusic: true });
   const choose = (id: string) => root.querySelectorAll('.melody-tone').find(item => item.dataset.partId === id)!.emit('click');
   const clear = () => { root.querySelector('.melody-scroll')!.emit('pointerdown', { button: 2, pointerId: 92, clientX: 400, clientY: 300 }); dom.document.emit('pointerup', { pointerId: 92 }); };
-  const pitches = () => plans.at(-1)!.events.map(event => Math.round(event.sound.note.frequencyHz));
+  const pitches = () => plans.at(-1)!.events.filter(event => soloGroup === undefined || event.groupId === soloGroup).map(event => Math.round(event.sound.note.frequencyHz));
   try {
     await settle(); choose(first);
     root.querySelector('.song-play')!.emit('click'); await settle(); assert.equal(plans.length, 0);
     choose(second); releaseFirst(); await settle(); assert.deepEqual(pitches(), [660], 'selection during sample loading must prepare the latest family');
-    assert.deepEqual(prepared.slice(0, 2), [[first], [second]]);
+    assert.equal(prepared.length, 1);
+    assert.deepEqual(prepared[0], phrase.read().body!.parts.map(part => part.id));
+    assert.deepEqual(plans[0]!.events.map(event => event.groupId), [first, second]);
     choose(first); await settle(); assert.deepEqual(pitches(), [440]);
     choose(second); await settle(); assert.deepEqual(pitches(), [660], 'same timbre in another family must stay silent');
-    assert.equal(plans.at(-1)!.transport!.positionSeconds, .25, 'live selection preserves the running head');
+    assert.equal(plans.length, 1, 'live selection must not replace the running plan or its clock');
     choose(empty); await settle(); assert.deepEqual(pitches(), [], 'empty selection is silence, not full-song fallback');
     clear(); await settle(); assert.deepEqual(pitches(), [440, 660]);
     choose(second); await settle();
@@ -266,7 +282,7 @@ test('only family selection changes the playback scope, and clicking a note keep
     await settle(); assert.deepEqual(pitches(), [660], 'clicking a note keeps the selected family');
     const playback = plans.at(-1)!;
     assert.equal(playback.preserveNoteLevel, true);
-    const event = playback.events[0]!;
+    const event = playback.events.find(event => event.groupId === second)!;
     assert.equal(event.sound.note.holdSeconds, 1.5);
     assert.deepEqual(auditions, [[event.sound, { pan: event.pan, preserveNoteLevel: true }]]);
     assert.equal(text, before, 'listening scope must not edit or save music');
@@ -343,10 +359,7 @@ test('the studio library filters by actual instruments, separate drum kits and c
       assert.equal(names().length, 11);
       assert(names().every(name => name.startsWith(kit)));
     }
-    const search = f.root.querySelector('.melody-library-search')!;
-    search.value = '底鼓'; search.emit('input');
-    assert.deepEqual(names(), ['录音室鼓 B · 底鼓']);
-    search.value = ''; search.emit('input');
+    assert(names().includes('录音室鼓 B · 底鼓'));
     for (let i = f.sounds.length - 1; i >= 0; i--) {
       if (f.sounds[i]!.name.startsWith('录音室鼓 B')) f.sounds.splice(i, 1);
     }
@@ -742,6 +755,142 @@ test('music shell restores playhead before the roll can persist a new context',a
     assert.equal(f.root.querySelector('.melody-playhead-time')!.textContent,'00:02.500');
     await composition.flush();assert.deepEqual(port.read()!.viewport,expected);assert.equal(port.read()!.playheadSeconds,2.5);
   }finally{composition.dispose();f.cleanup();}
+});
+
+test('desktop Escape cancels a drag before opening and closing the editor controls panel', async () => {
+  const f = editableRoll(); f.roll.dispose();
+  let level = 1;
+  const sound = { stopAll() {}, stop() {}, cancelAudition() {}, subscribe() { return () => {}; }, position() { return 0; },
+    readOutputLevel: () => level, setOutputLevel(next: number) { level = next; }, async audition() {} } as unknown as SoundRuntimePort;
+  const composition = mountPhraseComposition(f.root as unknown as HTMLElement, {
+    phrase: f.phrase, sound, directMusic: true, desktopPointerUx: true, onSave() {}, onSettings() {}, onExit() {},
+    readEditorSettings: () => ({ preferences: createLearningSettings({ getItem: () => null, setItem() {} }), options: {} }),
+  });
+  try {
+    await settle();
+    assert.equal(f.root.querySelector('.song-topbar'), undefined);
+    const panel = f.root.querySelector('.song-editor-controls')!;
+    const scroll = f.root.querySelector('.melody-scroll')!, canvas = f.root.querySelector('.melody-canvas')!;
+    assert(panel.querySelector('.song-save-project'));
+    assert.equal(panel.querySelector('.song-settings'), undefined);
+    assert.equal(panel.querySelector('.song-play'), undefined);
+    assert.equal(panel.querySelector('.song-stop'), undefined);
+    assert.equal(panel.hidden, true);
+    scroll.emit('pointerdown', { target: canvas, clientX: 360, clientY: 270, buttons: 1 });
+    f.document.emit('pointermove', { target: canvas, clientX: 415, clientY: 300, buttons: 1 });
+    f.document.emit('keydown', { key: 'Escape', target: scroll });
+    assert.equal(panel.hidden, true);
+    f.document.emit('keydown', { key: 'Escape', target: scroll });
+    assert.equal(panel.hidden, false);
+    assert(panel.querySelector('.learning-feature'));
+    const rates = panel.querySelectorAll('.song-rate-choice');
+    assert.deepEqual(rates.map(choice => choice.textContent), ['0.5x', '0.75x', '1x']);
+    for (let index = 0; index < rates.length; index++) {
+      rates[index]!.emit('click');
+      assert.deepEqual(rates.map(choice => choice.attributes.get('aria-pressed')), rates.map((_, other) => String(index === other)));
+    }
+    const inlineVolume = panel.querySelector('.output-volume-inline')!;
+    const slider = inlineVolume.querySelector('input')!;
+    slider.value = '75'; slider.emit('input');
+    assert.equal(level, .75);
+    inlineVolume.emit('wheel', { target: slider, deltaY: -100, buttons: 2 });
+    assert.equal(level, .8);
+    assert.equal(inlineVolume.querySelector('output')?.textContent, '80%');
+    f.document.emit('keydown', { key: 'Escape', target: panel });
+    assert.equal(panel.hidden, true);
+  } finally { composition.dispose(); f.cleanup(); }
+});
+
+test('desktop wheel edits update the score immediately and reach the audio plan on resume', async () => {
+  const f = editableRoll(); f.roll.dispose();
+  const plans: SoundSequencePlan[] = [];
+  let liveUpdates = 0;
+  const sound = {
+    stopAll() {}, stop() {}, cancelAudition() {}, subscribe() { return () => {}; }, position() { return 0; }, async audition() {},
+    async preview(plan: SoundSequencePlan) { plans.push(plan); return { id: 'music', status: 'playing' }; },
+    pause() { return { id: 'music', status: 'paused' }; },
+    async resume(_id: string, plan: SoundSequencePlan) { plans.push(plan); return { id: 'music', status: 'playing' }; },
+    update() { liveUpdates++; return { id: 'music', status: 'playing' }; },
+  } as unknown as SoundRuntimePort;
+  const editor = mountPhraseComposition(f.root as unknown as HTMLElement, { phrase: f.phrase, sound, directMusic: true, desktopPointerUx: true });
+  try {
+    await settle();
+    const scroll = f.root.querySelector('.melody-scroll')!, canvas = f.root.querySelector('.melody-canvas')!;
+    const space = () => f.document.emit('keydown', { key: ' ', code: 'Space', target: scroll });
+    f.root.querySelector('.melody-tone-shortcut')!.emit('click');
+    f.family(f.first).emit('click');
+    space(); await settle();
+    assert.equal(plans.length, 1);
+    const previous = f.phrase.read().body!.parts.find(part => part.id === f.first)!.notes[0]!;
+    const old = previous.durationSeconds ?? previous.durationBeats * .5;
+    const persisted = f.read();
+    scroll.emit('wheel', { target: f.note(f.a), deltaY: 100, clientX: 450, clientY: 240 });
+    await editor.flush();
+    assert.notEqual(f.read(), persisted);
+    const changed = f.phrase.read().body!.parts.find(part => part.id === f.first)!.notes[0]!;
+    assert((changed.durationSeconds ?? changed.durationBeats * .5) > old, `expected a longer note after the wheel edit, got ${JSON.stringify(changed)}`);
+    const savedEdit = f.read();
+    scroll.emit('wheel', { target: canvas, deltaY: 100, clientX: 500, clientY: f.note(f.a).getBoundingClientRect().bottom + 30 });
+    await new Promise(resolve => setTimeout(resolve, 280));
+    assert.equal(f.phrase.read().body!.parts.find(part => part.id === f.first)!.notes.length, 2);
+    assert.equal(f.read(), savedEdit);
+    assert.equal(plans.length, 1);
+    assert.equal(liveUpdates, 0);
+    space(); await settle();
+    assert.equal(f.read(), savedEdit);
+    space(); await settle();
+    assert.equal(plans.length, 2);
+    assert.equal(plans[1]!.events.length, plans[0]!.events.length + 1);
+    assert.equal(f.read(), savedEdit);
+    await editor.flush();
+    assert.notEqual(f.read(), savedEdit);
+  } finally { editor.dispose(); f.cleanup(); }
+});
+
+test('desktop erasure and undo reach the same playback session during device start and playback', async () => {
+  const f = editableRoll(); f.roll.dispose();
+  const plans: SoundSequencePlan[] = [];
+  const deletions: [string, readonly string[], boolean][] = [];
+  let finishStart: (() => void) | undefined;
+  let updates = 0;
+  const sound = {
+    stopAll() {}, stop() {}, cancelAudition() {}, subscribe() { return () => {}; }, position() { return .1; }, async audition() {},
+    async preview(plan: SoundSequencePlan) {
+      plans.push(plan);
+      await new Promise<void>(resolve => { finishStart = resolve; });
+      return { id: 'music', status: 'playing' };
+    },
+    setNotesDeleted(id: string, ids: readonly string[], deleted: boolean) { deletions.push([id, ids, deleted]); },
+    update() { updates++; return { id: 'music', status: 'playing' }; },
+  } as unknown as SoundRuntimePort;
+  const editor = mountPhraseComposition(f.root as unknown as HTMLElement, { phrase: f.phrase, sound, directMusic: true, desktopPointerUx: true });
+  try {
+    await settle();
+    const scroll = f.root.querySelector('.melody-scroll')!;
+    f.document.emit('keydown', { key: ' ', code: 'Space', target: scroll });
+    await settle();
+    assert(plans[0]!.editableNotes);
+    assert.deepEqual(new Set(plans[0]!.events.map(event => event.noteId)), new Set([f.a, f.b]));
+    const erase = (id: string) => {
+      const note = f.note(id), bounds = note.getBoundingClientRect();
+      const input = { button: 2, pointerId: 92, clientX: bounds.left + bounds.width / 2 - scroll.scrollLeft, clientY: bounds.top + bounds.height / 2 };
+      scroll.emit('pointerdown', { ...input, target: note });
+      f.document.emit('pointerup', input);
+      assert(!f.note(id));
+    };
+    erase(f.a);
+    assert.deepEqual(deletions, []);
+    finishStart!(); await settle();
+    assert.deepEqual(deletions, [['music', [f.a], true]]);
+    erase(f.b);
+    f.document.emit('keydown', { key: 'z', ctrlKey: true, target: scroll });
+    assert(f.note(f.b));
+    f.document.emit('keydown', { key: 'y', ctrlKey: true, target: scroll });
+    assert(!f.note(f.b));
+    assert.deepEqual(deletions, [['music', [f.a], true], ['music', [f.b], true], ['music', [f.b], false], ['music', [f.b], true]]);
+    assert.equal(plans.length, 1);
+    assert.equal(updates, 0);
+  } finally { editor.dispose(); f.cleanup(); }
 });
 
 test('vertical roll transposes time, pitches, gestures, resize and physical wheel axes without a console',()=>{

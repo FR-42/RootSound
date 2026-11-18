@@ -15,6 +15,7 @@ public sealed record ProjectLibraryPage(
 
 public sealed partial class ProjectDirectoryManager
 {
+    private string? selectedLibraryRoot;
     private readonly Dictionary<string, (long Length, DateTime Modified, ProjectDirectoryInfo Project)> listingHeaders = new(StringComparer.OrdinalIgnoreCase);
 
     private ProjectDirectoryInfo ReadListedProject(string path)
@@ -27,15 +28,55 @@ public sealed partial class ProjectDirectoryManager
         return project;
     }
 
+    public ProjectLibraryPage BrowseSelectedFolder(string path)
+    {
+        lock (gate)
+        {
+            ThrowIfDisposed();
+            string folder = Path.GetFullPath(path);
+            if (!Directory.Exists(folder) || IsLink(folder) || IsLibraryStagingName(Path.GetFileName(folder)))
+                throw new IOException("请选择可以打开的乐曲文件夹。");
+            string? previous = selectedLibraryRoot;
+            selectedLibraryRoot = WithinLibrary(folder, DefaultLocation) ? null : folder;
+            try { return Browse(folder); }
+            catch { selectedLibraryRoot = previous; throw; }
+        }
+    }
+
+    public string ReadLibraryScore(string path)
+    {
+        FileStream stream;
+        lock (gate)
+        {
+            ThrowIfDisposed();
+            path = FullDirectory(path);
+            if (!IsKnownProjectPath(path)) throw new IOException("请重新选择乐曲库中的歌曲。");
+            if (Directory.Exists(path))
+            {
+                using var legacy = new AtomicTextStore(path);
+                return legacy.Read() ?? throw new IOException("找不到歌曲资料。");
+            }
+            stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+        }
+        using (stream)
+        {
+            if (stream.Length > AtomicTextStore.MaximumBytes) throw new IOException("歌曲文件超过当前大小上限。");
+            var score = StreamingWorkspaceCodec.Read(stream, null, omitAssetData: true);
+            _ = ProjectFromMetadata(path, score.Metadata);
+            return score.Library;
+        }
+    }
+
     public ProjectLibraryPage Browse(string path = "")
     {
         lock (gate)
         {
             ThrowIfDisposed();
             string folder = ResolveLibraryFolder(path);
-            string? parent = SamePath(folder, DefaultLocation) ? null : Path.GetDirectoryName(folder);
+            string root = LibraryRootFor(folder);
+            string? parent = SamePath(folder, root) ? null : Path.GetDirectoryName(folder);
             var entries = new List<ProjectLibraryEntry>();
-            if (!Directory.Exists(folder)) return new(DefaultLocation, folder, parent, entries);
+            if (!Directory.Exists(folder)) return new(root, folder, parent, entries);
             var options = new EnumerationOptions { IgnoreInaccessible = true, AttributesToSkip = FileAttributes.ReparsePoint };
             foreach (var item in new DirectoryInfo(folder).EnumerateFileSystemInfos("*", options))
             {
@@ -64,7 +105,7 @@ public sealed partial class ProjectDirectoryManager
                 catch (UnauthorizedAccessException) { }
                 catch (InvalidDataException) { }
             }
-            return new(DefaultLocation, folder, parent, entries.OrderBy(entry => entry.Kind == "folder" ? 0 : 1)
+            return new(root, folder, parent, entries.OrderBy(entry => entry.Kind == "folder" ? 0 : 1)
                 .ThenBy(entry => entry.Name, StringComparer.OrdinalIgnoreCase).ThenBy(entry => entry.Path, StringComparer.OrdinalIgnoreCase).ToArray());
         }
     }
@@ -124,13 +165,28 @@ public sealed partial class ProjectDirectoryManager
         lock (gate)
         {
             ThrowIfDisposed();
-            path = RequireLibraryEntry(path);
+            if (sourceDocument is not null && current is not null && SamePath(current.Path, path))
+            {
+                _ = ResolveLibraryFolder(Path.GetDirectoryName(path)!);
+                Rename(path, current.Id, name, savedSnapshot!, RenameToken(path));
+                return;
+            }
+            path = RequireLibraryEntry(path, allowEditing: true);
             bool folder = Directory.Exists(path);
             string parent = Path.GetDirectoryName(path)!;
             string target = LibraryDestination(parent, name, folder ? "" : Path.GetExtension(path), path);
             if (path == target) return;
             var entries = folder ? LibraryTree(path) : new[] { path };
-            using var ownership = ClaimLibraryFiles(entries);
+            bool containsActive = folder && current is { PendingSave: false } && WithinLibrary(current.Path, path);
+            using var ownership = ClaimLibraryFiles(entries.Where(entry => !containsActive || !SamePath(entry, current!.Path)));
+            if (containsActive)
+            {
+                activeStore!.MoveParent(path, target);
+                current = current! with { Path = activeStore.FilePath };
+                if (sourceDocument is not null) sourceDocument = sourceDocument with { Path = activeStore.FilePath };
+                listingHeaders.Clear();
+                return;
+            }
             Action<string, string> move = folder ? Directory.Move : (from, to) => File.Move(from, to);
             if (SamePath(path, target))
             {
@@ -140,6 +196,8 @@ public sealed partial class ProjectDirectoryManager
                 catch { move(staging, path); throw; }
             }
             else move(path, target);
+            if (current is { PendingSave: true } pending && folder && WithinLibrary(pending.Path, path))
+                current = pending with { Path = Path.Combine(target, Path.GetRelativePath(path, pending.Path)) };
             listingHeaders.Clear();
         }
     }
@@ -185,7 +243,7 @@ public sealed partial class ProjectDirectoryManager
         }
     }
 
-    private string RequireLibraryEntry(string path)
+    private string RequireLibraryEntry(string path, bool allowEditing = false)
     {
         path = FullDirectory(path);
         string parent = ResolveLibraryFolder(Path.GetDirectoryName(path) ?? "");
@@ -193,7 +251,7 @@ public sealed partial class ProjectDirectoryManager
             || IsLibraryStagingName(Path.GetFileName(path)) || IsKnownProjectPath(path)
             || IsKnownProjectPath(parent) || !Directory.Exists(path) && NativeDocumentFiles.Format(path) is null)
             throw new IOException("请重新选择乐曲库中的文件或文件夹。");
-        if (current is not null && (SamePath(current.Path, path)
+        if (!allowEditing && current is not null && (SamePath(current.Path, path)
             || current.Path.StartsWith(path + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)))
             throw new IOException("其中的歌曲正在编辑，请先退出歌曲。");
         return path;
@@ -243,9 +301,8 @@ public sealed partial class ProjectDirectoryManager
     private string ResolveLibraryFolder(string path)
     {
         string folder = string.IsNullOrWhiteSpace(path) ? DefaultLocation : Path.GetFullPath(path);
-        string root = Path.TrimEndingDirectorySeparator(DefaultLocation);
-        var comparison = OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
-        if (!string.Equals(Path.TrimEndingDirectorySeparator(folder), root, comparison) && !folder.StartsWith(root + Path.DirectorySeparatorChar, comparison))
+        string root = LibraryRootFor(folder);
+        if (!WithinLibrary(folder, root))
             throw new IOException("请在乐曲库目录中浏览。");
         for (string? currentFolder = folder; currentFolder is not null; currentFolder = Path.GetDirectoryName(currentFolder))
         {
@@ -254,6 +311,15 @@ public sealed partial class ProjectDirectoryManager
             if (IsLibraryStagingName(Path.GetFileName(currentFolder))) throw new IOException("这个目录不是乐曲文件夹。");
         }
         throw new IOException("请在乐曲库目录中浏览。");
+    }
+
+    private string LibraryRootFor(string path) => selectedLibraryRoot is { } selected && WithinLibrary(path, selected) ? selected : DefaultLocation;
+
+    private static bool WithinLibrary(string path, string root)
+    {
+        string relative = Path.GetRelativePath(root, path);
+        return !Path.IsPathRooted(relative) && relative != ".."
+            && !relative.StartsWith(".." + Path.DirectorySeparatorChar, StringComparison.Ordinal);
     }
 
     private static bool IsLibraryStagingName(string name) => new[] { ".rootsound-create-", ".rootsound-delete-", ".rootsound-rename-" }

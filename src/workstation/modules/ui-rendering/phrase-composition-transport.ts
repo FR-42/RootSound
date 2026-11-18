@@ -14,6 +14,7 @@ export function createPhraseCompositionTransport(options: {
   durationSeconds?(): number;
   readBody?(): PhraseBody | undefined;
   readMidiEffects?(): boolean;
+  reuseBody?: boolean;
   runtime: SoundRuntimePort;
   onChange(state: PlaylistTransportState): void;
   onError(error: unknown): void;
@@ -26,7 +27,15 @@ export function createPhraseCompositionTransport(options: {
   let manualTail = false;
   // Recompute on edits/transport actions, never scan thousands of notes per frame.
   let bounds: ReturnType<typeof phraseAuditionExtent> | undefined;
-  const refreshExtent = () => { const body = options.readBody?.(); bounds = body ? phraseAuditionExtent(body, options.readMidiEffects?.()) : undefined; };
+  let boundedBody: PhraseBody | undefined;
+  let boundedEffects: boolean | undefined;
+  const refreshExtent = () => {
+    const body = options.readBody?.(), effects = options.readMidiEffects?.();
+    if (options.reuseBody && body === boundedBody && effects === boundedEffects) return;
+    bounds = body ? phraseAuditionExtent(body, effects) : undefined;
+    boundedBody = body;
+    boundedEffects = effects;
+  };
   const extent = () => bounds;
   refreshExtent();
   const fullDuration = () => options.durationSeconds?.() ?? (options.lengthBeats?.() ?? PHRASE_COMPOSITION_BEATS) * 60 / tempo;
@@ -106,6 +115,8 @@ export function createPhraseCompositionTransport(options: {
     },
     pause: base.pause,
     stop,
+    setNotesDeleted: base.setNotesDeleted,
+    setSoloGroup: base.setSoloGroup,
     setRate(rate) {
       if (disposed) return;
       refreshExtent();

@@ -7,6 +7,7 @@ using RootSound.Desktop;
 Console.InputEncoding = new UTF8Encoding(false);
 Console.OutputEncoding = new UTF8Encoding(false);
 if (args is ["--cleanup-installed-versions"]) return InstalledVersionCleanup.Run();
+if (args is ["--verify-installation"]) return InstalledVersionCleanup.VerifyPayload();
 if (args.Length != 1) return 2;
 Directory.CreateDirectory(args[0]);
 using var manager = new ProjectDirectoryManager(Path.GetFullPath(args[0]));
@@ -29,6 +30,7 @@ for (string? line; (line = Console.ReadLine()) is not null;)
             "project.Read" => Pack(new { status = "ready", defaultLocation = manager.DefaultLocation, current = manager.Current,
                 hasUnsavedChanges = manager.HasUnsavedChanges, doubleClickIntervalMs = 500 }),
             "project.Create" => Pack(new { status = "created", project = manager.Create(A(0), A(1), A(2)) }),
+            "project.StartNew" => Pack(new { status = "opened", project = manager.StartNew(A(0), A(1), A(2)) }),
             "project.CreateCopy" => Pack(new { status = "created", project = manager.CreateCopy(A(0), A(1), A(2)) }),
             "project.CreateDetached" => Pack(new { status = "created", project = manager.CreateDetached(A(0), A(1), A(2)) }),
             "project.List" => Pack(new { status = "listed", projects = manager.List() }),

@@ -18,6 +18,7 @@ export interface DesktopBridge {
     Read(): unknown;
     Write(value: string): unknown;
     WriteScoped?(value: string, scope: string): unknown;
+    WriteScopedIfUnchanged?(value: string, scope: string, revision: string): unknown;
     WriteScopedCheckpoint?(value: string, scope: string): unknown;
   };
   files: {
@@ -92,6 +93,7 @@ export function createDesktopPlatform(bridge: DesktopBridge = hostBridge()): {
   projectDirectories?: ProjectDirectoriesPort;
 } {
   let storageScope: string | undefined;
+  let observed: { value: string | null; revision: string } | undefined;
   return {
     ...(bridge.projectDirectories ? { projectDirectories: createDesktopProjectDirectories(bridge.projectDirectories) } : {}),
     sampleFiles: createDesktopSampleFiles(bridge.sampleFiles),
@@ -128,13 +130,26 @@ export function createDesktopPlatform(bridge: DesktopBridge = hostBridge()): {
             fail('项目已切换，请重新打开界面后继续。');
           storageScope = result.scope;
         } else if (bridge.projectDirectories) fail('项目存储缺少隔离标识，请关闭旧窗口后重新打开 RootSound。');
-        return result.value as string | null;
+        const value = result.value as string | null;
+        observed = typeof result.revision === 'string' && result.revision ? { value, revision: result.revision } : undefined;
+        return value;
       },
       write(value) {
         if (storageScope !== undefined && !bridge.storage.WriteScoped) fail('当前窗口缺少项目隔离保存，请重新打开 RootSound。');
         const result = response(storageScope === undefined ? bridge.storage.Write(value) : bridge.storage.WriteScoped!(value, storageScope));
         if (result.ok === false) responseError(result, 'error');
         if (result.ok !== true) fail('素材库写入结果无效，无法确认保存成功。');
+        observed = undefined;
+      },
+      writeIfUnchanged(value, expected) {
+        if ((!observed || observed.value !== expected) && this.read() !== expected)
+          fail('素材库已被其他窗口修改，请重新打开后继续。原数据未被覆盖。');
+        if (!observed || storageScope === undefined) { this.write(value); return; }
+        const result = response(bridge.storage.WriteScopedIfUnchanged!(value, storageScope, observed.revision));
+        if (result.ok === false) responseError(result, 'error');
+        if (result.ok !== true || typeof result.revision !== 'string' || !result.revision)
+          fail('素材库写入结果无效，无法确认保存成功。');
+        observed = { value, revision: result.revision };
       },
       writePermanent(value) {
         if (storageScope === undefined || !bridge.storage.WriteScopedCheckpoint)
@@ -142,6 +157,7 @@ export function createDesktopPlatform(bridge: DesktopBridge = hostBridge()): {
         const result = response(bridge.storage.WriteScopedCheckpoint(value, storageScope));
         if (result.ok === false) responseError(result, 'error');
         if (result.ok !== true) fail('永久删除的保存结果无效，无法确认操作成功。');
+        observed = undefined;
       },
     },
     audioFiles: {

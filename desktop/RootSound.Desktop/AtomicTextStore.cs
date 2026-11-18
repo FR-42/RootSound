@@ -9,7 +9,7 @@ public sealed class AtomicTextStore : IDisposable
     public const int MaximumBytes = 512 * 1024 * 1024;
     private static readonly UTF8Encoding Utf8 = new(false, true);
     private readonly object gate = new();
-    private readonly string directory;
+    private string directory;
     private FileStream? ownership;
     private byte[]? observedHash;
     private bool disposed;
@@ -22,10 +22,15 @@ public sealed class AtomicTextStore : IDisposable
     internal static AtomicTextStore ForProjectFile(string path)
     {
         path = Path.GetFullPath(path);
+        return new AtomicTextStore(Path.GetDirectoryName(path)!, Path.GetFileName(path), ProjectLockPath(path));
+    }
+
+    private static string ProjectLockPath(string path)
+    {
         string locks = Path.Combine(Path.GetTempPath(), "RootSound", "ProjectLocks");
         Directory.CreateDirectory(locks);
         string key = Convert.ToHexString(SHA256.HashData(Utf8.GetBytes(path.ToUpperInvariant())));
-        return new AtomicTextStore(Path.GetDirectoryName(path)!, Path.GetFileName(path), Path.Combine(locks, key + ".lock"));
+        return Path.Combine(locks, key + ".lock");
     }
 
     private AtomicTextStore(string directory, string fileName, string? lockPath)
@@ -156,6 +161,34 @@ public sealed class AtomicTextStore : IDisposable
                 {
                     ownership?.Dispose(); ownership = next.ownership; next.ownership = null;
                 }
+            }
+            finally { next?.Dispose(); }
+        }
+    }
+
+    internal void MoveParent(string source, string destination)
+    {
+        lock (gate)
+        {
+            ThrowIfDisposed(); RequireUnchanged();
+            string relative = Path.GetRelativePath(Path.GetFullPath(source), FilePath);
+            if (Path.IsPathRooted(relative) || relative == ".." || relative.StartsWith(".." + Path.DirectorySeparatorChar, StringComparison.Ordinal))
+                throw new IOException("歌曲不在这个目录中。");
+            string target = Path.GetFullPath(Path.Combine(destination, relative));
+            bool sameLock = string.Equals(FilePath, target, StringComparison.OrdinalIgnoreCase);
+            FileStream? next = sameLock ? null : new(ProjectLockPath(target), FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
+            try
+            {
+                if (sameLock)
+                {
+                    string staging = Path.Combine(Path.GetDirectoryName(source)!, ".rootsound-rename-" + Guid.NewGuid().ToString("N"));
+                    Directory.Move(source, staging);
+                    try { Directory.Move(staging, destination); }
+                    catch { Directory.Move(staging, source); throw; }
+                }
+                else Directory.Move(source, destination);
+                FilePath = target; directory = Path.GetDirectoryName(target)!;
+                if (next is not null) { ownership?.Dispose(); ownership = next; next = null; }
             }
             finally { next?.Dispose(); }
         }

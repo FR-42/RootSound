@@ -9,30 +9,63 @@ const { mountProjectLibrary } = await import('../src/workstation/modules/ui-rend
 class Element extends EventTarget {
   children: Element[] = []; parent?: Element; textContent = ''; className = ''; hidden = false; disabled = false; title = '';
   attributes = new Map<string, string>(); tagName: string;
+  style: Record<string, unknown> & { setProperty(name: string, value: string): void } = { setProperty(name, value) { this[name] = value; } };
+  dataset: Record<string, string> = {}; scrollTop = 0; clientHeight = 400;
   constructor(tag = 'div') { super(); this.tagName = tag; }
+  classList = {
+    add: (name: string) => { if (!this.className.split(' ').includes(name)) this.className = (this.className + ' ' + name).trim(); },
+    remove: (name: string) => { this.className = this.className.split(' ').filter(item => item !== name).join(' '); },
+    toggle: (name: string, value: boolean) => { if (value) this.classList.add(name); else this.classList.remove(name); },
+  };
+  closest(selector: string): Element | undefined {
+    return this.className.split(' ').includes(selector.slice(1)) ? this : this.parent?.closest(selector);
+  }
+  get lastElementChild(): Element | undefined { return this.children.at(-1); }
+  get firstElementChild(): Element | undefined { return this.children[0]; }
+  querySelector(selector: string): Element | undefined { return this.children.flatMap(flatten).find(item => item.className.split(' ').includes(selector.slice(1))); }
   append(...elements: Element[]) { for (const element of elements) { element.parent = this; this.children.push(element); } }
+  insertBefore(element: Element, before: Element | null) {
+    if (!before) { this.append(element); return; }
+    element.parent = this;
+    this.children.splice(this.children.indexOf(before), 0, element);
+  }
   replaceChildren(...elements: Element[]) { this.children = []; this.append(...elements); }
   remove() { if (this.parent) this.parent.children = this.parent.children.filter(element => element !== this); }
   setAttribute(key: string, value: string) { this.attributes.set(key, value); }
   contains(other: Element): boolean { return other === this || this.children.some(element => element.contains(other)); }
   replaceWith(other: Element) { if (this.parent) { const parent = this.parent; parent.children[parent.children.indexOf(this)] = other; other.parent = parent; this.parent = undefined; } }
+  getBoundingClientRect() { return { top: 300 }; }
   focus() { (document as unknown as { activeElement: Element }).activeElement = this; }
 }
 const flatten = (root: Element): Element[] => [root, ...root.children.flatMap(flatten)];
 const visible = (root: Element): Element[] => root.hidden ? [] : [root, ...root.children.flatMap(visible)];
 const settle = async () => { for (let index = 0; index < 8; index++) await Promise.resolve(); };
-function fixture(overrides: Partial<ProjectSetupPort> = {}, doubleClickIntervalMs?: number) {
+function fixture(overrides: Partial<ProjectSetupPort> = {}, desktopPointerUx = false) {
   const old = Object.getOwnPropertyDescriptor(globalThis, 'document'); const document = new Element('document');
   Object.assign(document, { createElement: (tag: string) => new Element(tag), createElementNS: (_: string, tag: string) => new Element(tag) });
   Object.defineProperty(globalThis, 'document', { configurable: true, value: document });
+  const oldWindow = Object.getOwnPropertyDescriptor(globalThis, 'window');
+  if (desktopPointerUx) {
+    const window = Object.assign(new EventTarget(), {
+      setTimeout: (call: () => void, delay: number) => setTimeout(call, delay),
+      clearTimeout: (timer: ReturnType<typeof setTimeout>) => clearTimeout(timer),
+    });
+    Object.defineProperty(globalThis, 'window', { configurable: true, value: window });
+  }
   const root = new Element('root'); const trigger = new Element('button'); root.append(trigger);
   const opened: Array<string | undefined> = []; let created = 0;
   const service: ProjectSetupPort = { defaultLocation: async () => 'D:/RootSound/project', chooseLocation: async () => ({ status: 'cancelled' }), create: async () => {},
     list: async () => [{ id: 'one', name: '第一首', path: 'D:/RootSound/project/第一首.rootsound' }], open: async path => { opened.push(path); }, ...overrides };
-  const menu = mountProjectLibrary(root as unknown as HTMLElement, trigger as unknown as HTMLButtonElement, service, () => { created++; }, doubleClickIntervalMs);
+  const menu = mountProjectLibrary(root as unknown as HTMLElement, trigger as unknown as HTMLButtonElement, service, () => { created++; }, undefined, desktopPointerUx);
   return { root, trigger, menu, service, opened, get created() { return created; }, document,
-    button(label: string) { const button = flatten(root).find(element => element.tagName === 'button' && element.attributes.get('aria-label') === label); assert(button); return button; },
-    cleanup() { menu.dispose(); if (old) Object.defineProperty(globalThis, 'document', old); else Reflect.deleteProperty(globalThis, 'document'); } };
+    button(label: string) { const button = flatten(root).find(element => element.tagName === 'button' && (element.attributes.get('aria-label') === label || element.textContent === label)); assert(button); return button; },
+    cleanup() {
+      menu.dispose();
+      if (old) Object.defineProperty(globalThis, 'document', old); else Reflect.deleteProperty(globalThis, 'document');
+      if (desktopPointerUx) {
+        if (oldWindow) Object.defineProperty(globalThis, 'window', oldWindow); else Reflect.deleteProperty(globalThis, 'window');
+      }
+    } };
 }
 
 function dragEvent(element: Element, type: string, transfer: object): Event {
@@ -45,6 +78,93 @@ function transfer() {
 function named(root: Element, className: string): Element {
   const result = flatten(root).find(node => node.className.split(' ').includes(className)); assert(result); return result;
 }
+
+test('desktop library mounts only nearby rows and opens the correct song after scrolling to the end', async t => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const root = 'D:/RootSound/project';
+  const entries = Array.from({ length: 448 }, (_, index) => ({
+    kind: 'project' as const, id: String(index), name: '乐曲 ' + index, path: `${root}/${index}.rootsound`,
+  }));
+  const f = fixture({ browse: async () => ({ root, path: root, entries }), readLibraryDuration: async () => 65 }, true);
+  try {
+    f.menu.open(); await settle();
+    const overlay = named(f.root, 'is-library-workspace');
+    const visibleRows = () => visible(f.root).filter(item => item.className === 'project-library-entry-name');
+    assert.equal(visibleRows().length, 14);
+    assert.equal(visibleRows()[0]!.textContent, '乐曲 0');
+    assert.equal(named(f.root, 'project-library-entry-duration').textContent, '1:05');
+    const scroll = new Event('wheel', { cancelable: true });
+    overlay.dispatchEvent(scroll);
+    assert.equal(scroll.defaultPrevented, false);
+    const list = named(f.root, 'project-library-grid');
+    list.scrollTop = entries.length * 40 - list.clientHeight;
+    list.dispatchEvent(new Event('scroll')); await settle();
+    assert.equal(visibleRows().length, 14);
+    assert.equal(visibleRows().at(-1)!.textContent, '乐曲 447');
+    const last = f.button('乐曲 447');
+    last.dispatchEvent(new Event('pointerover')); await settle();
+    assert.deepEqual(f.opened, []);
+    last.dispatchEvent(new Event('click')); t.mock.timers.tick(600); await settle();
+    assert.deepEqual(f.opened, [entries[447]!.path]);
+  } finally { f.cleanup(); }
+});
+
+test('desktop library folder rows and breadcrumb navigate the list', async t => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const root = 'D:/RootSound/project', child = root + '/演示项目';
+  const opened: string[] = [];
+  const f = fixture({ browse: async (path = root) => {
+    opened.push(path);
+    return path === root ? { root, path, entries: [{ kind: 'folder', name: '演示项目', path: child }] }
+      : { root, path, parent: root, entries: [{ kind: 'project', name: '钟', path: child + '/钟.rootsound', id: 'one' }] };
+  } }, true);
+  try {
+    f.menu.open(); await settle();
+    f.button('打开文件夹 演示项目').dispatchEvent(new Event('click')); t.mock.timers.tick(600); await settle();
+    assert(f.button('钟'));
+    f.button('乐曲库根目录').dispatchEvent(new Event('click')); await settle();
+    assert.deepEqual(opened, [root, child, root]);
+  } finally { f.cleanup(); }
+});
+
+test('welcome library places its three actions after the path and creates in the current folder', async t => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const root = 'D:/RootSound/project', child = root + '/演示项目';
+  const started: Array<[string, string]> = [];
+  const created: Array<[string, string]> = [];
+  const f = fixture({
+    browse: async (path = root) => path === root
+      ? { root, path, entries: [{ kind: 'folder', name: '演示项目', path: child }] }
+      : { root, path, parent: root, entries: [{ kind: 'project', id: 'one', name: '新建项目', path: child + '/新建项目.rootsound' }] },
+    chooseLibraryFolder: async () => { throw Error('Unexpected folder chooser'); },
+    createFolder: async (path, name) => {
+      created.push([path, name]);
+    },
+    startNew: async (name, path) => { started.push([name, path]); },
+  }, true);
+  try {
+    f.menu.open(); await settle();
+    const directory = named(f.root, 'project-library-directory');
+    const [breadcrumb, actions] = directory.children;
+    assert.equal(breadcrumb?.tagName, 'nav');
+    assert.deepEqual(actions?.children.map(button => [button.attributes.get('aria-label'), button.textContent, button.children[0]?.tagName]), [
+      ['选择音乐文件', '', 'svg'], ['新建文件夹', '', 'svg'], ['新建项目', '', 'svg'],
+    ]);
+    assert(!visible(f.root).some(node => node.tagName === 'h2'));
+    f.button('打开文件夹 演示项目').dispatchEvent(new Event('click')); t.mock.timers.tick(600); await settle();
+    f.button('选择音乐文件').dispatchEvent(new Event('click')); await settle();
+    assert.deepEqual(f.opened, [undefined]);
+    assert.equal(breadcrumb?.lastElementChild?.textContent, '演示项目');
+    assert.equal(named(f.root, 'is-welcome-library').hidden, false);
+    f.button('新建文件夹').dispatchEvent(new Event('click'));
+    const form = named(f.root, 'project-library-folder-form');
+    Object.assign(form.children[0]!, { value: '草稿' });
+    form.dispatchEvent(new Event('submit', { cancelable: true })); await settle();
+    assert.deepEqual(created, [[child, '草稿']]);
+    f.button('新建项目').dispatchEvent(new Event('click')); await settle();
+    assert.deepEqual(started, [['新建项目 1', child]]);
+  } finally { f.cleanup(); }
+});
 
 test('a deleted song disappears while a retained external tone-copy notice remains visible in the library', async () => {
   let projects = [{ id: 'one', name: '第一首', path: 'D:/RootSound/project/第一首.rootsound' }]; let removals = 0;
@@ -127,13 +247,14 @@ test('a closed library cannot receive a stale catalog result', async () => {
   } finally { f.cleanup(); }
 });
 
-test('two clicks followed by double-click edit a song name without opening it, and Enter persists the listed identity', async t => {
-  t.mock.timers.enable({ apis: ['setTimeout'] }); const renamed: unknown[][] = [];
+test('right-click rename persists the listed song identity without opening it', async () => {
+  const renamed: unknown[][] = [];
   const f = fixture({ rename: async (project, name) => { renamed.push([project, name]); return { ...project, name }; } });
   try {
     f.menu.open(); await settle(); const tile = f.button('第一首');
-    tile.dispatchEvent(new Event('click')); t.mock.timers.tick(450); tile.dispatchEvent(new Event('click'));
-    tile.dispatchEvent(new Event('dblclick', { cancelable: true })); t.mock.timers.tick(500); await settle();
+    tile.dispatchEvent(new Event('dblclick', { cancelable: true }));
+    assert(!flatten(f.root).some(item => item.className === 'project-library-name'));
+    tile.dispatchEvent(new Event('contextmenu', { cancelable: true })); f.button('改名').dispatchEvent(new Event('click')); await settle();
     assert.deepEqual(f.opened, []); const input = named(f.root, 'project-library-name'); assert.equal(input.tagName, 'input');
     Object.assign(input, { value: '新的曲名' }); const enter = new Event('keydown', { cancelable: true }); Object.assign(enter, { key: 'Enter' }); input.dispatchEvent(enter); await settle();
     assert.deepEqual(renamed, [[{ id: 'one', name: '第一首', path: 'D:/RootSound/project/第一首.rootsound' }, '新的曲名']]);
@@ -141,18 +262,45 @@ test('two clicks followed by double-click edit a song name without opening it, a
   } finally { f.cleanup(); }
 });
 
+test('desktop folders and imported files rename only through their right-click menus', async () => {
+  const root = 'D:/RootSound/project';
+  for (const entry of [
+    { kind: 'folder' as const, name: 'Folder', path: root + '/Folder' },
+    { kind: 'midi' as const, name: 'Imported', path: root + '/Imported.mid' },
+  ]) {
+    const renames: string[][] = [];
+    let browses = 0;
+    const f = fixture({
+      browse: async () => { browses++; return { root, path: root, entries: [entry] }; },
+      renameEntry: async (path, name) => { renames.push([path, name]); },
+    }, true);
+    try {
+      f.menu.open(); await settle();
+      const row = f.button(entry.kind === 'folder' ? '打开文件夹 Folder' : '打开 Imported');
+      row.dispatchEvent(new Event('dblclick', { cancelable: true }));
+      assert(!flatten(f.root).some(item => item.className === 'project-library-name'));
+      row.dispatchEvent(new Event('contextmenu', { cancelable: true })); f.button('改名').dispatchEvent(new Event('click')); await settle();
+      assert.equal(browses, 1); assert.deepEqual(f.opened, []);
+      const input = named(f.root, 'project-library-name'); Object.assign(input, { value: 'New name' });
+      const enter = new Event('keydown', { cancelable: true }); Object.assign(enter, { key: 'Enter' });
+      input.dispatchEvent(enter); await settle();
+      assert.deepEqual(renames, [[entry.path, 'New name']]);
+    } finally { f.cleanup(); }
+  }
+});
+
 test('song inline rename rejects empty names, Escape cancels, and failures retain text for retry', async t => {
   t.mock.timers.enable({ apis: ['setTimeout'] }); let attempts = 0;
   const f = fixture({ rename: async (project, name) => { if (++attempts === 1) throw new Error('文件正在使用'); return { ...project, name }; } });
   const key = (node: Element, value: string) => { const event = new Event('keydown', { cancelable: true }); Object.assign(event, { key: value }); node.dispatchEvent(event); };
   try {
-    f.menu.open(); await settle(); f.button('第一首').dispatchEvent(new Event('dblclick'));
+    f.menu.open(); await settle(); f.button('第一首').dispatchEvent(new Event('contextmenu')); f.button('改名').dispatchEvent(new Event('click'));
     const field = named(f.root, 'project-library-name'); Object.assign(field, { value: '  ' }); key(field, 'Enter'); await settle(); assert.equal(attempts, 0);
     assert(visible(f.root).some(node => node.textContent === '名称不能为空。'));
     Object.assign(field, { value: '保留输入' }); key(field, 'Enter'); await settle(); assert.equal(attempts, 1);
     assert(visible(f.root).some(node => node.textContent === '文件正在使用')); assert.equal((field as unknown as { value: string }).value, '保留输入');
     key(field, 'Enter'); await settle(); assert.equal(attempts, 2); assert(f.button('保留输入'));
-    f.button('保留输入').dispatchEvent(new Event('dblclick')); Object.assign(named(f.root, 'project-library-name'), { value: '取消这次输入' });
+    f.button('保留输入').dispatchEvent(new Event('contextmenu')); f.button('改名').dispatchEvent(new Event('click')); Object.assign(named(f.root, 'project-library-name'), { value: '取消这次输入' });
     key(named(f.root, 'project-library-name'), 'Escape'); assert(f.button('保留输入')); assert.equal(attempts, 2);
   } finally { f.cleanup(); }
 });
@@ -161,7 +309,7 @@ test('pending rename blocks duplicate saves and navigation; a disposed completio
   let finish!: (value: { id: string; name: string; path: string }) => void; let writes = 0;
   const f = fixture({ rename: () => { writes++; return new Promise(resolve => { finish = resolve; }); } });
   try {
-    f.menu.open(); await settle(); f.button('第一首').dispatchEvent(new Event('dblclick'));
+    f.menu.open(); await settle(); f.button('第一首').dispatchEvent(new Event('contextmenu')); f.button('改名').dispatchEvent(new Event('click'));
     const field = named(f.root, 'project-library-name'); Object.assign(field, { value: '稍后完成' });
     field.dispatchEvent(new Event('blur')); field.dispatchEvent(new Event('blur')); assert.equal(writes, 1);
     assert.equal(field.disabled, true); f.button('关闭乐曲库').dispatchEvent(new Event('click')); assert.equal(f.trigger.attributes.get('aria-expanded'), 'true');
@@ -170,14 +318,15 @@ test('pending rename blocks duplicate saves and navigation; a disposed completio
   } finally { f.cleanup(); }
 });
 
-test('a slower configured double-click interval is respected before a song opens', async t => {
-  t.mock.timers.enable({ apis: ['setTimeout'] });
-  const f = fixture({ rename: async (project, name) => ({ ...project, name }) }, 900);
+test('single-click opens synchronously and a following double-click cannot rename or overlap the open', async () => {
+  const calls: unknown[] = []; let finish!: () => void;
+  const f = fixture({ open: path => { calls.push(path); return new Promise<void>(resolve => { finish = resolve; }); }, rename: async (project, name) => ({ ...project, name }) });
   try {
-    f.menu.open(); await settle(); f.button('第一首').dispatchEvent(new Event('click'));
-    t.mock.timers.tick(880); assert.deepEqual(f.opened, []);
-    f.button('第一首').dispatchEvent(new Event('dblclick')); t.mock.timers.tick(1000); assert.deepEqual(f.opened, []);
-    assert.equal(named(f.root, 'project-library-name').tagName, 'input');
+    f.menu.open(); await settle(); const tile = f.button('第一首'); tile.dispatchEvent(new Event('click'));
+    assert.deepEqual(calls, ['D:/RootSound/project/第一首.rootsound']);
+    tile.dispatchEvent(Object.assign(new Event('click'), { detail: 2 })); tile.dispatchEvent(new Event('dblclick'));
+    assert.equal(calls.length, 1); assert(!flatten(f.root).some(item => item.className === 'project-library-name'));
+    finish(); await settle(); assert.equal(calls.length, 1);
   } finally { f.cleanup(); }
 });
 

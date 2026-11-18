@@ -1,10 +1,10 @@
-param([string]$Version = '0.1.0-preview.5', [switch]$UseCachedRuntimes)
+param([string]$Version = '0.1.0-preview.11', [switch]$UseCachedRuntimes)
 $ErrorActionPreference = 'Stop'
 if ($Version -notmatch '^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$') { throw 'Invalid release version.' }
 $releaseTaskRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..')).Path
 Push-Location -LiteralPath $releaseTaskRoot
 try {
-    foreach ($releaseName in @("RootSound-Windows-x64-$Version-Setup.exe", "RootSound-macOS-arm64-$Version.pkg")) {
+    foreach ($releaseName in @('简乐安装.exe', '简乐安装.pkg')) {
         if (Test-Path -LiteralPath "release/$Version/$releaseName") { throw 'Release files already exist. Choose a new version to preserve them.' }
     }
     $env:ROOTSOUND_RELEASE_VERSION = $Version
@@ -22,6 +22,11 @@ try {
     if ($UseCachedRuntimes) { & python scripts/fetch-release-dependencies.py --offline }
     else { & python scripts/fetch-release-dependencies.py }
     if ($LASTEXITCODE -ne 0) { throw 'Runtime preparation failed.' }
+    & python scripts/fetch-native-release-dependencies.py
+    if ($LASTEXITCODE -ne 0) { throw 'Native Windows runtime preparation failed.' }
+    & dotnet build desktop/RootSound.Desktop/RootSound.Desktop.csproj -c Release --no-restore -o .cache/release-native "-p:Version=$Version"
+    if ($LASTEXITCODE -ne 0) { throw 'Native Windows desktop build failed.' }
+    & (Join-Path $PSScriptRoot 'Build-Launcher.ps1') -OutputPath '.cache/release-native-launcher/RootSound.exe' -ReleaseVersion $Version
     & python scripts/package-desktop-release.py prepare; if ($LASTEXITCODE -ne 0) { throw 'Package preparation failed.' }
     & python scripts/package-desktop-release.py sign-mac; if ($LASTEXITCODE -ne 0) { throw 'Local Mac signing failed.' }
     & python scripts/package-desktop-release.py archive; if ($LASTEXITCODE -ne 0) { throw 'ZIP creation failed.' }

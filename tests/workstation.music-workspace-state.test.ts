@@ -6,6 +6,15 @@ import type { MusicWorkspaceState } from '../src/workstation/contracts/workspace
 const state: MusicWorkspaceState = { showGridCells: true, viewport: { leftSeconds: 2.5, zoom: 6, top: 720, rowHeight: 38 },
   selection: { partId: 'p', noteId: 'n' }, playheadSeconds: 4.5, entryOctave: 5, entryToneId: 'p', noteLengths: { p: .173 } };
 
+test('vertical leading margin survives reopening and is bounded to half a viewport',()=>{
+  let text='';const storage={getItem:()=>text||null,setItem(_key:string,value:string){text=value;}};
+  const port=createMusicWorkspaceState(storage,'lead');
+  port.write({...state,orientation:'vertical',viewport:{...state.viewport,leftSeconds:-.3}});
+  assert.equal(createMusicWorkspaceState(storage,'lead').read()!.viewport.leftSeconds,-.3);
+  port.write({...state,orientation:'vertical',viewport:{...state.viewport,leftSeconds:-100}});
+  assert.equal(createMusicWorkspaceState(storage,'lead').read()!.viewport.leftSeconds,-4/state.viewport.zoom);
+});
+
 test('project-local context survives reopening, isolates projects and returns owned snapshots', () => {
   const records = new Map<string,string>();
   const storage = { getItem: (key: string) => records.get(key) ?? null, setItem(key: string,value: string) { records.set(key,value); } };

@@ -7,6 +7,7 @@ class FakeParam {
   setValueAtTime(value: number, time: number): void { this.changes.push({ kind: 'set', value, time }); }
   linearRampToValueAtTime(value: number, time: number): void { this.changes.push({ kind: 'ramp', value, time }); }
   exponentialRampToValueAtTime(value: number, time: number): void { this.changes.push({ kind: 'ramp', value, time }); }
+  cancelScheduledValues(time: number): void { this.changes.splice(0, this.changes.length, ...this.changes.filter(change => change.time < time)); }
   cancelAndHoldAtTime(time: number): void { this.changes.push({ kind: 'hold', value: 0, time }); }
 }
 

@@ -8,6 +8,8 @@ const { HostClient } = require('./rpc.cjs');
 const { seedBundledProjects } = require('./bundled-projects.cjs');
 
 const ORIGIN = 'https://rootsound.local';
+const CLOSE_SCRIPT_TIMEOUT = 3000;
+const CLOSE_WORK_TIMEOUT = 8000;
 app.setName('RootSound');
 const base = __dirname;
 let window, host, closeAccepted = false, preparingClose = false, pickerBusy = false;
@@ -103,26 +105,63 @@ async function resource(request) {
     return new Response(request.method === 'HEAD' ? null : Readable.toWeb(fs.createReadStream(file)), { headers });
   } catch { return new Response(null, { status: 404 }); }
 }
+async function closeScript(script, timeout = CLOSE_SCRIPT_TIMEOUT) {
+  let timer;
+  try {
+    return await Promise.race([
+      window.webContents.executeJavaScript(script),
+      new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('编辑器未及时响应。')), timeout); }),
+    ]);
+  } finally { clearTimeout(timer); }
+}
+async function prepareWindowClose(mode) {
+  const id = JSON.stringify(randomUUID());
+  try {
+    if (await closeScript(`globalThis.__rootSoundClose?.begin(${id}, ${JSON.stringify(mode)})`) !== true)
+      throw new Error('编辑器尚未就绪。');
+    let working = performance.now();
+    for (;;) {
+      const status = await closeScript(`globalThis.__rootSoundClose?.read(${id})`);
+      if (!status) throw new Error('编辑器已切换，退出请求已中断。');
+      if (status.result) return status.result;
+      if (mode === 'save' && status.awaitingChoice) working = performance.now();
+      if (performance.now() - working >= CLOSE_WORK_TIMEOUT) throw new Error('退出准备未及时完成。');
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+  } finally { await closeScript(`globalThis.__rootSoundClose?.cancel(${id})`, 500).catch(() => {}); }
+}
+async function canCloseProject() {
+  const state = readResponse(await host.call('project.Read', [], CLOSE_WORK_TIMEOUT));
+  if (!state.current) return true;
+  const prepared = await prepareWindowClose('check');
+  const refreshed = readResponse(await host.call('project.Read', [], CLOSE_WORK_TIMEOUT));
+  if (prepared.startupFailed && refreshed.hasUnsavedChanges === false) return true;
+  if (!prepared.ready || !prepared.canSave)
+    throw new Error(prepared.saveMessage ?? prepared.message ?? '当前编辑尚未准备好。');
+  if (refreshed.hasUnsavedChanges === false) return true;
+  const choice = await prepareWindowClose('save');
+  if (choice.cancelled) return false;
+  if (!choice.ready || !choice.canSave)
+    throw new Error(choice.saveMessage ?? choice.message ?? '当前修改尚未保存。');
+  if (!choice.saved && !choice.discarded)
+    readResponse(await host.call('project.Save', [choice.name ?? ''], CLOSE_WORK_TIMEOUT));
+  return true;
+}
 async function confirmClose(event) {
   if (closeAccepted) return;
   event.preventDefault(); if (preparingClose) return; preparingClose = true;
   try {
-    const state = readResponse(await host.call('project.Read'));
-    if (state.current) {
-      const prepared = await window.webContents.executeJavaScript('globalThis.__rootSoundPrepareClose("check")');
-      if (!prepared?.ready) throw new Error('当前编辑尚未准备好，请稍后重试。');
-      if (!prepared.canSave) throw new Error(prepared.saveMessage ?? '当前编辑尚未准备好，请稍后重试。');
-      if (readResponse(await host.call('project.Read')).hasUnsavedChanges) {
-        const choice = await window.webContents.executeJavaScript('globalThis.__rootSoundPrepareClose("save")');
-        if (choice?.cancelled) return;
-        if (!choice?.ready || !choice.canSave) throw new Error(choice?.saveMessage ?? choice?.message ?? '当前编辑尚未准备好，请稍后重试。');
-        if (!choice.saved && !choice.discarded) readResponse(await host.call('project.Save', [choice.name ?? '']));
-      }
-      readResponse(await host.call('project.Exit', ['discard', '']));
+    try {
+      if (!await canCloseProject()) return;
+    } catch (error) {
+      if (window.isDestroyed()) return;
+      const choice = await dialog.showMessageBox(window, { type: 'warning', title: 'RootSound', message: '直接退出？',
+        detail: (error.message ?? String(error)) + '\n\n直接退出可能丢失未保存的修改。',
+        buttons: ['返回', '直接退出'], defaultId: 0, cancelId: 0, noLink: true });
+      if (choice.response !== 1) return;
     }
     closeAccepted = true; window.close();
-  } catch (error) { await dialog.showMessageBox(window, { type: 'error', title: '暂时无法关闭', message: error.message ?? String(error) }); }
-  finally { preparingClose = false; }
+  } finally { preparingClose = false; }
 }
 app.whenReady().then(async () => {
   const executableDirectory = path.dirname(process.execPath);

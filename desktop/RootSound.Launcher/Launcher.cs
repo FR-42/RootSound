@@ -63,6 +63,30 @@ namespace RootSound.Launcher
         internal static ProcessStartInfo CreateStartInfo(string rootDirectory, string[] arguments)
         {
             if (arguments == null) throw new ArgumentNullException("arguments");
+            string root = Path.GetFullPath(rootDirectory);
+            string installedApp = Path.Combine(root, "resources", "app");
+            string installedMarker = Path.Combine(installedApp, "rootsound-installed");
+            if (File.Exists(installedMarker))
+            {
+                foreach (string directory in new[] { root, Path.Combine(root, "resources"), installedApp, Path.Combine(installedApp, "runtime"), Path.Combine(installedApp, "ui") })
+                    RequireOrdinary(directory, true, File.GetAttributes);
+                foreach (string file in new[] { installedMarker, Path.Combine(installedApp, "RootSound.dll"), Path.Combine(installedApp, "runtime", "dotnet.exe"), Path.Combine(installedApp, "ui", "index.html") })
+                    RequireOrdinary(file, false, File.GetAttributes);
+                if (new FileInfo(installedMarker).Length != 0) throw new IOException("RootSound 的安装记录无效。");
+                string dataRoot = Path.GetDirectoryName(root);
+                string[] installedArguments = new string[arguments.Length + 3];
+                installedArguments[0] = Path.Combine(installedApp, "RootSound.dll");
+                installedArguments[1] = "--install-root";
+                installedArguments[2] = dataRoot;
+                Array.Copy(arguments, 0, installedArguments, 3, arguments.Length);
+                return new ProcessStartInfo {
+                    FileName = Path.Combine(installedApp, "runtime", "dotnet.exe"),
+                    WorkingDirectory = dataRoot,
+                    Arguments = QuoteArguments(installedArguments),
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                };
+            }
             return new ProcessStartInfo {
                 FileName = ResolveExecutable(rootDirectory),
                 WorkingDirectory = Path.GetFullPath(rootDirectory),

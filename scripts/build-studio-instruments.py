@@ -1,4 +1,5 @@
 import hashlib
+import argparse
 import io
 import json
 import mmap
@@ -30,6 +31,7 @@ INSTRUMENTS = (
     ('sax', '次中音萨克斯', '木管', '木管', 66, 60),
     ('bass', '指弹电贝斯', '低音', '贝斯', 33, 40),
     ('guitar', '古典吉他', '拨弦', '吉他', 24, 57),
+    ('steel-guitar', '木吉他', '拨弦', '吉他', 25, 57),
 )
 DRUMS = (
     ('kick', '底鼓', 36, 36), ('snare', '军鼓', 38, 38), ('rim', '边击', 37, 37),
@@ -229,20 +231,35 @@ def write_json(path, data):
 
 
 def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--instrument', choices=[item[0] for item in INSTRUMENTS])
+    selected = parser.parse_args().instrument
     OUT.mkdir(parents=True, exist_ok=True)
-    definitions, instruments = [], {}
+    definitions = json.loads(CATALOG.read_text(encoding='utf-8')) if selected else []
+    instruments = json.loads((OUT / 'manifest.json').read_text(encoding='utf-8'))['instruments'] if selected else {}
 
     def add(key, name, category, midi, zones, library_group=None, **mapping):
         if not zones or len(zones) > 512:
             raise ValueError(f'{key}: invalid number of zones ({len(zones)})')
         key = 'studio-' + key
-        definitions.append(dict(key=key, name=name, category=category, libraryGroup=library_group or category, midi=midi, **mapping))
+        spec = dict(key=key, name=name, category=category, libraryGroup=library_group or category, midi=midi, **mapping)
+        index = next((i for i, item in enumerate(definitions) if item['key'] == key), len(definitions))
+        if index < len(definitions):
+            definitions[index] = spec
+        else:
+            definitions.append(spec)
         instruments[key] = zones
         print(key, len(zones), flush=True)
 
     for key, name, category, group, program, midi in INSTRUMENTS:
+        if selected and selected != key:
+            continue
         source = next((SOURCE / key).rglob('*.sf2'))
         add(key, name, category, midi, sf2_zones(source, piano=key == 'piano')[None], library_group=group, program=program)
+    if selected:
+        write_json(CATALOG, definitions)
+        write_json(OUT / 'manifest.json', dict(bank=BANK, instruments=instruments))
+        return
     for key, name, category, program, midi, filename in ORCHESTRA:
         add(key, name, category, midi, sfz_zones(SOURCE / 'vsco-selection' / filename), program=program)
     add('dizi', '竹笛', '木管', 79, dizi_zones(), program=73)

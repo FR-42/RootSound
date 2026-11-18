@@ -1,0 +1,493 @@
+:root.windows-desktop-colors {
+  --surface-base: #fdf1e7;
+  --surface: #fffbf6;
+  --surface-raised: #fce9dc;
+  --surface-hover: #f6e2d5;
+  --border: #e5c8ba;
+  --text: #422b34;
+  --muted: #69505a;
+  --accent: #8d391b;
+  --danger: #a03b47;
+  --canvas: #fffdf9;
+  --roll-column: #e8d6cf;
+  --roll-beat: #dcc5c1;
+  --roll-subdivision: #f3e6e0;
+  --roll-accidental: #fdf4ed;
+  --piano-ivory: #fffefa;
+  --piano-ivory-shade: #f8eee8;
+  --piano-key-border: #dabeb5;
+  --piano-ink: #513746;
+  --piano-black: #302539;
+  --piano-black-shade: #47384f;
+  --playline: #78468d;
+  --playline-label: #6c3382;
+  --lilac-border: #decbe8;
+  --lilac-paper: #faf0ff;
+  --card-peach: #fceee3;
+  --card-lilac: #f0e6f7;
+  --left-edge: #e36d45;
+  --right-edge: #ac76ce;
+  --workspace-gradient: linear-gradient(135deg, #fffcf7, #fdf0e4 48%, #f4eaf9);
+  --library-gradient: linear-gradient(135deg, #fffdf8, #f8ddc7 50%, #ded0f2);
+  --roll-gradient: linear-gradient(90deg, #fff6ee, var(--canvas) 48%, #faf2fb);
+  --surface-gradient: linear-gradient(145deg, #fffdf9ed, #fff6eced 60%, #f7edf9ed);
+  --control-wash: linear-gradient(145deg, #fffbf6a0, #f3e7f780);
+  --active-gradient: linear-gradient(145deg, #fce9db, #f0e2f8);
+  --focus-color: #be94c6;
+  --input-fill: #c2b2ef;
+  --input-ink: #403244;
+  --input-gradient: linear-gradient(112deg in oklab, #83dfed, #c2b2ef 51%, #f5b0cb);
+  --text-selection-gradient: linear-gradient(90deg in oklab, #493567, #654168 50%, #8a4d60);
+  --text-selection-fill: #654168;
+  --text-selection-ink: #fff9f2;
+  --rate-active-gradient: linear-gradient(110deg in oklab, #a4dce9, #c2b3ee 50%, #efb2d5);
+  --tone-card-back-pattern: url('../modules/ui-rendering/tone-card-back.svg');
+  --tone-card-back-fill: #493567;
+  --tone-card-back-gradient: linear-gradient(145deg in oklab, #8a4d60, #654168 53%, #493567);
+  --tone-card-back-edge: #d8bdcd;
+}
+
+:where(.windows-desktop-colors) :focus { outline: none !important; }
+:where(.windows-desktop-colors) #app :is(button, a[href], input, select, textarea, summary, [role="button"], [role="menuitem"], [contenteditable="true"], [tabindex="0"]):focus-visible {
+  box-shadow: 0 0 0 2px var(--focus-color);
+}
+:where(.windows-desktop-colors) #app :is(input:not([type]), input[type="text"], input[type="search"], input[type="number"], input[type="url"], input[type="email"], input[type="password"], textarea, [contenteditable="true"]) {
+  color: var(--input-ink);
+  background-color: var(--input-fill) !important;
+  background-image: var(--field-selection-layers, var(--input-gradient)) !important;
+  background-size: var(--field-selection-sizes, 100% 100%) !important;
+  background-position: var(--field-selection-positions, 0 0) !important;
+  background-repeat: no-repeat !important;
+  background-origin: padding-box;
+  border: 0 !important;
+  outline: 0 !important;
+  border-radius: 3px;
+  box-shadow: none !important;
+}
+:where(.windows-desktop-colors) #app :is(input:not([type]), input[type="text"], input[type="search"], input[type="number"], input[type="url"], input[type="email"], input[type="password"], textarea, [contenteditable="true"]):focus {
+  filter: brightness(1.08);
+}
+:where(.windows-desktop-colors) #app ::selection { background: var(--text-selection-fill); color: var(--text-selection-ink); }
+:where(.windows-desktop-colors) #app .has-gradient-selection::selection { background: transparent; }
+:where(.windows-desktop-colors) #app :is(input, textarea)::placeholder { color: var(--input-ink); opacity: .72; }
+
+:where(.windows-desktop-colors) :is(.project-welcome, .welcome.project-start) {
+  background-image: var(--workspace-gradient);
+}
+:where(.windows-desktop-colors) .project-welcome {
+  isolation: isolate;
+  overflow: hidden;
+  --welcome-ink: var(--text);
+}
+:where(.windows-desktop-colors) .project-welcome.is-desktop-welcome {
+  padding-block: clamp(20px, 5svh, 68px);
+}
+:where(.windows-desktop-colors) .is-desktop-welcome .invitation {
+  padding-block: clamp(16px, 5svh, 45px) clamp(26px, 9svh, 80px);
+}
+@media (max-width: 680px) {
+  :where(.windows-desktop-colors) .is-desktop-welcome .invitation { gap: clamp(14px, 4svh, 30px); }
+  :where(.windows-desktop-colors) .is-desktop-welcome .project-welcome-art { width: min(330px, 90%, 48svh); }
+}
+:where(.windows-desktop-colors) .project-welcome :is(.invitation h1, .project-welcome-brand > span) { color: var(--text); }
+:where(.windows-desktop-colors) .project-welcome :is(.project-welcome-brand > span, .project-welcome-sheet) { border-color: var(--border); }
+:where(.windows-desktop-colors) .project-welcome-brand > span { background-image: var(--surface-gradient); }
+:where(.windows-desktop-colors) .project-welcome-sheet {
+  background-color: var(--surface);
+  background-image: linear-gradient(to right, #9868bf22 1px, transparent 1px),
+    linear-gradient(#c76a4522 1px, transparent 1px), var(--roll-gradient);
+  background-size: 8% 100%, 100% 15%, 100% 100%;
+  box-shadow: 0 18px 48px #5b2b4926;
+}
+:where(.windows-desktop-colors) .project-welcome-sheet::after {
+  border-color: var(--border);
+  background-image: repeating-linear-gradient(to right, var(--piano-ivory) 0 7.7%, var(--piano-key-border) 7.7% 8%, var(--piano-ivory-shade) 8% 15.7%, var(--piano-key-border) 15.7% 16%);
+}
+:where(.windows-desktop-colors) .project-welcome-sheet i {
+  border-color: #c57858;
+  background-image: linear-gradient(145deg, #f1bf9f, #d99476);
+}
+:where(.windows-desktop-colors) .project-welcome-sheet i:nth-child(2n) {
+  border-color: #a782bc;
+  background-image: linear-gradient(145deg, #ddc0eb, #b890d0);
+}
+:where(.windows-desktop-colors) .project-welcome-sheet i:nth-child(3) {
+  border-color: #8cb0c4;
+  background-image: linear-gradient(145deg, #c4dce6, #93b6cc);
+}
+:where(.windows-desktop-colors) .is-desktop-welcome::before {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  inset: auto -18% -20% -18%;
+  height: 72%;
+  pointer-events: none;
+  background: radial-gradient(ellipse at 34% 78%, #f2c7a8bd, transparent 56%),
+    radial-gradient(ellipse at 66% 72%, #e1c7edc9, transparent 59%);
+  animation: workspace-color-drift 18s ease-in-out infinite;
+}
+@keyframes workspace-color-drift {
+  0%, 100% { transform: translate3d(-10%, 0, 0); opacity: .76; }
+  38% { transform: translate3d(4%, -7%, 0) scale(1.08); opacity: .94; }
+  72% { transform: translate3d(11%, -1%, 0); opacity: .84; }
+}
+@media (prefers-reduced-motion: reduce) {
+  :where(.windows-desktop-colors) .is-desktop-welcome::before { animation: none; }
+}
+
+:where(.windows-desktop-colors) .release-window-titlebar {
+  background-image: var(--surface-gradient);
+  box-shadow: inset 0 -1px var(--border);
+}
+
+:where(.windows-desktop-colors) .music-editor {
+  --editor-edge: var(--border);
+  --editor-ink: var(--text);
+  --editor-tint: var(--surface-raised);
+  --editor-hover: var(--surface-hover);
+}
+
+:where(.windows-desktop-colors) .has-pointer-roll.is-gain-editing {
+  --canvas: #10151b;
+  --roll-gradient: linear-gradient(90deg, #171321, var(--canvas) 48%, #261929);
+  --roll-column: #bfa6bc20;
+  --roll-beat: #c3a8c165;
+  --roll-subdivision: #ad95af40;
+  --roll-accidental: #ad86b00c;
+}
+
+:where(.windows-desktop-colors) .music-editor .has-pointer-roll :is(.melody-scroll, .melody-after-end, .melody-drum-canvas),
+:where(.windows-desktop-colors) .roll-appearance-preview { background-color: var(--canvas); }
+:where(.windows-desktop-colors) .music-editor .has-pointer-roll :is(.melody-world, .melody-after-end, .melody-drum-canvas),
+:where(.windows-desktop-colors) .roll-appearance-preview,
+:where(.windows-desktop-colors) .roll-appearance-preview .melody-after-end { background-image: var(--roll-gradient); }
+:where(.windows-desktop-colors) .music-editor .has-pointer-roll .melody-grid-line { background-color: var(--roll-subdivision); }
+:where(.windows-desktop-colors) .music-editor .has-pointer-roll .melody-grid-line:is(.is-beat, .is-bar) { background-color: var(--roll-beat); }
+:where(.windows-desktop-colors) .music-editor .has-pointer-roll .melody-pitch-row.is-accidental { background-color: var(--roll-accidental); }
+:where(.windows-desktop-colors) .music-editor .has-pointer-roll .melody-pitch-row::after { background-color: var(--roll-column); }
+:where(.windows-desktop-colors) .roll-appearance-preview .melody-pitch-row::after { background-color: var(--roll-column); }
+:where(.windows-desktop-colors) .roll-appearance-preview .melody-grid-line { background-color: var(--roll-subdivision); }
+:where(.windows-desktop-colors) .roll-appearance-preview .melody-grid-line:is(.is-beat, .is-bar) { background-color: var(--roll-beat); }
+
+:root.windows-desktop-colors .music-editor .has-pointer-roll .melody-note {
+  color: var(--text);
+  background: transparent;
+  box-shadow: none;
+  border-radius: 1px;
+  translate: calc(-.5px * var(--melody-grid-thickness, 1)) 0;
+}
+:root.windows-desktop-colors .music-editor .has-pointer-roll .melody-note::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 1px;
+  pointer-events: none;
+  background-color: color-mix(in srgb, var(--tone-color) 74%, var(--canvas));
+  background-image: linear-gradient(to bottom, color-mix(in srgb, var(--tone-color) 86%, var(--canvas)), color-mix(in srgb, var(--tone-color) 58%, var(--canvas)));
+  box-shadow: inset 0 0 0 .5px #000;
+}
+:root.windows-desktop-colors .music-editor .has-pointer-roll .melody-note.is-selected::before {
+  box-shadow: inset 0 0 0 .5px #000, inset 0 0 0 1px color-mix(in srgb, var(--tone-color) 54%, var(--piano-ivory)), inset 0 0 0 2px var(--piano-ivory);
+}
+:root.windows-desktop-colors .music-editor .has-pointer-roll .melody-note.is-sounding::before {
+  box-shadow: inset 0 0 0 .5px #000, inset 0 0 0 1px #fffdf7, inset 0 0 0 2px color-mix(in srgb, var(--tone-color) 39%, var(--piano-ivory));
+}
+:root.windows-desktop-colors .music-editor .has-pointer-roll .melody-note-highlights {
+  transform: translateX(calc(-.5px * var(--melody-grid-thickness, 1)));
+}
+
+:where(.windows-desktop-colors) .music-editor .has-pointer-roll .melody-key:not(.is-accidental, .is-sounding, :hover) {
+  border-color: var(--piano-key-border);
+  color: var(--piano-ink);
+  background-image: linear-gradient(var(--piano-ivory), var(--piano-ivory-shade));
+}
+:where(.windows-desktop-colors) .music-editor .has-pointer-roll .melody-key:not(.is-accidental, .is-sounding):hover {
+  background-color: var(--surface-hover);
+  color: var(--piano-ink);
+}
+:where(.windows-desktop-colors) .music-editor .has-pointer-roll .melody-key.is-accidental:not(.is-sounding) {
+  background-image: linear-gradient(var(--piano-black), var(--piano-black-shade));
+}
+:where(.windows-desktop-colors) .music-editor .has-pointer-roll .melody-key.is-pointer-pitch:not(.is-sounding) {
+  box-shadow: inset 0 0 0 2px #cc8d76, inset 0 -9px #dfac9b5e;
+}
+:where(.windows-desktop-colors) .music-editor .has-pointer-roll .melody-key.is-entry-range:not(.is-pointer-pitch) {
+  box-shadow: inset 0 -4px var(--playline);
+}
+:where(.windows-desktop-colors) .music-editor .has-pointer-roll .melody-keys,
+:where(.windows-desktop-colors) .music-editor .melody-tempo-dock { border-color: var(--piano-key-border); }
+:where(.windows-desktop-colors) .music-editor .melody-tempo-dock { background-image: linear-gradient(var(--piano-ivory), var(--piano-ivory-shade)); }
+:where(.windows-desktop-colors) .music-editor .melody-tempo-button { color: var(--piano-ink); }
+:where(.windows-desktop-colors) .music-editor .melody-tempo-button:hover { background-color: var(--piano-ivory); }
+:where(.windows-desktop-colors) .melody-bpm-roll:not(.is-continuation) { border-top-color: var(--playline); }
+:where(.windows-desktop-colors) .melody-roll-end::before { background-color: #95697e55; }
+:where(.windows-desktop-colors) .melody-roll-end::after { background-image: linear-gradient(to bottom, #95697e45, transparent); }
+:where(.windows-desktop-colors) .melody-roll-end:is(:hover, .is-dragging)::before { background-color: #95697e; }
+:where(.windows-desktop-colors) .music-editor :is(.melody-playhead, .melody-head-handle) { background-color: var(--playline); }
+:where(.windows-desktop-colors) .music-editor .melody-playhead-time {
+  background-image: linear-gradient(150deg, var(--surface), var(--lilac-paper));
+  color: var(--playline-label);
+  border-color: var(--lilac-border);
+}
+
+:where(.windows-desktop-colors) .music-editor .has-pointer-roll :is(.melody-tone-hand, .melody-pinned-tone) .melody-note-family,
+:where(.windows-desktop-colors) .music-editor .has-pointer-roll .melody-library-deck .melody-library-tone,
+:where(.windows-desktop-colors) :is(.melody-card-flight, .melody-card-drag-image):not(.melody-card-backs) {
+  background-color: color-mix(in srgb, var(--surface) 96%, transparent);
+  background-image: var(--control-wash);
+  border-color: color-mix(in srgb, var(--tone-color, var(--border)) 42%, var(--border));
+  color: var(--text);
+}
+:where(.windows-desktop-colors) .music-editor .has-pointer-roll :is(.melody-tone-hand, .melody-pinned-tone) .melody-note-family:is(:hover, :focus-visible, .is-selected),
+:where(.windows-desktop-colors) .music-editor .has-pointer-roll .melody-library-deck .melody-library-tone:is(:hover, :focus-visible) {
+  background-color: color-mix(in srgb, var(--tone-color, var(--border)) 11%, var(--surface));
+  border-color: color-mix(in srgb, var(--tone-color, var(--border)) 70%, var(--piano-ink));
+}
+:where(.windows-desktop-colors) .music-editor .has-pointer-roll .melody-pinned-tone .melody-note-family.is-selected {
+  background-color: color-mix(in srgb, var(--tone-color) 19%, var(--surface));
+}
+:where(.windows-desktop-colors) .melody-card-art {
+  background-color: color-mix(in srgb, var(--tone-color, var(--border)) 18%, var(--card-peach));
+  background-image: radial-gradient(ellipse at 43% 30%, #fffbf69c, transparent 68%),
+    linear-gradient(147deg, #fffbf645, color-mix(in srgb, var(--tone-color, var(--border)) 20%, transparent));
+}
+:where(.windows-desktop-colors) .music-editor .melody-card-art .melody-instrument-icon { color: var(--accent); }
+:where(.windows-desktop-colors) .melody-card-backs i {
+  background-color: var(--tone-card-back-fill);
+  background-image: linear-gradient(145deg in oklab, #493567, #654168 48%, #8a4d60);
+  border-color: var(--tone-card-back-edge);
+  box-shadow: 0 1px 2px #24192c40;
+}
+:where(.windows-desktop-colors) .melody-card-backs i:last-child {
+  background-image: linear-gradient(140deg, transparent 22%, #ffeff221 48%, transparent 70%),
+    linear-gradient(145deg in oklab, #8a4d60, #654168 53%, #493567);
+}
+:where(.windows-desktop-colors) .melody-tone-pile.is-library-spread .melody-tone-pile-empty { border-color: var(--piano-key-border); }
+:where(.windows-desktop-colors) .melody-tone-shortcut:focus-visible { background-color: var(--card-lilac); }
+:where(.windows-desktop-colors) .melody-tone-edge.is-left { --edge-ink: var(--left-edge); --edge-light: var(--left-edge); }
+:where(.windows-desktop-colors) .melody-tone-edge.is-right { --edge-ink: var(--right-edge); --edge-light: var(--right-edge); }
+:where(.windows-desktop-colors) .round-pointer {
+  border-color: #e36d4599;
+  background-color: #e36d4534;
+}
+:where(.windows-desktop-colors) .round-pointer.has-pan-dot { border-color: #e36d45a8; }
+:where(.windows-desktop-colors) .round-pointer.has-pan-dot::after { background-color: var(--accent); }
+:where(.windows-desktop-colors) .round-pointer.is-pan-waiting::after { border-color: var(--accent); background-color: transparent; }
+:where(.windows-desktop-colors) .round-pointer svg { stroke: var(--accent); }
+
+:where(.windows-desktop-colors) .has-round-pointer .learning-settings:not(.song-editor-controls, .is-previewing) {
+  background-image: var(--surface-gradient);
+  color: var(--text);
+}
+:where(.windows-desktop-colors) .music-editor .song-editor-controls { --details-label-width: 156px; color: var(--text); }
+:where(.windows-desktop-colors) .music-editor .song-editor-controls .song-rate-segments {
+  height: 28px;
+  border-radius: 4px;
+  background: transparent;
+}
+:where(.windows-desktop-colors) .music-editor .song-editor-controls .song-rate-choice {
+  box-sizing: border-box;
+  display: grid;
+  place-items: center;
+  width: 100%;
+  min-width: 0;
+  height: 28px;
+  min-height: 28px;
+  padding: 0;
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  color: var(--text);
+  background: transparent;
+  font-size: 12px;
+  line-height: 1;
+  font-weight: 400;
+}
+:where(.windows-desktop-colors) .music-editor .song-editor-controls .song-rate-choice[aria-pressed="true"] {
+  background: var(--rate-active-gradient);
+  font-weight: 500;
+}
+:where(.windows-desktop-colors) .music-editor .song-editor-controls:not(.is-previewing) {
+  background-image: linear-gradient(75deg, #f8ecf8b3, #f8ecf8ed 35%, #fff5e9 59%, #fffcf8);
+}
+:where(.windows-desktop-colors) .music-editor .song-project-name { color: var(--text); }
+:where(.windows-desktop-colors) .music-editor .song-editor-controls .song-file-icon {
+  border-color: var(--border);
+  color: var(--text);
+  background-color: var(--surface-raised);
+  background-image: var(--control-wash);
+  transition: none;
+}
+:where(.windows-desktop-colors) .music-editor .song-file-actions.is-exit-armed .song-exit {
+  color: #fff;
+  background-color: #e32132;
+  background-image: linear-gradient(145deg, #ef2935, #ca1027);
+}
+:where(.windows-desktop-colors) .music-editor .song-file-actions.is-exit-armed .song-save-project {
+  color: #fff;
+  background-color: #00923a;
+  background-image: linear-gradient(145deg, #009c3d, #00752f);
+}
+:where(.windows-desktop-colors) .learning-settings.is-previewing .learning-grid-appearance input {
+  background-image: var(--surface-gradient);
+  box-shadow: 0 2px 8px #5b2b4926;
+}
+:where(.windows-desktop-colors) :is(.learning-settings, .music-editor .song-editor-controls, .output-volume) input { accent-color: var(--accent); }
+:where(.windows-desktop-colors) #app .song-editor-controls input[type="range"] {
+  appearance: none;
+  height: 32px;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+:where(.windows-desktop-colors) .song-editor-controls input[type="range"]::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, #ba6749, #a379b5) left center /
+      calc(5px + (100% - 10px) * var(--range-progress, 0)) 100% no-repeat,
+    #cdbcb9;
+}
+:where(.windows-desktop-colors) .song-editor-controls input[type="range"]::-webkit-slider-thumb {
+  appearance: none;
+  width: 10px;
+  height: 18px;
+  margin-top: -7px;
+  background: linear-gradient(#82516b, #6d4057) center / 3px 14px no-repeat;
+}
+:where(.windows-desktop-colors) .song-editor-controls input[type="range"]:is(:focus-visible, :active)::-webkit-slider-thumb {
+  background-size: 3px 18px;
+}
+:where(.windows-desktop-colors) #app .song-editor-controls.is-previewing .learning-grid-appearance input {
+  background: linear-gradient(90deg, #fffaf1e6, #f8eef7dc);
+  border-radius: 7px;
+}
+:where(.windows-desktop-colors) .song-editor-controls .learning-roll-switch {
+  position: relative;
+  width: max-content;
+  max-width: 100%;
+  min-height: 30px;
+  gap: 12px;
+}
+:where(.windows-desktop-colors) .learning-roll-switch input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  opacity: 0;
+}
+.learning-roll-switch-face { display: none; }
+:where(.windows-desktop-colors) .learning-roll-switch-face {
+  display: block;
+  position: relative;
+  width: 36px;
+  height: 20px;
+  flex: none;
+  border-radius: 10px;
+  color: #795d65;
+  background-color: #e4d6d1;
+  background-image: linear-gradient(135deg, #fff8ee80, #e5d3ee40);
+  transition: background-color 150ms ease;
+}
+:where(.windows-desktop-colors) .learning-roll-switch-face::before,
+:where(.windows-desktop-colors) .learning-roll-switch-face::after {
+  content: '';
+  position: absolute;
+  top: 5px;
+  left: 8px;
+  width: 9px;
+  height: 10px;
+  border: 1px solid currentColor;
+  border-radius: 2px;
+  transition: transform 150ms ease, opacity 150ms ease;
+}
+:where(.windows-desktop-colors) .learning-roll-switch-face::before {
+  z-index: 1;
+  background-color: #fff6eb;
+}
+:where(.windows-desktop-colors) .learning-roll-switch-face::after { opacity: 0; }
+:where(.windows-desktop-colors) .learning-roll-switch input:checked ~ .learning-roll-switch-face {
+  color: #734f83;
+  background-color: #e7bdcf;
+}
+:where(.windows-desktop-colors) .learning-roll-switch input:checked ~ .learning-roll-switch-face::before { transform: translateX(8px); }
+:where(.windows-desktop-colors) .learning-roll-switch input:checked ~ .learning-roll-switch-face::after {
+  transform: translate(11px, -2px);
+  opacity: 1;
+}
+:where(.windows-desktop-colors) .learning-roll-switch input:focus-visible ~ .learning-roll-switch-face { box-shadow: 0 0 0 2px var(--focus-color); }
+:where(.windows-desktop-colors) .learning-roll-switch input:disabled ~ .learning-roll-switch-face { opacity: .59; }
+@media (prefers-reduced-motion: reduce) {
+  :where(.windows-desktop-colors) .learning-roll-switch-face,
+  :where(.windows-desktop-colors) .learning-roll-switch-face::before,
+  :where(.windows-desktop-colors) .learning-roll-switch-face::after { transition: none; }
+}
+@media (forced-colors: active) {
+  :where(.windows-desktop-colors) #app .song-editor-controls input[type="range"] { appearance: auto; }
+  :where(.windows-desktop-colors) .learning-roll-switch input { position: static; width: 17px; height: 17px; opacity: 1; }
+  :where(.windows-desktop-colors) .learning-roll-switch-face { display: none; }
+}
+:where(.windows-desktop-colors) .music-editor .song-exit-choice {
+  background-image: linear-gradient(#fdf1e735 0%, #fdf1e795 64%, #fdf1e7e8 100%);
+}
+:where(.windows-desktop-colors) .song-exit-choice .project-exit-actions button {
+  border-color: var(--border);
+  color: var(--text);
+  background-color: var(--surface);
+  background-image: var(--control-wash);
+}
+:where(.windows-desktop-colors) .song-exit-choice .project-exit-actions .project-exit-save {
+  color: var(--accent);
+  background-color: var(--surface-raised);
+}
+
+:where(.windows-desktop-colors) .project-library {
+  --library-edge: var(--border);
+  --library-tint: var(--surface-raised);
+  --library-ink: var(--text);
+}
+:where(.windows-desktop-colors) .is-library-workspace :is(.project-library-header h2, .project-library-navigation [aria-current]) {
+  color: var(--text);
+}
+:where(.windows-desktop-colors) .is-library-workspace :is(.project-library-navigation button:not([aria-current]), .welcome-settings, .music-guide-launch) {
+  color: var(--muted);
+}
+:where(.windows-desktop-colors) .is-library-workspace .project-library-action {
+  color: var(--text);
+  background-color: var(--surface-raised);
+  background-image: var(--control-wash);
+}
+:where(.windows-desktop-colors) .is-library-workspace .project-library-new {
+  color: var(--accent);
+  background-color: var(--surface-hover);
+}
+:where(.windows-desktop-colors) .is-library-workspace .project-library-action:enabled:hover { background-color: var(--surface-hover); }
+:where(.windows-desktop-colors) .is-library-workspace .project-library .project-library-tile:is(:enabled:hover, :focus-visible) {
+  background: linear-gradient(90deg, #f9dfcbaa, #ebd9f377);
+}
+:where(.windows-desktop-colors) .project-library-entry-duration { color: var(--muted); }
+:where(.windows-desktop-colors) .project-library-entry-icon { color: var(--accent); }
+:where(.windows-desktop-colors) .project-library-folder .project-library-entry-icon { color: #65417b; }
+:where(.windows-desktop-colors) .is-library-workspace .project-library-name {
+  background: var(--surface-gradient); outline-color: var(--accent);
+}
+:where(.windows-desktop-colors) .is-library-workspace :is(.project-library-copy-form, .project-library-folder-form) input {
+  border-color: var(--border);
+  color: var(--text);
+  background-color: var(--surface);
+}
+:where(.windows-desktop-colors) .is-library-workspace :is(.project-library-copy-form, .project-library-folder-form) button {
+  color: var(--accent);
+  background-color: var(--surface-raised);
+}
+:where(.windows-desktop-colors) .is-library-workspace :is(.project-library-copy-form, .project-library-folder-form) button:enabled:hover {
+  background-color: var(--surface-hover);
+}
+:where(.windows-desktop-colors) .project-delete-actions button:last-child {
+  background-color: var(--danger);
+  border-color: var(--danger);
+  color: var(--piano-ivory);
+}
+:where(.windows-desktop-colors) #app :is(.project-delete-warning, .project-library-context, .project-exit-dialog, .melody-card-menu, .melody-tone-delete-dialog, .melody-tempo-menu, .melody-tempo-panel, .learning-feature-gate) {
+  background-image: var(--surface-gradient);
+}

@@ -23,6 +23,7 @@ export function createWorkspacePreferences(storage: PreferenceStorage, defaultGr
           welcomeEnabled: typeof parsed.welcomeEnabled === 'boolean' ? parsed.welcomeEnabled : defaults.welcomeEnabled,
           startWorkspace: parsed.startWorkspace === 'last' || workspaces.includes(parsed.startWorkspace) ? parsed.startWorkspace : defaults.startWorkspace,
           lastWorkspace: workspaces.includes(parsed.lastWorkspace) ? parsed.lastWorkspace : defaults.lastWorkspace, ...rollAppearance };
+        if (isPercentage(parsed.pointerSensitivity)) value.pointerSensitivity = parsed.pointerSensitivity;
         const appearance = parsed.rollAppearance;
         if (appearance && typeof appearance === 'object' && !Array.isArray(appearance)) {
           const { gridStrength } = appearance;
@@ -39,9 +40,10 @@ export function createWorkspacePreferences(storage: PreferenceStorage, defaultGr
     read,
     update(changes) {
       const next = { ...value, ...changes };
-      if (Object.keys(changes).some(key => !['keyboardPerformance', 'welcomeEnabled', 'startWorkspace', 'lastWorkspace', 'rollAppearance'].includes(key))
+      if (Object.keys(changes).some(key => !['keyboardPerformance', 'welcomeEnabled', 'startWorkspace', 'lastWorkspace', 'rollAppearance', 'pointerSensitivity'].includes(key))
         || typeof next.keyboardPerformance !== 'boolean' || typeof next.welcomeEnabled !== 'boolean' || !workspaces.includes(next.lastWorkspace)
         || (next.startWorkspace !== 'last' && !workspaces.includes(next.startWorkspace))) throw new Error('设置无效。');
+      if (next.pointerSensitivity !== undefined && !isPercentage(next.pointerSensitivity)) throw new Error('设置无效。');
       if (next.rollAppearance !== undefined) {
         const { gridStrength } = next.rollAppearance ?? {};
         if (!isPercentage(gridStrength)) throw new Error('设置无效。');

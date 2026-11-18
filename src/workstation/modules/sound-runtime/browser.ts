@@ -10,7 +10,7 @@ import type {
 } from '../../contracts/sound.ts';
 
 import { previewFingerprint, readPreview, samePreviewSamples, validateFrequency, type ScheduledPreview } from './plan.ts';
-import { allocateGraph, releaseGraph, releaseScheduledNotes, scheduleGraph, startGraphSource, type GraphResources, type SoundGraph } from './graph.ts';
+import { allocateGraph, clearGraphAutomation, releaseGraph, releaseScheduledNotes, scheduleGraph, startGraphSource, setGraphSolo, type GraphResources, type SoundGraph } from './graph.ts';
 import { renderOffline } from './offline.ts';
 import { readPcmAudio } from './pcm.ts';
 import { WindowedGraph, WINDOWED_EVENT_THRESHOLD } from './windowed.ts';
@@ -18,6 +18,7 @@ import { createOutputLimiter } from './output-limiter.ts';
 
 const DEVICE_RESUME_TIMEOUT_MS = 3000;
 const LIVE_TRANSITION_SECONDS = 0.005;
+const AUDITION_LEAD_SECONDS = 0.002;
 let runtimeSequence = 0;
 
 interface ActiveVoice {
@@ -39,7 +40,7 @@ interface ActiveVoice {
   preview?: ScheduledPreview;
   startTimes: Map<AudioScheduledSourceNode, number>;
   graph?: SoundGraph;
-  readonly retiring: Set<{ resources: GraphResources; clock: ConstantSourceNode; until: number; windowed?: WindowedGraph }>;
+  readonly retiring: Set<{ resources: GraphResources; clock: ConstantSourceNode; until: number; windowed?: WindowedGraph; graph?: SoundGraph }>;
   originSeconds: number;
   clockFloorSeconds?: number;
   pausedElapsed?: number;
@@ -47,7 +48,9 @@ interface ActiveVoice {
 
 interface AuditionVoice {
   readonly resources: GraphResources;
+  readonly duck: boolean;
   remaining: number;
+  start: number;
 }
 
 
@@ -70,11 +73,13 @@ export function createBrowserSoundRuntime(): SoundRuntimePort {
   let dispatching = false;
   let context: AudioContext | null = null;
   let active: ActiveVoice | null = null;
-  let auditionVoice: AuditionVoice | null = null;
+  const auditionVoices = new Set<AuditionVoice>();
   let auditionSequence = 0;
+  let lastAttackStart = 0;
   let mainMix: GainNode | null = null;
   let outputMix: GainNode | null = null;
   let outputLimiter: ReturnType<typeof createOutputLimiter> | null = null;
+  let outputReady: Promise<void> | undefined;
   let outputLevel = 1;
   let sequence = 0;
   let requestSequence = 0;
@@ -117,9 +122,9 @@ export function createBrowserSoundRuntime(): SoundRuntimePort {
   }
 
   function releaseAudition(voice: AuditionVoice): void {
-    if (auditionVoice === voice) auditionVoice = null;
+    const removed = auditionVoices.delete(voice);
     releaseGraph(voice.resources);
-    if (!auditionVoice) duckMain(false);
+    if (removed && voice.duck && !Array.from(auditionVoices).some(active => active.duck)) duckMain(false);
   }
 
   function duckMain(duck: boolean, until?: number): void {
@@ -138,14 +143,14 @@ export function createBrowserSoundRuntime(): SoundRuntimePort {
     for (const outlet of [...(active ? outlets(active) : []), ...[...(active?.retiring ?? [])].flatMap(item => outlets(item.resources))]) {
       outlet.disconnect(); outlet.connect(mix);
     }
-    if (active?.audioSource) { active.audioSource.disconnect(); active.audioSource.connect(mix); }
   }
 
   function listeningOutput(audio: AudioContext): AudioNode { return outputMix ?? audio.destination; }
   function cancelAudition(): void {
     auditionSequence++;
     cancelPendingResumes(pendingAuditionResumes);
-    if (auditionVoice) releaseAudition(auditionVoice);
+    lastAttackStart = 0;
+    for (const voice of auditionVoices) releaseAudition(voice);
   }
 
   function clearRetiring(voice: ActiveVoice): void {
@@ -220,17 +225,18 @@ export function createBrowserSoundRuntime(): SoundRuntimePort {
       context.onstatechange = deviceChanged;
       outputMix = context.createGain();
       outputMix.gain.setValueAtTime(outputLevel, context.currentTime);
-      outputLimiter = createOutputLimiter(context, context.destination);
-      outputMix.connect(outputLimiter.input);
+      outputLimiter = createOutputLimiter(context, outputMix, context.destination);
+      outputReady = outputLimiter.ready?.finally(() => { outputReady = undefined; });
     }
     const audio = context;
     if (audio.state === 'closed') throw new Error('声音设备已关闭，请重新打开工作站。');
-    if (audio.state !== 'running') {
+    if (audio.state !== 'running' || outputReady) {
       let timer: ReturnType<typeof setTimeout> | undefined;
       let cancel: (() => void) | undefined;
       try {
+        const resumed = audio.state === 'running' ? undefined : audio.resume();
         await Promise.race([
-          audio.resume(),
+          outputReady ? Promise.all([resumed, outputReady]) : resumed,
           new Promise<never>((_resolve, reject) => {
             timer = setTimeout(() => reject(new Error('声音设备未能启动，请重新点击试听并检查浏览器的声音权限。')), DEVICE_RESUME_TIMEOUT_MS);
           }),
@@ -281,7 +287,7 @@ export function createBrowserSoundRuntime(): SoundRuntimePort {
     try {
       if (preview.sequence) voice.completion = audio.createConstantSource();
       const generation = voice.generation;
-      if (preview.sequence && preview.events.length > WINDOWED_EVENT_THRESHOLD) voice.windowed = new WindowedGraph(audio, preview, voice, mainMix ?? listeningOutput(audio));
+      if (preview.sequence && (preview.deletedNotes || preview.events.length > WINDOWED_EVENT_THRESHOLD)) voice.windowed = new WindowedGraph(audio, preview, voice, mainMix ?? listeningOutput(audio));
       voice.windowed?.prime(0);
       const graph = voice.windowed?.graph ?? allocateGraph(audio, preview, voice, () => {
         if (voice.generation !== generation) return;
@@ -340,18 +346,27 @@ export function createBrowserSoundRuntime(): SoundRuntimePort {
     catch (error) { if (!disposed && request === requestSequence) device('failed', message(error)); throw error; }
     if (disposed || request !== requestSequence) throw new Error('这次试听已取消。');
     let source: AudioBufferSourceNode | undefined;
+    let edges: GainNode | undefined;
     let voice: ActiveVoice | undefined;
     try {
       const buffer = audio.createBuffer(pcm.channels.length, pcm.channels[0]!.length, pcm.sampleRate);
       pcm.channels.forEach((channel, index) => buffer.getChannelData(index).set(channel));
       source = audio.createBufferSource(); source.buffer = buffer;
-      source.connect(mainMix ?? listeningOutput(audio));
+      edges = audio.createGain();
+      source.connect(edges); edges.connect(mainMix ?? listeningOutput(audio));
       if (active) finish(active, 'stopped');
       // A subscriber may stop or replace playback during the previous stop event.
       if (disposed || request !== requestSequence) throw new Error('这次试听已取消。');
       const session: PlaybackSession = Object.freeze({ id: `preview-${runtimeId}-${++sequence}`, status: 'playing',
         startedAtSeconds: audio.currentTime + 0.005, durationSeconds: buffer.length / buffer.sampleRate });
-      voice = { session, audioSource: source, oscillators: [], samples: [], bufferReleases: [], gains: [], panners: [], completion: null,
+      const duration = session.durationSeconds!;
+      const start = session.startedAtSeconds, end = start + duration;
+      edges.gain.setValueAtTime(0, start);
+      edges.gain.linearRampToValueAtTime(1, start + Math.min(.002, duration / 4));
+      edges.gain.setValueAtTime(1, end - Math.min(.004, duration / 4));
+      edges.gain.linearRampToValueAtTime(0, end);
+      voice = { session, audioSource: source, oscillators: [], samples: [], bufferReleases: [], gains: [edges], panners: [],
+        outputBuses: [edges], completion: null,
         remaining: 0, generation: 0, fadeGains: [], fingerprint: 'acquired-audio', startTimes: new Map(), retiring: new Set(), originSeconds: session.startedAtSeconds };
       const current = voice;
       source.onended = () => { if (active === current) finish(current, 'ended'); };
@@ -359,7 +374,10 @@ export function createBrowserSoundRuntime(): SoundRuntimePort {
       emit({ type: 'session', session }); deviceChanged(); return voice.session;
     } catch (error) {
       if (voice) finish(voice, 'failed', message(error));
-      else if (source) { source.onended = null; try { source.stop(); } catch { /* Not started. */ } source.disconnect(); }
+      else {
+        if (source) { source.onended = null; try { source.stop(); } catch { } source.disconnect(); }
+        edges?.disconnect();
+      }
       throw new Error(`采样试听启动失败：${message(error)}`);
     }
   }
@@ -368,28 +386,40 @@ export function createBrowserSoundRuntime(): SoundRuntimePort {
     if (disposed) throw new Error('声音运行已关闭。');
     const preview = readPreview(input, { audition: options });
     if (preview.sequence) throw new Error('按键试音需要一个音符。');
-    cancelAudition();
+    if (!options?.keepAttack && !options?.overlap) cancelAudition();
     const request = auditionSequence;
     // The short-note lane shares the device, but never changes the main session
     // or its pending start. Its completion is intentionally not a transport event.
     const audio = await ready(pendingAuditionResumes);
     if (disposed || request !== auditionSequence) throw new Error('这次试音已取消。');
-    if (disposed || request !== auditionSequence) throw new Error('这次试音已取消。');
     validateFrequency(preview, audio.sampleRate);
     const resources: GraphResources = { oscillators: [], samples: [], bufferReleases: [], gains: [], panners: [] };
-    const voice: AuditionVoice = { resources, remaining: 0 };
+    const duck = !options?.preserveNoteLevel;
+    const voice: AuditionVoice = { resources, remaining: 0, duck, start: 0 };
     try {
       const graph = allocateGraph(audio, preview, resources, () => {
-        if (auditionVoice !== voice) return;
+        if (!auditionVoices.has(voice)) return;
         if (--voice.remaining === 0) releaseAudition(voice);
       }, listeningOutput(audio));
-      const start = audio.currentTime + 0.005;
-      const duck = !options?.preserveNoteLevel;
       if (duck) ensureMainMix(audio);
-      scheduleGraph(graph, preview.normalization * (duck && active?.session.status === 'playing' ? 0.5 : 1), start);
-      if (audio.currentTime >= start || disposed || request !== auditionSequence) throw new Error('这次试音已取消，请重试。');
+      const normalization = preview.normalization * (duck && active?.session.status === 'playing' ? 0.5 : 1);
+      let schedulingBegan = audio.currentTime;
+      let start = options?.keepAttack ? Math.max(schedulingBegan + .015, lastAttackStart + .035) : schedulingBegan + AUDITION_LEAD_SECONDS;
+      scheduleGraph(graph, normalization, start);
+      for (let retry = 0; retry < 2 && audio.currentTime >= start; retry++) {
+        const schedulingTime = audio.currentTime - schedulingBegan;
+        clearGraphAutomation(graph);
+        schedulingBegan = audio.currentTime;
+        start = schedulingBegan + AUDITION_LEAD_SECONDS + (retry === 0 ? 0 : schedulingTime);
+        scheduleGraph(graph, normalization, start);
+      }
+      if (disposed || request !== auditionSequence) throw new Error('这次试音已取消。');
       voice.remaining = resources.oscillators.length + resources.samples.length;
-      auditionVoice = voice;
+      voice.start = start;
+      auditionVoices.add(voice);
+      if (options?.keepAttack) lastAttackStart = start;
+      const oldest = auditionVoices.values().next().value!;
+      if (auditionVoices.size > 64 || auditionVoices.size > 12 && oldest.start + .045 < audio.currentTime) releaseAudition(oldest);
       if (duck) duckMain(true, start);
       for (const scheduled of graph.starts) startGraphSource(scheduled, start);
       deviceChanged();
@@ -410,12 +440,15 @@ export function createBrowserSoundRuntime(): SoundRuntimePort {
       finish(voice, 'ended');
       return undefined;
     }
-    const preview = readPreview(input, { allowEmptySequence: true, previous: voice.preview, transportElapsed: options?.elapsedSeconds ?? elapsed(voice) });
+    const requested = input.kind === 'sequence' && input.soloGroupId === undefined && voice.preview?.soloGroupId !== undefined
+      ? { ...input, soloGroupId: voice.preview.soloGroupId } : input;
+    const preview = readPreview(requested, { allowEmptySequence: true, previous: voice.preview, transportElapsed: options?.elapsedSeconds ?? elapsed(voice) });
     validateFrequency(preview, audio.sampleRate);
     const fingerprint = previewFingerprint(preview);
     const previousFingerprint = voice.fingerprint ?? (voice.preview && previewFingerprint(voice.preview));
     if (previousFingerprint === fingerprint && samePreviewSamples(voice.preview, preview)) {
-      voice.preview = preview;
+      setSoloGroup(sessionId, preview.soloGroupId);
+      voice.preview = voice.preview?.deletedNotes ? { ...preview, deletedNotes: voice.preview.deletedNotes } : preview;
       voice.fingerprint = fingerprint;
       return voice.session;
     }
@@ -431,7 +464,7 @@ export function createBrowserSoundRuntime(): SoundRuntimePort {
         ...preview,
         events: preview.events.filter(event => event.atSeconds + event.duration > position),
       };
-      if (voice.windowed || preview.events.length > WINDOWED_EVENT_THRESHOLD) windowed = new WindowedGraph(audio, preview, resources, mainMix ?? listeningOutput(audio));
+      if (voice.windowed || preview.deletedNotes || preview.events.length > WINDOWED_EVENT_THRESHOLD) windowed = new WindowedGraph(audio, preview, resources, mainMix ?? listeningOutput(audio));
       windowed?.prime(position);
       const graph = windowed?.graph ?? allocateGraph(audio, remaining, resources, undefined, mainMix ?? listeningOutput(audio));
       if (audio.currentTime >= origin + voice.session.durationSeconds! + 0.001) {
@@ -468,7 +501,7 @@ export function createBrowserSoundRuntime(): SoundRuntimePort {
       // invalid plan or allocation failure therefore leaves the old music intact.
       const retired = {
         resources: { oscillators: [...voice.oscillators], samples: [...voice.samples], bufferReleases: [...voice.bufferReleases], gains: [...voice.gains], panners: [...voice.panners], outputBuses: [...(voice.outputBuses ?? [])], filters: [...(voice.filters ?? [])] },
-        clock: retiringClock, until, windowed: voice.windowed,
+        clock: retiringClock, until, windowed: voice.windowed, graph: voice.graph,
       };
       for (const gain of voice.fadeGains) {
         gain.gain.cancelAndHoldAtTime(cutover);
@@ -524,6 +557,26 @@ export function createBrowserSoundRuntime(): SoundRuntimePort {
     }
   }
 
+  function setNotesDeleted(sessionId: string, noteIds: readonly string[], deleted: boolean): void {
+    const voice = active;
+    if (!voice || voice.session.id !== sessionId || voice.session.status !== 'playing') return;
+    if (deleted) for (const retiring of voice.retiring) retiring.windowed?.setNotesDeleted(noteIds, true);
+    const windowed = voice.windowed;
+    if (windowed?.setNotesDeleted(noteIds, deleted))
+      windowed.run(error => { if (active === voice) finish(voice, 'failed', message(error)); }, true);
+  }
+
+  function setSoloGroup(sessionId: string, groupId?: string): void {
+    const voice = active;
+    if (!voice || voice.session.id !== sessionId || !voice.preview?.sequence || !context) return;
+    if (groupId !== undefined && (typeof groupId !== 'string' || !groupId || groupId.length > 1024)) throw new Error('播放音色标识无效。');
+    if (voice.preview.soloGroupId === groupId) return;
+    voice.preview = { ...voice.preview, soloGroupId: groupId };
+    const now = context.currentTime;
+    setGraphSolo(voice.graph, groupId, now);
+    for (const retiring of voice.retiring) setGraphSolo(retiring.graph, groupId, now);
+  }
+
   function pause(sessionId: string): PlaybackSession | undefined {
     const voice = active;
     if (!voice || voice.session.id !== sessionId || !voice.preview?.sequence) return undefined;
@@ -553,7 +606,8 @@ export function createBrowserSoundRuntime(): SoundRuntimePort {
     const request = ++requestSequence;
     const fromSeconds = voice.pausedElapsed!;
     // Validate before touching the retained paused session. Invalid edits leave it resumable.
-    const preview = input ? readPreview(input, { allowEmptySequence: true, previous: voice.preview, transportElapsed: fromSeconds }) : voice.preview;
+    const requested = input && input.soloGroupId === undefined ? { ...input, soloGroupId: voice.preview.soloGroupId } : input;
+    const preview = requested ? readPreview(requested, { allowEmptySequence: true, previous: voice.preview, transportElapsed: fromSeconds }) : voice.preview;
     cancelPendingResumes();
     const audio = await ready();
     if (disposed || request !== requestSequence || active !== voice || voice.session.status !== 'paused') throw new Error('这次试听已取消。');
@@ -564,7 +618,7 @@ export function createBrowserSoundRuntime(): SoundRuntimePort {
     let windowed: WindowedGraph | undefined;
     try {
       const remaining = { ...preview, events: preview.events.filter(event => event.atSeconds + event.duration > fromSeconds) };
-      if (preview.events.length > WINDOWED_EVENT_THRESHOLD) windowed = new WindowedGraph(audio, preview, resources, mainMix ?? listeningOutput(audio));
+      if (preview.deletedNotes || preview.events.length > WINDOWED_EVENT_THRESHOLD) windowed = new WindowedGraph(audio, preview, resources, mainMix ?? listeningOutput(audio));
       windowed?.prime(fromSeconds);
       const graph = windowed?.graph ?? allocateGraph(audio, remaining, resources, undefined, mainMix ?? listeningOutput(audio));
       completion = audio.createConstantSource();
@@ -615,6 +669,8 @@ export function createBrowserSoundRuntime(): SoundRuntimePort {
     cancelAudition,
     update,
     pause,
+    setNotesDeleted,
+    setSoloGroup,
     resume,
     async render(plan, options = {}) {
       if (disposed) return Promise.reject(new Error('声音运行已关闭。'));

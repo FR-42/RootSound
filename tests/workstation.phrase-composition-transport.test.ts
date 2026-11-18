@@ -19,11 +19,12 @@ function fixture(durationSeconds?: () => number, readBody?: () => PhraseBody) {
   let elapsed = 0; let tempo = 120; let length = 16; let session: PlaybackSession | undefined; let count = 0;
   let prepare = async () => {}; let waitDevice: Promise<void> | undefined;
   let input: SoundSequencePlan = { kind: 'sequence', version: 1, durationSeconds: 20, events: [{ atSeconds: 0, sound }] };
-  const calls: { method: string; plan?: SoundSequencePlan; id?: string }[] = [];
+  const calls: { method: string; plan?: SoundSequencePlan; id?: string; groupId?: string }[] = [];
   const states: PlaylistTransportState[] = []; const errors: unknown[] = [];
   const listeners = new Set<(event: SoundRuntimeEvent) => void>();
   const emit = (status: PlaybackSession['status']) => { session = { ...session!, status }; for (const listener of listeners) listener({ type: 'session', session }); };
   const runtime = {
+    setSoloGroup(id: string, groupId?: string) { calls.push({ method: 'solo', id, groupId }); },
     async preview(plan: SoundSequencePlan) { calls.push({ method: 'preview', plan }); if (waitDevice) await waitDevice; elapsed = 0; session = { id: String(++count), status: 'playing', startedAtSeconds: 1, durationSeconds: plan.durationSeconds }; return session; },
     update(id: string, plan: SoundSequencePlan) { calls.push({ method: 'update', id, plan }); return session; },
     pause(id: string) { calls.push({ method: 'pause', id }); emit('paused'); return session; },
@@ -39,6 +40,34 @@ function fixture(durationSeconds?: () => number, readBody?: () => PhraseBody) {
     plan(value: SoundSequencePlan) { input = value; }, length(value: number) { length = value; }, prepare(value: () => Promise<void>) { prepare = value; }, waitDevice(value: Promise<void>) { waitDevice = value; } };
 }
 async function settle() { await Promise.resolve(); await Promise.resolve(); await Promise.resolve(); }
+
+test('solo keeps the full plan and clock, never prepares or replaces audio during switching', async () => {
+  const f = fixture(); let prepares = 0; f.prepare(async () => { prepares++; });
+  f.transport.setSoloGroup('a');
+  await f.transport.toggle();
+  assert.equal(f.calls.find(call => call.method === 'preview')!.plan!.soloGroupId, 'a');
+  f.elapsed(3);
+  const original = f.transport.position();
+  for (let i=0;i<100;i++) f.transport.setSoloGroup(i%2 ? 'a' : 'b');
+  assert.equal(prepares,1);
+  assert.equal(f.calls.filter(call => call.method==='preview').length,1);
+  assert.equal(f.calls.filter(call => call.method==='update').length,0);
+  assert.equal(f.transport.position(),original);
+  f.transport.pause();f.transport.setSoloGroup('b');await f.transport.toggle();
+  assert.equal(f.calls.filter(call=>call.method==='resume').at(-1)!.plan!.soloGroupId,'b');
+  f.transport.setSoloGroup();
+  assert.equal(f.calls.at(-1)!.groupId,undefined);
+  f.transport.dispose();
+});
+
+test('a hover change during device preparation reaches the new session without restarting it', async () => {
+  const f=fixture(),wait=deferred();f.waitDevice(wait.promise);
+  f.transport.setSoloGroup('a');const opening=f.transport.toggle();await settle();
+  f.transport.setSoloGroup('b');wait.resolve();await opening;
+  assert.equal(f.calls.filter(call=>call.method==='preview').length,1);
+  assert.equal(f.calls.at(-1)!.method,'solo');assert.equal(f.calls.at(-1)!.groupId,'b');
+  f.transport.dispose();
+});
 
 test('phrase audition contains only the fixed four bars and leaves stored source notes intact', async () => {
   const f = fixture();
@@ -213,6 +242,70 @@ test('a generated-note audition survives live head movement by waiting for the m
     assert.equal(requests, 1); assert(played.length > 0); assert(played.every(node => node.started && !node.stopped));
     assert.equal(transport.position(), .125); assert.deepEqual(errors, []);
   } finally { audition.cancel(); transport.dispose(); await runtime.dispose(); }
+}));
+
+test('rapid column clicks queued during audio preparation retain distinct attacks', async () => simulatedDevice(async () => {
+  const phrase = auditionPhrase();
+  const runtime = createBrowserSoundRuntime();
+  const ready = deferred();
+  const errors: string[] = [];
+  const audition = createPhraseAudition(phrase, {
+    activate: async () => { await ready.promise; await runtime.activate!(); },
+    audition: runtime.audition,
+    cancelAudition: runtime.cancelAudition,
+  }, () => phrase.read().body!.parts[0]!.id, error => errors.push(error));
+  try {
+    const first = audition.prepareColumn(440);
+    const second = audition.prepareColumn(660);
+    const abandoned = audition.prepareColumn(880);
+    assert.equal(typeof abandoned, 'function');
+    first(); second();
+    ready.resolve();
+    await new Promise<void>(resolve => setImmediate(resolve));
+    const attacks = audio().oscillators.filter(node => node.started && !node.stopped);
+    const at = (frequency: number) => attacks.find(node => node.frequency.changes.some(change => change.value === frequency))?.startTime;
+    const firstAttack = at(440), secondAttack = at(660);
+    assert(firstAttack !== undefined && secondAttack !== undefined && secondAttack > firstAttack);
+    assert.equal(at(880), undefined);
+    assert.deepEqual(errors, []);
+  } finally { audition.cancel(); await runtime.dispose(); }
+}));
+
+test('rolling in new notes preserves each attack until the selection changes', async () => simulatedDevice(async () => {
+  const phrase = auditionPhrase(), part = phrase.read().body!.parts[0]!.id;
+  const runtime = createBrowserSoundRuntime(), errors: string[] = [];
+  const late = deferred(), cancelled = deferred();
+  let selected: string | undefined = part;
+  const audition = createPhraseAudition({
+    ...phrase,
+    async previewNotePlan(_id, input) {
+      if (input.frequencyHz === 550) await late.promise;
+      if (input.frequencyHz === 880) await cancelled.promise;
+      return { ...sound, note: input };
+    },
+  }, runtime, () => selected, error => errors.push(error));
+  const request = (frequencyHz: number) => audition.requestNewNote(part, { frequencyHz, velocity: .75 });
+  try {
+    await request(440);
+    const firstAttack = audio().oscillators[0]!;
+    audio().currentTime += .001;
+    const pending = request(550);
+    await request(660);
+    assert(firstAttack.startTime! > audio().currentTime && !firstAttack.disconnected);
+    late.resolve();
+    await pending;
+    const attacks = audio().oscillators;
+    assert.deepEqual(attacks.map(node => node.frequency.changes[0]!.value), [440, 660, 550]);
+    assert(attacks.every(node => node.started && !node.stopped));
+    const obsolete = request(880);
+    selected = undefined;
+    audition.sync();
+    cancelled.resolve();
+    await obsolete;
+    assert.equal(attacks.length, 3);
+    assert(attacks.every(node => node.stopped && node.disconnected));
+    assert.deepEqual(errors, []);
+  } finally { await runtime.dispose(); }
 }));
 
 test('waiting generated-note auditions retain cancellation and do not sound after selection changes', async () => {

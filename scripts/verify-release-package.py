@@ -29,11 +29,17 @@ for platform in ['windows','mac']:
         if requested:
             manifest=json.loads(package.read(prefix+'seed-projects/manifest.json'));assert manifest['projects']==plan['projects']
         assert package.read(prefix+'icon.png')==(ROOT/'desktop/assets/RootSound.png').read_bytes()
-        for required in ['main.cjs','preload.cjs','rpc.cjs','package.json','host/RootSound.Host.dll','ui/index.html','ui/instruments/rootsound-studio-v1/CREDITS.md','runtime/LICENSE.txt']:
+        native = platform == 'windows' and plan.get('windowsNative')
+        for required in ['package.json','host/RootSound.Host.dll','ui/index.html','ui/instruments/rootsound-studio-v1/CREDITS.md','runtime/LICENSE.txt']:
             assert prefix+required in names,required
-        for source in ['main.cjs','preload.cjs','rpc.cjs','bundled-projects.cjs']:
-            assert package.read(prefix+source)==(ROOT/'desktop/electron'/source).read_bytes(),source
-        assert b"script-src 'self' 'wasm-unsafe-eval'" in package.read(prefix+'main.cjs')
+        if not native:
+            for source in ['main.cjs','preload.cjs','rpc.cjs','bundled-projects.cjs']:
+                assert package.read(prefix+source)==(ROOT/'desktop/electron'/source).read_bytes(),source
+            assert b"script-src 'self' 'wasm-unsafe-eval'" in package.read(prefix+'main.cjs')
+        else:
+            assert json.loads(package.read(prefix+'package.json'))['shell'] == 'native-windows'
+            for required in ['RootSound.dll','RootSound.runtimeconfig.json','webview/msedgewebview2.exe','install-files.json']:
+                assert prefix+required in names
         runtime='runtime/dotnet.exe' if platform=='windows' else 'runtime/dotnet'
         assert prefix+runtime in names
         voices=[name for name in names if name.startswith(prefix+'ui/instruments/') and name.endswith('.wav')]

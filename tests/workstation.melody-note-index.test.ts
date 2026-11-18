@@ -17,6 +17,37 @@ test('visible interval lookup retains overlapping holds and uses explicit second
   assert.equal(index.startingBetween(100.1,100.9).length, 0);
 });
 
+test('local edits update the overlap lookup and playback onsets without rebuilding the index', () => {
+  const first = { id: 'first', startBeat: 1, durationBeats: 1, frequencyHz: 440, velocity: .7 };
+  const second = { ...first, id: 'second', startBeat: 4 };
+  const voice = { id: 'voice', name: 'test', timbreId: 'tone', notes: [first, second] };
+  const body: PhraseBody = { model: 'note-phrase', version: 1, timeUnit: 'beat', tempoBpm: 120, lengthBeats: 16, parts: [voice] };
+  const index = createMelodyNoteIndex(body, [voice]);
+  assert.deepEqual(index.startingBetween(.3, .7).map(entry => entry.note.id), ['first']);
+  assert(index.replace(body, first.id, voice, { ...first, startBeat: 6, durationSeconds: 1 }));
+  assert(index.replace(body, second.id));
+  assert.deepEqual(index.visible(0, 2.9), []);
+  assert.deepEqual(index.visible(3.5, 3.7).map(entry => entry.note.id), ['first']);
+  assert.deepEqual(index.startingBetween(2.9, 3.1).map(entry => entry.note.id), ['first']);
+  assert.deepEqual(index.startingBetween(3.1, 3.2), []);
+  assert(!index.byId.has(second.id));
+});
+
+test('repeated inserts and deletes extend the same interval index past a full editing session', () => {
+  const voice = { id: 'voice', name: 'test', timbreId: 'tone', notes: [] };
+  const body: PhraseBody = { model: 'note-phrase', version: 1, timeUnit: 'beat', tempoBpm: 120, lengthBeats: 1024, parts: [voice] };
+  const index = createMelodyNoteIndex(body, [voice]);
+  for (let i = 0; i < 800; i++) {
+    const startBeat = i * 137 % 1021;
+    assert(index.replace(body, String(i), voice, { id: String(i), startBeat, durationBeats: 1, frequencyHz: 440, velocity: .7 }));
+  }
+  for (let i = 0; i < 800; i += 3) index.replace(body, String(i));
+  const entries = [...index.byId.values()].sort((a, b) => a.start - b.start);
+  for (let start = 1; start < 512; start += 9) {
+    assert.deepEqual(index.visible(start, start + 3), entries.filter(item => item.start <= start + 3 && item.end >= start));
+  }
+});
+
 test('follow target waits for the edge then places the head at the top, including the final page',()=>{
   assert.equal(melodyFollowTarget(8,0,10,100),undefined);
   assert.equal(melodyFollowTarget(9.9,0,10,100),undefined);

@@ -153,8 +153,34 @@ namespace RootSound.Launcher
                 Equal("", start.Arguments);
             });
             Check("argument-escaping-real-child-roundtrip", ArgumentRoundtrip);
+            Check("installed-native-runtime-and-song-directory", delegate {
+                string root = InstalledFixture();
+                var start = Launcher.CreateStartInfo(root, new[] { "--data-dir", @"D:\中文 空格\profile" });
+                Equal(Path.Combine(root, @"resources\app\runtime\dotnet.exe"), start.FileName);
+                Equal(Path.GetDirectoryName(root), start.WorkingDirectory);
+                Equal(Launcher.QuoteArguments(new[] { Path.Combine(root, @"resources\app\RootSound.dll"), "--install-root", Path.GetDirectoryName(root), "--data-dir", @"D:\中文 空格\profile" }), start.Arguments);
+                Assert(!start.UseShellExecute && start.CreateNoWindow, "Installed launch must not use a shell.");
+            });
+            Check("installed-native-missing-runtime-rejected", delegate {
+                string root = InstalledFixture(); File.Delete(Path.Combine(root, @"resources\app\runtime\dotnet.exe"));
+                Reject(delegate { Launcher.CreateStartInfo(root, new string[0]); });
+            });
+            Check("installed-native-invalid-marker-rejected", delegate {
+                string root = InstalledFixture(); File.WriteAllText(Path.Combine(root, @"resources\app\rootsound-installed"), "bad");
+                Reject(delegate { Launcher.CreateStartInfo(root, new string[0]); });
+            });
             Check("null-argument-rejected", delegate { Reject(delegate { Launcher.QuoteArguments(new string[] { null }); }); });
             Check("nul-argument-rejected", delegate { Reject(delegate { Launcher.QuoteArguments(new string[] { "a\0b" }); }); });
+        }
+
+        private static string InstalledFixture()
+        {
+            string root = Fixture(@".cache\desktop-builds\20261023-001-abcdef");
+            string app = Path.Combine(root, @"resources\app");
+            Directory.CreateDirectory(Path.Combine(app, "runtime")); Directory.CreateDirectory(Path.Combine(app, "ui"));
+            foreach (string file in new[] { "rootsound-installed", "RootSound.dll", @"runtime\dotnet.exe", @"ui\index.html" })
+                File.WriteAllBytes(Path.Combine(app, file), new byte[0]);
+            return root;
         }
 
         private static void ArgumentRoundtrip()

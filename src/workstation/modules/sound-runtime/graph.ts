@@ -24,6 +24,16 @@ export interface SoundGraph {
   readonly starts: GraphStart[];
   readonly pans: { atSeconds: number; node: StereoPannerNode; pan: number }[];
   readonly output?: { node: GainNode; preview: ScheduledPreview };
+  readonly groups?: ReadonlyMap<string, GainNode>;
+}
+
+export function setGraphSolo(graph: SoundGraph | undefined, groupId: string | undefined, now: number): void {
+  for (const [id, node] of graph?.groups ?? []) {
+    const value = node.gain.value;
+    node.gain.cancelAndHoldAtTime(now);
+    node.gain.setValueAtTime(value, now);
+    node.gain.linearRampToValueAtTime(groupId === undefined || id === groupId ? 1 : 0, now + .005);
+  }
 }
 
 export function releaseScheduledNotes(graph: SoundGraph, starts: ReadonlyMap<AudioScheduledSourceNode, number>, origin: number, now: number, normalization: number): number {
@@ -127,13 +137,20 @@ export function createWindowedSampleCache(audio: BaseAudioContext) {
 
 /** One graph builder and one envelope scheduler serve live and offline clocks. */
 export function allocateGraph(audio: BaseAudioContext, preview: ScheduledPreview, resources: GraphResources, ended?: () => void,
-  destination: AudioNode = audio.destination): SoundGraph {
+  destination: AudioNode = audio.destination, inheritedGroups?: ReadonlyMap<string, GainNode>): SoundGraph {
   let output: SoundGraph['output'];
-  if (preview.output) {
+  if (preview.output || !inheritedGroups && preview.groupIds?.length) {
     const node = audio.createGain(); resources.gains.push(node); (resources.outputBuses ??= []).push(node);
-    node.connect(destination); destination = node; output = { node, preview };
+    node.connect(destination); destination = node;
+    if (preview.output) output = { node, preview };
   }
-  const graph: SoundGraph = { envelopes: [], starts: [], pans: [], ...(output ? { output } : {}) };
+  const groups = inheritedGroups ?? new Map<string, GainNode>();
+  if (!inheritedGroups) for (const id of preview.groupIds ?? []) {
+    const node = audio.createGain(); resources.gains.push(node);
+    node.gain.value = preview.soloGroupId === undefined || preview.soloGroupId === id ? 1 : 0;
+    node.connect(destination); (groups as Map<string, GainNode>).set(id, node);
+  }
+  const graph: SoundGraph = { envelopes: [], starts: [], pans: [], ...(output ? { output } : {}), ...(groups.size ? { groups } : {}) };
   const buffers = new Map<SampleSourceSnapshot, AudioBuffer>();
   for (const event of preview.events) {
     const plan = event.sound;
@@ -150,7 +167,7 @@ export function allocateGraph(audio: BaseAudioContext, preview: ScheduledPreview
       resources.gains.push(automation.node);
       envelope.connect(automation.node); automation.node.connect(panner);
     } else envelope.connect(panner);
-    panner.connect(destination);
+    panner.connect(event.groupId ? groups.get(event.groupId) ?? destination : destination);
     if (plan.kind === 'sample') {
       let buffer = buffers.get(plan.source);
       if (!buffer) { const lease = leaseBuffer(audio, plan.source); resources.bufferReleases.push(lease.release); buffer = lease.buffer; buffers.set(plan.source, buffer); }
@@ -228,14 +245,22 @@ export function scheduleGraph(graph: SoundGraph, normalization: number, start: n
       envelope.gain.setValueAtTime(0, end);
       continue;
     }
-    if (plan.envelope.decaySeconds !== undefined || plan.envelope.releaseShape === 'natural') {
-      const age = Math.max(0, fromSeconds - scheduled.atSeconds); if (age >= plan.note.holdSeconds + plan.envelope.releaseSeconds) continue;
-      const time = noteStart + age; const joined = Math.min(plan.note.holdSeconds + plan.envelope.releaseSeconds, age + transitionSeconds);
-      const value = (at: number) => amplitude * envelopeValue(plan.envelope, plan.note.holdSeconds, at);
+    const envelopeEnd = plan.note.holdSeconds + plan.envelope.releaseSeconds;
+    const sampleEndsEarly = plan.kind === 'sample' && !plan.loop && scheduled.duration < envelopeEnd;
+    if (plan.envelope.decaySeconds !== undefined || plan.envelope.releaseShape === 'natural' || sampleEndsEarly) {
+      const end = sampleEndsEarly ? scheduled.duration : envelopeEnd;
+      const age = Math.max(0, fromSeconds - scheduled.atSeconds); if (age >= end) continue;
+      const time = noteStart + age; const joined = Math.min(end, age + transitionSeconds);
+      const fadeStart = sampleEndsEarly ? end - Math.min(.004, end / 4) : end;
+      const natural = (at: number) => amplitude * envelopeValue(plan.envelope, plan.note.holdSeconds, at);
+      const value = (at: number) => at <= fadeStart ? natural(at) : natural(fadeStart) * (end - at) / (end - fadeStart);
       envelope.gain.setValueAtTime(transitionSeconds > 0 ? 0 : value(age), time);
       if (joined > age) envelope.gain.linearRampToValueAtTime(value(joined), noteStart + joined);
-      const points = [plan.envelope.attackSeconds, plan.envelope.attackSeconds + (plan.envelope.decaySeconds ?? 0), plan.note.holdSeconds, ...releaseBreakpoints(plan.envelope, plan.note.holdSeconds)];
-      for (const point of [...new Set(points)].filter(point => point > joined && point <= plan.note.holdSeconds + plan.envelope.releaseSeconds).sort((a, b) => a - b)) envelope.gain.linearRampToValueAtTime(value(point), noteStart + point);
+      const points = [plan.envelope.attackSeconds, plan.envelope.attackSeconds + (plan.envelope.decaySeconds ?? 0), plan.note.holdSeconds,
+        ...releaseBreakpoints(plan.envelope, plan.note.holdSeconds)].filter(point => point <= fadeStart);
+      if (sampleEndsEarly) points.push(fadeStart, end);
+      for (const point of [...new Set(points)].filter(point => point > joined).sort((a, b) => a - b))
+        envelope.gain.linearRampToValueAtTime(value(point), noteStart + point);
       continue;
     }
     // A short note releases from the partial attack level it has actually reached.
@@ -296,6 +321,21 @@ export function scheduleGraph(graph: SoundGraph, normalization: number, start: n
     else if(scheduled.kind==='noise')scheduled.gain.gain.setValueAtTime(scheduled.level, time);
   }
   for (const scheduled of graph.pans) scheduled.node.pan.setValueAtTime(scheduled.pan, start + Math.max(scheduled.atSeconds, fromSeconds));
+}
+
+export function clearGraphAutomation(graph: SoundGraph): void {
+  graph.output?.node.gain.cancelScheduledValues(0);
+  for (const { node, automation } of graph.envelopes) {
+    node.gain.cancelScheduledValues(0);
+    automation?.node.gain.cancelScheduledValues(0);
+  }
+  for (const { node } of graph.pans) node.pan.cancelScheduledValues(0);
+  for (const source of graph.starts) {
+    if (source.kind === 'sample') source.node.playbackRate.cancelScheduledValues(0);
+    else source.gain.gain.cancelScheduledValues(0);
+    if (source.kind === 'oscillator') source.node.frequency.cancelScheduledValues(0);
+    if (source.kind !== 'noise' && source.pitchCurve) source.node.detune.cancelScheduledValues(0);
+  }
 }
 
 /** Piecewise linear fades meet at a reduced peak if they overlap on a short song. */

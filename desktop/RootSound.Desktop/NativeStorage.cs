@@ -17,8 +17,9 @@ public sealed class NativeStorage
     {
         try
         {
-            var result = manager?.ReadLibrary() ?? (store!.Read(), scope);
-            return LargeJsonText.Serialize(new { ok = true, scope = result.Item2 }, "value", result.Item1);
+            if (manager is null) return LargeJsonText.Serialize(new { ok = true, scope }, "value", store!.Read());
+            var snapshot = manager.ReadLibraryVersioned();
+            return LargeJsonText.Serialize(new { ok = true, scope = snapshot.Scope, revision = snapshot.Revision }, "value", snapshot.Value);
         }
         catch (Exception error) { return JsonSerializer.Serialize(new { ok = false, error = error.Message }); }
     }
@@ -46,6 +47,18 @@ public sealed class NativeStorage
                 store!.Write(value);
             }
             return "{\"ok\":true}";
+        }
+        catch (Exception error) { return JsonSerializer.Serialize(new { ok = false, error = error.Message }); }
+    }
+
+    public string WriteScopedIfUnchanged(string value, string expectedScope, string expectedRevision)
+    {
+        try
+        {
+            if (manager is null || string.IsNullOrWhiteSpace(expectedScope) || string.IsNullOrWhiteSpace(expectedRevision))
+                throw new IOException("保存缺少当前歌曲项目的版本标识，请重新打开歌曲后再编辑。");
+            string revision = manager.WriteLibraryIfUnchanged(value, expectedScope, expectedRevision);
+            return JsonSerializer.Serialize(new { ok = true, revision });
         }
         catch (Exception error) { return JsonSerializer.Serialize(new { ok = false, error = error.Message }); }
     }

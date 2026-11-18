@@ -3,24 +3,30 @@ import { melodyScale, melodySeconds } from './melody-geometry.ts';
 import { phrasePitchRow } from './phrase-viewport.ts';
 
 const COLORS = ['#4388d8', '#e47749', '#31ad8b', '#9a68d5', '#dfa62d', '#329db8', '#d4649c', '#88ad37'];
+const WINDOWS_COLORS = ['#5776b6', '#9f536d', '#41836a', '#9868bf', '#ac7d34', '#468490', '#b15c92', '#c76a45'];
 const orderedKeyboard = (keys: readonly KeyboardPitch[]) => [...keys].sort((left, right) => right.frequencyHz - left.frequencyHz);
 const positive = (value: number | undefined, fallback: number) => Number.isFinite(value) && value! > 0 ? value! : fallback;
 const nonnegative = (value: number) => Number.isFinite(value) ? Math.max(0, value) : 0;
 
-/** A tone keeps its visual identity across sections, reopening and part order changes. */
-export function toneColor(timbreId: string): string {
+function toneColorIndex(timbreId: string): number {
   let hash = 0;
   for (const character of timbreId) hash = (hash * 31 + character.charCodeAt(0)) >>> 0;
-  return COLORS[hash % COLORS.length]!;
+  return hash % COLORS.length;
 }
 
+/** A tone keeps its visual identity across sections, reopening and part order changes. */
+export function toneColor(timbreId: string): string { return COLORS[toneColorIndex(timbreId)]!; }
+
+export function windowsToneColor(timbreId: string): string { return WINDOWS_COLORS[toneColorIndex(timbreId)]!; }
+
 /** One phrase-wide palette, deterministic across departments, reopening and part order. */
-export function buildPhraseToneColors(timbreIds: Iterable<string>): Map<string, string> {
+export function buildPhraseToneColors(timbreIds: Iterable<string>, windowsPalette = false): Map<string, string> {
+  const palette = windowsPalette ? WINDOWS_COLORS : COLORS;
   const result = new Map<string, string>(); const used = new Set<number>();
   for (const id of [...new Set(timbreIds)].sort()) {
-    let index = COLORS.indexOf(toneColor(id));
-    while (used.size < COLORS.length && used.has(index)) index = (index + 1) % COLORS.length;
-    used.add(index); result.set(id, COLORS[index]!);
+    let index = toneColorIndex(id);
+    while (used.size < palette.length && used.has(index)) index = (index + 1) % palette.length;
+    used.add(index); result.set(id, palette[index]!);
   }
   return result;
 }

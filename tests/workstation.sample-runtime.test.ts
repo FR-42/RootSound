@@ -4,6 +4,7 @@ import type { PcmAudio, SampleSoundPlan, SoundPlan, SoundSequencePlan } from '..
 import { createBrowserSoundRuntime } from '../src/workstation/modules/sound-runtime/public.ts';
 import { previewFingerprint, readPreview } from '../src/workstation/modules/sound-runtime/plan.ts';
 import { emptyResources, WindowedGraph } from '../src/workstation/modules/sound-runtime/windowed.ts';
+import { OUTPUT_CEILING } from '../src/workstation/modules/sound-runtime/output-limiter-worklet.js';
 
 class Param {
   changes: { kind: 'set' | 'ramp' | 'hold'; value: number; time: number }[] = [];
@@ -28,6 +29,7 @@ class Node {
   disconnect(): void { this.disconnected = true; this.connections.length = 0; }
 }
 class Gain extends Node { gain = new Param(1); }
+class Compressor extends Node { threshold = new Param(); knee = new Param(); ratio = new Param(); attack = new Param(); release = new Param(); }
 class Panner extends Node { pan = new Param(); }
 class Source extends Node {
   onended: (() => void) | null = null; startTime = -1; stopTime = Infinity; stopped = false; started = false;
@@ -58,6 +60,7 @@ class Context {
   createOscillator(): Oscillator { const node = new Oscillator(); this.oscillators.push(node); return node; }
   createGain(): Gain { const node = new Gain(); this.gains.push(node); return node; }
   createWaveShaper(): Node { return new Node(); }
+  createDynamicsCompressor(): Compressor { return new Compressor(); }
   createStereoPanner(): Panner { const node = new Panner(); this.panners.push(node); return node; }
   createConstantSource(): Constant { const node = new Constant(); this.clocks.push(node); return node; }
   resume(): Promise<void> { if (Context.blocked) return new Promise(() => {}); this.state = 'running'; this.onstatechange?.(); return Promise.resolve(); }
@@ -240,7 +243,7 @@ test('stereo full-pan and multichannel downmix stay conservatively bounded befor
   const left: SoundSequencePlan = { kind: 'sequence', version: 1, durationSeconds: 0.3, events: [{ atSeconds: 0, sound: stereo, pan: -1 }] };
   close(readPreview(left).normalization, 1 / (channel[0]! * 2));
   const runtime = createBrowserSoundRuntime(); const rendered = await runtime.render(left);
-  close(pcm(rendered.bytes, 100, 0), 8388607, 2); assert.equal(pcm(rendered.bytes, 100, 1), 0);
+  close(pcm(rendered.bytes, 100, 0), OUTPUT_CEILING * 8388607, 2); assert.equal(pcm(rendered.bytes, 100, 1), 0);
   for (const count of [3, 4, 5, 6, 7, 8]) {
     const multi = { ...stereo, source: { ...stereo.source, audio: { sampleRate: 8000, channels: Array.from({ length: count }, () => channel) } } };
     const checked = readPreview({ ...left, events: [{ atSeconds: 0, sound: multi, pan: 1 }] });
@@ -314,7 +317,10 @@ test('offline WAV contains the trimmed, pitched sample through the same envelope
   close(node.offset, audio().samples[0]!.offset); close(node.sourceDuration, audio().samples[0]!.sourceDuration); close(node.playbackRate.at(0.005), 2);
   close(node.startTime, audio().samples[0]!.startTime - live.startedAtSeconds); assert.equal(offline.buffers.length, 1);
   assert.equal(pcm(rendered.bytes, 100, 0), 0); close(pcm(rendered.bytes, 240, 0), Math.round(0.4 * 8388607), 2);
-  close(pcm(rendered.bytes, 305, 0), Math.round(-0.1 * 8388608), 2); assert.equal(pcm(rendered.bytes, 400, 0), 0);
+  close(pcm(rendered.bytes, 298, 0), Math.round(-0.1 * 8388608), 2);
+  const fadeAt305 = (0.0075 - 305 / 44100) / 0.000625;
+  close(pcm(rendered.bytes, 305, 0), Math.round(-0.1 * fadeAt305 * 8388608), 2);
+  assert.equal(pcm(rendered.bytes, 400, 0), 0);
   assert.equal(pcm(rendered.bytes, 240, 1), 0); assert.ok(offline.samples.every(source => source.disconnected));
   close(rendered.durationSeconds, 0.02); await runtime.dispose();
 }));

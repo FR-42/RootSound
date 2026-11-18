@@ -3,7 +3,7 @@ import { MAX_AUDIO_FILE_BYTES } from '../../contracts/files.ts';
 import { allocateGraph, releaseGraph, scheduleGraph, startGraphSource, type GraphResources } from './graph.ts';
 import { readPreview, validateFrequency } from './plan.ts';
 import { WindowedGraph, WINDOWED_EVENT_THRESHOLD } from './windowed.ts';
-import { outputPeakSample } from './output-limiter.ts';
+import { OutputPeakLimiter } from './output-limiter-worklet.js';
 
 function cancelled(): DOMException { return new DOMException('音频导出已取消，尚未保存文件。', 'AbortError'); }
 function abortIfNeeded(signal?: AbortSignal): void { if (signal?.aborted) throw cancelled(); }
@@ -12,7 +12,7 @@ function report(options: AudioRenderOptions, progress: number): void {
 }
 
 /** 24-bit little-endian, two interleaved channels, ordinary RIFF PCM WAV. */
-async function encodeWav(buffer: AudioBuffer, options: AudioRenderOptions, guardPeaks: boolean): Promise<Uint8Array> {
+async function encodeWav(buffer: AudioBuffer, options: AudioRenderOptions): Promise<Uint8Array> {
   const frames = buffer.length;
   const dataBytes = frames * 6;
   const padding = dataBytes % 2;
@@ -25,16 +25,22 @@ async function encodeWav(buffer: AudioBuffer, options: AudioRenderOptions, guard
   view.setUint32(24, buffer.sampleRate, true); view.setUint32(28, buffer.sampleRate * 6, true);
   view.setUint16(32, 6, true); view.setUint16(34, 24, true);
   label(36, 'data'); view.setUint32(40, dataBytes, true);
-  const channels = [buffer.getChannelData(0), buffer.getChannelData(1)];
+  const left = buffer.getChannelData(0), right = buffer.getChannelData(1);
+  const limiter = new OutputPeakLimiter(buffer.sampleRate);
+  function advance(index: number): void {
+    const l = index < frames ? left[index]! : 0, r = index < frames ? right[index]! : 0;
+    if (!Number.isFinite(l) || !Number.isFinite(r)) throw new Error('声音执行器产生了无效采样，尚未保存音频。');
+    limiter.push(l, r);
+  }
+  for (let index = 0; index < limiter.delayFrames; index++) advance(index);
   for (let begin = 0; begin < frames; begin += 65536) {
     abortIfNeeded(options.signal);
     const end = Math.min(frames, begin + 65536);
     for (let frame = begin; frame < end; frame += 1) {
+      advance(frame + limiter.delayFrames);
       for (let channel = 0; channel < 2; channel += 1) {
-        const value = channels[channel]![frame]!;
-        if (!Number.isFinite(value)) throw new Error('声音执行器产生了无效采样，尚未保存音频。');
-        const bounded = guardPeaks ? outputPeakSample(value) : Math.min(1, Math.max(-1, value));
-        const sample = Math.round(bounded * (bounded < 0 ? 8388608 : 8388607));
+        const value = channel === 0 ? limiter.left : limiter.right;
+        const sample = Math.round(value * (value < 0 ? 8388608 : 8388607));
         const at = 44 + frame * 6 + channel * 3;
         bytes[at] = sample & 255;
         bytes[at + 1] = (sample >> 8) & 255;
@@ -104,7 +110,7 @@ export async function renderOffline(plan: PlayableNotePlan | SoundSequencePlan, 
     const buffer = await Promise.race([audio.startRendering(), aborted]);
     abortIfNeeded(options.signal);
     report(options, 0.85);
-    const bytes = await encodeWav(buffer, options, plan.kind === 'sequence' && plan.preserveNoteLevel === true);
+    const bytes = await encodeWav(buffer, options);
     return Object.freeze({ bytes, mimeType: 'audio/wav', extension: '.wav', sampleRate, channels: 2, bitsPerSample: 24, durationSeconds: frames / sampleRate });
   } finally {
     options.signal?.removeEventListener('abort', abort);

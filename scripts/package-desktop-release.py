@@ -2,23 +2,33 @@
 import hashlib, json, os, pathlib, plistlib, posixpath, shutil, stat, subprocess, sys, tarfile, tempfile, zipfile
 from verify_macos_signatures import verify_macho
 from windows_icon import embed_icon
+from installer_art import create_art
+import importlib.util
+
+_spec = importlib.util.spec_from_file_location('install_file_list', pathlib.Path(__file__).with_name('install-file-list.py'))
+_inventory = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(_inventory)
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 CACHE = ROOT / '.cache'
 DEPS = CACHE / 'release-dependencies'
 PLAN = CACHE / 'release-package-plan.json'
-VERSION = os.environ.get('ROOTSOUND_RELEASE_VERSION', '0.1.0-preview.5')
+VERSION = os.environ.get('ROOTSOUND_RELEASE_VERSION', '0.1.0-preview.11')
 
 def safe_path(root, name):
     target = (root / name).resolve()
     if not target.is_relative_to(root.resolve()): raise ValueError('Archive path escapes build directory')
     return target
 
-def populate(app, runtime, host, ui):
+def populate(app, runtime, host, ui, native=False):
     app.mkdir(parents=True)
-    for name in ['main.cjs', 'preload.cjs', 'rpc.cjs', 'bundled-projects.cjs']: shutil.copyfile(ROOT / 'desktop/electron' / name, app / name)
+    if not native:
+        for name in ['main.cjs', 'preload.cjs', 'rpc.cjs', 'bundled-projects.cjs']: shutil.copyfile(ROOT / 'desktop/electron' / name, app / name)
     shutil.copyfile(ROOT/'desktop/assets/RootSound.png',app/'icon.png')
-    (app / 'package.json').write_text(json.dumps({'name':'rootsound','productName':'RootSound','version':VERSION,'main':'main.cjs','private':True}), 'utf-8')
+    if native: shutil.copyfile(ROOT/'desktop/assets/RootSound.ico', app/'icon.ico')
+    metadata = {'name':'rootsound','productName':'RootSound','version':VERSION,'private':True}
+    metadata.update({'shell':'native-windows'} if native else {'main':'main.cjs'})
+    (app / 'package.json').write_text(json.dumps(metadata), 'utf-8')
     (app / 'host').mkdir()
     for name in ['RootSound.Host.dll','RootSound.Host.deps.json','RootSound.Host.runtimeconfig.json']: shutil.copyfile(host / name, app / 'host' / name)
     shutil.copytree(ui, app / 'ui')
@@ -30,22 +40,32 @@ def populate(app, runtime, host, ui):
     (app / 'ui/release-scope.json').unlink()
     runtime.mkdir()
 
+def windows_native(stage, dotnet):
+    native_lock = json.loads((ROOT / 'desktop/installer/native-runtime-lock.json').read_text('utf-8'))
+    assert native_lock['dotnetVersion'] == dotnet
+    windows = stage / 'RootSound-Windows-x64'
+    windows.mkdir()
+    app = windows / 'resources/app'
+    populate(app, app/'runtime', CACHE/'release-host', CACHE/'release-ui', native=True)
+    for source in (CACHE/'release-native').iterdir():
+        if source.is_file() and source.suffix in ('.dll', '.json'):
+            shutil.copyfile(source, app/source.name)
+    shutil.copytree(CACHE/'release-native/runtimes/win-x64', app/'runtimes/win-x64')
+    shutil.copyfile(CACHE/'release-native-launcher/RootSound.exe', windows/'RootSound.exe')
+    native_deps = CACHE/'native-release-dependencies'
+    for filename in [DEPS/f'dotnet-runtime-{dotnet}-win-x64.zip', native_deps/f'windowsdesktop-runtime-{dotnet}-win-x64.zip']:
+        with zipfile.ZipFile(filename) as archive:
+            for item in archive.infolist(): safe_path(app/'runtime', item.filename)
+            archive.extractall(app/'runtime')
+    shutil.copytree(native_deps/native_lock['webviewDirectory'], app/'webview')
+    return windows
+
 def prepare():
     dependencies = json.loads((DEPS/'manifest.json').read_text('utf-8')); electron = dependencies['electronVersion']; dotnet = dependencies['dotnetVersion']
     build_root = CACHE / 'release-package-builds'; build_root.mkdir(exist_ok=True)
     stage = pathlib.Path(tempfile.mkdtemp(prefix='r-', dir=build_root))
-    windows = stage / 'RootSound-Windows-x64'; windows.mkdir()
-    with zipfile.ZipFile(DEPS / f'electron-v{electron}-win32-x64.zip') as archive:
-        for item in archive.infolist(): safe_path(windows, item.filename)
-        archive.extractall(windows)
-    (windows/'electron.exe').rename(windows/'RootSound.exe')
-    embed_icon(windows/'RootSound.exe',ROOT/'desktop/assets/RootSound.ico')
-    (windows/'resources/default_app.asar').unlink(missing_ok=True)
+    windows = windows_native(stage, dotnet)
     win_app = windows/'resources/app'
-    populate(win_app, win_app/'runtime', CACHE/'release-host', CACHE/'release-ui')
-    with zipfile.ZipFile(DEPS/f'dotnet-runtime-{dotnet}-win-x64.zip') as archive:
-        for item in archive.infolist(): safe_path(win_app/'runtime', item.filename)
-        archive.extractall(win_app/'runtime')
 
     mac = stage/'RootSound-macOS-arm64'; mac.mkdir()
     links = {}; mac_modes = {}; base_entries = []
@@ -68,38 +88,39 @@ def prepare():
             elif member.isfile(): target.parent.mkdir(parents=True, exist_ok=True); target.write_bytes(archive.extractfile(member).read())
             else: raise ValueError('Unexpected linked .NET runtime entry')
     info_file = app/'Contents/Info.plist'; info = plistlib.loads(info_file.read_bytes())
-    info.update(CFBundleName='RootSound', CFBundleDisplayName='RootSound', CFBundleIdentifier='com.rootsound.desktop',
-                CFBundleShortVersionString=VERSION.split('-')[0], CFBundleVersion=VERSION.split('-')[0])
+    build_version = VERSION.split('-')[0] + ('.' + VERSION.rsplit('.', 1)[1] if '-preview.' in VERSION else '.9999')
+    major, minor, patch = (int(part) for part in VERSION.split('-')[0].split('.'))
+    bundle_version = f'{major}.{minor}.{patch * 1000 + (int(VERSION.rsplit(".", 1)[1]) if "-preview." in VERSION else 999)}'
+    info.update(CFBundleName='RootSound', CFBundleDisplayName='简乐', CFBundleIdentifier='com.rootsound.desktop',
+                CFBundleShortVersionString=VERSION.split('-')[0], CFBundleVersion=bundle_version)
     info_file.write_bytes(plistlib.dumps(info))
     icon_name=info.get('CFBundleIconFile','electron.icns')
     if not icon_name.endswith('.icns'):icon_name+='.icns'
     shutil.copyfile(ROOT/'desktop/assets/RootSound.icns',app/'Contents/Resources'/icon_name)
 
     demo_dir = 'project/演示项目/'
-    tree = subprocess.check_output(['git', 'ls-tree', '-r', '-z', 'HEAD', '--', demo_dir], cwd=ROOT)
     snapshot = stage/'bundled-projects'
     snapshot.mkdir()
     projects = []
-    for entry in tree.decode('utf-8').split('\0'):
-        if not entry:
-            continue
-        metadata, relative = entry.split('\t', 1)
-        mode, kind, oid = metadata.split()
-        if mode not in ('100644', '100755') or kind != 'blob' or not relative.endswith('.rootsound'):
-            continue
-        name = relative.removeprefix(demo_dir)
-        if name == relative or '\\' in name or any(part in ('', '.', '..') for part in name.split('/')):
-            raise ValueError('Invalid demo project path')
+    for source in sorted((ROOT / demo_dir).rglob('*.rootsound')):
+        if source.is_symlink() or not source.resolve().is_relative_to((ROOT / demo_dir).resolve()):
+            raise ValueError('Linked demo project path')
+        name = source.relative_to(ROOT / demo_dir).as_posix()
         target = safe_path(snapshot, name)
         target.parent.mkdir(parents=True, exist_ok=True)
-        with target.open('xb') as output:
-            subprocess.run(['git', 'cat-file', 'blob', oid], cwd=ROOT, stdout=output, check=True)
+        shutil.copyfile(source, target)
         with target.open('rb') as input:
             checksum = hashlib.file_digest(input, 'sha256').hexdigest()
         projects.append({'name': name, 'bytes': target.stat().st_size, 'sha256': checksum})
     for destination in [win_app/'seed-projects', mac_app/'seed-projects']:
         shutil.copytree(snapshot, destination)
         (destination/'manifest.json').write_text(json.dumps({'version': 2, 'projects': projects}, ensure_ascii=False, indent=2), encoding='utf-8')
+
+    legacy = ROOT / 'desktop/installer/legacy-files'
+    if legacy.exists():
+        shutil.copytree(legacy, win_app / 'legacy-install-files')
+    (win_app / 'install-files.json').write_text(json.dumps(_inventory.inventory(windows), ensure_ascii=False), encoding='utf-8')
+    create_art(CACHE / 'installer-art')
 
     # Windows cannot create Unix symlinks without a system privilege. Provide
     # local-only aliases so the shallow signer can read vendor framework bundles;
@@ -126,9 +147,26 @@ def prepare():
     entitlements.write_bytes(plistlib.dumps({'com.apple.security.cs.allow-jit':True,'com.apple.security.cs.allow-unsigned-executable-memory':True,'com.apple.security.cs.disable-library-validation':True}))
     plan = {'version':VERSION,'electronVersion':electron,'dotnetVersion':dotnet,'windows':str(windows),'mac':str(mac),'macLinks':links,
             'macModes':mac_modes,'macBaseEntries':base_entries,'entitlements':str(entitlements),'macMinimumVersion':info.get('LSMinimumSystemVersion'),
-            'projects':projects,'customAppIcon':True}
+            'projects':projects,'customAppIcon':True,'macBuildVersion':build_version,'macBundleVersion':bundle_version,'windowsNative':True}
     PLAN.write_text(json.dumps(plan,indent=2),encoding='utf-8')
     print(json.dumps({key:plan[key] for key in ['version','windows','mac','macMinimumVersion']}))
+
+def prepare_windows_native():
+    plan = json.loads(PLAN.read_text('utf-8'))
+    stage = pathlib.Path(tempfile.mkdtemp(prefix='native-', dir=CACHE/'release-package-builds'))
+    windows = windows_native(stage, plan['dotnetVersion'])
+    app = windows/'resources/app'
+    mac_seed = pathlib.Path(plan['mac'])/'RootSound.app/Contents/Resources/app/seed-projects'
+    for project in plan['projects']:
+        source = ROOT/'project/演示项目'/project['name']
+        with source.open('rb') as stream:
+            assert hashlib.file_digest(stream, 'sha256').hexdigest() == project['sha256'], 'Demo changed; rebuild both platforms'
+    shutil.copytree(mac_seed, app/'seed-projects')
+    shutil.copytree(ROOT/'desktop/installer/legacy-files', app/'legacy-install-files')
+    (app/'install-files.json').write_text(json.dumps(_inventory.inventory(windows), ensure_ascii=False), encoding='utf-8')
+    plan.update(windows=str(windows), windowsNative=True)
+    PLAN.write_text(json.dumps(plan, indent=2), encoding='utf-8')
+    print(json.dumps({'windows': str(windows), 'native': True}))
 
 def archive():
     plan=json.loads(PLAN.read_text('utf-8')); release=pathlib.Path(os.environ.get('ROOTSOUND_RELEASE_OUTPUT',str(ROOT/'release'))).resolve()
@@ -139,15 +177,15 @@ def archive():
     for key in ['windows','mac']:
         source=pathlib.Path(plan[key])
         readme='RootSound '+VERSION+'\n\n'
-        readme+=('解压整个文件夹，双击 RootSound.exe。无需安装 Node.js 或 .NET。\n项目默认保存在程序旁的 project 文件夹。\n' if key=='windows' else
+        readme+=('此 ZIP 为内部打包校验文件。请使用 release 目录中的“简乐安装.exe”安装软件。\n' if key=='windows' else
                  '适用于 Apple 芯片 Mac，macOS 13 或以上。解压后将 RootSound.app 拖入“应用程序”，再打开。\n项目默认保存在“音乐/RootSound/project”，不写入应用程序包。\n本预览包为本地签名，尚无苹果开发者签名／公证；首次打开可能需要在“系统设置→隐私与安全性”中确认。\n尚未在真实 Mac 上完成运行与听音验收。\n')
-        readme+='\n包含：乐曲库、竖向钢琴卷帘、128种GM乐器及47种鼓音、音色导入、琴键试听、MIDI导入、BPM卷帘、工程保存和WAV导出。\n不包含：旧歌曲编排界面、乐句库、灵感共创、独立采样／蓝牙实验工具。\n'
+        readme+='\n包含：乐曲库、竖向钢琴卷帘、精选采样音色、音色卡、琴键试听、MIDI导入、多卷帘、播放曲线和 .rootsound 工程保存。\n'
         readme+='\n内置音色采用录音采样，许可见 ui/instruments/rootsound-studio-v1/CREDITS.md。\n'
         if plan.get('projects'):
-            readme+=f'\n随包附带演示项目目录中已提交的 {len(plan["projects"])} 个工程。\n'
+            readme+=f'\n随包附带当前演示项目目录中的 {len(plan["projects"])} 个工程。\n'
             readme+='首次打开会加入乐曲库；已有同名工程不会被覆盖，删除后的随包工程不会在下次启动时重新出现。\n'
             readme+='\n'.join('- '+item['name'] for item in plan['projects'])+'\n'
-        readme+='\n退出时可选择保存、放弃或取消，普通编辑不会自动保存工程。\n'
+        readme+='\n普通编辑不会覆盖原工程；保存和另存为由用户操作，异常恢复记录独立保存。\n'
         output=release/f'{source.name}-{VERSION}.zip'
         with zipfile.ZipFile(output,'x',compression=zipfile.ZIP_DEFLATED,compresslevel=6) as archive:
             if key=='windows':
@@ -205,4 +243,4 @@ def sign_mac():
     print('Verified local signatures:',len(signatures),'Developer ID/notarization: not supplied')
 
 if __name__=='__main__':
-    {'prepare':prepare,'sign-mac':sign_mac,'archive':archive}[sys.argv[1]]()
+    {'prepare':prepare,'prepare-windows-native':prepare_windows_native,'sign-mac':sign_mac,'archive':archive}[sys.argv[1]]()

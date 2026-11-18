@@ -7,6 +7,23 @@
   color: var(--welcome-ink);
   background: radial-gradient(ellipse at 81% 33%, #e4f1f7 0%, transparent 57%), linear-gradient(145deg, #fff, #f2f8fa);
 }
+.is-desktop-welcome { isolation: isolate; overflow: hidden; }
+.is-desktop-welcome::after {
+  content: '';
+  position: absolute; inset: 0; z-index: -2; pointer-events: none;
+  background: var(--library-gradient, linear-gradient(135deg, #fcfeff, #eaf2f8));
+  opacity: 0; transition: opacity 300ms ease-in-out;
+}
+.is-desktop-welcome.is-library-open::after { opacity: 1; }
+.is-desktop-welcome .invitation { transition: opacity 240ms ease-in-out; }
+.is-desktop-welcome.is-library-open .invitation { opacity: 0; }
+@media (prefers-reduced-motion: reduce) {
+  .is-desktop-welcome::after, .is-desktop-welcome .invitation { transition: none; }
+}
+.pointer-keyboard-entry:not(:focus-visible) {
+  position: absolute; width: 1px; height: 1px; padding: 0; border: 0;
+  min-width: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap;
+}
 .project-welcome-brand { display: flex; align-items: center; gap: 10px; }
 .project-welcome-brand > span {
   display: grid; place-items: center; width: 34px; height: 34px;

@@ -148,7 +148,9 @@ internal static class Program
         {
             // Hold the application-wide lock without reading or reviving the retired global library.
             using var applicationLock = AcquireApplicationLock(dataDirectory);
-            using var projects = new ProjectDirectoryManager(ResolveInstallationRoot(Argument(args, "--install-root")));
+            var installationRoot = ResolveInstallationRoot(Argument(args, "--install-root"));
+            BundledProjects.Seed(Path.Combine(AppContext.BaseDirectory, "seed-projects"), installationRoot);
+            using var projects = new ProjectDirectoryManager(installationRoot);
             Application.Run(new MainWindow(projects, dataDirectory));
             return 0;
         }

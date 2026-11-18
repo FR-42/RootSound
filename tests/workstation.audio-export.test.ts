@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { OUTPUT_CEILING } from '../src/workstation/modules/sound-runtime/output-limiter-worklet.js';
 import { createBrowserSoundRuntime } from '../src/workstation/modules/sound-runtime/public.ts';
 import type { SoundPlan, SoundSequencePlan } from '../src/workstation/contracts/sound.ts';
 import type { ContentRecord, SaveResult } from '../src/workstation/contracts/content.ts';
@@ -26,6 +27,7 @@ class Oscillator extends Node {
   stop(time = 0): void { this.stopTime = time; }
 }
 class Gain extends Node { gain = new Param(); }
+class Compressor extends Node { threshold = new Param(); knee = new Param(); ratio = new Param(); attack = new Param(); release = new Param(); }
 class Panner extends Node { pan = new Param(); }
 class Constant extends Oscillator { offset = new Param(); }
 class Context {
@@ -37,6 +39,7 @@ class Context {
   createOscillator(): Oscillator { const node = new Oscillator(); this.oscillators.push(node); return node; }
   createGain(): Gain { const node = new Gain(); this.gains.push(node); return node; }
   createWaveShaper(): Node { return new Node(); }
+  createDynamicsCompressor(): Compressor { return new Compressor(); }
   createStereoPanner(): Panner { const node = new Panner(); this.panners.push(node); return node; }
   createConstantSource(): Constant { return new Constant(); }
   async resume(): Promise<void> { /* Always available for the scheduling fixture. */ }
@@ -44,7 +47,7 @@ class Context {
 }
 class Offline extends Context {
   static instances: Offline[] = [];
-  static mode: 'normal' | 'pending' | 'failure' | 'nonfinite' = 'normal';
+  static mode: 'normal' | 'pending' | 'failure' | 'nonfinite' | 'overload' = 'normal';
   readonly channels: number; readonly length: number;
   suspensionTimes: number[] = [];
   constructor(channels: number, length: number, sampleRate: number) {
@@ -56,8 +59,12 @@ class Offline extends Context {
     if (Offline.mode === 'failure') return Promise.reject(new Error('offline device failed'));
     const left = new Float32Array(this.length);
     const right = new Float32Array(this.length);
-    left.set([0, 0.25, -0.5, 1, -1, 1.5, -1.5].slice(0, this.length));
-    right.set([-0.25, 0.5, 0, -1, 1, -1.5, 1.5].slice(0, this.length));
+    left.set([0, .25, -.5, .75, -.75, .875, -.875].slice(0, this.length));
+    right.set([-.25, .5, 0, -.75, .75, -.875, .875].slice(0, this.length));
+    if (Offline.mode === 'overload') {
+      left[1200] = 4; right[1200] = -2;
+      left[this.length - 1] = -3; right[this.length - 1] = 1.5;
+    }
     if (Offline.mode === 'nonfinite') left[0] = Number.NaN;
     return Promise.resolve({ length: this.length, sampleRate: this.sampleRate, getChannelData: (channel: number) => channel === 0 ? left : right } as AudioBuffer);
   }
@@ -104,12 +111,25 @@ test('offline WAV encodes exact stereo PCM samples, duration and standard RIFF h
   assert.equal(view.getUint16(32, true), 6); assert.equal(view.getUint16(34, true), 24);
   assert.equal(view.getUint32(40, true), 72000);
   assert.equal(pcm(result.bytes, 1, 0), 2097152); assert.equal(pcm(result.bytes, 0, 1), -2097152);
-  assert.equal(pcm(result.bytes, 3, 0), 8388607); assert.equal(pcm(result.bytes, 4, 0), -8388608);
-  assert.equal(pcm(result.bytes, 5, 0), 8388607); assert.equal(pcm(result.bytes, 6, 0), -8388608);
+  assert.equal(pcm(result.bytes, 3, 0), 6291455); assert.equal(pcm(result.bytes, 4, 0), -6291456);
+  assert.equal(pcm(result.bytes, 5, 0), 7340031); assert.equal(pcm(result.bytes, 6, 0), -7340032);
   assert.deepEqual([progress[0], progress.at(-1)], [0, 1]);
   assert(Offline.instances[0]!.oscillators.every(node => node.disconnected));
   await runtime.dispose();
 }));
+
+test('offline overload protection preserves stereo balance and the last sample without shifting the WAV', async () => fixture(async () => {
+  const runtime = createBrowserSoundRuntime();
+  try {
+    const { bytes } = await runtime.render(plan());
+    const frames = (bytes.length - 44) / 6;
+    const cap = Math.round(OUTPUT_CEILING * 8388607);
+    assert.equal(pcm(bytes, 1199, 0), 0);
+    assert.equal(pcm(bytes, 1200, 0), cap);
+    assert.equal(pcm(bytes, 1200, 1), Math.round(-OUTPUT_CEILING * .5 * 8388608));
+    assert.equal(pcm(bytes, frames - 1, 0), Math.round(-OUTPUT_CEILING * 8388608));
+  } finally { await runtime.dispose(); }
+}, 'overload'));
 
 test('live and offline use identical normalized envelope, source, panning and note timing', async () => fixture(async () => {
   const runtime = createBrowserSoundRuntime();

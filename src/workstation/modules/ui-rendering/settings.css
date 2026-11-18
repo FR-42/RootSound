@@ -14,8 +14,8 @@
 .learning-appearance input { box-sizing: border-box; width: 100%; height: 32px; margin: 0; accent-color: #506e85; touch-action: none; cursor: pointer; }
 .learning-settings.is-previewing { background: transparent; border-color: transparent; box-shadow: none; }
 .learning-settings.is-previewing::backdrop { background: transparent; }
-.learning-settings.is-previewing > :not(.learning-appearance), .learning-settings.is-previewing .learning-appearance > span { visibility: hidden; }
-.learning-settings.is-previewing .learning-appearance input { background: #fff; border-radius: 16px; box-shadow: 0 2px 8px #26374640; }
+.learning-settings.is-previewing > :not(.learning-grid-appearance), .learning-settings.is-previewing .learning-grid-appearance > span { visibility: hidden; }
+.learning-settings.is-previewing .learning-grid-appearance input { background: #fff; border-radius: 16px; box-shadow: 0 2px 8px #26374640; }
 .roll-appearance-preview { position: fixed; inset: 0; z-index: 30; pointer-events: none; }
 .roll-appearance-preview.is-vertical .melody-canvas { bottom: 0; }
 .welcome-settings { position:absolute; bottom:22px; right:24px; border:0; color:#72808a; background:none; font-size:13px; }

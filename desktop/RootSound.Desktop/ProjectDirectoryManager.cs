@@ -11,7 +11,8 @@ public sealed record ProjectDirectoryInfo(
     [property: JsonPropertyName("id")] string Id,
     [property: JsonPropertyName("name")] string Name,
     [property: JsonPropertyName("path")] string Path,
-    [property: JsonPropertyName("format"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Format = null);
+    [property: JsonPropertyName("format"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Format = null,
+    [property: JsonPropertyName("pendingSave"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] bool PendingSave = false);
 
 public sealed record ProjectLibrarySnapshot(
     [property: JsonPropertyName("project")] ProjectDirectoryInfo Project,
@@ -43,6 +44,7 @@ public sealed partial class ProjectDirectoryManager : IDisposable
     private JsonObject? fileEnvelope;
     private string? memory;
     private string scope = Guid.NewGuid().ToString("N");
+    private string revision = Guid.NewGuid().ToString("N");
     private bool disposed;
     private readonly string payloadRoot;
     private readonly int payloadThreshold;
@@ -139,36 +141,63 @@ public sealed partial class ProjectDirectoryManager : IDisposable
 
     public (string? Value, string Scope) ReadLibrary()
     {
+        var snapshot = ReadLibraryVersioned();
+        return (snapshot.Value, snapshot.Scope);
+    }
+
+    internal (string? Value, string Scope, string Revision) ReadLibraryVersioned()
+    {
         lock (gate)
         {
             ThrowIfDisposed();
-            if (activeStore is null) return (memory, scope);
-            // Draft reads never touch the source file. Explicit Save still compares
-            // its full fingerprint before committing, without adopting external edits.
-            return (currentSnapshot, scope);
+            return (current is null ? memory : currentSnapshot, scope, revision);
         }
     }
 
     public void WriteLibrary(string value, string? expectedScope = null, bool checkpoint = false)
+        => WriteLibrary(value, expectedScope, null, checkpoint);
+
+    internal string WriteLibraryIfUnchanged(string value, string expectedScope, string expectedRevision)
+        => WriteLibrary(value, expectedScope, expectedRevision, checkpoint: false);
+
+    private string WriteLibrary(string value, string? expectedScope, string? expectedRevision, bool checkpoint)
     {
         lock (gate)
         {
             ThrowIfDisposed();
             if (expectedScope is not null && !string.Equals(expectedScope, scope, StringComparison.Ordinal))
                 throw new IOException("当前歌曲项目已切换，这次旧页面的保存没有写入。请重新打开当前歌曲后再编辑。");
-            ValidateLibrary(value);
-            StreamingWorkspaceCodec.ValidateTokens(value, payloads);
-            if (checkpoint && activeStore is null) throw new IOException("请先创建或打开歌曲项目，再执行永久删除。");
-            if (activeStore is null) memory = value;
+            if (expectedRevision is not null && !string.Equals(expectedRevision, revision, StringComparison.Ordinal))
+                throw new IOException("素材库已被其他窗口修改，请重新打开后继续。原数据未被覆盖。");
+            value = ValidateLibrary(value, root => StreamingWorkspaceCodec.ValidateTokens(root, payloads));
+            if (checkpoint && current is null) throw new IOException("请先创建或打开歌曲项目，再执行永久删除。");
+            if (current is null) memory = value;
             else
             {
-                if (!File.Exists(activeStore.FilePath)) throw new IOException("当前歌曲项目文件已被移走，本次没有重建或覆盖它。");
+                if (activeStore is not null && !File.Exists(activeStore.FilePath)) throw new IOException("当前歌曲项目文件已被移走，本次没有重建或覆盖它。");
                 currentSnapshot = value;
             }
+            revision = Guid.NewGuid().ToString("N");
+            return revision;
         }
     }
 
     public ProjectDirectoryInfo Create(string name, string parentPath, string libraryText) => CreateCore(name, parentPath, libraryText, false);
+
+    public ProjectDirectoryInfo StartNew(string name, string folder, string libraryText)
+    {
+        lock (gate)
+        {
+            ThrowIfDisposed();
+            RequireCleanForSwitch();
+            var project = new ProjectDirectoryInfo(Guid.NewGuid().ToString("N"), ValidateName(name), ResolveLibraryFolder(folder), PendingSave: true);
+            string text = ValidateLibrary(libraryText);
+            StreamingWorkspaceCodec.ValidateTokens(text, null);
+            Exit("discard");
+            currentSnapshot = committedSnapshot = savedSnapshot = text;
+            return current = project;
+        }
+    }
 
     /// <summary>An explicit Save As may activate a saved copy without saving the original draft.</summary>
     public ProjectDirectoryInfo CreateCopy(string name, string parentPath, string libraryText) => CreateCore(name, parentPath, libraryText, true);
@@ -397,6 +426,14 @@ public sealed partial class ProjectDirectoryManager : IDisposable
     {
         lock (gate)
         {
+            if (current is { PendingSave: false } activeSelected && File.Exists(path) && SamePath(activeSelected.Path, path) && activeSelected.Id == expectedId)
+            {
+                ThrowIfDisposed();
+                activeStore!.VerifyUnchanged();
+                string token = RenameToken(activeSelected.Path);
+                activeStore.VerifyUnchanged();
+                return new(activeSelected, savedSnapshot ?? throw new IOException("当前歌曲资料不可用。"), token);
+            }
             ThrowIfDisposed(); path = RequireEditableSelection(path, expectedId);
             if (File.Exists(path))
             {
@@ -429,6 +466,32 @@ public sealed partial class ProjectDirectoryManager : IDisposable
     {
         lock (gate)
         {
+            if (current is { PendingSave: false } activeSelected && File.Exists(path) && SamePath(activeSelected.Path, path) && activeSelected.Id == expectedId)
+            {
+                ThrowIfDisposed(); name = ValidateName(name); libraryText = ValidateLibrary(libraryText);
+                StreamingWorkspaceCodec.ValidateTokens(libraryText, payloads);
+                activeStore!.VerifyUnchanged();
+                if (string.IsNullOrWhiteSpace(expectedToken) || RenameToken(activeSelected.Path) != expectedToken)
+                    throw new IOException("这首歌刚刚发生变化，请重新选择后改名。");
+                if (sourceDocument is not null)
+                {
+                    string target = Path.Combine(Path.GetDirectoryName(activeSelected.Path)!, name + Path.GetExtension(activeSelected.Path));
+                    activeStore.MoveTo(target);
+                    sourceDocument = sourceDocument with { Name = Path.GetFileName(target), Path = target };
+                }
+                else if (fileEnvelope is not null)
+                {
+                    var envelope = (JsonObject)fileEnvelope.DeepClone(); envelope["name"] = name;
+                    beforeSaveCommit?.Invoke(activeSelected.Path);
+                    WriteNamedProject(activeStore, name, stream => StreamingWorkspaceCodec.Write(stream, envelope, libraryText, payloads));
+                    fileEnvelope = envelope;
+                }
+                else throw new IOException("请先保存为 .rootsound 文件，再修改名称。");
+                current = activeSelected with { Name = name, Path = activeStore.FilePath };
+                savedSnapshot = libraryText;
+                listingHeaders.Clear();
+                return current;
+            }
             ThrowIfDisposed(); path = RequireEditableSelection(path, expectedId); name = ValidateName(name);
             libraryText = ValidateLibrary(libraryText);
             if (string.IsNullOrWhiteSpace(expectedToken)) throw new IOException("歌曲快照已过期，请重新打开乐曲库。");
@@ -586,7 +649,7 @@ public sealed partial class ProjectDirectoryManager : IDisposable
         ownership.VerifyUnchanged();
         captured.VerifyUnchanged();
         if (Path.Exists(backup) != files.Contains(backup)) throw new IOException("歌曲备份刚刚发生变化，本次没有删除。");
-        string staging = NewDeletionPath();
+        string staging = NewDeletionPath(Path.GetDirectoryName(path)!);
         Directory.CreateDirectory(staging);
         try { DeleteCaptured(path, staging, captured, isDirectory: false); }
         finally { captured.Dispose(); ownership.Dispose(); RemoveEmptyDeletionDirectory(staging); }
@@ -638,10 +701,11 @@ public sealed partial class ProjectDirectoryManager : IDisposable
         }
     }
 
-    private string NewDeletionPath()
+    private string NewDeletionPath(string? parent = null)
     {
-        string path = Path.Combine(DefaultLocation, ".rootsound-delete-" + Guid.NewGuid().ToString("N"));
-        if (!SamePath(Path.GetDirectoryName(path)!, DefaultLocation) || Path.Exists(path)) throw new IOException("无法准备歌曲删除，请重试。");
+        parent ??= DefaultLocation;
+        string path = Path.Combine(parent, ".rootsound-delete-" + Guid.NewGuid().ToString("N"));
+        if (!SamePath(Path.GetDirectoryName(path)!, parent) || Path.Exists(path)) throw new IOException("无法准备歌曲删除，请重试。");
         return path;
     }
 
@@ -762,12 +826,13 @@ public sealed partial class ProjectDirectoryManager : IDisposable
     private bool IsKnownProjectPath(string path)
     {
         string? parent = Path.GetDirectoryName(path);
-        if (parent is null || !Path.Exists(path) || !Directory.Exists(DefaultLocation) || IsLink(DefaultLocation) || IsLink(path)) return false;
+        string root = LibraryRootFor(path);
+        if (parent is null || !Path.Exists(path) || !Directory.Exists(root) || IsLink(root) || IsLink(path)) return false;
         if (File.Exists(path))
         {
-            if (!path.StartsWith(Path.TrimEndingDirectorySeparator(DefaultLocation) + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)) return false;
+            if (!WithinLibrary(path, root)) return false;
             string? directory = parent;
-            while (directory is not null && !SamePath(directory, DefaultLocation))
+            while (directory is not null && !SamePath(directory, root))
             {
                 if (IsLink(directory)) return false;
                 string name = Path.GetFileName(directory);
@@ -935,13 +1000,15 @@ public sealed partial class ProjectDirectoryManager : IDisposable
         finally { candidate?.Dispose(); }
     }
 
-    internal static string ValidateLibrary(string text)
+    internal static string ValidateLibrary(string text) => ValidateLibrary(text, null);
+
+    private static string ValidateLibrary(string text, Action<JsonElement>? validate)
     {
         ValidateEncodingAndSize(text);
         string normalized = text.StartsWith('\uFEFF') ? text[1..] : text;
         try
         {
-            using var document = JsonDocument.Parse(normalized, new JsonDocumentOptions { MaxDepth = 256 });
+            using var document = JsonDocument.Parse(normalized, new JsonDocumentOptions { MaxDepth = validate is null ? 256 : 64 });
             var root = document.RootElement;
             if (root.ValueKind != JsonValueKind.Object
                 || !root.TryGetProperty("format", out var format) || format.ValueKind != JsonValueKind.String || format.GetString() != "RootSoundMaterialLibrary"
@@ -949,6 +1016,7 @@ public sealed partial class ProjectDirectoryManager : IDisposable
                 || !root.TryGetProperty("contents", out var contents) || contents.ValueKind != JsonValueKind.Array
                 || !root.TryGetProperty("drafts", out var drafts) || drafts.ValueKind != JsonValueKind.Array)
                 throw new InvalidDataException("歌曲资料库的格式或版本无效，现有资料没有被覆盖。");
+            validate?.Invoke(root);
         }
         catch (JsonException error) { throw new InvalidDataException("歌曲资料库不是完整的 JSON 文本，现有资料没有被覆盖。", error); }
         return normalized;

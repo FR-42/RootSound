@@ -82,7 +82,8 @@ test('library navigates folders, keeps the current folder on reopen, and opens o
     mounted.open(); await settle(); assert(!all(container).some(item => item.textContent === song.name));
     button('打开文件夹 my music').dispatchEvent(new Event('click')); await settle();
     assert(all(container).some(item => item.textContent === song.name)); assert.deepEqual(opened, []);
-    button('打开 参考').dispatchEvent(new Event('click')); await settle(); assert.deepEqual(opened, [midi.path]);
+    button('打开 参考').dispatchEvent(Object.assign(new Event('click'), { detail: 2 })); assert.deepEqual(opened, []);
+    button('打开 参考').dispatchEvent(new Event('click')); assert.deepEqual(opened, [midi.path]); await settle();
     button('关闭乐曲库').dispatchEvent(new Event('click')); mounted.open(); await settle(); assert.equal(browsed.at(-1), page.path);
     button('返回上级文件夹').dispatchEvent(new Event('click')); await settle(); assert.equal(browsed.at(-1), root);
     assert(!all(container).some(item => item.textContent === song.name));

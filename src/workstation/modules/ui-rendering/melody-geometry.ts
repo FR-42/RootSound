@@ -24,20 +24,21 @@ export function initialMelodyView(body: PhraseBody, width: number): MelodyView {
   return clampMelodyView({ leftSeconds: 0, zoom: 8 * 32 * phraseStepsPerBeat(body) * body.tempoBpm / (60 * Math.max(1, width) * phraseMeterBeatLength(body)), rowHeight: 32 }, melodyDuration(body));
 }
 export const melodyClamp = (value: number, low: number, high: number) => Math.max(low, Math.min(high, value));
-export function clampMelodyView(view: MelodyView, duration: number): MelodyView {
+export function clampMelodyView(view: MelodyView, duration: number, leadingFraction = 0): MelodyView {
   const zoom = melodyClamp(Number.isFinite(view.zoom) ? view.zoom : 1, .25, 256);
   return { zoom, rowHeight: melodyClamp(view.rowHeight, 12, 44),
-    leftSeconds: melodyClamp(view.leftSeconds, 0, Math.max(0, duration - 8 / zoom)) };
+    leftSeconds: melodyClamp(view.leftSeconds, leadingFraction ? -8 * leadingFraction / zoom : 0, Math.max(0, duration - 8 / zoom)) };
 }
 /** A stable seconds scale makes tempo changes visibly move beats, without stretching held notes. */
 export const melodyScale = (view: MelodyView, width: number, _duration: number) => Math.max(1, width) * view.zoom / 8;
 export function melodyTimeAt(view: MelodyView, width: number, duration: number, x: number): number {
   return melodyClamp(view.leftSeconds + x / melodyScale(view, width, duration), 0, duration);
 }
-export function zoomMelody(view: MelodyView, width: number, duration: number, x: number, factor: number): MelodyView {
-  const anchor = melodyClamp(x, 0, Math.max(1, width)); const time = melodyTimeAt(view, width, duration, anchor);
-  const next = clampMelodyView({ ...view, zoom: view.zoom * factor }, duration);
-  return clampMelodyView({ ...next, leftSeconds: time - anchor / melodyScale(next, width, duration) }, duration);
+export function zoomMelody(view: MelodyView, width: number, duration: number, x: number, factor: number, leadingFraction = 0): MelodyView {
+  const anchor = melodyClamp(x, 0, Math.max(1, width));
+  const time = leadingFraction ? view.leftSeconds + anchor / melodyScale(view, width, duration) : melodyTimeAt(view, width, duration, anchor);
+  const next = clampMelodyView({ ...view, zoom: view.zoom * factor }, duration, leadingFraction);
+  return clampMelodyView({ ...next, leftSeconds: time - anchor / melodyScale(next, width, duration) }, duration, leadingFraction);
 }
 export function melodyNoteRect(note: PhraseNote, body: PhraseBody, keys: readonly KeyboardPitch[], view: MelodyView, width: number, row = phrasePitchRow(note.frequencyHz, keys)) {
   const scale = melodyScale(view, width, melodyDuration(body));
@@ -45,8 +46,8 @@ export function melodyNoteRect(note: PhraseNote, body: PhraseBody, keys: readonl
     y: melodyPitchTop(keys, row, view.rowHeight) + 1,
     width: Math.max(0, phraseHeldSeconds(body, note) * scale), height: melodyPitchHeight(keys, row, view.rowHeight) - 2 };
 }
-export function melodyScoreGrid(body: PhraseBody, view: MelodyView, width: number, cellPixels = 48) {
-  const result: ReturnType<typeof melodyDetailGrid> = [], end = view.leftSeconds + 8 / view.zoom;
+export function melodyScoreGrid(body: PhraseBody, view: MelodyView, width: number, cellPixels = 48, visibleSeconds = 8 / view.zoom) {
+  const result: ReturnType<typeof melodyDetailGrid> = [], end = view.leftSeconds + visibleSeconds;
   const spans = phraseTempoSpans(body);
   const depth = melodyScoreGridDepth(body, melodyScale(view, width, end), cellPixels);
   for (const span of spans) {
@@ -56,7 +57,7 @@ export function melodyScoreGrid(body: PhraseBody, view: MelodyView, width: numbe
     const local = { ...view, leftSeconds: view.leftSeconds - origin };
     const endFromOrigin = span.endSeconds - origin;
     const steps = phraseStepsAtBeat(body, span.startBeat);
-    for (const line of melodyGridLines(endFromOrigin, span.tempoBpm, steps, local, width, phraseBarBeats(body), span.startBeat === 0 ? body.pickupBeats ?? 0 : 0, steps ** depth, phraseMeterBeatLength(body))) {
+    for (const line of melodyGridLines(endFromOrigin, span.tempoBpm, steps, local, width, phraseBarBeats(body), span.startBeat === 0 ? body.pickupBeats ?? 0 : 0, steps ** depth, phraseMeterBeatLength(body), visibleSeconds)) {
       if (line.seconds < offset - 1e-8 || line.seconds >= endFromOrigin - 1e-8 && span.endBeat < body.lengthBeats) continue;
       result.push({ ...line, seconds: line.seconds + origin });
     }
@@ -82,15 +83,15 @@ function melodyGridDepth(tempo: number, steps: number, scale: number, minimumCel
 export function melodyDetailSteps(tempo: number, steps: number, scale: number, minimumCellPixels = 48, beatSize = 1): number {
   return steps ** melodyGridDepth(tempo, steps, scale, minimumCellPixels, beatSize);
 }
-export function melodyDetailGrid(duration: number, tempo: number, steps: number, view: MelodyView, width: number, beatsPerBar = 4, pickupBeats = 0, minimumCellPixels = 48, beatSize = 1) {
+export function melodyDetailGrid(duration: number, tempo: number, steps: number, view: MelodyView, width: number, beatsPerBar = 4, pickupBeats = 0, minimumCellPixels = 48, beatSize = 1, visibleSeconds = 8 / view.zoom) {
   const divisions = melodyDetailSteps(tempo, steps, melodyScale(view, width, duration), minimumCellPixels, beatSize);
-  return melodyGridLines(duration, tempo, steps, view, width, beatsPerBar, pickupBeats, divisions, beatSize);
+  return melodyGridLines(duration, tempo, steps, view, width, beatsPerBar, pickupBeats, divisions, beatSize, visibleSeconds);
 }
-function melodyGridLines(duration: number, tempo: number, steps: number, view: MelodyView, width: number, beatsPerBar: number, pickupBeats: number, divisions: number, beatSize: number) {
+function melodyGridLines(duration: number, tempo: number, steps: number, view: MelodyView, width: number, beatsPerBar: number, pickupBeats: number, divisions: number, beatSize: number, visibleSeconds: number) {
   const scale = melodyScale(view, width, duration);
   const cell = 60 / tempo * beatSize / divisions;
   const visibleStart = view.leftSeconds - 1 / scale;
-  const visibleEnd = Math.min(duration, view.leftSeconds + (width + 1) / scale) + 1e-8;
+  const visibleEnd = Math.min(duration, view.leftSeconds + visibleSeconds + 1 / scale) + 1e-8;
   const first = Math.max(0, Math.ceil(visibleStart / cell));
   const last = Math.floor(visibleEnd / cell);
   const lines = Array.from({ length: Math.max(0, last - first + 1) }, (_, offset) => {

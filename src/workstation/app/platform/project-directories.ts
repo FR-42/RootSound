@@ -5,11 +5,15 @@ export interface NativeProjectDirectoriesBridge {
   Read(): Promise<unknown>;
   ChooseLocation(current: string): Promise<unknown>;
   Create(name: string, location: string, libraryText: string): Promise<unknown>;
+  StartNew?(name: string, location: string, libraryText: string): Promise<unknown>;
   CreateCopy?(name: string, location: string, libraryText: string): Promise<unknown>;
   CreateDetached?(name: string, location: string, libraryText: string): Promise<unknown>;
   Open(): Promise<unknown>;
   List?(): Promise<unknown>;
   Browse?(path: string): Promise<unknown>;
+  ChooseLibraryFolder?(current: string): Promise<unknown>;
+  StartLibraryDuration?(path: string): Promise<unknown>;
+  ReadLibraryDuration?(path: string): Promise<unknown>;
   CreateLibraryFolder?(path: string, name: string): Promise<unknown>;
   RenameLibraryEntry?(path: string, name: string): Promise<unknown>;
   DeleteLibraryEntry?(path: string): Promise<unknown>;
@@ -42,7 +46,8 @@ function project(value: unknown): ProjectDirectory {
   const item = value as Record<string, unknown>;
   if (typeof item.id !== 'string' || !item.id.trim() || typeof item.name !== 'string' || !item.name.trim()
     || typeof item.path !== 'string' || !item.path.trim()) return fail();
-  return { id: item.id, name: item.name, path: item.path, ...(item.format ? { format: fileFormat(item.format) } : {}) };
+  return { id: item.id, name: item.name, path: item.path, ...(item.format ? { format: fileFormat(item.format) } : {}),
+    ...(item.pendingSave === true ? { pendingSave: true } : {}) };
 }
 
 function fileFormat(value: unknown): EditableFileFormat {
@@ -122,6 +127,11 @@ export function createDesktopProjectDirectories(bridge: NativeProjectDirectories
       if (result.status !== 'created') return fail();
       return project(result.project);
     },
+    ...(bridge.StartNew ? { async startNew(name: string, location: string, libraryText: string) {
+      const result = await call(() => bridge.StartNew!(name, location, libraryText));
+      if (result.status !== 'opened') return fail();
+      return project(result.project);
+    } } : {}),
     ...(bridge.CreateCopy ? { async createCopy(name: string, location: string, libraryText: string) {
       const result = await call(() => bridge.CreateCopy!(name, location, libraryText));
       if (result.status !== 'created') return fail();
@@ -144,6 +154,28 @@ export function createDesktopProjectDirectories(bridge: NativeProjectDirectories
       const result = await call(() => bridge.Browse!(path ?? ''));
       if (result.status !== 'browsed') return fail();
       return libraryPage(result.page);
+    } } : {}),
+    ...(bridge.ChooseLibraryFolder ? { async chooseLibraryFolder(current: string) {
+      const result = await call(() => bridge.ChooseLibraryFolder!(current));
+      if (result.status === 'cancelled') return undefined;
+      if (result.status !== 'browsed') return fail();
+      return libraryPage(result.page);
+    } } : {}),
+    ...(bridge.StartLibraryDuration && bridge.ReadLibraryDuration ? { async readLibraryScore(path: string) {
+      const wait = () => new Promise(resolve => setTimeout(resolve, 35));
+      let started = await call(() => bridge.StartLibraryDuration!(path));
+      while (started.status === 'pending') {
+        await wait();
+        started = await call(() => bridge.StartLibraryDuration!(path));
+      }
+      if (started.status !== 'started') return undefined;
+      for (;;) {
+        const result = await call(() => bridge.ReadLibraryDuration!(path));
+        if (result.status === 'score' && typeof result.libraryText === 'string') return result.libraryText;
+        if (result.status === 'document') return documentSource(result);
+        if (result.status !== 'pending') return undefined;
+        await wait();
+      }
     } } : {}),
     ...(bridge.CreateLibraryFolder ? { async createFolder(path: string, name: string) {
       if ((await call(() => bridge.CreateLibraryFolder!(path, name))).status !== 'ready') fail();
@@ -199,7 +231,7 @@ export function createDesktopProjectDirectories(bridge: NativeProjectDirectories
       const renamed = project(result.project);
       if (renamed.id !== target.id || renamed.name !== name.trim()) return fail();
       if (renamed.path !== target.path && (renamed.path.replace(/[^\\/]+$/u, '') !== target.path.replace(/[^\\/]+$/u, '')
-        || renamed.path.split(/[\\/]/u).at(-1) !== `${name.trim()}.rootsound`)) return fail();
+        || renamed.path.split(/[\\/]/u).at(-1) !== `${name.trim()}${target.format ? target.path.match(/\.[^.\\/]+$/u)?.[0] ?? '' : '.rootsound'}`)) return fail();
       return renamed;
     },
     async save(name) {

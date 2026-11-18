@@ -163,3 +163,9 @@ user's actual instructions.
   the publication steps. Website deployment is a separate action governed by the user's
   instructions for that task.
 - Origin: user's explicit instruction, 2026-11-08.
+
+## N21 · Keep controls within the workspace — ACTIVE
+
+- Organize views and controls within the workspace. RootSound prohibits
+  expandable pop-up windows and expandable bars in future designs and revisions.
+- Origin: user's explicit instruction, 2026-11-16.

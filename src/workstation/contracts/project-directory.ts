@@ -1,6 +1,6 @@
 /** A complete .rootsound song file; legacy project folders remain readable. */
 export type EditableFileFormat = 'midi' | 'musicxml' | 'mxl' | 'rsproject';
-export interface ProjectDirectory { id: string; name: string; path: string; format?: EditableFileFormat }
+export interface ProjectDirectory { id: string; name: string; path: string; format?: EditableFileFormat; pendingSave?: boolean }
 export type ProjectLibraryEntry =
   | ({ kind: 'project' } & ProjectDirectory)
   | { kind: 'folder'; name: string; path: string }
@@ -24,10 +24,13 @@ export interface ProjectDirectoriesPort {
   read(): Promise<{ defaultLocation: string; current?: ProjectDirectory; hasUnsavedChanges?: boolean; doubleClickIntervalMs?: number }>;
   chooseLocation(current: string): Promise<ProjectLocationResult>;
   create(name: string, location: string, libraryText: string): Promise<ProjectDirectory>;
+  startNew?(name: string, location: string, libraryText: string): Promise<ProjectDirectory>;
   /** Explicit Save As may copy a dirty working project without overwriting it. */
   createCopy?(name: string, location: string, libraryText: string): Promise<ProjectDirectory>;
   /** Save an isolated practice score without activating it or changing the current draft. */
   createDetached?(name: string, location: string, libraryText: string): Promise<ProjectDirectory>;
+  chooseLibraryFolder?(current: string): Promise<ProjectLibraryPage | undefined>;
+  readLibraryScore?(path: string): Promise<string | EditableFileSource | undefined>;
   list?(): Promise<ProjectDirectory[]>;
   browse?(path?: string): Promise<ProjectLibraryPage>;
   createFolder?(path: string, name: string): Promise<void>;
@@ -49,6 +52,9 @@ export interface ProjectSetupPort {
   defaultLocation(): Promise<string>;
   chooseLocation(current: string): Promise<ProjectLocationResult>;
   create(name: string, location: string): Promise<void>;
+  startNew?(name: string, location: string): Promise<void>;
+  chooseLibraryFolder?(current: string): Promise<ProjectLibraryPage | undefined>;
+  readLibraryDuration?(path: string): Promise<number | undefined>;
   list?(): Promise<ProjectDirectory[]>;
   browse?(path?: string): Promise<ProjectLibraryPage>;
   createFolder?(path: string, name: string): Promise<void>;
@@ -57,9 +63,10 @@ export interface ProjectSetupPort {
   reveal?(entry: Exclude<ProjectLibraryEntry, { kind: 'folder' }>): Promise<void>;
   remove?(project: ProjectDirectory): Promise<ProjectRemovalResult>;
   rename?(project: ProjectDirectory, name: string): Promise<ProjectDirectory>;
+  renameCurrent?(name: string): Promise<void>;
   open(path?: string): Promise<void>;
   save?(): Promise<void>;
-  saveAs?(name: string, location: string, mode?: 'edit' | 'exit' | 'close'): Promise<void>;
+  saveAs?(name: string, location: string, mode?: 'edit' | 'exit' | 'close' | 'details'): Promise<void>;
   readSaveSource?(): Promise<ProjectDirectory | undefined>;
   hasUnsavedChanges?(): Promise<boolean>;
   exit?(mode: ProjectExitMode): Promise<void>;

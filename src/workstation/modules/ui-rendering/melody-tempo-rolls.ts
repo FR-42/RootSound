@@ -226,10 +226,14 @@ export function mountMelodyTempoRolls(options: {
   }
   const up = (event: PointerEvent) => { if (drag?.pointerId === event.pointerId) finishResize(true); };
   const cancel = (event: PointerEvent) => { if (drag?.pointerId === event.pointerId) finishResize(false); };
+  function cancelInteraction(): boolean {
+    if (!menu.hidden) { closeMenu(true); return true; }
+    if (drag) { finishResize(false); return true; }
+    if (opened) { rateInput.cancel(); close(); button.focus(); return true; }
+    return false;
+  }
   const escape = (event: KeyboardEvent) => {
-    if (event.key !== 'Escape') return;
-    if (!menu.hidden) { event.preventDefault(); closeMenu(true); }
-    else if (drag) { event.preventDefault(); finishResize(false); }
+    if (event.key === 'Escape' && !event.defaultPrevented && cancelInteraction()) event.preventDefault();
   };
   document.addEventListener('pointermove', move); document.addEventListener('pointerup', up); document.addEventListener('pointercancel', cancel); document.addEventListener('keydown', escape);
   options.end.addEventListener('pointerdown', event => beginResize(event, undefined, options.end));
@@ -241,29 +245,35 @@ export function mountMelodyTempoRolls(options: {
     catch (error) { options.report(error instanceof Error ? error.message : String(error)); }
   });
   panel.addEventListener('keydown', event => { event.stopPropagation(); if (event.key === 'Escape') { event.preventDefault(); rateInput.cancel(); close(); button.focus(); } });
-  function paint(body = options.readBody()) {
+  function paint(body = options.readBody(), geometry?: { scale: number; height: number }) {
     if (disposed || !body) return;
-    const spans = phraseTempoSpans(body), view = options.readView(), scale = options.scale(), height = options.height();
+    const spans = phraseTempoSpans(body), view = options.readView();
+    const { scale, height } = geometry ?? { scale: options.scale(), height: options.height() };
     const end = (spans.at(-1)!.endSeconds - view.leftSeconds) * scale;
     const basic = options.readMultipleTempoRolls?.() === false;
     options.root.classList.toggle('is-single-roll', basic);
     options.end.hidden = drag?.capture !== options.end && (end < 0 || end > height);
     const meterValue = `${body.beatsPerBar ?? 4}/${body.beatUnit ?? 4}`;
-    if (importedMeter?.value !== meterValue) {
+    if (meter.value !== meterValue) {
       importedMeter?.remove(); importedMeter = undefined;
       if (!commonMeters.includes(meterValue)) { importedMeter = element('option', '', meterValue); importedMeter.value = meterValue; meter.append(importedMeter); }
+      meter.value = meterValue;
     }
-    meter.value = meterValue;
-    options.end.style.top = `${Math.max(0, Math.min(end, height)) - 5}px`;
+    const endTop = `${Math.max(0, Math.min(end, height)) - 5}px`;
+    if (options.end.style.top !== endTop) options.end.style.top = endTop;
     const visibleEnd = view.leftSeconds + height / scale;
     const chosen = selected && spans.find(span => (span.id ?? 'first') === selected);
     const dockSpan = chosen || spans.find(span => span.endSeconds >= visibleEnd - 1e-8) || spans.at(-1)!;
     if (!opened && !tap) active = dockSpan.id;
     const panelSpan = spans.find(span => span.id === active) ?? dockSpan;
-    grid.value = String(phraseStepsAtBeat(body, panelSpan.startBeat));
-    options.dock.dataset.sectionId = dockSpan.id ?? 'first';
-    button.textContent = String(Math.round(dockSpan.tempoBpm)); button.title = `BPM ${button.textContent}`;
-    if (document.activeElement !== input) input.value = String(Math.round(panelSpan.tempoBpm));
+    const gridValue = String(phraseStepsAtBeat(body, panelSpan.startBeat));
+    if (grid.value !== gridValue) grid.value = gridValue;
+    const sectionId = dockSpan.id ?? 'first';
+    if (options.dock.dataset.sectionId !== sectionId) options.dock.dataset.sectionId = sectionId;
+    const dockBpm = String(Math.round(dockSpan.tempoBpm));
+    if (button.textContent !== dockBpm) { button.textContent = dockBpm; button.title = `BPM ${dockBpm}`; }
+    const panelBpm = String(Math.round(panelSpan.tempoBpm));
+    if (document.activeElement !== input && input.value !== panelBpm) input.value = panelBpm;
     const seen = new Set<string>();
     for (const [index, span] of basic ? [] : spans.entries()) {
       const top = (span.startSeconds - view.leftSeconds) * scale, bottom = (span.endSeconds - view.leftSeconds) * scale;
@@ -304,13 +314,15 @@ export function mountMelodyTempoRolls(options: {
       item.block.hidden = top < 0 && !dragging; item.button.hidden = item.block.hidden;
       item.block.style.top = `${top}px`;
       item.block.style.translate = `0 ${Math.max(0, Math.min(top - 9, height - 20)) - top}px`;
-      item.button.textContent = String(Math.round(span.tempoBpm)); item.button.title = `卷帘 ${index + 1} · ${item.button.textContent} 拍/分钟`;
+      const bpm = String(Math.round(span.tempoBpm));
+      if (item.button.textContent !== bpm) item.button.textContent = bpm;
+      item.button.title = `卷帘 ${index + 1} · ${bpm} 拍/分钟`;
       item.button.setAttribute('aria-label', `卷帘 ${index + 1} BPM`);
     }
     for (const [id, item] of markers) if (!seen.has(id)) { item.band.remove(); item.block.remove(); markers.delete(id); }
     options.extend.hidden = basic;
   }
-  return { paint, addRoll, selectAt, flush() { rateInput.flush(); finishResize(true); }, isDragging: () => !!drag,
+  return { paint, addRoll, selectAt, cancelInteraction, flush() { rateInput.flush(); finishResize(true); }, isDragging: () => !!drag,
     dispose() { finishResize(false, false); disposed = true; rateInput.cancel(); tap?.dispose(); panel.remove(); menu.remove(); hint.remove();
       document.removeEventListener('pointerdown', outside); document.removeEventListener('pointermove', move); document.removeEventListener('pointerup', up);
       document.removeEventListener('pointercancel', cancel); document.removeEventListener('keydown', escape); } };

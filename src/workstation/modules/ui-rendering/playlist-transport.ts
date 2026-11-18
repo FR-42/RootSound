@@ -19,6 +19,8 @@ export function createPlaylistTransport(options: {
   pause(): void;
   stop(allowScheduledTail?: boolean): void;
   setRate(rate: number): void;
+  setNotesDeleted(ids: readonly string[], deleted: boolean): void;
+  setSoloGroup(groupId?: string): void;
   seek(seconds: number): Promise<void>;
   position(): number;
   refresh(preserveSounding?: boolean): void;
@@ -28,7 +30,9 @@ export function createPlaylistTransport(options: {
   let playing = false; let preparing = false; let rate = 1; let cursor = 0; let duration = Infinity;
   let id: string | undefined; let anchorPosition = 0; let anchorElapsed = 0;
   let tailId: string | undefined;
+  let soloGroupId: string | undefined;
   let generation = 0; let editGeneration = 0; let disposed = false; let pendingDevice = false;
+  const pendingNoteChanges = new Map<string, boolean>();
 
   function positionAt(elapsed: number): number {
     return Math.min(duration, Math.max(0, anchorPosition + Math.max(0, elapsed - anchorElapsed) * rate));
@@ -54,7 +58,8 @@ export function createPlaylistTransport(options: {
     }
     const extent = position >= source.durationSeconds ? Math.min(600, position + 30) : source.durationSeconds;
     duration = extent;
-    return { ...source, durationSeconds: extent, transport: { positionSeconds: position, rate: speed } };
+    const { soloGroupId: _sourceSolo, ...fullSource } = source;
+    return { ...fullSource, ...(soloGroupId === undefined ? {} : { soloGroupId }), durationSeconds: extent, transport: { positionSeconds: position, rate: speed } };
   }
   function forget(stop: boolean): void {
     const previous = id; id = undefined;
@@ -67,6 +72,7 @@ export function createPlaylistTransport(options: {
   function pause(): void {
     if (disposed) return;
     generation++; editGeneration++;
+    pendingNoteChanges.clear();
     cursor = position();
     if (preparing) {
       preparing = false;
@@ -86,6 +92,7 @@ export function createPlaylistTransport(options: {
     if (disposed) return;
     generation++; editGeneration++;
     const cancelDevice = pendingDevice;
+    pendingNoteChanges.clear();
     stopTail();
     if (allowScheduledTail && playing) tailId = id;
     pendingDevice = false; playing = false; preparing = false;
@@ -114,7 +121,15 @@ export function createPlaylistTransport(options: {
       if (disposed || request !== generation) { runtime.stop(session.id); return; }
       stopTail();
       id = session.id; playing = session.status === 'playing';
+      if (plan.soloGroupId !== soloGroupId) runtime.setSoloGroup?.(session.id, soloGroupId);
       if (!playing && session.status !== 'paused') id = undefined;
+      if (playing && pendingNoteChanges.size) {
+        const removed: string[] = [], restored: string[] = [];
+        for (const [noteId, deleted] of pendingNoteChanges) (deleted ? removed : restored).push(noteId);
+        pendingNoteChanges.clear();
+        if (removed.length) runtime.setNotesDeleted?.(session.id, removed, true);
+        if (restored.length) runtime.setNotesDeleted?.(session.id, restored, false);
+      }
       const currentElapsed = runtime.position(session.id) ?? previousElapsed;
       cursor = Math.min(duration, requestedPosition + Math.max(0, currentElapsed - previousElapsed) * plan.transport!.rate);
       anchorPosition = cursor; anchorElapsed = currentElapsed;
@@ -123,8 +138,20 @@ export function createPlaylistTransport(options: {
     } catch (error) {
       if (!disposed && request === generation) { pendingDevice = false; playing = false; options.onError(error); }
     } finally {
-      if (!disposed && request === generation) { preparing = false; changed(); }
+      if (!disposed && request === generation) { pendingNoteChanges.clear(); preparing = false; changed(); }
     }
+  }
+  function setNotesDeleted(ids: readonly string[], deleted: boolean): void {
+    if (disposed || !runtime.setNotesDeleted) return;
+    if (pendingDevice) {
+      for (const noteId of ids) pendingNoteChanges.set(noteId, deleted);
+    } else if (playing && id) runtime.setNotesDeleted(id, ids, deleted);
+  }
+  function setSoloGroup(groupId?: string): void {
+    if (disposed || soloGroupId === groupId) return;
+    soloGroupId = groupId;
+    if (id) runtime.setSoloGroup?.(id, groupId);
+    if (tailId) runtime.setSoloGroup?.(tailId, groupId);
   }
   function setRate(nextRate: number): void {
     if (disposed) return;
@@ -145,6 +172,7 @@ export function createPlaylistTransport(options: {
     if (disposed || !Number.isFinite(seconds)) return Promise.resolve();
     const continuePlaying = playing || preparing;
     generation++; editGeneration++;
+    pendingNoteChanges.clear();
     if (pendingDevice) { pendingDevice = false; runtime.stopAll(); }
     preparing = false; playing = false; forget(true); stopTail();
     // A paused head can be placed beyond the previously played extent; edits
@@ -177,13 +205,13 @@ export function createPlaylistTransport(options: {
     if (disposed || event.type !== 'session' || event.session.id !== id || event.session.status === 'playing') return;
     if (event.session.status === 'paused') { cursor = position(); playing = false; changed(); return; }
     cursor = event.session.status === 'ended' ? 0 : position();
-    playing = false; preparing = false; pendingDevice = false; generation++; editGeneration++; forget(false);
+    playing = false; preparing = false; pendingDevice = false; generation++; editGeneration++; pendingNoteChanges.clear(); forget(false);
     if (event.session.status === 'failed') options.onError(new Error(event.session.error ?? '播放未能完成。'));
     changed();
   });
-  return { toggle, pause, stop, setRate, seek, position, refresh, dispose() {
+  return { toggle, pause, stop, setRate, setNotesDeleted, setSoloGroup, seek, position, refresh, dispose() {
     if (disposed) return;
-    disposed = true; generation++; editGeneration++; unsubscribe();
+    disposed = true; generation++; editGeneration++; unsubscribe(); pendingNoteChanges.clear();
     if (pendingDevice) runtime.stopAll();
     forget(true); stopTail(); playing = false; preparing = false;
   } };

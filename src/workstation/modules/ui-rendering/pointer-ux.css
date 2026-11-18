@@ -1,0 +1,254 @@
+.has-round-pointer, .has-round-pointer * { cursor: none !important; }
+:where(.has-round-pointer) :focus { outline: none; }
+.has-round-pointer :where(button, a[href], input, select, textarea, summary, [role="button"], [role="slider"], [role="menuitem"], [contenteditable="true"]):focus-visible {
+  outline: 2px solid var(--accent, #476f96);
+}
+.has-round-pointer :is(.project-welcome, .project-library, .workspace-inline-panel, dialog, .melody-scroll):focus { outline: none; }
+.round-pointer {
+  position: fixed; z-index: 1000; inset: 0 auto auto 0; transform: translate(-50%, -50%);
+  box-sizing: border-box; width: var(--round-pointer-size); height: var(--round-pointer-size);
+  border-radius: 50%; pointer-events: none;
+  border: 1px solid #36799f99; background: #90c9ea64;
+}
+.round-pointer.has-pan-dot { border-color: #80adc8a8; }
+.round-pointer.has-pan-dot::after {
+  content: ''; position: absolute; left: 50%; top: 50%; width: 4px; height: 4px;
+  margin: -2px 0 0 -2px; border-radius: 50%; background: #507f9b;
+  translate: var(--pan-dot-x, 0px) var(--pan-dot-y, 0px);
+}
+.round-pointer.is-pan-waiting::after { box-sizing: border-box; border: 1px solid #507f9b; background: transparent; }
+.round-pointer svg {
+  display: none; position: absolute; inset: -1px; width: 100%; height: 100%; box-sizing: content-box;
+  overflow: visible; transform: rotate(-90deg); fill: none; stroke: #267aa7; stroke-width: 2; stroke-linecap: round;
+}
+.round-pointer.is-counting svg { display: block; }
+.round-pointer circle { stroke-dasharray: 1; stroke-dashoffset: 1; }
+.workspace-inline-panel[hidden] { display: none !important; }
+.has-round-pointer .workspace-inline-panel.learning-settings:not(.song-editor-controls) {
+  position: fixed; z-index: 94; inset: 0; max-width: none; overflow: auto;
+  border: 0; border-radius: 0; box-shadow: none; padding: clamp(20px, 6vh, 58px) clamp(24px, 10vw, 130px);
+}
+.has-round-pointer .workspace-inline-panel.learning-settings:not(.song-editor-controls) > * { width: min(100%, 440px); margin-inline: auto; }
+.has-round-pointer .workspace-inline-panel.learning-settings.is-previewing { background: transparent; }
+.has-round-pointer .workspace-inline-panel.learning-feature-gate {
+  position: fixed; z-index: 94; inset: auto 0 0; max-width: none;
+  border: 0; border-radius: 0; padding: 25px clamp(24px, 10vw, 130px); background: #f3f9fc;
+}
+
+.has-pointer-roll .melody-main { position: relative; grid-template-columns: minmax(0, 1fr); overflow: clip; }
+.has-pointer-roll {
+  --tone-card-width: clamp(74px, min(10.2vw, 18vh), 182px);
+  --tone-card-height: clamp(98px, min(13.1vw, 21vh), 218px);
+  --tone-card-peek: clamp(33px, 5.6vh, 72px);
+}
+.music-editor .has-pointer-roll .melody-shelf {
+  position: absolute; z-index: 12; inset: 0;
+  display: block; width: auto; max-height: none; margin: 0; padding: 0; overflow: visible;
+  border: 0; background: transparent; box-shadow: none;
+  opacity: 0; visibility: hidden; pointer-events: none;
+  transition: opacity 170ms ease-out, visibility 170ms;
+}
+.music-editor .has-pointer-roll.is-tone-shelf-open .melody-shelf { opacity: 1; visibility: visible; }
+.has-pointer-roll .melody-tone-hand-mask {
+  position: absolute; inset: 0 0 calc(var(--melody-keyboard-height) + var(--tone-keyboard-inset, 0px)); overflow: clip; pointer-events: none;
+}
+.has-pointer-roll .melody-tone-hand {
+  position: absolute; inset: auto 16% 0 5%; height: var(--tone-card-height);
+}
+.music-editor .has-pointer-roll .melody-tone-hand .melody-tone-entry {
+  width: var(--tone-card-width); height: var(--tone-card-height); padding: 0; position: absolute; left: 50%; bottom: 0;
+  margin: 0; z-index: var(--card-layer, 1); transform-origin: center bottom;
+  transform: translate(calc(-50% + var(--hand-x, 0px)), calc(var(--tone-card-height) - var(--tone-card-peek) + var(--hand-y, 0px))) rotate(var(--card-turn, 0deg));
+  transition: transform 190ms cubic-bezier(.22,.75,.2,1), opacity 160ms ease-out;
+}
+.music-editor .has-pointer-roll.is-tone-shelf-open .melody-tone-hand:is(.is-revealed, :focus-within) .melody-tone-entry {
+  transform: translate(calc(-50% + var(--hand-x, 0px)), calc(-12px + var(--hand-y, 0px))) rotate(var(--card-turn, 0deg));
+}
+.music-editor .has-pointer-roll.is-tone-shelf-open .melody-tone-hand .melody-tone-entry:is(:hover, :focus-within) {
+  z-index: 100; transform: translate(calc(-50% + var(--hand-x, 0px)), calc(-24px + var(--hand-y, 0px))) rotate(var(--card-turn, 0deg)) scale(1.04);
+}
+.music-editor .has-pointer-roll .melody-tone-hand .melody-tone-entry.is-hand-hidden { opacity: 0; pointer-events: none; }
+.has-pointer-roll .melody-tone-hand .is-hand-hidden .melody-note-family { pointer-events: none; }
+.has-pointer-roll .melody-tone-hand .melody-note-family, .has-pointer-roll .melody-pinned-tone .melody-note-family,
+.has-pointer-roll .melody-library-deck .melody-library-tone, .melody-card-flight, .melody-card-drag-image {
+  color: color-mix(in srgb, var(--tone-color, #8ebcd3) 36%, #1e3b51);
+  width: 100%; height: 100%; min-height: 0; box-sizing: border-box; display: grid; grid-template-rows: auto minmax(0, 1fr);
+  gap: 3px; padding: 4px; border: 1px solid color-mix(in srgb, var(--tone-color, #8ebcd3) 45%, #a6b9c8);
+  border-radius: 10px; background: #fcfdfff5; box-shadow: 0 4px 11px #223b4b26;
+  overflow: hidden; text-align: center; font-size: clamp(11px, 1.12vw, 16px);
+}
+.has-pointer-roll.is-tone-shelf-open .melody-shelf :is(.melody-note-family, .melody-tone-pile) { pointer-events: auto; }
+.has-pointer-roll :is(.melody-tone-hand, .melody-pinned-tone) .melody-note-family::before { display: none; }
+.has-pointer-roll :is(.melody-tone-hand, .melody-pinned-tone) .melody-note-family:is(:hover, :focus-visible, .is-selected) {
+  border-color: color-mix(in srgb, var(--tone-color) 70%, #29465a);
+  background: #fcfdff;
+}
+.melody-card-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.melody-card-art {
+  display: grid; place-items: center; position: relative; min-height: 0; overflow: hidden; border-radius: 6px;
+  background: radial-gradient(ellipse at 45% 38%, #ffffff70, transparent 64%), color-mix(in srgb, var(--tone-color, #8ebcd3) 27%, #edf3f8);
+}
+.melody-card-art .melody-instrument-icon {
+  position: static; transform: none; width: 61%; height: 67%;
+  max-width: clamp(48px, 4.1vw, 79px); max-height: clamp(42px, 4vw, 76px);
+}
+.has-pointer-roll .melody-shelf .melody-tone-pile {
+  position: absolute; right: 7%; bottom: calc(var(--melody-keyboard-height) + var(--tone-keyboard-inset, 0px) + 7px);
+  width: clamp(60px, 7.2vw, 110px); height: clamp(78px, 9.3vw, 144px); min-height: 0; margin: 0; padding: 0;
+  border: 0; background: transparent;
+}
+.music-editor .has-pointer-roll .melody-shelf .melody-tone-pile:hover { background: transparent; border: 0; }
+.melody-card-backs { display: block; position: relative; width: 100%; height: 100%; pointer-events: none; }
+.melody-card-backs i {
+  position: absolute; inset: 3px 3px 3px 5px; display: block;
+  transform: translate(calc(-2.8px * var(--stack-step)), calc(1.5px * var(--stack-step))) rotate(calc(3deg - .9deg * var(--stack-step)));
+  border: 1px solid #879fb5; border-radius: 7px; background: #dce7f1; box-shadow: 0 2px 4px #253f552a;
+}
+.melody-card-backs i:last-child {
+  background: repeating-linear-gradient(48deg, #d4e0eb 0 2px, #e7eff6 2px 5px);
+}
+.melody-card-backs i::after {
+  content: ''; position: absolute; inset: 0; border: 0; border-radius: inherit; pointer-events: none;
+  background: var(--tone-card-back-pattern, none) center / 100% 100% no-repeat;
+}
+.melody-library-deck .melody-card-backs.is-left i {
+  transform: translate(calc(2.8px * var(--stack-step)), calc(1.5px * var(--stack-step))) rotate(calc(-3deg + .9deg * var(--stack-step)));
+}
+.melody-tone-pile-empty { display: none; }
+.melody-tone-pile.is-library-spread .melody-card-backs { display: none; }
+.melody-tone-pile.is-library-spread .melody-tone-pile-empty {
+  display: grid; place-items: center; width: 100%; height: 100%; border: 1px dashed #849cae; border-radius: 8px;
+  color: #58748a; font-size: 21px; text-align: center;
+}
+.melody-tone-pile.is-over .melody-tone-pile-empty { border-color: #ae5550; }
+.has-pointer-roll .melody-pinned-tone {
+  position: absolute; z-index: 15; top: 9px; left: 12px;
+  width: clamp(58px, min(7vw, 10.3vh), 117px);
+  height: clamp(62px, min(8vw, 11.5vh), 133px);
+}
+.has-pointer-roll .melody-pinned-tone .melody-tone-entry { width: 100%; height: 100%; }
+.has-pointer-roll .melody-pinned-tone .melody-note-family.is-selected {
+  background: color-mix(in srgb, var(--tone-color) 25%, #fbfdff);
+  box-shadow: 0 3px 10px color-mix(in srgb, var(--tone-color) 36%, transparent);
+}
+.has-pointer-roll .melody-main > .melody-card-flight { position: absolute; z-index: 38; pointer-events: none; }
+.melody-card-drag-image { position: fixed; z-index: 38; pointer-events: none; left: -64px; top: 0; width: 46px; height: 58px; font-size: 9px; }
+.melody-card-flight.melody-card-backs { min-width: 0; padding: 0; border: 0; background: transparent; box-shadow: none; }
+.has-pointer-roll .is-card-arriving { opacity: 0; pointer-events: none; }
+.music-editor .has-pointer-roll .melody-ruler-row {
+  position: absolute; z-index: 7; inset: 0 auto var(--melody-keyboard-height) 0;
+  width: var(--melody-roll-controls-width, 40px); border: 0; background: transparent; pointer-events: none;
+}
+.has-pointer-roll.is-single-roll .melody-ruler-row, .has-pointer-roll .melody-head-handle { display: none; }
+.has-pointer-roll .melody-tempo-block button { pointer-events: auto; }
+.music-editor .has-pointer-roll .melody-scroll { grid-column: 1 / 3; }
+.has-pointer-roll :is(.melody-grid, .melody-notes) { position: absolute; inset: 0; pointer-events: none; }
+.has-pointer-roll .melody-notes { z-index: 2; }
+.has-pointer-roll .melody-tone-note-layer { position: absolute; inset: 0; pointer-events: none; z-index: 1; will-change: opacity; }
+.has-pointer-roll .melody-notes .melody-note:not(.is-drawing) { pointer-events: auto; }
+.has-pointer-roll .melody-note-highlights { position: absolute; top: 0; left: 0; z-index: 3; pointer-events: none; }
+.has-pointer-roll .melody-note-highlights[hidden] { display: none; }
+.has-pointer-roll .melody-note-resize { display: none; }
+.music-editor .has-pointer-roll .melody-grid-line { background: #e5edf3; }
+.music-editor .has-pointer-roll .melody-grid-line.is-beat {
+  --melody-line-width: var(--melody-grid-stroke, 1px);
+  background: #cbdbe5;
+}
+.music-editor .has-pointer-roll .melody-pitch-row.is-accidental { background: #3048670b; }
+.music-editor .has-pointer-roll .melody-pitch-row::after { background: #91aabd55; }
+.music-editor .has-pointer-roll .melody-note:not(.is-sounding) { background-color: color-mix(in srgb, var(--tone-color) 69%, white); }
+.has-pointer-roll .melody-tone-note-layer:is(.is-current-tone, .is-tone-preview) { z-index: 2; }
+.has-pointer-roll .melody-tone-note-layer:is(.is-dim:not(.is-tone-preview), .is-tone-preview-dim) { opacity: .34; z-index: 0; }
+.music-editor .has-pointer-roll .workspace-inline-panel.melody-tone-library {
+  position: absolute; inset: auto 0 var(--tone-keyboard-inset, 0px); z-index: 18; width: auto; max-width: none; max-height: none;
+  height: var(--melody-keyboard-height); overflow: visible; margin: 0; padding: 0;
+  border: 0; border-radius: 0; box-shadow: none; background: transparent; pointer-events: none;
+}
+.melody-library-deck {
+  position: relative; display: grid; height: 100%; align-items: center; grid-template-columns: clamp(56px, 7.2vw, 90px) minmax(0, 1fr) clamp(56px, 7.2vw, 90px);
+  gap: 7px; padding-inline: 12px; pointer-events: auto; overflow: hidden;
+}
+.melody-library-deck.is-deck-moving { overflow: visible; }
+.melody-library-deck .melody-card-backs { width: min(100%, clamp(56px, 6.2vw, 90px)); height: min(84%, clamp(78px, 8.7vw, 126px)); align-self: center; }
+.melody-library-deck .melody-card-backs.is-right { justify-self: end; }
+.music-editor .has-pointer-roll .melody-library-deck .melody-library-grid {
+  display: flex; justify-content: center; height: 100%; min-height: 0; padding: 3px 4px; gap: 6px; overflow: visible;
+}
+.has-pointer-roll .melody-library-deck .melody-library-card {
+  position: relative; display: block; flex: 0 1 clamp(78px, 8.5vw, 146px); min-width: 0; height: 100%; min-height: 0;
+  padding: 0; border: 0; border-radius: 8px; transform: rotate(var(--card-turn, 0deg)); z-index: var(--card-layer, 1);
+}
+.has-pointer-roll .melody-library-deck .melody-library-tone { padding: 3px; border-radius: 8px; }
+.has-pointer-roll .melody-library-deck .melody-library-tone:hover { background: #eef6fb; }
+.has-pointer-roll .melody-library-deck .melody-library-tone[aria-disabled="true"] { opacity: .72; }
+.has-pointer-roll .melody-tone-library .melody-library-error {
+  position: absolute; bottom: calc(100% + 8px); right: 2%; max-width: 45%; pointer-events: auto;
+}
+.has-pointer-roll.is-tone-settings-covered :is(.melody-tone-library, .melody-pinned-tone, .melody-tone-shortcut) { visibility: hidden; }
+.music-editor .has-pointer-roll.is-tone-settings-covered .melody-shelf { transition: none; }
+.has-pointer-roll .workspace-inline-panel.melody-tone-delete-dialog {
+  position: absolute; z-index: 46; inset: 50% auto auto 50%; translate: -50% -50%;
+  max-width: 94%; border-radius: 10px; box-shadow: 0 8px 24px #223b4a35; pointer-events: auto;
+}
+.melody-tone-shortcut { position: absolute; z-index: 15; bottom: calc(var(--melody-keyboard-height) - 10px); left: 8px; }
+.melody-tone-shortcut:focus-visible { width: 30px; height: 28px; background: #e3f1fa; }
+.melody-tone-shortcut svg { width: 16px; height: 16px; }
+.melody-tone-edge {
+  --tone-arc-width: clamp(140px, 19vw, 223px); --tone-edge-y: 50%;
+  position: absolute; z-index: 23; pointer-events: none; inset-block: 0;
+  width: var(--tone-arc-width);
+  mask-image: linear-gradient(to bottom, transparent calc(var(--tone-edge-y) - 22%),
+    #0006 calc(var(--tone-edge-y) - 12%), #000 var(--tone-edge-y), #0006 calc(var(--tone-edge-y) + 12%),
+    transparent calc(var(--tone-edge-y) + 22%));
+  opacity: 0;
+}
+.music-editor > .melody-tone-edge { z-index: 90; }
+.music-editor:has(> .melody-tone-edge) { overflow: clip; }
+.melody-tone-edge.is-left { left: calc(-.72 * var(--tone-arc-width)); --edge-ink: #3fa5ed; --edge-light: #74c9ff; }
+.melody-tone-edge.is-right { right: calc(-.72 * var(--tone-arc-width)); --edge-ink: #24b8a5; --edge-light: #78e4ca; }
+.melody-tone-edge::before {
+  content: ''; position: absolute; inset: -17% 0; border-radius: 50%; border: 2px solid var(--edge-ink);
+  background: radial-gradient(ellipse closest-side, transparent 60%,
+    color-mix(in srgb, var(--edge-light) 24%, transparent) 84%,
+    color-mix(in srgb, var(--edge-light) 66%, transparent) 100%);
+}
+.music-editor .has-pointer-roll .melody-key.is-pointer-pitch:not(.is-sounding) {
+  box-shadow: inset 0 0 0 2px #78b0d3, inset 0 -9px #a7cde65e;
+}
+.music-editor .has-pointer-roll .melody-keys { --black-key-depth: 61%; }
+.music-editor .has-pointer-roll .melody-key:not(.is-accidental) {
+  clip-path: polygon(var(--key-notch-left) 0, calc(100% - var(--key-notch-right)) 0,
+    calc(100% - var(--key-notch-right)) var(--black-key-depth), 100% var(--black-key-depth),
+    100% 100%, 0 100%, 0 var(--black-key-depth), var(--key-notch-left) var(--black-key-depth));
+}
+.music-editor .has-pointer-roll .melody-key.is-accidental {
+  height: var(--black-key-depth);
+  border-right: 0;
+  z-index: 1;
+}
+.music-editor .has-pointer-roll .melody-key.is-accidental:not(.is-sounding) {
+  color: transparent;
+  background: linear-gradient(#172635, #2e4658);
+}
+.music-editor .has-pointer-roll :is(.melody-pitch-row, .melody-key)::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 75ms ease-out;
+}
+.music-editor .has-pointer-roll .melody-pitch-row::before {
+  background: linear-gradient(#ddb5ef8c, #eaa17d8c 65%, #f2c6a74f);
+}
+.music-editor .has-pointer-roll .melody-key::before {
+  background: linear-gradient(#c491ecbb, #ef9a6dbd);
+}
+.music-editor .has-pointer-roll :is(.melody-pitch-row, .melody-key).is-auditioning::before { opacity: 1; }
+@media (max-width: 650px) {
+  .music-editor .has-pointer-roll .melody-tone-hand.is-dense .melody-tone-entry { margin-inline: -11px; min-width: 36px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .has-pointer-roll .melody-shelf,
+  .has-pointer-roll .melody-tone-entry, .has-pointer-roll .melody-tone-library { animation: none; transition: none; }
+}

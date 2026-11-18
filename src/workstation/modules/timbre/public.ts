@@ -1,6 +1,7 @@
 import { createSampleBankAudio, type SampleBankAudio } from './sample-bank.ts';
 import { MIN_PITCH_HZ, MAX_PITCH_HZ } from '../../contracts/music-limits.ts';
 import { readSampleBankBody } from './sample-bank-model.ts';
+import { defaultInstrumentInfo } from './instrument-catalog.ts';
 import type { ContentRecord, Draft, JsonValue, MaterialLibrary, SaveConfirmation } from '../../contracts/content.ts';
 import type { ReferenceAdapter } from '../../contracts/references.ts';
 import type { PlayableNotePlan, SoundPlan } from '../../contracts/sound.ts';
@@ -45,7 +46,10 @@ export function createTimbreReferenceAdapter(): ReferenceAdapter {
     if(record.dependencies.length!==expected.length || expected.some(id=>!record.dependencies.includes(id)))throw new Error('声音的采样引用与依赖记录不一致。');
     return body;
   }
-  return {kind:KIND,slots(record){return sampleSlots(validate(record)).map(({endSeconds:_end,...slot})=>slot);},
+  return {kind:KIND,allowsSharedName(record,name){
+      const body=record.body;
+      return !!body&&typeof body==='object'&&!Array.isArray(body)&&body.model==='sample-bank'&&defaultInstrumentInfo('',body)?.name===name;
+    },slots(record){return sampleSlots(validate(record)).map(({endSeconds:_end,...slot})=>slot);},
     validateTarget(record,slotId,target){const slot=sampleSlots(validate(record)).find(slot=>slot.id===slotId);
       if(!slot || target.kind!=='rootsound.sample' || target.owner!=='sampling' || target.schemaVersion!==1 || target.dependencies.length)throw new Error('乐器需要有效的原始采样。');
       if(slot.endSeconds>readSampleBody(target.body).decoded.durationSeconds+1e-9)throw new Error('音色裁切超出原始采样长度。');},

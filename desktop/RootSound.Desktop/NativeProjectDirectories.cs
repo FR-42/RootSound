@@ -12,6 +12,8 @@ public sealed class NativeProjectDirectories
     private readonly Func<string, string?> chooseLocation;
     private readonly Func<string?> chooseProject;
     private int operating;
+    private Task<string>? libraryDuration;
+    private string? libraryDurationPath;
 
     public NativeProjectDirectories(Form owner, ProjectDirectoryManager manager)
     {
@@ -43,6 +45,9 @@ public sealed class NativeProjectDirectories
     public string Create(string name, string parentPath, string libraryText) => Run(() =>
         JsonSerializer.Serialize(new { status = "created", project = manager.Create(name, parentPath, libraryText) }));
 
+    public string StartNew(string name, string parentPath, string libraryText) => Run(() =>
+        JsonSerializer.Serialize(new { status = "opened", project = manager.StartNew(name, parentPath, libraryText) }));
+
     public string CreateCopy(string name, string parentPath, string libraryText) => Run(() =>
         JsonSerializer.Serialize(new { status = "created", project = manager.CreateCopy(name, parentPath, libraryText) }));
 
@@ -65,6 +70,40 @@ public sealed class NativeProjectDirectories
 
     public string Browse(string path = "") => Run(() =>
         JsonSerializer.Serialize(new { status = "browsed", page = manager.Browse(path) }));
+
+    public string ChooseLibraryFolder(string currentPath) => Run(() =>
+    {
+        string? path = owner is null ? chooseLocation(currentPath) : PickFolder("打开文件夹", currentPath);
+        return path is null ? Cancelled() : JsonSerializer.Serialize(new { status = "browsed", page = manager.BrowseSelectedFolder(path) });
+    });
+
+    public string StartLibraryDuration(string path) => Run(() =>
+    {
+        if (libraryDuration is not null && StringComparer.OrdinalIgnoreCase.Equals(libraryDurationPath, path)) return "{\"status\":\"started\"}";
+        if (libraryDuration is { IsCompleted: false }) return "{\"status\":\"pending\"}";
+        libraryDurationPath = path;
+        libraryDuration = Task.Run(() =>
+        {
+            try
+            {
+                return NativeDocumentFiles.Format(path) is not null
+                    ? SourceResult(manager.ReadDocumentFile(path, known: true))
+                    : LargeJsonText.Serialize(new { status = "score" }, "libraryText", manager.ReadLibraryScore(path));
+            }
+            catch (Exception error) { return Failure(error); }
+        });
+        return "{\"status\":\"started\"}";
+    });
+
+    public string ReadLibraryDuration(string path) => Run(() =>
+    {
+        if (libraryDuration is null || !StringComparer.OrdinalIgnoreCase.Equals(libraryDurationPath, path)) return "{\"status\":\"none\"}";
+        if (!libraryDuration.IsCompleted) return "{\"status\":\"pending\"}";
+        var result = libraryDuration;
+        libraryDuration = null;
+        libraryDurationPath = null;
+        return result.GetAwaiter().GetResult();
+    });
 
     public string CreateLibraryFolder(string path, string name) => Run(() =>
     { manager.CreateLibraryFolder(path, name); return "{\"status\":\"ready\"}"; });

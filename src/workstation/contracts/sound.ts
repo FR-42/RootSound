@@ -76,6 +76,8 @@ export interface SoundSequencePlan {
   /** Musical extent; the runtime preserves this silence and any note release tails. */
   readonly durationSeconds: number;
   readonly preserveNoteLevel?: true;
+  readonly editableNotes?: true;
+  readonly soloGroupId?: string;
   /** Playback-head position and speed only. Individual sounds keep their own clock. */
   readonly transport?: { readonly positionSeconds: number; readonly rate: number };
   /** Final-mix processing. Fades include the final note's release tail. */
@@ -85,6 +87,8 @@ export interface SoundSequencePlan {
   readonly pitchCurves?: Readonly<Record<string, readonly SoundGainPoint[]>>;
   readonly events: readonly {
     readonly atSeconds: number;
+    readonly noteId?: string;
+    readonly groupId?: string;
     readonly sound: PlayableNotePlan;
     /** -1 is left, 1 is right; omitted values are centered. */
     readonly pan?: number;
@@ -131,7 +135,7 @@ export type SoundRuntimeEvent =
   | { readonly type: 'session'; readonly session: PlaybackSession }
   | { readonly type: 'device'; readonly status: SoundDeviceStatus; readonly error?: string };
 
-export type SoundAuditionOptions = { pan?: number; preserveNoteLevel?: true; gainCurve?: readonly SoundGainPoint[]; pitchCurve?: readonly SoundGainPoint[]; gainCurveStartSeconds?: number };
+export type SoundAuditionOptions = { keepAttack?: true; overlap?: true; pan?: number; preserveNoteLevel?: true; gainCurve?: readonly SoundGainPoint[]; pitchCurve?: readonly SoundGainPoint[]; gainCurveStartSeconds?: number };
 
 export interface SoundRuntimePort {
   /** Listening gain only; affects playback and key auditions, never export or saved notes. */
@@ -156,6 +160,8 @@ export interface SoundRuntimePort {
   update(sessionId: string, plan: PlayableNotePlan | SoundSequencePlan, options?: { preserveSounding?: boolean; elapsedSeconds?: number }): PlaybackSession | undefined;
   /** Freeze the transport, cancel future attacks and let sounding notes release on the shared device. */
   pause?(sessionId: string): PlaybackSession | undefined;
+  setNotesDeleted?(sessionId: string, noteIds: readonly string[], deleted: boolean): void;
+  setSoloGroup?(sessionId: string, groupId?: string): void;
   /** Continue the paused sequence at its retained source ages, optionally applying edits. */
   resume?(sessionId: string, plan?: SoundSequencePlan): Promise<PlaybackSession>;
   /** Renders on an offline clock; never records or opens the playback device. */

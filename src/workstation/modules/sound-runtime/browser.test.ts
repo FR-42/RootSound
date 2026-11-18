@@ -5,6 +5,56 @@ import { createBrowserSoundRuntime } from './browser.ts';
 import { FakeAudioContext, acquired, audio, close, fixture, longSample, phrase, plan } from './testing.ts';
 import { dbAmplitude } from '../../contracts/gain-curve.ts';
 
+for (const windowed of [false, true]) test(`solo changes held and future groups without rebuilding audio (${windowed ? 'windowed' : 'scheduled'})`, async () => fixture(async () => {
+  const runtime = createBrowserSoundRuntime();
+  const held = { ...plan(), note: { ...plan().note, holdSeconds: 2 } };
+  const input: SoundSequencePlan = { ...phrase([
+    { atSeconds: 0, sound: held, groupId: 'a', noteId: 'a0' },
+    { atSeconds: 0, sound: held, groupId: 'b', noteId: 'b0' },
+    { atSeconds: 1, sound: held, groupId: 'b', noteId: 'b1' },
+  ], 4), soloGroupId: 'a', ...(windowed ? { editableNotes: true as const } : {}) };
+  try {
+    const session = await runtime.preview(input), device = audio();
+    const groupA = device.panners[0]!.connections[0] as typeof device.gains[number];
+    const groupB = device.panners[1]!.connections[0] as typeof device.gains[number];
+    assert.notEqual(groupA, groupB);
+    assert.equal((groupA.gain as unknown as AudioParam).value, 1);
+    assert.equal((groupB.gain as unknown as AudioParam).value, 0);
+    await runtime.audition(plan());
+    assert.equal(device.panners[0]!.connections.length, 1);
+    assert.equal(device.panners[1]!.connections.length, 1);
+    runtime.cancelAudition();
+    const counts = [device.gains.length, device.oscillators.length, device.panners.length, device.clocks.length];
+    const position = runtime.position(session.id);
+    runtime.update(session.id, { ...input, soloGroupId: 'b' });
+    assert.equal(groupA.gain.changes.at(-1)!.value, 0);
+    assert.equal(groupB.gain.changes.at(-1)!.value, 1);
+    for (let i = 0; i < 100; i++) runtime.setSoloGroup!(session.id, i % 2 ? 'b' : 'a');
+    assert.deepEqual([device.gains.length, device.oscillators.length, device.panners.length, device.clocks.length], counts);
+    assert.equal(runtime.position(session.id), position);
+    assert.equal(groupA.gain.changes.at(-1)!.value, 0);
+    assert.equal(groupB.gain.changes.at(-1)!.value, 1);
+    const { soloGroupId: _solo, ...source } = input;
+    const previousPannerCount = device.panners.length;
+    runtime.update(session.id, { ...source, events: source.events.map(e => ({ ...e, sound: { ...held, level: .4 } })) });
+    const currentA = device.panners[previousPannerCount]!.connections[0] as typeof device.gains[number];
+    const currentB = device.panners[previousPannerCount+1]!.connections[0] as typeof device.gains[number];
+    assert.equal((currentA.gain as unknown as AudioParam).value, 0);
+    assert.equal((currentB.gain as unknown as AudioParam).value, 1);
+    if (!windowed) assert.equal(device.panners[previousPannerCount+2]!.connections[0],currentB);
+    runtime.setSoloGroup!(session.id, 'a');
+    assert.equal(groupA.gain.changes.at(-1)!.value, 1);
+    assert.equal(groupB.gain.changes.at(-1)!.value, 0);
+    runtime.pause!(session.id);
+    await runtime.resume!(session.id, source);
+    const buses = device.panners.filter(p => !p.disconnected).map(p => p.connections[0] as typeof device.gains[number]);
+    assert.equal((buses[0]!.gain as unknown as AudioParam).value, 1);
+    assert.equal((buses[1]!.gain as unknown as AudioParam).value, 0);
+    runtime.setSoloGroup!(session.id);
+    assert(buses.every(bus => bus.gain.changes.at(-1)!.value === 1));
+  } finally { await runtime.dispose(); }
+}));
+
 test('card gain ramps through an already-held note without changing neighboring cards', async () => fixture(async () => {
   const runtime = createBrowserSoundRuntime();
   const held = { ...plan(), note: { ...plan().note, holdSeconds: 2 } };
@@ -47,7 +97,7 @@ test('listening volume works before activation and live without changing transpo
   assert.equal(FakeAudioContext.instances.length,0);
   const session=await runtime.preview(plan());
   const mix=audio().gains[0]!;
-  assert.equal(audio().shapers.length,1); assert.equal(audio().compressors.length,0);
+  assert.equal(audio().shapers.length,1); assert.equal(audio().compressors.length,1);
   assert.equal(mix.gain.changes.at(-1)!.value,2);
   const notes=audio().oscillators.length;
   runtime.setOutputLevel!(0); assert.equal(mix.gain.changes.at(-1)!.value,0);
@@ -56,7 +106,7 @@ test('listening volume works before activation and live without changing transpo
   await runtime.audition(plan());
   assert(audio().panners.at(-1)!.connections.includes(mix));
   assert.throws(()=>runtime.setOutputLevel!(4.1));
-  await runtime.dispose(); assert(mix.disconnected); assert(audio().shapers[0]!.disconnected);
+  await runtime.dispose(); assert(mix.disconnected); assert(audio().shapers[0]!.disconnected); assert(audio().compressors[0]!.disconnected);
 }));
 
 test('moving listening volume reuses the output graph while the song and a key are sounding', async () => fixture(async () => {
@@ -100,6 +150,73 @@ test('head speed retimes triggers while samples, note holds and releases keep re
   const envelope = audio().gains.find(gain => continued.connections.includes(gain))!;
   assert(envelope.gain.changes.some(change => change.kind === 'ramp' && Math.abs(change.time - (session.startedAtSeconds + 3)) < 1e-10));
   await runtime.dispose();
+}));
+
+test('live note deletion skips future attacks, keeps current tails, and restores only upcoming attacks', async context => fixture(async () => {
+  context.mock.timers.enable({ apis: ['setTimeout'] });
+  const runtime = createBrowserSoundRuntime();
+  const sound = { ...plan(), note: { ...plan().note, holdSeconds: 1 } };
+  const input: SoundSequencePlan = { ...phrase([
+    { noteId: 'sounding', atSeconds: 0, sound },
+    { noteId: 'upcoming', atSeconds: .2, sound },
+    { noteId: 'same-pitch', atSeconds: .2, sound },
+    { noteId: 'later', atSeconds: 2, sound },
+    { noteId: 'missed', atSeconds: 3, sound },
+  ], 4), editableNotes: true };
+  try {
+    const session = await runtime.preview(input), device = audio();
+    const start = session.startedAtSeconds;
+    const [sounding, upcoming, neighbor] = device.oscillators;
+    assert.equal(device.oscillators.length, 3);
+    const finish = sounding!.stopTime;
+    device.currentTime = start + .09;
+    runtime.setNotesDeleted!(session.id, ['upcoming', 'later', 'missed', 'sounding'], true);
+    assert(upcoming!.stopped && upcoming!.disconnected);
+    assert(!sounding!.stopped && !neighbor!.stopped);
+    assert.equal(sounding!.stopTime, finish);
+    close(runtime.position(session.id), .09);
+
+    runtime.setNotesDeleted!(session.id, ['upcoming', 'sounding'], false);
+    context.mock.timers.tick(1);
+    assert.equal(device.oscillators.length, 4);
+    const restored = device.oscillators[3]!;
+    close(restored.startTime, start + .2);
+
+    runtime.setNotesDeleted!(session.id, ['upcoming'], true);
+    assert(restored.stopped && restored.disconnected);
+    device.currentTime = start + .24;
+    runtime.setNotesDeleted!(session.id, ['upcoming'], false);
+    context.mock.timers.tick(25);
+    assert.equal(device.oscillators.length, 4);
+    assert(!neighbor!.stopped);
+
+    device.currentTime = start + 1.8;
+    context.mock.timers.tick(25);
+    assert.equal(device.oscillators.length, 4, 'deleted notes outside the initial lookahead never allocate a source');
+    close(runtime.position(session.id), 1.8);
+    device.currentTime = start + 3.01;
+    runtime.setNotesDeleted!(session.id, ['missed'], false);
+    context.mock.timers.tick(25);
+    assert.equal(device.oscillators.length, 4, 'undo after the attack does not replay a note even when the scheduler was delayed');
+    assert.equal(device.clocks.length, 1);
+  } finally { await runtime.dispose(); }
+}));
+
+test('live deletion cancels each recording layer for a scheduled note', async () => fixture(async () => {
+  const runtime = createBrowserSoundRuntime();
+  const sample = longSample();
+  const layered = { ...sample, layers: [{ ...sample, startSeconds: .3 }], layerReferenceLevel: sample.level };
+  const input: SoundSequencePlan = { ...phrase([
+    { noteId: 'layered', atSeconds: .25, sound: layered },
+    { noteId: 'neighbor', atSeconds: .25, sound: sample },
+  ], 4), editableNotes: true };
+  try {
+    const session = await runtime.preview(input), device = audio();
+    assert.equal(device.sampleSources.length, 3);
+    runtime.setNotesDeleted!(session.id, ['layered'], true);
+    assert(device.sampleSources.slice(0, 2).every(node => node.stopped && node.disconnected));
+    assert(!device.sampleSources[2]!.stopped);
+  } finally { await runtime.dispose(); }
 }));
 
 test('pause freezes device elapsed and resumes at the original sample and release age', async () => fixture(async () => {
@@ -185,8 +302,29 @@ test('sample audition uses the shared device clock, copies exact channels and re
   assert.deepEqual([...source.buffer!.data[0]!], [0, 0.25, -0.5, 0]);
   assert.deepEqual(source.buffer!.data[1], input.channels[1]);
   close(session.durationSeconds, 4 / 8000); close(source.startTime, session.startedAtSeconds);
-  source.end(); assert(source.stopped); assert(source.disconnected);
+  const edges = audio().gains.find(gain => source.connections.includes(gain))!;
+  assert.deepEqual(edges.gain.changes.map(({ kind, value }) => [kind, value]), [['set', 0], ['ramp', 1], ['set', 1], ['ramp', 0]]);
+  close(edges.gain.changes[3]!.time, session.startedAtSeconds + session.durationSeconds!);
+  await runtime.audition(plan());
+  assert(edges.connections.includes(audio().gains.at(-1)!));
+  source.end(); assert(source.stopped); assert(source.disconnected); assert(edges.disconnected);
   close(runtime.position(session.id), session.durationSeconds!); await runtime.dispose();
+}));
+
+test('a sample that ends during a held note fades its final four milliseconds without shortening the sample', async () => fixture(async () => {
+  const runtime = createBrowserSoundRuntime();
+  const sound = { ...longSample(), startSeconds: 1, endSeconds: 1.6 };
+  try {
+    const session = await runtime.preview(sound);
+    const sample = audio().sampleSources[0]!;
+    const envelope = audio().gains.find(gain => sample.connections.includes(gain))!;
+    const [beforeEnd, end] = envelope.gain.changes.slice(-2);
+    close(beforeEnd!.time, session.startedAtSeconds + .396);
+    close(beforeEnd!.value, .396 * sound.level);
+    close(end!.time, session.startedAtSeconds + .4);
+    close(end!.value, 0);
+    close(sample.sourceDuration, .6);
+  } finally { await runtime.dispose(); }
 }));
 
 test('sample and synthesized previews replace each other without leaving a second global player', async () => fixture(async () => {
@@ -685,6 +823,50 @@ test('short note audition shares the device and preserves the main session clock
   audio().oscillators[1]!.end(); assert(audio().oscillators[1]!.disconnected); assert.equal(mix.gain.changes.at(-1)!.value, 1);
   close(runtime.position(main.id), 0.6); await runtime.dispose(); assert(mix.disconnected);
 }));
+
+test('short note audition uses a short lead and rebases all automation when scheduling overruns it', async () => {
+  for (const delays of [0, 1, 2]) await fixture(async () => {
+    const runtime = createBrowserSoundRuntime();
+    await runtime.activate!();
+    const device = audio(), began = device.currentTime;
+    const createGain = device.createGain.bind(device);
+    let envelope: ReturnType<typeof createGain> | undefined;
+    let delaysLeft = delays;
+    device.createGain = () => {
+      const node = createGain();
+      if (envelope) return node;
+      envelope = node;
+      const set = node.gain.setValueAtTime.bind(node.gain);
+      node.gain.setValueAtTime = (value, time) => {
+        set(value, time);
+        if (delaysLeft > 0 && value === 0 && time > device.currentTime) {
+          delaysLeft--;
+          device.currentTime += .008;
+        }
+      };
+      return node;
+    };
+    try {
+      const input = longSample();
+      await runtime.audition(input, { preserveNoteLevel: true, pan: .25,
+        gainCurve: [{ atSeconds: 0, db: 0 }, { atSeconds: 1, db: -4 }],
+        pitchCurve: [{ atSeconds: 0, db: 0 }, { atSeconds: 1, db: 1 }] });
+      assert.equal(delaysLeft, 0);
+      assert.equal(device.sampleSources.length, 1);
+      const [source] = device.sampleSources;
+      const start = source!.startTime!;
+      close(start - began, [.002, .010, .026][delays]!);
+      assert(source!.started && !source!.stopped && start > device.currentTime);
+      close(source!.offset, input.startSeconds);
+      close(source!.stopTime! - start, input.note.holdSeconds + input.envelope.releaseSeconds + .001);
+      const parameters = [envelope!.gain, device.gains.at(-1)!.gain, device.panners[0]!.pan, source!.detune, source!.playbackRate];
+      for (const parameter of parameters) {
+        close(parameter.changes[0]?.time, start);
+        assert(parameter.changes.every(change => change.time >= start));
+      }
+    } finally { await runtime.dispose(); }
+  });
+});
 
 test('audition replacement and cancellation release only the short note; a normal preview and stopAll release both lanes', async () => fixture(async () => {
   const runtime = createBrowserSoundRuntime(); const main = await runtime.preview(phrase([{ atSeconds: 2, sound: plan() }], 4));

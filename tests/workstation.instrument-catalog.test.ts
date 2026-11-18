@@ -1,15 +1,15 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { prepareMelodyTimbres, readEditableTimbreBody } from '../src/workstation/modules/timbre/public.ts';
-import { listDefaultInstruments, instrumentCategories, defaultInstrumentInfo } from '../src/workstation/modules/timbre/instrument-catalog.ts';
+import { listDefaultInstruments, instrumentCategories, defaultInstrumentInfo, studioInstrumentForMidi } from '../src/workstation/modules/timbre/instrument-catalog.ts';
 import { createInitialProjectLibrary } from '../src/workstation/app/project-setup.ts';
 import { ensureProjectMelodyTimbres, listProjectTimbres, requiresTimbreDeleteConfirmation, tryRemoveUnusedProjectTimbre } from '../src/workstation/app/project-timbres.ts';
 import { createMaterialLibrary } from '../src/workstation/modules/materials/public.ts';
 
-test('the complete palette has 34 uniquely named, distinct portable recipes', () => {
+test('the complete palette has 35 uniquely named, distinct portable recipes', () => {
   const definitions = listDefaultInstruments(), tones = prepareMelodyTimbres();
-  assert.equal(tones.length, 34); assert.equal(new Set(tones.map(item => item.id)).size, 34);
-  assert.equal(new Set(tones.map(item => item.name)).size, 34);
+  assert.equal(tones.length, 35); assert.equal(new Set(tones.map(item => item.id)).size, 35);
+  assert.equal(new Set(tones.map(item => item.name)).size, 35);
   assert(definitions.every(item => instrumentCategories.some(category => category === item.category)));
   const fingerprints = tones.map(tone => { const body = readEditableTimbreBody(tone.body); assert.equal(tone.dependencies.length, 0);
     return JSON.stringify(body).replace(/rootsound\.instrument\.[a-z-]+/gu, 'instrument').replace(/"name":"[^"]+"/gu, '"name":"sound"'); });
@@ -25,9 +25,9 @@ test('every new project gets independent ordered defaults; deleted defaults do n
   assert.deepEqual(first.map(item => item.name), listDefaultInstruments().map(item => item.name));
   assert(first.every(tone => defaultInstrumentInfo(tone.id)));
   assert(first.every(tone => !requiresTimbreDeleteConfirmation(tone)));
-  assert.equal(ensureProjectMelodyTimbres(library, root.id).length, 34);
+  assert.equal(ensureProjectMelodyTimbres(library, root.id).length, 35);
   assert(tryRemoveUnusedProjectTimbre(library, root.id, first[0]!.id));
-  assert.equal(ensureProjectMelodyTimbres(library, root.id).length, 33);
+  assert.equal(ensureProjectMelodyTimbres(library, root.id).length, 34);
   const other = JSON.parse(createInitialProjectLibrary('另一个音乐')).contents.filter((item: {kind:string}) => item.kind === 'rootsound.timbre');
   assert(other.every((tone: {id:string}) => !first.some(item => item.id === tone.id)));
 });
@@ -37,4 +37,34 @@ test('the new defaults are compact sampled-bank definitions, with no imitation o
   for(const tone of tones){const body=readEditableTimbreBody(tone.body);assert.equal(body.model,'sample-bank');
     assert(!JSON.stringify(body).includes('sources'));assert(!JSON.stringify(body).includes('oscillators'));}
   assert(JSON.stringify(tones).length<85000, 'empty projects must not eagerly embed the entire recording library');
+});
+
+test('the steel-string guitar has its own recording identity and MIDI program', () => {
+  assert.equal(studioInstrumentForMidi(25).key, 'studio-steel-guitar');
+  assert.equal(studioInstrumentForMidi(24).key, 'studio-guitar');
+  assert.equal(studioInstrumentForMidi(25).name, '木吉他');
+});
+
+test('a version-three song receives only the new guitar and keeps its deleted defaults deleted', () => {
+  let text = createInitialProjectLibrary('旧歌曲');
+  const storage = { read: () => text, write: (value: string) => { text = value; } };
+  const library = createMaterialLibrary(storage);
+  const song = library.listDrafts().find(item => item.kind === 'rootsound.song')!;
+  const tones = listProjectTimbres(library, song.id);
+  const guitar = tones.find(item => defaultInstrumentInfo(item.id)?.key === 'studio-steel-guitar')!;
+  const flute = tones.find(item => defaultInstrumentInfo(item.id)?.key === 'studio-flute')!;
+  assert(tryRemoveUnusedProjectTimbre(library, song.id, guitar.id));
+  assert(tryRemoveUnusedProjectTimbre(library, song.id, flute.id));
+  const previous = listProjectTimbres(library, song.id);
+  const draft = library.readDraft(song.id)!;
+  library.updateDraft(song.id, { body: { ...draft.body as object, timbreCatalogVersion: 3 } });
+  const migrated = ensureProjectMelodyTimbres(library, song.id);
+  assert.equal(migrated.length, previous.length + 1);
+  assert(!migrated.some(item => item.id === flute.id));
+  assert.deepEqual(migrated.filter(item => item.id !== guitar.id), previous);
+  assert.equal(migrated.filter(item => item.id === guitar.id).length, 1);
+  const reopened = createMaterialLibrary(storage);
+  assert.deepEqual(ensureProjectMelodyTimbres(reopened, song.id), migrated);
+  assert(tryRemoveUnusedProjectTimbre(reopened, song.id, guitar.id));
+  assert(!ensureProjectMelodyTimbres(reopened, song.id).some(item => item.id === guitar.id));
 });

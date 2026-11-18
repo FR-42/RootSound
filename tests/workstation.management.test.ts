@@ -104,7 +104,7 @@ class SettingsElement extends EventTarget {
       if (enabled) names.add(name); else names.delete(name);
       this.className = [...names].join(' ');
     },
-    add: (name: string) => this.classList.toggle(name, true),
+    add: (...names: string[]) => names.forEach(name => this.classList.toggle(name, true)),
     remove: (name: string) => this.classList.toggle(name, false),
   };
   readonly tag: string;

@@ -1,4 +1,4 @@
-import type { ProjectDirectoriesPort, ProjectSetupPort } from '../contracts/project-directory.ts';
+import type { EditableFileSource, ProjectDirectoriesPort, ProjectSetupPort } from '../contracts/project-directory.ts';
 import { createMaterialLibrary } from '../modules/materials/public.ts';
 import { createTimbrePlayback, createTimbreReferenceAdapter } from '../modules/timbre/public.ts';
 import { createPhraseEditor, createPhrasePlayback, createPhraseReferenceAdapter } from '../modules/phrase/public.ts';
@@ -65,8 +65,40 @@ export function renameProjectLibrary(text: string, input: string): string {
   return snapshot;
 }
 
-export function createProjectSetup(directories: ProjectDirectoriesPort, enter: () => void,
-  source?: { read(): string; songDraftId(): string; name?(): string; prepareSave?(target?: 'source' | 'rootsound'): void | Promise<void> }): ProjectSetupPort {
+let durationWorker: Worker | undefined;
+let durationRequest = 0;
+const pendingDurations = new Map<number, (duration: number | undefined) => void>();
+async function readDuration(source: string | EditableFileSource): Promise<number | undefined> {
+  if (typeof Worker !== 'function') return (await import('./library-duration-worker.ts')).measureLibraryDuration(source);
+  if (!durationWorker) {
+    durationWorker = new Worker(new URL('./library-duration-worker.ts', import.meta.url), { type: 'module' });
+    const failed = () => {
+      durationWorker?.terminate(); durationWorker = undefined;
+      for (const resolve of pendingDurations.values()) resolve(undefined);
+      pendingDurations.clear();
+    };
+    durationWorker.onerror = event => { event.preventDefault(); failed(); };
+    durationWorker.onmessageerror = failed;
+    durationWorker.onmessage = (event: MessageEvent<{ id: number; duration?: number }>) => {
+      const { id, duration } = event.data;
+      const resolve = pendingDurations.get(id);
+      pendingDurations.delete(id);
+      resolve?.(duration);
+    };
+  }
+  const worker = durationWorker;
+  return new Promise((resolve, reject) => {
+    const id = ++durationRequest;
+    const transfer = typeof source !== 'string' && source.bytes.buffer instanceof ArrayBuffer ? [source.bytes.buffer] : [];
+    pendingDurations.set(id, resolve);
+    try { worker.postMessage({ id, source }, transfer); }
+    catch (error) { pendingDurations.delete(id); reject(error); }
+  });
+}
+
+export function createProjectSetup(directories: ProjectDirectoriesPort, enter: (savedDetails?: boolean) => void,
+  source?: { read(): string; songDraftId(): string; name?(): string; hasDeferredChanges?(): boolean;
+    flushDraft?(): void | Promise<void>; prepareSave?(target?: 'source' | 'rootsound'): void | Promise<void>; renamed?(name: string): void }): ProjectSetupPort {
   let busy = false;
   async function exclusive<T>(action: () => Promise<T>): Promise<T> {
     if (busy) throw new Error('正在处理项目，请稍候。');
@@ -82,17 +114,34 @@ export function createProjectSetup(directories: ProjectDirectoriesPort, enter: (
       await directories.create(name, location.trim(), createInitialProjectLibrary(name));
       enter();
     }),
+    ...(directories.startNew ? { startNew: (input: string, location: string) => exclusive(async () => {
+      const name = projectName(input);
+      if (!location.trim()) throw new Error('请选择项目的存储位置。');
+      await directories.startNew!(name, location.trim(), createInitialProjectLibrary(name));
+      enter();
+    }) } : {}),
     async list() {
       if (!directories.list) throw new Error('当前窗口暂不支持列出项目，请重新打开 RootSound。');
       return directories.list();
     },
+    ...(directories.chooseLibraryFolder ? { chooseLibraryFolder: (current: string) => exclusive(() => directories.chooseLibraryFolder!(current)) } : {}),
+    ...(directories.readLibraryScore ? { async readLibraryDuration(path: string) {
+      const source = await directories.readLibraryScore!(path);
+      return source === undefined ? undefined : readDuration(source);
+    } } : {}),
     ...(directories.browse ? { browse: (path?: string) => directories.browse!(path) } : {}),
     ...(directories.createFolder ? { createFolder: (path: string, name: string) => exclusive(() => directories.createFolder!(path, projectName(name))) } : {}),
-    ...(directories.renameEntry ? { renameEntry: (path: string, name: string) => exclusive(() => directories.renameEntry!(path, projectName(name))) } : {}),
+    ...(directories.renameEntry ? { renameEntry: (path: string, input: string) => exclusive(async () => {
+      const name = projectName(input);
+      const current = (await directories.read()).current;
+      await directories.renameEntry!(path, name);
+      if (current?.path === path) source?.renamed?.(name);
+    }) } : {}),
     ...(directories.removeEntry ? { removeEntry: (path: string) => exclusive(() => directories.removeEntry!(path)) } : {}),
     ...(directories.reveal ? { reveal: (entry: Parameters<NonNullable<ProjectDirectoriesPort['reveal']>>[0]) => exclusive(() => directories.reveal!(entry)) } : {}),
     ...(source && directories.browse ? { async readSaveSource() { return (await directories.read()).current; } } : {}),
     open: path => exclusive(async () => {
+      if (source?.hasDeferredChanges?.()) await source.flushDraft?.();
       const result = await directories.open(path);
       if (result.status === 'opened') enter();
       else if (result.status === 'document') {
@@ -112,7 +161,18 @@ export function createProjectSetup(directories: ProjectDirectoriesPort, enter: (
       const name = projectName(input);
       if (!directories.inspect || !directories.rename) throw new Error('当前窗口尚不支持库内改名，请重新打开 RootSound。');
       const snapshot = await directories.inspect(selected);
-      return directories.rename(snapshot.project, name, renameProjectLibrary(snapshot.libraryText, name), snapshot.token);
+      const renamed = await directories.rename(snapshot.project, name, renameProjectLibrary(snapshot.libraryText, name), snapshot.token);
+      if ((await directories.read()).current?.id === selected.id) source?.renamed?.(name);
+      return renamed;
+    }),
+    renameCurrent: input => exclusive(async () => {
+      const name = projectName(input);
+      const selected = (await directories.read()).current;
+      if (!selected) throw new Error('先打开一个音乐项目。');
+      if (selected.pendingSave) return;
+      if (!directories.inspect || !directories.rename) throw new Error('当前窗口尚不支持改名，请重新打开 RootSound。');
+      const snapshot = await directories.inspect(selected);
+      await directories.rename(snapshot.project, name, renameProjectLibrary(snapshot.libraryText, name), snapshot.token);
     }),
     save: () => exclusive(async () => {
       if (!directories.save) throw new Error('当前窗口尚不支持保存项目，请重新打开 RootSound。');
@@ -120,6 +180,7 @@ export function createProjectSetup(directories: ProjectDirectoriesPort, enter: (
       await directories.save(source?.name?.());
     }),
     async hasUnsavedChanges() {
+      if (source?.hasDeferredChanges?.()) return true;
       const state = await directories.read();
       if (typeof state.hasUnsavedChanges !== 'boolean') throw new Error('当前窗口尚不支持检查未保存修改，请重新打开 RootSound。');
       return state.hasUnsavedChanges;
@@ -132,7 +193,7 @@ export function createProjectSetup(directories: ProjectDirectoriesPort, enter: (
       } else await directories.exit('discard');
       enter();
     }),
-    ...(source ? { saveAs: (input: string, location: string, mode: 'edit' | 'exit' | 'close' = 'edit') => exclusive(async () => {
+    ...(source ? { saveAs: (input: string, location: string, mode: 'edit' | 'exit' | 'close' | 'details' = 'edit') => exclusive(async () => {
       const name = projectName(input);
       if (!location.trim()) throw new Error('请选择项目的存储位置。');
       await source.prepareSave?.('rootsound');
@@ -140,7 +201,7 @@ export function createProjectSetup(directories: ProjectDirectoriesPort, enter: (
       if (directories.createCopy) await directories.createCopy(name, location.trim(), text);
       else await directories.create(name, location.trim(), text);
       if (mode === 'exit') await directories.exit?.('discard');
-      if (mode !== 'close') enter();
+      if (mode !== 'close') enter(mode === 'details');
     }) } : {}),
   };
 }

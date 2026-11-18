@@ -1,7 +1,7 @@
 import type { ContentRecord } from '../../contracts/content.ts';
 import studioDefinitions from './studio-instrument-definitions.json' with { type: 'json' };
 import generalMidi from './general-midi.json' with { type: 'json' };
-export const studioInstrumentCatalogVersion = 3;
+export const studioInstrumentCatalogVersion = 4;
 export const studioBank = 'rootsound-studio-v1';
 export const instrumentCategories = ['键盘', '拨弦', '弦乐', '木管', '铜管', '低音', '打击', '电子', '人声'] as const;
 export const studioLibraryGroups = [...new Set(studioDefinitions.map(item => item.libraryGroup))];

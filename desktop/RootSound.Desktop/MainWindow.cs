@@ -1,5 +1,6 @@
 using Microsoft.Web.WebView2.Core;
 using Microsoft.Web.WebView2.WinForms;
+using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Text.Json;
 
@@ -11,35 +12,133 @@ internal sealed class MainWindow : Form
     private const int CaptionColorAttribute = 35;
     private const int CaptionTextColorAttribute = 36;
     private const uint DefaultWindowColor = 0xffffffff;
-    private readonly WebView2 view = new() { Dock = DockStyle.Fill, DefaultBackgroundColor = Color.FromArgb(250, 251, 253) };
+    private const int CalculateClientRectangle = 0x0083;
+    private const uint NonClientButtonDown = 0x00A1;
+    private const int CaptionHit = 2;
+    private static readonly TimeSpan CloseScriptTimeout = TimeSpan.FromSeconds(3);
+    private static readonly TimeSpan CloseWorkTimeout = TimeSpan.FromSeconds(8);
+    private static readonly Color WorkspaceBackground = Color.FromArgb(251, 233, 218);
+    private static readonly Color CaptionBackground = Color.FromArgb(255, 240, 223);
+    private static readonly Color CaptionInk = Color.FromArgb(66, 43, 52);
+    private readonly WebView2 view = new() { Dock = DockStyle.Fill, DefaultBackgroundColor = WorkspaceBackground };
+    private readonly bool useClientCaption = !SystemInformation.HighContrast;
+    private readonly Panel captionBar = new() { Visible = false, BackColor = CaptionBackground };
     private readonly ProjectDirectoryManager projects;
     private readonly string dataDirectory;
     private bool closeAccepted;
     private bool preparingClose;
+    private DesktopPointerInput? pointerInput;
+    private readonly WindowCaptionVisibility captionVisibility = new();
+    internal bool CaptionRevealed => captionVisibility.Visible;
 
     public MainWindow(ProjectDirectoryManager projects, string dataDirectory)
     {
         this.projects = projects;
         this.dataDirectory = dataDirectory;
         Text = "RootSound";
-        Icon = System.Drawing.Icon.ExtractAssociatedIcon(Application.ExecutablePath);
+        var packagedIcon = Path.Combine(AppContext.BaseDirectory, "icon.ico");
+        Icon = File.Exists(packagedIcon) ? new Icon(packagedIcon) : System.Drawing.Icon.ExtractAssociatedIcon(Application.ExecutablePath);
         ClientSize = new Size(1180, 800);
         MinimumSize = new Size(860, 640);
         StartPosition = FormStartPosition.CenterScreen;
-        BackColor = Color.FromArgb(250, 251, 253);
+        BackColor = WorkspaceBackground;
         Controls.Add(view);
+        if (useClientCaption) CreateCaptionBar();
         Shown += async (_, _) => await InitializeView();
         FormClosing += ConfirmWindowClose;
-        FormClosed += (_, _) => view.Dispose();
+        FormClosed += (_, _) => { pointerInput?.Dispose(); pointerInput = null; view.Dispose(); };
     }
 
     [DllImport("dwmapi.dll", ExactSpelling = true)]
     private static extern int DwmSetWindowAttribute(IntPtr hwnd, int attribute, in uint value, int size);
 
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool ReleaseCapture();
+
+    [DllImport("user32.dll", ExactSpelling = true)]
+    private static extern IntPtr SendMessageW(IntPtr hwnd, uint message, IntPtr wParam, IntPtr lParam);
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct WindowRectangle { public int Left, Top, Right, Bottom; }
+
+    private void CreateCaptionBar()
+    {
+        captionBar.Size = new Size(ClientSize.Width, LogicalToDeviceUnits(32));
+        captionBar.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
+        captionBar.Font = new Font("Segoe MDL2 Assets", 10);
+        void ToggleMaximized() => WindowState = WindowState == FormWindowState.Maximized ? FormWindowState.Normal : FormWindowState.Maximized;
+        var minimize = CaptionButton("\uE921", "最小化", () => WindowState = FormWindowState.Minimized);
+        var maximize = CaptionButton("\uE922", "最大化", ToggleMaximized);
+        var close = CaptionButton("\uE8BB", "关闭", Close);
+        Resize += (_, _) =>
+        {
+            bool maximized = WindowState == FormWindowState.Maximized;
+            maximize.Text = maximized ? "\uE923" : "\uE922";
+            maximize.AccessibleName = maximized ? "还原" : "最大化";
+        };
+        captionBar.Controls.AddRange([minimize, maximize, close]);
+        captionBar.MouseDown += (_, args) =>
+        {
+            if (args.Button != MouseButtons.Left) return;
+            if (args.Clicks == 2) { ToggleMaximized(); return; }
+            ReleaseCapture();
+            SendMessageW(Handle, NonClientButtonDown, new IntPtr(CaptionHit), IntPtr.Zero);
+        };
+        Controls.Add(captionBar);
+        captionBar.BringToFront();
+    }
+
+    private Button CaptionButton(string glyph, string name, Action activate)
+    {
+        var button = new Button
+        {
+            Text = glyph, AccessibleName = name, FlatStyle = FlatStyle.Flat, ForeColor = CaptionInk,
+            Dock = DockStyle.Right, Width = LogicalToDeviceUnits(46), UseVisualStyleBackColor = false
+        };
+        button.FlatAppearance.BorderSize = 0;
+        button.Click += (_, _) => activate();
+        return button;
+    }
+
+    internal void UpdateCaption(Point pointer, Rectangle client)
+    {
+        if (!useClientCaption) return;
+        bool wasVisible = captionVisibility.Visible;
+        bool visible = captionVisibility.Update(pointer, client, captionBar.Height, LogicalToDeviceUnits(8), SystemInformation.FrameBorderSize.Height);
+        if (wasVisible == visible) return;
+        captionBar.Visible = visible;
+        if (visible) captionBar.BringToFront();
+    }
+
     protected override void OnHandleCreated(EventArgs e)
     {
         base.OnHandleCreated(e);
         UpdateCaptionColors();
+    }
+
+    protected override void WndProc(ref Message message)
+    {
+        pointerInput?.Read(message);
+        if (useClientCaption && message.Msg == CalculateClientRectangle && message.LParam != IntPtr.Zero)
+        {
+            var window = Marshal.PtrToStructure<WindowRectangle>(message.LParam);
+            base.WndProc(ref message);
+            var client = Marshal.PtrToStructure<WindowRectangle>(message.LParam);
+            client.Top = Math.Min(client.Bottom, window.Top + Math.Max(0, window.Bottom - client.Bottom));
+            Marshal.StructureToPtr(client, message.LParam, false);
+            message.Result = IntPtr.Zero;
+            return;
+        }
+        base.WndProc(ref message);
+    }
+
+    protected override void OnDeactivate(EventArgs e)
+    {
+        captionVisibility.Reset();
+        if (useClientCaption) captionBar.Visible = false;
+        pointerInput?.Reset();
+        base.OnDeactivate(e);
     }
 
     protected override void OnSystemColorsChanged(EventArgs e)
@@ -51,8 +150,8 @@ internal sealed class MainWindow : Form
     private void UpdateCaptionColors()
     {
         if (!IsHandleCreated || !OperatingSystem.IsWindowsVersionAtLeast(10, 0, 22000)) return;
-        var caption = SystemInformation.HighContrast ? DefaultWindowColor : (uint)ColorTranslator.ToWin32(Color.FromArgb(239, 246, 250));
-        var text = SystemInformation.HighContrast ? DefaultWindowColor : (uint)ColorTranslator.ToWin32(Color.FromArgb(53, 86, 106));
+        var caption = SystemInformation.HighContrast ? DefaultWindowColor : (uint)ColorTranslator.ToWin32(CaptionBackground);
+        var text = SystemInformation.HighContrast ? DefaultWindowColor : (uint)ColorTranslator.ToWin32(CaptionInk);
         DwmSetWindowAttribute(Handle, CaptionColorAttribute, in caption, sizeof(uint));
         DwmSetWindowAttribute(Handle, CaptionTextColorAttribute, in text, sizeof(uint));
     }
@@ -65,47 +164,86 @@ internal sealed class MainWindow : Form
         preparingClose = true;
         try
         {
-            var preparation = await PrepareWindowClose("check");
-            if (!preparation.Ready) throw new IOException(preparation.Message ?? "当前编辑还未准备好，请稍后再关闭。");
-            if (!preparation.CanSave) throw new IOException(preparation.SaveMessage ?? "当前编辑还未准备好，请稍后再关闭。");
-            if (projects.HasUnsavedChanges)
+            try
             {
-                var choice = await PrepareWindowClose("save");
-                if (choice.Cancelled) return;
-                if (!choice.Ready || !choice.CanSave) throw new IOException(choice.SaveMessage ?? choice.Message ?? "请先完成或放弃正在编辑的音乐，再保存歌曲。");
-                if (!choice.Saved && !choice.Discarded) projects.Save(choice.Name, renameFile: false);
+                if (!await CanCloseProject(projects, PrepareWindowClose)) return;
             }
-            projects.Exit("discard");
+            catch (Exception error)
+            {
+                if (IsDisposed || Disposing || !ConfirmCloseAfterFailure(error)) return;
+            }
             closeAccepted = true; Close();
-        }
-        catch (Exception error)
-        {
-            if (!IsDisposed && !Disposing) MessageBox.Show(this, "暂时无法关闭：" + error.Message, "RootSound", MessageBoxButtons.OK, MessageBoxIcon.Warning);
         }
         finally { preparingClose = false; }
     }
 
-    private async Task<ClosePreparation> PrepareWindowClose(string mode)
+    internal static async Task<bool> CanCloseProject(ProjectDirectoryManager projects, Func<string, Task<ClosePreparation>> prepare)
     {
-        if (projects.Current is null) return new(true, null, true, null, null);
-        var core = view.CoreWebView2 ?? throw new IOException("界面仍在准备中，请稍后再试。");
-        string id = Guid.NewGuid().ToString("N");
-        // ExecuteScriptAsync does not await a JavaScript Promise. Keep this
-        // handshake scoped to one request and poll its completed JSON result.
-        string request = JsonSerializer.Serialize(id);
-        await core.ExecuteScriptAsync("(() => { const id = " + request + "; globalThis.__rootSoundCloseHandshake = { id, result: null }; Promise.resolve().then(() => { if (typeof globalThis.__rootSoundPrepareClose !== 'function') throw new Error('界面仍在准备中，请稍后再试。'); return globalThis.__rootSoundPrepareClose(" + JsonSerializer.Serialize(mode) + "); }).then(result => { if (globalThis.__rootSoundCloseHandshake?.id === id) globalThis.__rootSoundCloseHandshake.result = result; }, error => { if (globalThis.__rootSoundCloseHandshake?.id === id) globalThis.__rootSoundCloseHandshake.result = { ready: false, message: error?.message ?? String(error) }; }); })()");
-        var deadline = DateTime.UtcNow.AddSeconds(30);
-        while (!IsDisposed && (mode == "save" || DateTime.UtcNow < deadline))
-        {
-            await Task.Delay(mode == "save" ? 100 : 25);
-            string json = await core.ExecuteScriptAsync("globalThis.__rootSoundCloseHandshake?.id === " + request + " ? globalThis.__rootSoundCloseHandshake.result : null");
-            if (json is "null" or "undefined") continue;
-            return ParseClosePreparation(json);
-        }
-        throw new IOException("等待当前编辑完成超时，草稿仍在窗口中，请重试。");
+        if (!await Task.Run(() => projects.Current is not null).WaitAsync(CloseWorkTimeout)) return true;
+        var preparation = await prepare("check");
+        bool dirty = await Task.Run(() => projects.HasUnsavedChanges).WaitAsync(CloseWorkTimeout);
+        if (preparation.StartupFailed && !dirty) return true;
+        if (!preparation.Ready || !preparation.CanSave)
+            throw new IOException(preparation.SaveMessage ?? preparation.Message ?? "当前编辑尚未准备好。");
+        if (!dirty) return true;
+        var choice = await prepare("save");
+        if (choice.Cancelled) return false;
+        if (!choice.Ready || !choice.CanSave)
+            throw new IOException(choice.SaveMessage ?? choice.Message ?? "当前修改尚未保存。");
+        if (!choice.Saved && !choice.Discarded)
+            await Task.Run(() => projects.Save(choice.Name, renameFile: false)).WaitAsync(CloseWorkTimeout);
+        return true;
     }
 
-    internal sealed record ClosePreparation(bool Ready, string? Name, bool CanSave, string? Message, string? SaveMessage, bool Saved = false, bool Cancelled = false, bool Discarded = false);
+    private bool ConfirmCloseAfterFailure(Exception error)
+    {
+        var exit = new TaskDialogButton("直接退出");
+        var back = new TaskDialogButton("返回");
+        return TaskDialog.ShowDialog(this, new TaskDialogPage
+        {
+            Caption = "RootSound",
+            Heading = "直接退出？",
+            Text = (error is TimeoutException ? "编辑器或工程服务未及时响应。" : error.Message) + "\n\n直接退出可能丢失未保存的修改。",
+            AllowCancel = true,
+            DefaultButton = back,
+            Buttons = { back, exit },
+        }) == exit;
+    }
+
+    private async Task<ClosePreparation> PrepareWindowClose(string mode)
+    {
+        var core = view.CoreWebView2 ?? throw new IOException("编辑器尚未就绪。");
+        string request = JsonSerializer.Serialize(Guid.NewGuid().ToString("N"));
+        try
+        {
+            string started = await core.ExecuteScriptAsync($"globalThis.__rootSoundClose?.begin({request}, {JsonSerializer.Serialize(mode)})")
+                .WaitAsync(CloseScriptTimeout);
+            if (started != "true") throw new IOException("编辑器尚未就绪。");
+            var working = Stopwatch.StartNew();
+            while (!IsDisposed)
+            {
+                string json = await core.ExecuteScriptAsync($"globalThis.__rootSoundClose?.read({request})").WaitAsync(CloseScriptTimeout);
+                using var document = JsonDocument.Parse(json);
+                var state = document.RootElement;
+                if (state.ValueKind != JsonValueKind.Object) throw new IOException("编辑器已切换，退出请求已中断。");
+                if (state.TryGetProperty("result", out var result) && result.ValueKind != JsonValueKind.Null)
+                    return ParseClosePreparation(result.GetRawText());
+                if (mode == "save" && state.TryGetProperty("awaitingChoice", out var waiting) && waiting.ValueKind == JsonValueKind.True)
+                    working.Restart();
+                if (working.Elapsed >= CloseWorkTimeout) throw new TimeoutException();
+                await Task.Delay(100);
+            }
+            throw new ObjectDisposedException(nameof(MainWindow));
+        }
+        finally
+        {
+            try { await core.ExecuteScriptAsync($"globalThis.__rootSoundClose?.cancel({request})").WaitAsync(TimeSpan.FromMilliseconds(500)); }
+            catch (Exception) { }
+        }
+    }
+
+    internal sealed record ClosePreparation(bool Ready, string? Name, bool CanSave, string? Message, string? SaveMessage,
+        bool Saved = false, bool Cancelled = false, bool Discarded = false, bool StartupFailed = false);
     internal static ClosePreparation ParseClosePreparation(string json)
     {
         using var document = JsonDocument.Parse(json); var root = document.RootElement;
@@ -114,7 +252,7 @@ internal sealed class MainWindow : Form
         string? Text(string key) => root.TryGetProperty(key, out var item) && item.ValueKind == JsonValueKind.String ? item.GetString() : null;
         bool canSave = root.TryGetProperty("canSave", out var value) && value.ValueKind == JsonValueKind.True;
         bool Flag(string key) => root.TryGetProperty(key, out var flag) && flag.ValueKind == JsonValueKind.True;
-        return new(ready.GetBoolean(), Text("name"), canSave, Text("message"), Text("saveMessage"), Flag("saved"), Flag("cancelled"), Flag("discarded"));
+        return new(ready.GetBoolean(), Text("name"), canSave, Text("message"), Text("saveMessage"), Flag("saved"), Flag("cancelled"), Flag("discarded"), Flag("startupFailed"));
     }
 
     private async Task InitializeView()
@@ -124,7 +262,10 @@ internal sealed class MainWindow : Form
             var uiDirectory = Path.Combine(AppContext.BaseDirectory, "ui");
             if (!File.Exists(Path.Combine(uiDirectory, "index.html")))
                 throw new IOException("缺少界面文件，请重新安装或构建 RootSound。");
-            var environment = await CoreWebView2Environment.CreateAsync(null, Path.Combine(dataDirectory, "webview"));
+            var privateBrowser = Path.Combine(AppContext.BaseDirectory, "webview");
+            var environment = await CoreWebView2Environment.CreateAsync(
+                File.Exists(Path.Combine(privateBrowser, "msedgewebview2.exe")) ? privateBrowser : null,
+                Path.Combine(dataDirectory, "webview"));
             await view.EnsureCoreWebView2Async(environment);
             var core = view.CoreWebView2;
             core.Settings.IsStatusBarEnabled = false;
@@ -137,7 +278,10 @@ internal sealed class MainWindow : Form
             core.AddHostObjectToScript("projectFiles", new NativeProjectFiles(this, projects));
             core.AddHostObjectToScript("sampleFiles", new NativeSampleFiles(this));
             core.AddHostObjectToScript("timbreFiles", new NativeTimbreFiles(this, projects, dataDirectory));
-            core.NavigationStarting += (_, e) => e.Cancel = !Trusted(e.Uri);
+            core.NavigationStarting += (_, e) =>
+            {
+                e.Cancel = !Trusted(e.Uri);
+            };
             core.FrameNavigationStarting += (_, e) => e.Cancel = !Trusted(e.Uri);
             core.NewWindowRequested += (_, e) => e.Handled = true;
             core.PermissionRequested += (_, e) => e.State = PermissionStateFor(e.Uri, e.PermissionKind);
@@ -147,6 +291,10 @@ internal sealed class MainWindow : Form
                 var resource = resources.Open(e.Request.Uri, e.Request.Method, e.Request.Headers.Contains("Range") ? e.Request.Headers.GetHeader("Range") : null);
                 e.Response = environment.CreateWebResourceResponse(resource.Content, resource.StatusCode, resource.Reason, resource.Headers);
             };
+            pointerInput = new DesktopPointerInput(this, json =>
+            {
+                if (Trusted(core.Source)) core.PostWebMessageAsJson(json);
+            }, UpdateCaption);
             core.Navigate(Origin + "/index.html");
         }
         catch (Exception error)

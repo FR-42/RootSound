@@ -1,13 +1,15 @@
 # RootSound decisions in force
 
-Updated 2026-11-11. This is the current decision summary, not an append-only delivery log.
+Updated 2026-11-18. This is the current decision summary, not an append-only delivery log.
 User-confirmed intent, implementation choices and open work are distinguished below.
 The Chinese mirror is [AItoHUMAN/DECISIONS.md](AItoHUMAN/DECISIONS.md); neither language overrides the user.
 Earlier wording and source IDs are preserved in [the original record](../history/2026-11-05-maintenance/governance/DECISIONS.md).
 
 ## Purpose and acceptance — USER CONFIRMED
 
-- RootSound is in early development. Once the user confirms a replacement, remove superseded files, assets and builds from the active project. Older song projects do not require backward compatibility or justify keeping superseded resources. Update bundled demo songs to the current format and resources.
+- RootSound is in early development. Once the user confirms a replacement, remove superseded interfaces, obsolete settings, unused resources and builds from the active project. Native `.rootsound` songs from the first public Release onward must retain backward readability without a later age cutoff. The user clarified on 2026-11-18 that the baseline is the first public Release, not the first GitHub push: `preview261103` ("先导"), commit `58cebb3db902ffc1dddc12d13672792ae7769eb9`, published 2026-11-04 00:23:02 +08:00, https://github.com/FR-42/RootSound/releases/tag/preview261103 . Dedicated compatibility for earlier development versions may be removed when it is not needed by baseline-or-later files. Keep or replace the readers, conversions and sound-data handling needed for supported songs; this does not require retaining the old interface or startup/configuration behavior. General-purpose file formats and framework compatibility are outside this cleanup. Update bundled demo songs to the current format and resources. This supersedes the earlier blanket statement that old songs required no compatibility; it is a policy requirement, not a claim that all historical files have already been verified.
+- The current roll, notes, tone cards, console and playback/performance curves are active features to retain, not obsolete compatibility targets.
+- On 2026-11-18 the user replaced origin-based naming: defaults consistently use the actual curated instrument name, including MIDI imports, with no numeric suffixes. Independent voices can share that canonical name while preserving identities, MIDI program/drum data, notes and curves. Existing recognized GM default names are normalized on load; custom names remain. The user then removed the former 10-card limit and authorized direct implementation. Hand cards scroll horizontally with the vertical wheel while the pointer is over their region; the fan rotates out of sight beneath the keyboard without side piles. Existing keyboard-library deck piles retain their behavior.
 
 - RootSound is a music creation app that helps everyday users get started quickly and get feedback efficiently as they create.
   Reducing the effort needed to learn and use the app helps users start creating sooner. Potential users include elementary and middle school students,
@@ -24,7 +26,7 @@ Earlier wording and source IDs are preserved in [the original record](../history
 ## Current creative route — USER CONFIRMED
 
 - Public product name is 简乐; repository/technical name remains RootSound.
-- Welcome → physical song library → one editable music score. The former arrangement/phrase overview,
+- The desktop opens directly to the physical song library. A song opens one editable music score. The former arrangement/phrase overview,
   separate melody/rhythm editors and co-creation route are not current release entry points.
 - A vertical piano roll uses horizontal pitch and vertical time. Note groups remain independently editable.
 - Keep the interface compact and transport controls centered. Tempo rolls use thin one-line labels;
@@ -33,7 +35,9 @@ Earlier wording and source IDs are preserved in [the original record](../history
   context menu extends the preceding roll over the same beats and retains the notes. The first roll remains
   and the setting can be turned off with one roll. The bottom resize edge has a downward fading shadow.
 - The BPM panel offers a score-wide time signature, defaulting to 4/4, independent of subdivisions.
-  Changing meter preserves note timing. Bar lines are heaviest, then beat lines, then subdivision lines.
+  Changing meter preserves note timing.
+- On 2026-11-16 the user removed measure labels and separate bar lines from the piano roll design.
+  The grid displays beat and subdivision lines. This supersedes the earlier visual rule for bar lines.
 - Old removal of empty settings is superseded by the explicit learning/advanced-feature settings.
   Old in-editor tutorial steps are superseded by hands-on practice. The website image deck is a separate scope.
   Sources: D-2026-11-02, vertical-roll, D-2026-11-05-roll-label, hands-on-guidance.
@@ -52,7 +56,7 @@ Earlier wording and source IDs are preserved in [the original record](../history
 - Dimmed groups do not react to selection, dragging or eraser sweeps. A populated group removal requires
   confirmation; two deliberate Delete presses may remove the selected group and notes with undo.
 - Same-timbre group drag/drop merges preserve overlaps, hidden notes, identity, note mix and MIDI lanes,
-  with one undo step. Unassigned/different-timbre groups do not merge.
+  with one undo step. Unassigned/different-timbre groups do not merge. On 2026-11-18 the user removed automatic target selection after a merge: retain an existing valid selection, clear selection/entry state referring to the removed source, and do not select or pin another card as a side effect. Suppress the drag's follow-up click; later intentional clicks retain their normal behavior.
 - Play to the end of the last occupied bar, then pause and return to the start. Selected-family audition,
   master audition gain and WAV-export gain have separate meanings; do not reintroduce output pumping.
 - Historical fixed-second/BPM behavior differs by compatibility model. Do not apply an old global rule:
@@ -61,11 +65,14 @@ Earlier wording and source IDs are preserved in [the original record](../history
 
 ## Files, library and saving — USER CONFIRMED
 
-- Browse the real project directory one layer at a time. Keep icons/names and pagination, not old columns,
-  separators/counts or recursive-flat discovery. Left/Right and pager buttons wrap; editable inputs keep caret behavior.
+- Release installer requirements confirmed on 2026-11-18: prepare Windows and macOS ARM64 packages locally for the user to publish manually. Redesign installation guidance to follow the current application's visual style and simplify the user-facing installer filenames. Both default and custom installation locations must support subsequent upgrades while preserving songs and cleaning obsolete program files. The first Windows default stays off C: (D: preferred); an end user may explicitly choose a custom C: location. This installer permission does not change the worktree-on-C: restriction. The user approved the release Prompt and confirmed switching Windows installers to the same native .NET/WebView2 desktop implementation used by the root project. macOS retains Electron; its Windows-specific pointer/titlebar behavior is not yet adapted or verified on a real Mac.
+
+- The desktop library browses real folders in a single scrolling list. On 2026-11-18 the user replaced delayed single-click opening and double-click renaming: clicking a song or folder should open it immediately, and renaming belongs in the right-click menu. Apply the rename entry to Save As as well, preserving its save-destination semantics. Implemented after Prompt approval: remove the opening timer and double-click rename handler, ignore the second click of a double-click, and preserve right-click rename in Save As. Use the breadcrumb to move between folders. The view draws rows near the viewport and loads durations in the background.
 - Open native music, MIDI/RMI, MusicXML/MXL and supported portable projects through one file route.
   Opening MIDI does not automatically create a .rootsound file.
-- Save opens the library with the choice to write the original .rootsound file or create a .rootsound copy in the displayed folder. Imported MIDI and other external files can only be saved as .rootsound. The library can create folders and rename or delete entries.
+- Save writes the open .rootsound in place and keeps the editor open. Save As and the first save of a new or imported score use the library list to choose a folder, with the current song name filled in. A name collision uses a numbered suffix. The library can create folders and rename or delete entries.
+- The details Exit button leaves a clean song immediately. For a dirty song, the first click colors Exit red and Save green. A second click discards the edits and leaves the song, including a rapid double-click. Successful Save and Save As return to song details, restore the button colors, briefly flash all three file buttons white and clear the unsaved star. The native window close action uses its save/discard chooser.
+- Library and details renames update real file paths and the active save destination. Editable text fields use colored rectangular fills and color-based focus feedback.
 - Normal editing stays in a draft until explicit Save. Save conflicts must not silently overwrite externally
   changed files. Write validated content atomically. Do not reinstate automatic .bak creation.
 - User confirmation 2026-11-05: conversion may shorten trailing empty time. Preserve all sound events,
@@ -82,6 +89,7 @@ Earlier wording and source IDs are preserved in [the original record](../history
   xiao, suona, brass, bass, guitar, and acoustic drum-kit pieces. Square and saw leads are outside the default palette.
 - Desktop, web and bundled demos use the current recorded sample library. MIDI imports map program and drum numbers to these recordings and retain the source numbers for export.
 - Preserve licenses, provenance and user deletions. The current sample runtime applies sustain and sostenuto. MIDI bend, continuous controllers and aftertouch remain in the score for export.
+- On 2026-11-18 the user approved adding “木吉他”, a steel-string folk/acoustic guitar, alongside the existing nylon-string classical guitar. Use the high-quality FreePats FSS Steel-String Acoustic Guitar recording (2020-05-21), preserve its source, licence and composition exception, and map it to zero-based MIDI program 25. Load recordings on demand; add this voice to existing song libraries without restoring previously deleted defaults. Website and installer publication remain separate tasks.
 - The UI calls the playhead “播放线”. The setting is “多卷帘” and has no description below it.
 - These mechanisms do not establish that the user is satisfied with the sound. See docs/GM_INSTRUMENTS.md
   and docs/MUSIC_FILES.md. Source: full-sf2, sampled-gm, timbre strengthening and MIDI-EXPRESSION.
@@ -148,6 +156,23 @@ web has smaller limits. MIDI encoding cannot represent the entire native tempo r
 must reject unsupported encoding rather than truncate. Verify constants and docs/MUSIC_FILES.md when changing them.
 View thresholds, frame scheduling, data structures, file encodings and framework choices are revisable.
 Current check/build evidence and remaining validation are in docs/CURRENT_STATE.md and docs/TESTING.md.
+
+## Desktop pointer interaction
+
+- A quick, predominantly horizontal sweep into the outer 6% triggers the corresponding side. A deliberate outward push at the actual border also qualifies, including when Windows clamps the pointer in a maximized window. The left side toggles tone cards while settings are closed. The right side toggles settings from the roll or tone cards. A left swipe while settings are open stays in settings. View switches show a brief arc and share a fixed 0.5-second cooldown.
+- With no song open, the desktop shows the welcome view. A downward sweep at the bottom edge opens the song library. Slowly moving gradients color both views. The roll uses a stationary gradient, and sounding notes brighten along their edges.
+- Song details cover the roll and piano. The song title sits above the file actions. Three adjacent playback-rate blocks (0.5x, 0.75x and 1x) sit to the left of volume, followed by grid intensity, pointer sensitivity and the multiple-roll switch. The three slider tracks are thicker and align at both ends. The switch shows one or two overlapping shapes.
+- On 2026-11-18 the user revised the Windows desktop colour study. Text fields use a light cyan, lavender and pink gradient with dark text; selected text uses a dark plum gradient with light text. Tone-card backs retain the dark plum gradient. Only the active playback speed has a coloured gradient fill; inactive speeds have transparent backgrounds.
+- Touching or crossing the active window's top edge reveals the native caption controls in the welcome view, library and editor. They stay visible over the caption and while the pointer is outside the window, then hide when the pointer returns to non-caption content. Card-back dimensions and stacking are adjusted for visual balance with the piano and ordinary tone cards; proportions follow the visual result rather than a mandatory scaling rule.
+- Playback and audition highlights follow the visible white and black key shapes.
+- Desktop note bodies fill the complete scheduled start-to-end interval. Do not inset or shorten them to create artificial time gaps, including on short notes. The user subsequently chose a 0.5 px black inner border and a small 1 px corner radius, retaining the top-to-bottom tone gradient. Centre notes within the space between the visible column lines: offset their pitch position by half the actual column-line width, and apply the same correction to the highlight overlay. Selection, hover and playback retain light outlines inside the black rim without a surrounding shadow. Musical timing is unchanged. The earlier large rounded corners and artificial end gaps were rejected because they misrepresented note timing.
+- Moving the pointer into the area above the keyboard reveals the hand. Clicking a card pins it above the roll in a short arc while the hand stays open. Unpinning by click or by dropping the card in the editor sends it back in a short arc. The desktop tone library shows cards, stacks and the empty slot left by a spread. The taller keyboard and cards scale with the window.
+- Clicking the empty slot gathers the spread back into the pile. Settings temporarily cover the hand and spread, and closing settings restores their prior visibility and deck position. The roll remains editable while the deck is spread. The wheel pages the cards when the pointer is over the deck.
+- The user selected the original Flow card back: two fine warm lines on the plum gradient. The later bulged-centre and dot variation was withdrawn. Visible paper edges and staggered layers distinguish the stack. After finding the face-turn animation too slow, the user requested the previous spread/gather animation: 240 ms translation, scale and opacity with 14 ms staggering. Midway toggles continue from the current visual state. Animation frames run through browser composition without repeated layout reads.
+- Moving into the roll's outer regions pans the viewport, with increasing speed toward the boundary. Fast pointer travel pauses auto-pan, which resumes when the pointer slows in an eligible area. Middle-click toggles position-driven panning. Mouse or keyboard presses interrupt it until the pointer returns to the central zone.
+- The desktop viewport may move above the score start so the first notes can be reached comfortably. The leading margin continues the pitch-column lines without beat or subdivision rows. Zoom and viewport restoration retain this space; note times remain nonnegative.
+- A selected tone card solos its own notes. Hovering a highlighted card in the current song's hand temporarily overrides the selected tone; leaving restores the selection, or all tones when none is selected. Closing the hand or deleting a card must clear transient listening focus. Switching changes per-group audio gain with a short smooth transition, retaining the full song clock and current source ages without preparing samples or rebuilding the score.
+- The pointer center determines the first ordinary wheel action. Scrolling down in blank space with a tone selected adds a note. A wheel edit stays on the same note at the same pointer position, even after the note shrinks away from the pointer. After deletion, scrolling at that position leaves the note deleted. A wheel scroll that pans the roll continues panning at the same pointer position. Pointer movement lets the next wheel action choose a target again.
 
 ## Experiments and historical scopes
 

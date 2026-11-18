@@ -15,7 +15,6 @@ export type ProjectScopes = {
 export type ProjectState = { contents: ContentRecord[]; drafts: Draft[]; projectScopes?: ProjectScopes };
 const same = sameJson;
 const clone = copyJson;
-const key = (kind: string, name: string): string => JSON.stringify([kind, name.trim().normalize('NFC').toLocaleLowerCase('en-US')]);
 function fail(message: string): never { throw new Error(`歌曲素材：${message}`); }
 
 export function validateProjectScopes(value: unknown): void {
@@ -55,6 +54,11 @@ export function createProjectScopePolicy(policy: ProjectPolicy) {
   const adapters = new Map(policy.adapters.map(adapter => [adapter.kind, adapter]));
   if (adapters.size !== policy.adapters.length || !adapters.has(policy.rootKind)) fail('工程素材解释器配置无效。');
   const owner = (record: ContentRecord | Draft) => adapters.get(record.kind) ?? fail(`尚不能独立复制 ${record.kind} 类型的素材。`);
+  const key = (record: ContentRecord | Draft, name: string, identity?: string): string => JSON.stringify([
+    record.kind, name.trim().normalize('NFC').toLocaleLowerCase('en-US'),
+    ...(adapters.get(record.kind)?.allowsSharedName?.(record, name)
+      ? [identity ?? ('sourceId' in record && record.sourceId || record.id)] : []),
+  ]);
   function closure(root: ContentRecord | Draft, contents: Map<string, ContentRecord>, readSlots = (record: ContentRecord | Draft) => owner(record).slots(record)): ContentRecord[] {
     const result: ContentRecord[] = []; const seen = new Set<string>(); const visiting = new Set<string>();
     function visit(record: ContentRecord | Draft, include: boolean): void {
@@ -91,7 +95,7 @@ export function createProjectScopePolicy(policy: ProjectPolicy) {
       ...state.drafts.filter(item => belongs(item)).map(record => ({ type: 'draft' as const, record }))];
   }
   function assertDraftName(state: ProjectState, draft: Draft, name: string): void {
-    if (key(draft.kind, name) === key(draft.kind, draft.name)) return;
+    if (key(draft, name) === key(draft, draft.name)) return;
     assertPublicName(state, draft, name);
     const contents = new Map(state.contents.map(record => [record.id, record]));
     let contextRoot: Draft | ContentRecord = draft.projectRootId ? state.drafts.find(item => item.id === draft.projectRootId)! : draft; const visited = new Set<string>();
@@ -120,14 +124,14 @@ export function createProjectScopePolicy(policy: ProjectPolicy) {
       const record = contents.get(assignment.id); if (record) occupied.set(record.id, record);
     }
     for (const other of occupied.values()) {
-      if (other.id !== draft.sourceId && other.id !== draft.id && key(other.kind, other.name) === key(draft.kind, name)) {
+      if (other.id !== draft.sourceId && other.id !== draft.id && key(other, other.name) === key(draft, name)) {
         fail(`这首歌曲已经有同类素材“${other.name}”，请换一个名称。你的修改仍然保留。`);
       }
     }
     for (const other of state.drafts) {
       if (other.id === draft.id || other.sourceId && other.sourceId === draft.sourceId) continue;
       const otherScope = state.projectScopes?.roots.find(item => item.type === 'draft' && item.id === other.id)?.scopeId;
-      if (otherScope && candidateScopes.has(otherScope) && key(other.kind, other.name) === key(draft.kind, name)) {
+      if (otherScope && candidateScopes.has(otherScope) && key(other, other.name) === key(draft, name)) {
         fail(`这首歌曲已经有同类编辑稿“${other.name}”，请换一个名称。你的修改仍然保留。`);
       }
     }
@@ -144,13 +148,13 @@ export function createProjectScopePolicy(policy: ProjectPolicy) {
     const identity = 'sourceId' in record && record.sourceId ? record.sourceId : record.id;
     for (const other of [...state.contents, ...state.drafts]) {
       const otherIdentity = 'sourceId' in other && other.sourceId ? other.sourceId : other.id;
-      if (otherIdentity !== identity && isPublic(state, other) && key(other.kind, other.name) === key(record.kind, name)) {
+      if (otherIdentity !== identity && isPublic(state, other) && key(other, other.name) === key(record, name)) {
         fail(`公共素材中已经有同类素材“${other.name}”，请换一个名称。你的修改仍然保留。`);
       }
     }
   }
   /** Explicit unpublished custody may never adopt material owned by another song. */
-  function validateDraftOwnership(state: ProjectState): void {
+  function validateDraftOwnership(state: ProjectState, readSlots?: (record: ContentRecord | Draft) => ReferenceSlot[]): void {
     const contents = new Map(state.contents.map(record => [record.id, record]));
     for (const draft of state.drafts) {
       if (draft.projectRootId === undefined) continue;
@@ -160,20 +164,33 @@ export function createProjectScopePolicy(policy: ProjectPolicy) {
         ?? state.projectScopes?.roots.find(item => item.type === 'content' && item.id === root.sourceId)?.scopeId ?? root.id;
       const recorded = state.projectScopes?.roots.find(item => item.type === 'draft' && item.id === draft.id)?.scopeId;
       if (recorded && recorded !== scope) fail('编辑稿的歌曲归属记录不一致。');
-      for (const record of [...closure(draft, contents), ...(draft.sourceId && contents.has(draft.sourceId) ? [contents.get(draft.sourceId)!] : [])]) {
+      for (const record of [...closure(draft, contents, readSlots), ...(draft.sourceId && contents.has(draft.sourceId) ? [contents.get(draft.sourceId)!] : [])]) {
         const ownerScope = state.projectScopes?.contents.find(item => item.id === record.id)?.scopeId;
         if (ownerScope && ownerScope !== scope) fail('编辑稿不能引用另一首歌曲的素材。');
       }
     }
   }
+  function keepsDraftScope(state: ProjectState, before: Draft, after: Draft, allowOwnedReferences = false): boolean {
+    const scopes = state.projectScopes;
+    if (!scopes || before.name !== after.name || !allowOwnedReferences && !same(before.dependencies, after.dependencies)) return false;
+    const scope = scopes.roots.find(item => item.type === 'draft' && item.id === before.id)?.scopeId;
+    if (!scope || before.projectRootId && !scopes.roots.some(item => item.type === 'draft' && item.id === before.projectRootId && item.scopeId === scope)) return false;
+    const slots = owner(after).slots(after);
+    if (!allowOwnedReferences && !same(slots, owner(before).slots(before))) return false;
+    const contents = new Map(state.contents.map(record => [record.id, record]));
+    const graph = closure(after, contents, record => record === after ? slots : owner(record).slots(record));
+    const owned = new Set(scopes.contents.filter(item => item.scopeId === scope).map(item => item.id));
+    return (!before.sourceId || owned.has(before.sourceId)) && graph.every(record => owned.has(record.id))
+      && (!allowOwnedReferences || new Set(graph.map(record => key(record, record.name))).size === graph.length);
+  }
   function normalize(before: ProjectState, next: ProjectState, exactNameIds = new Set<string>()): void {
-    validateDraftOwnership(next);
     const slotsByRecord = new Map<ContentRecord | Draft, ReferenceSlot[]>();
     function readSlots(record: ContentRecord | Draft): ReferenceSlot[] {
       let slots = slotsByRecord.get(record);
       if (!slots) { slots = owner(record).slots(record); slotsByRecord.set(record, slots); }
       return slots;
     }
+    validateDraftOwnership(next, readSlots);
     const oldContents = new Map(before.contents.map(record => [record.id, record]));
     const oldDrafts = new Map(before.drafts.map(record => [record.id, record]));
     const contents = new Map(next.contents.map(record => [record.id, record]));
@@ -254,7 +271,7 @@ export function createProjectScopePolicy(policy: ProjectPolicy) {
     for (const [id, scopeId] of ownership) {
       const record = contents.get(id); if (!record) continue;
       const names = scopeNames.get(scopeId) ?? new Map<string, string>(); scopeNames.set(scopeId, names);
-      const nameKey = key(record.kind, record.name); const other = names.get(nameKey);
+      const nameKey = key(record, record.name); const other = names.get(nameKey);
       if (other && other !== id) fail(`这首歌曲已经有同类素材“${record.name}”，请换一个名称。`);
       names.set(nameKey, id);
     }
@@ -262,11 +279,11 @@ export function createProjectScopePolicy(policy: ProjectPolicy) {
       const scopeId = bindings.get(`draft:${draft.id}`)!;
       const names = scopeNames.get(scopeId) ?? new Map<string, string>(); scopeNames.set(scopeId, names);
       const identity = draft.sourceId ?? draft.id; const proposed = draft.name.trim(); let name = proposed; let suffix = 2;
-      const previous = oldDrafts.get(draft.id); const manual = previous && key(draft.kind, previous.name) !== key(draft.kind, proposed);
-      const conflicts = () => names.has(key(draft.kind, name)) && names.get(key(draft.kind, name)) !== identity;
+      const previous = oldDrafts.get(draft.id); const manual = previous && key(draft, previous.name) !== key(draft, proposed);
+      const conflicts = () => names.has(key(draft, name)) && names.get(key(draft, name)) !== identity;
       if (conflicts() && (manual || exactNameIds.has(draft.id))) fail(`这首歌曲已经有同类素材“${proposed}”，请换一个名称。`);
       while (conflicts()) name = `${proposed} ${suffix++}`;
-      draft.name = name; names.set(key(draft.kind, name), identity);
+      draft.name = name; names.set(key(draft, name), identity);
     }
     for (const { type, record: root } of projectRoots) {
       const previous = type === 'draft' ? oldDrafts.get(root.id) : oldContents.get(root.id);
@@ -279,14 +296,14 @@ export function createProjectScopePolicy(policy: ProjectPolicy) {
       // Previously local identities keep their names; additions and copies get
       // a suffix when needed. Repeated references to one identity reserve once.
       for (const record of dependencies) if (ownership.get(record.id) === scopeId && oldContents.has(record.id)) {
-        const nameKey = key(record.kind, record.name); const other = names.get(nameKey);
+        const nameKey = key(record, record.name); const other = names.get(nameKey);
         if (other && other !== record.id) fail(`这首歌曲已经有同类素材“${record.name}”，请换一个名称。`);
         names.set(nameKey, record.id);
       }
       function visit(record: ContentRecord): ContentRecord {
         const cached = mapped.get(record.id);
         if (cached) {
-          const nameKey = key(cached.kind, cached.name); const other = names.get(nameKey);
+          const nameKey = key(cached, cached.name); const other = names.get(nameKey);
           if (other && other !== cached.id) fail(`这首歌曲中的“${cached.name}”需要使用不同名称。`);
           names.set(nameKey, cached.id); return cached;
         }
@@ -296,7 +313,7 @@ export function createProjectScopePolicy(policy: ProjectPolicy) {
         if (originToken) {
           const adopted = imports.get(adoptionKey(scopeId, record.id, originToken)); const existing = adopted ? contents.get(adopted.localId) : undefined;
           if (existing && ownership.get(existing.id) === scopeId) {
-            mapped.set(record.id, existing); names.set(key(existing.kind, existing.name), existing.id); return existing;
+            mapped.set(record.id, existing); names.set(key(existing, existing.name), existing.id); return existing;
           }
         }
         const identity = external ? crypto.randomUUID() : record.id;
@@ -304,11 +321,11 @@ export function createProjectScopePolicy(policy: ProjectPolicy) {
         const children = slots.map(slot => ({ slotId: slot.id, targetId: visit(contents.get(slot.targetId)!).id }));
         const changes = adapter.replace(record, children);
         let name = record.name.trim(); let suffix = 2;
-        if (exactNameIds.has(record.id) && names.has(key(record.kind, name)) && names.get(key(record.kind, name)) !== identity) {
+        if (exactNameIds.has(record.id) && names.has(key(record, name, identity)) && names.get(key(record, name, identity)) !== identity) {
           fail(`这首歌曲已经有同类素材“${name}”，请换一个名称。你的修改仍然保留。`);
         }
-        while (names.has(key(record.kind, name)) && names.get(key(record.kind, name)) !== identity) name = `${record.name.trim()} ${suffix++}`;
-        names.set(key(record.kind, name), identity);
+        while (names.has(key(record, name, identity)) && names.get(key(record, name, identity)) !== identity) name = `${record.name.trim()} ${suffix++}`;
+        names.set(key(record, name, identity), identity);
         let result: ContentRecord = { ...clone(record), ...changes, id: identity, name,
           revision: external ? 1 : record.revision };
         if (!external && oldContents.has(identity) && !same(result, record) && result.revision === oldContents.get(identity)!.revision) {
@@ -330,7 +347,7 @@ export function createProjectScopePolicy(policy: ProjectPolicy) {
       }
       const finalGraph = closure(updated, contents, readSlots); const finalNames = new Map<string, string>();
       for (const item of finalGraph) {
-        const nameKey = key(item.kind, item.name); const existing = finalNames.get(nameKey);
+        const nameKey = key(item, item.name); const existing = finalNames.get(nameKey);
         if (existing && existing !== item.id) fail(`这首歌曲已经有同类素材“${item.name}”。`);
         finalNames.set(nameKey, item.id);
       }
@@ -350,20 +367,20 @@ export function createProjectScopePolicy(policy: ProjectPolicy) {
     const stable = (record: ContentRecord | Draft) => {
       const previous = previousOf(record);
       return !!previous && isPublic(before, previous) && identityOf(previous) === identityOf(record)
-        && key(previous.kind, previous.name) === key(record.kind, record.name);
+        && key(previous, previous.name) === key(record, record.name);
     };
     const publicNames = new Map<string, Set<string>>();
     const reserve = (record: ContentRecord | Draft) => {
-      const nameKey = key(record.kind, record.name); const identities = publicNames.get(nameKey) ?? new Set<string>();
+      const nameKey = key(record, record.name); const identities = publicNames.get(nameKey) ?? new Set<string>();
       identities.add(identityOf(record)); publicNames.set(nameKey, identities);
     };
-    const conflicts = (record: ContentRecord | Draft, name: string) => [...(publicNames.get(key(record.kind, name)) ?? [])]
+    const conflicts = (record: ContentRecord | Draft, name: string) => [...(publicNames.get(key(record, name)) ?? [])]
       .some(id => id !== identityOf(record));
     for (const record of publicRecords.filter(stable)) reserve(record);
     for (const record of publicRecords.filter(record => !stable(record))) {
       const previous = previousOf(record);
       const manualRename = !!previous && identityOf(previous) === identityOf(record)
-        && key(previous.kind, previous.name) !== key(record.kind, record.name);
+        && key(previous, previous.name) !== key(record, record.name);
       const originalName = record.name.trim(); let name = originalName; let suffix = 2;
       if (conflicts(record, name) && (manualRename || exactNameIds.has(record.id))) {
         fail(`公共素材中已经有同类素材“${name}”，请换一个名称。你的修改仍然保留。`);
@@ -386,7 +403,7 @@ export function createProjectScopePolicy(policy: ProjectPolicy) {
         const otherScope = 'revision' in other ? next.projectScopes?.contents.find(item => item.id === other.id)?.scopeId
           : next.projectScopes?.roots.find(item => item.type === 'draft' && item.id === other.id)?.scopeId
             ?? next.projectScopes?.contents.find(item => item.id === other.sourceId)?.scopeId;
-        if (otherIdentity !== identity && otherScope === scope && key(other.kind, other.name) === key(draft.kind, draft.name)) {
+        if (otherIdentity !== identity && otherScope === scope && key(other, other.name) === key(draft, draft.name)) {
           fail(`这首歌曲中“${draft.name}”的名称已被使用，请调整冲突名称后再重做。`);
         }
       }
@@ -396,16 +413,16 @@ export function createProjectScopePolicy(policy: ProjectPolicy) {
       const old = previous.get(record.id);
       const identity = 'sourceId' in record && record.sourceId ? record.sourceId : record.id;
       const oldIdentity = old && ('sourceId' in old && old.sourceId ? old.sourceId : old.id);
-      if (old && identity === oldIdentity && key(old.kind, old.name) === key(record.kind, record.name)) continue;
+      if (old && identity === oldIdentity && key(old, old.name) === key(record, record.name)) continue;
       if (isPublic(next, record)) assertPublicName(next, record, record.name);
       else if ('revision' in record && record.kind !== policy.rootKind) {
         const scope = next.projectScopes?.contents.find(item => item.id === record.id)?.scopeId;
-        if (scope && next.contents.some(other => other.id !== record.id && key(other.kind, other.name) === key(record.kind, record.name)
+        if (scope && next.contents.some(other => other.id !== record.id && key(other, other.name) === key(record, record.name)
           && next.projectScopes?.contents.some(item => item.id === other.id && item.scopeId === scope))) {
           fail(`这首歌曲中“${record.name}”的名称已被使用，请调整冲突名称后再重做。`);
         }
       }
     }
   }
-  return { normalize, assertDraftName, assertPublicName, assertRestoredNames, validateDraftOwnership };
+  return { normalize, keepsDraftScope, assertDraftName, assertPublicName, assertRestoredNames, validateDraftOwnership };
 }

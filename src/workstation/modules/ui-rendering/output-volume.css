@@ -20,3 +20,10 @@
 .output-volume .song-transport-panel { min-width: 56px; padding-block: 8px; }
 .output-volume input { writing-mode: vertical-lr; direction: rtl; width: 22px; height: 104px; margin: 0; accent-color: #5a8093; cursor: pointer; }
 .output-volume output { color: var(--text); font: 11px ui-monospace, monospace; }
+.output-volume-inline {
+  display: grid; grid-template-columns: auto minmax(0, 1fr) 4ch; align-items: center; gap: 8px;
+  padding: 2px 8px; border: 0; background: transparent; color: var(--editor-ink);
+}
+.output-volume-inline > span { display: grid; place-items: center; }
+.output-volume-inline input { writing-mode: horizontal-tb; direction: ltr; width: 100%; height: 30px; min-width: 0; }
+.output-volume-inline output { text-align: right; }

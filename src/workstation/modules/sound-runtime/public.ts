@@ -13,3 +13,4 @@ export type {
 } from '../../contracts/sound.ts';
 
 export { createBrowserSoundRuntime } from './browser.ts';
+export { preparedPcm, readPcmSnapshot, retainPreparedPcm, type PcmSnapshot } from './pcm.ts';

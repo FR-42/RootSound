@@ -70,14 +70,15 @@ const clone = copyJson;
 function isObject(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
-function validJson(value: unknown, ancestors = new Set<object>()): value is JsonValue {
+function validJson(value: unknown, ancestors = new Set<object>(), shared?: WeakSet<object>): value is JsonValue {
   if (value === null || typeof value === 'string' || typeof value === 'boolean') return true;
   if (typeof value === 'number') return Number.isFinite(value);
   if (typeof value !== 'object' || ancestors.has(value)) return false;
+  if (shared?.has(value)) return true;
   if (!Array.isArray(value) && Object.getPrototypeOf(value) !== Object.prototype) return false;
   ancestors.add(value);
   const valid = Object.getOwnPropertySymbols(value).length === 0
-    && (Array.isArray(value) ? Array.from(value) : Object.values(value)).every(item => validJson(item, ancestors));
+    && (Array.isArray(value) ? Array.from(value) : Object.values(value)).every(item => validJson(item, ancestors, shared));
   ancestors.delete(value);
   return valid;
 }
@@ -253,6 +254,25 @@ export function createMaterialLibrary(storage?: MaterialStorage, options?: { pro
     : restore(raw, options?.project?.rootKind);
   projectPolicy?.validateDraftOwnership(state);
   let token = crypto.randomUUID();
+  const sharedJson = new WeakSet<object>();
+  const draftViews = new WeakMap<Draft, Draft>();
+  const historyViews = new WeakMap<HistoryStep, HistoryStep>();
+  function retain(value: JsonValue): JsonValue {
+    if (value === null || typeof value !== 'object' || sharedJson.has(value)) return value === 0 ? 0 : value;
+    const result = Array.isArray(value) ? value.map(retain) : Object.fromEntries(Object.entries(value).map(([key, child]) => [key, retain(child)]));
+    sharedJson.add(result);
+    Object.freeze(result);
+    return result;
+  }
+  function draftView(draft: Draft): Draft {
+    let view = draftViews.get(draft);
+    if (!view) {
+      view = Object.freeze({ ...draft, dependencies: retain(draft.dependencies) as string[], body: retain(draft.body),
+        ...(draft.editingContext !== undefined ? { editingContext: retain(draft.editingContext) } : {}) });
+      draftViews.set(draft, view);
+    }
+    return view;
+  }
   const serializedSteps = new WeakMap<HistoryStep, string>();
   function serializeStep(step: HistoryStep): string {
     let text = serializedSteps.get(step);
@@ -266,18 +286,28 @@ export function createMaterialLibrary(storage?: MaterialStorage, options?: { pro
     const entries = next.editHistory.entries.map(entry => `{"draftId":${JSON.stringify(entry.draftId)},"past":[${entry.past.map(serializeStep).join(',')}],"future":[${entry.future.map(serializeStep).join(',')}]}`);
     return `${text.slice(0, -1)},"editHistory":{"version":1,"entries":[${entries.join(',')}]}}`;
   }
-  function commit(next: State, permanent = false): void {
-    collectJournals(next);
+  let pendingWrite = false;
+  function writeState(next: State, permanent = false): void {
+    if (!storage) return;
     const nextRaw = serialize(next);
     try {
       // Another store client may have committed since this instance was opened.
       // Never let an old undo stack replace newer disk content.
-      if (storage && storage.read() !== raw) fail('素材库已被其他窗口修改，请重新打开后继续。原数据未被覆盖。');
-      if (permanent && storage?.writePermanent) storage.writePermanent(nextRaw);
-      else storage?.write(nextRaw);
+      if (!permanent && storage.writeIfUnchanged) storage.writeIfUnchanged(nextRaw, raw);
+      else {
+        if (storage.read() !== raw) fail('素材库已被其他窗口修改，请重新打开后继续。原数据未被覆盖。');
+        if (permanent && storage.writePermanent) storage.writePermanent(nextRaw);
+        else storage.write(nextRaw);
+      }
     } catch (error) { fail(`写入失败：${String(error)}`); }
-    state = next;
     raw = nextRaw;
+    pendingWrite = false;
+  }
+  function commit(next: State, permanent = false, deferStorage = false): void {
+    collectJournals(next);
+    if (storage && deferStorage) pendingWrite = true;
+    else writeState(next, permanent);
+    state = next;
     token = crypto.randomUUID();
   }
   function checkCandidate(next: State, changedDrafts: Set<string>): void {
@@ -294,7 +324,7 @@ export function createMaterialLibrary(storage?: MaterialStorage, options?: { pro
   }
   function commitTransaction(transaction: MaterialTransaction): MaterialTransactionResult {
     if (transaction.expectedToken !== token) return { status: 'conflict', reason: '素材或使用位置已变化，请重新查看后再应用。' };
-    const next = clone(state);
+    const next = copyForDraftEdit(transaction.anchorDraftId);
     const transactionId = crypto.randomUUID();
     const contents: RecordPatch<ContentRecord>[] = [];
     const drafts: RecordPatch<Draft>[] = [];
@@ -451,18 +481,63 @@ export function createMaterialLibrary(storage?: MaterialStorage, options?: { pro
     commit(next);
     return clone(next.drafts.find(item => item.id === draft.id)!);
   }
-  function copyForDraftEdit(id: string): State {
+  function copyForDraftEdit(id: string | undefined, replacement?: Draft, keepScope = false): State {
     const { editHistory, transactionHistory, ...live } = state;
-    return { ...clone(live),
+    const records = replacement ? { ...live, drafts: live.drafts.map(draft => draft.id === id ? replacement : draft) } : live;
+    return { ...(keepScope ? records : clone(records)),
       ...(editHistory ? { editHistory: { ...editHistory, entries: editHistory.entries.map(entry => entry.draftId === id
         ? { ...entry, past: entry.past.slice(), future: entry.future.slice() } : entry) } } : {}),
       ...(transactionHistory ? { transactionHistory: { ...transactionHistory, entries: transactionHistory.entries.slice() } } : {}) };
   }
-  function updateDraft(id: string, changes: DraftChanges, options?: DraftEditOptions): Draft {
-    const next = copyForDraftEdit(id);
-    const draft = next.drafts.find(item => item.id === id);
+  function rememberDraftEdit(next: State, id: string, before: DraftSnapshot): void {
+    next.editHistory ??= { version: 1, entries: [] };
+    let history = historyFor(next, id);
+    if (!history) { history = { draftId: id, past: [], future: [] }; next.editHistory.entries.push(history); }
+    history.past.push(before);
+    if (history.past.length > MAX_HISTORY) history.past.shift();
+    history.future = [];
+  }
+  function editDraftBody(id: string, body: JsonValue, expectedToken: string, references?: {
+    dependencies: string[];
+    retainContent?: string;
+  }): Draft {
+    const draft = state.drafts.find(item => item.id === id);
     if (!draft) fail('找不到编辑稿。');
-    if (options && !same(draft, options.expected)) fail('编辑稿已发生变化，请重新查看后继续。');
+    if (expectedToken !== token) fail('编辑稿已发生变化，请重新查看后继续。');
+    if (!validJson(body, new Set(), sharedJson)) fail('内容必须是完整、有限且无循环的 JSON 数据。');
+    const before = draftView(draft);
+    const dependencies = references?.dependencies ?? draft.dependencies;
+    if (before.body === body && same(before.dependencies, dependencies) && !references?.retainContent) return before;
+    const fields = { ...draft, dependencies, body };
+    if (projectPolicy && !projectPolicy.keepsDraftScope(state, before, fields, !!references)) {
+      if (references?.retainContent) fail('素材或使用位置已变化，请重新查看后再应用。');
+      updateDraft(id, { body, dependencies }, { remember: true, expected: draft, expectedToken, deferStorage: true });
+      return draftView(state.drafts.find(item => item.id === id)!);
+    }
+    const replacement = { ...fields, dependencies: retain(dependencies) as string[], body: retain(body) };
+    const next = copyForDraftEdit(id, replacement, true);
+    if (references?.retainContent) {
+      const contentId = references.retainContent, scopeId = projectScopeOf({ type: 'draft', id });
+      const content = state.contents.find(record => record.id === contentId);
+      if (!content || content.kind === options?.project?.rootKind || !scopeId
+        || projectScopeOf({ type: 'content', id: contentId }) !== scopeId || !state.projectScopes) {
+        fail('不能把另一首歌曲的素材直接加入本曲。');
+      }
+      const members = state.projectScopes.members ?? [];
+      if (!members.some(item => item.id === contentId && item.scopeId === scopeId)) {
+        next.projectScopes = { ...state.projectScopes, members: [...members, { id: contentId, scopeId }] };
+      }
+    }
+    rememberDraftEdit(next, id, { name: before.name, dependencies: before.dependencies, body: before.body });
+    commit(next, false, true);
+    return draftView(replacement);
+  }
+  function updateDraft(id: string, changes: DraftChanges, options?: DraftEditOptions): Draft {
+    const draft = state.drafts.find(item => item.id === id);
+    if (!draft) fail('找不到编辑稿。');
+    if (options && (options.expectedToken !== undefined ? options.expectedToken !== token : !same(draft, options.expected))) {
+      fail('编辑稿已发生变化，请重新查看后继续。');
+    }
     const fields = { ...draft };
     for (const key of ['body', 'name', 'dependencies'] as const) {
       if (Object.prototype.hasOwnProperty.call(changes, key)) Object.assign(fields, { [key]: changes[key] });
@@ -470,22 +545,38 @@ export function createMaterialLibrary(storage?: MaterialStorage, options?: { pro
     validateFields(fields);
     if (changes.name !== undefined) projectPolicy?.assertDraftName(state, draft, changes.name);
     if (draft.name === fields.name && same(draft.dependencies, fields.dependencies) && same(draft.body, fields.body)) return clone(draft);
+    const keepScope = options?.expectedToken !== undefined && (!projectPolicy || projectPolicy.keepsDraftScope(state, draft, fields));
+    const next = copyForDraftEdit(id, keepScope ? clone(fields) : fields, keepScope);
     if (options?.remember) {
-      next.editHistory ??= { version: 1, entries: [] };
-      let history = historyFor(next, id);
-      if (!history) { history = { draftId: id, past: [], future: [] }; next.editHistory.entries.push(history); }
-      history.past.push(snapshot(draft));
-      if (history.past.length > MAX_HISTORY) history.past.shift();
-      history.future = [];
+      rememberDraftEdit(next, id, snapshot(draft));
     } else if (next.editHistory) {
       next.editHistory.entries = next.editHistory.entries.filter(entry => entry.draftId !== id);
     }
-    Object.assign(draft, clone(fields));
-    projectPolicy?.normalize(state, next);
-    commit(next);
+    if (!keepScope) projectPolicy?.normalize(state, next);
+    commit(next, false, options?.deferStorage);
     return clone(next.drafts.find(item => item.id === id)!);
   }
-  function travelDraft(id: string, direction: 'undo' | 'redo', expected: Draft): Draft {
+  function travelDraft(id: string, direction: 'undo' | 'redo', expected: Draft, deferredToken?: string): Draft {
+    if (deferredToken !== undefined) {
+      const original = state.drafts.find(item => item.id === id);
+      if (!original) fail('找不到编辑稿。');
+      if (deferredToken !== token) fail('编辑稿已发生变化，请重新查看后继续。');
+      const entry = historyFor(state, id);
+      const stored = (direction === 'undo' ? entry?.past : entry?.future)?.at(-1);
+      if (!stored) return draftView(original);
+      const step = historyViews.get(stored) ?? stored;
+      const before = draftView(original), after = { ...original, name: step.name, dependencies: step.dependencies, body: step.body };
+      if (!step.transactionId && (!projectPolicy || projectPolicy.keepsDraftScope(state, before, after, true))) {
+        const replacement = { ...after, dependencies: retain(after.dependencies) as string[], body: retain(after.body) };
+        const next = copyForDraftEdit(id, replacement, true), edited = historyFor(next, id)!;
+        const from = direction === 'undo' ? edited.past : edited.future, to = direction === 'undo' ? edited.future : edited.past;
+        from.pop();
+        to.push({ name: before.name, dependencies: before.dependencies, body: before.body });
+        if (to.length > MAX_HISTORY) to.shift();
+        commit(next, false, true);
+        return draftView(replacement);
+      }
+    }
     const next = copyForDraftEdit(id);
     const draft = next.drafts.find(item => item.id === id);
     if (!draft) fail('找不到编辑稿。');
@@ -577,7 +668,7 @@ export function createMaterialLibrary(storage?: MaterialStorage, options?: { pro
       projectPolicy?.assertRestoredNames(state, next);
       checkCandidate(next, changedDrafts);
     }
-    commit(next);
+    commit(next, false, deferredToken !== undefined);
     return clone(next.drafts.find(item => item.id === id)!);
   }
   function saveDraft(id: string, mode: 'overwrite' | 'new', confirmation?: SaveConfirmation): SaveResult {
@@ -682,10 +773,27 @@ export function createMaterialLibrary(storage?: MaterialStorage, options?: { pro
   }
   return {
     createDraft, updateDraft, saveDraft, travelDraft, commitTransaction, currentToken: () => token,
-    readDraftHistoryStep(id, direction) {
+    readDraftView(id) { const draft = state.drafts.find(item => item.id === id); return draft && draftView(draft); },
+    isDraftChanged(id) {
+      const draft = state.drafts.find(item => item.id === id);
+      if (!draft) return false;
+      const saved = state.contents.find(item => item.id === draft.sourceId);
+      return !saved || draft.name !== saved.name || !same(draft.dependencies, saved.dependencies) || !same(draft.body, saved.body);
+    },
+    editDraftBody,
+    hasDeferredWrites: () => pendingWrite,
+    flushDeferredWrites() { if (pendingWrite) writeState(state); },
+    readDraftHistoryStep(id, direction, shared = false) {
       const history = historyFor(state, id);
       const step = (direction === 'undo' ? history?.past : history?.future)?.at(-1);
-      return step && clone(step);
+      if (!step) return;
+      if (!shared) return clone(step);
+      let view = historyViews.get(step);
+      if (!view) {
+        view = Object.freeze({ ...step, dependencies: retain(step.dependencies) as string[], body: retain(step.body) });
+        historyViews.set(step, view);
+      }
+      return view;
     },
     readDraftHistoryStatus(id) {
       const history = historyFor(state, id);

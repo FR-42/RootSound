@@ -10,7 +10,6 @@ import { createPhraseEditor, createPhrasePlayback, createPhraseReferenceAdapter,
 import { createSongEditor, createSongReferenceAdapter, readSongBody } from '../modules/song/public.ts';
 import { createSampleReferenceAdapter } from '../modules/sampling/public.ts';
 import { studioBank, studioInstrumentForMidi } from '../modules/timbre/instrument-catalog.ts';
-import generalMidi from '../modules/timbre/general-midi.json' with { type: 'json' };
 import { openMusicDocument, commitMusicDocument } from './music-document.ts';
 import { readExchangeMidi, writeExchangeMidi, createMidiPatcher } from './music-interchange-midi.ts';
 import { readExchangeXml, writeExchangeXml } from './music-interchange-xml.ts';
@@ -28,15 +27,14 @@ function memory(text: string | null = null) {
 function libraryFromScore(score: ExchangeScore): string {
   if (score.length > MAX_PHRASE_BEATS) throw new Error(`音乐超过当前 ${MAX_PHRASE_BEATS} 拍范围，源文件未改动。`);
   if (score.tempos.some(point => point.bpm < MIN_TEMPO_BPM || point.bpm > MAX_TEMPO_BPM)) throw new Error(`这份音乐的速度超出当前 ${MIN_TEMPO_BPM}～${MAX_TEMPO_BPM} BPM 编辑范围，源文件未改动。`);
-  const palette = new Map<string, ContentRecord>(), names = new Set<string>();
+  const palette = new Map<string, ContentRecord>();
   const parts = score.parts.map((part, index) => {
     const key = part.drum === undefined ? `gm-${part.program}` : `gm-drum-${part.drum}`;
     let tone = palette.get(key);
     if (!tone) {
-      const proposed = part.drum === undefined ? generalMidi.programs[part.program]! : (generalMidi.drums as Record<number, string>)[part.drum] ?? `鼓 ${part.drum}`;
-      let name = proposed, suffix = 2; while (names.has(name)) name = `${proposed} ${suffix++}`; names.add(name);
+      const instrument = studioInstrumentForMidi(part.program, part.drum), proposed = instrument.name;
       tone = { id: crypto.randomUUID(), kind: 'rootsound.timbre', owner: 'timbre', schemaVersion: 1, revision: 1,
-        name, dependencies: [], body: { model: 'sample-bank', version: 1, bank: studioBank, instrument: studioInstrumentForMidi(part.program, part.drum).key,
+        name: proposed, dependencies: [], body: { model: 'sample-bank', version: 1, bank: studioBank, instrument: instrument.key,
           attackSeconds: 0, releaseSeconds: .03, level: .7, ...(part.drum === undefined ? { midiProgram: part.program } : { midiDrum: part.drum }) } };
       palette.set(key, tone);
     }

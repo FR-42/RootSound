@@ -16,11 +16,11 @@ class HostClient {
     this.child.on('error', error => this.fail(error));
     this.child.on('exit', code => this.fail(new Error(`工程服务已退出（${code}）。${this.diagnostic}`)));
   }
-  call(method, args = []) {
+  call(method, args = [], timeout = 120000) {
     if (this.failure) return Promise.reject(this.failure);
     return new Promise((resolve, reject) => {
       const id = ++this.serial;
-      const timer = setTimeout(() => { this.pending.delete(id); reject(new Error('工程服务响应超时，请保留当前窗口并重试。')); }, 120000);
+      const timer = setTimeout(() => { this.pending.delete(id); reject(new Error('工程服务响应超时，请保留当前窗口并重试。')); }, timeout);
       this.pending.set(id, { resolve, reject, timer });
       this.child.stdin.write(JSON.stringify({ id, method, args }) + '\n', error => { if (error) this.fail(error); });
     });

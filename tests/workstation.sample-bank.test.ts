@@ -42,6 +42,18 @@ function fixture(overlap=false, releaseSeconds=.03) {
 }
 const low={frequencyHz:220,holdSeconds:.04,velocity:.3};
 
+test('installed recordings are reused by audition and callers cannot mutate the shared waveform', async () => {
+  const f = fixture();
+  await f.tones.prepareForSaved(f.original.id, [low]);
+  const first = f.tones.planForSaved(f.original.id, low);
+  assert(first.kind === 'sample');
+  const before = readPreview(first).samples[0]!;
+  first.source.audio.channels[0]![1] = 0;
+  const next = readPreview(f.tones.planForSaved(f.original.id, low)).samples[0]!;
+  assert.equal(next.audio, before.audio);
+  assert.notEqual(next.audio.channels[0]![1], 0);
+});
+
 test('overlapping recordings survive audition, mixing gain, explicit save and reopen',async()=>{
   const f=fixture(true);await f.tones.prepareForSaved(f.original.id,[low]);
   const plan=f.tones.planForSaved(f.original.id,low);assert(plan.kind==='sample');assert.equal(plan.layers?.length,1);

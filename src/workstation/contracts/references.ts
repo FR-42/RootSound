@@ -9,6 +9,7 @@ export type ReferenceReplacement = { slotId: string; targetId: string };
 /** Each owner alone interprets its content. The common manager only walks slots. */
 export interface ReferenceAdapter {
   kind: string;
+  allowsSharedName?(record: ContentRecord | Draft, name: string): boolean;
   slots(record: ContentRecord | Draft): ReferenceSlot[];
   replace(record: ContentRecord | Draft, replacements: ReferenceReplacement[]): DraftChanges;
   /** Rewrite non-musical identity metadata when a complete graph receives new ids. */
