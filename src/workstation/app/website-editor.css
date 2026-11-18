@@ -1,0 +1,32 @@
+:root.website-editor { color-scheme: light; }
+:root.website-editor body, :root.website-editor .song-studio { background: var(--workspace-gradient); }
+:root.website-editor .music-editor {
+  --editor-edge: var(--border);
+  --editor-ink: var(--text);
+  --editor-tint: var(--surface-raised);
+  --editor-hover: var(--surface-hover);
+  --editor-play: var(--playline);
+}
+:root.website-editor .music-editor .song-topbar { background: var(--surface-gradient); border: 0; }
+:root.website-editor .music-editor .song-project-name { color: var(--text); }
+:root.website-editor .music-editor .song-transport { background: var(--control-wash); border: 0; box-shadow: none; }
+:root.website-editor .music-editor .song-play:enabled:hover { background: var(--playline-label); }
+:root.website-editor .music-editor :is(.song-settings, .song-touch-right) { border: 0; background: var(--control-wash); color: var(--text); }
+:root.website-editor .music-editor .song-touch-right[aria-pressed="true"] { background: var(--active-gradient); color: var(--accent); }
+:root.website-editor .music-editor .song-settings:enabled:hover { background: var(--active-gradient); color: var(--accent); }
+:root.website-editor .music-editor .melody-shelf { background: var(--surface-gradient); border: 0; }
+:root.website-editor .music-editor .melody-note-family { background: var(--control-wash); color: var(--text); border: 0; }
+:root.website-editor .music-editor .melody-note-family:is(:hover, .is-selected) { background: var(--active-gradient); color: var(--text); }
+:root.website-editor .music-editor .melody-instrument-icon { color: var(--accent); }
+:root.website-editor .music-editor .melody-add-tone { border-color: var(--border); background: var(--control-wash); color: var(--text); }
+:root.website-editor .music-editor .melody-add-tone:hover { background: var(--active-gradient); }
+:root.website-editor .music-editor :is(.melody-ruler-row, .melody-tempo-dock) { background: var(--surface-gradient); border-color: var(--border); }
+:root.website-editor .music-editor .melody-tempo-button { color: var(--text); }
+:root.website-editor .music-editor .melody-tempo-button:hover { background: var(--active-gradient); }
+:root.website-editor .music-editor :is(.melody-playhead, .melody-head-handle) { background: var(--playline); }
+:root.website-editor .music-editor .melody-playhead-time { color: var(--playline-label); background: var(--surface); border-color: var(--lilac-border); }
+:root.website-editor :is(.learning-settings, .song-popover-panel, .melody-tone-library) { background: var(--surface-gradient); color: var(--text); border: 0; box-shadow: 0 18px 70px -35px var(--muted); }
+:root.website-editor .learning-heading button { color: var(--text); }
+:root.website-editor .melody-library-tone { color: var(--text); border-color: var(--border); background: var(--control-wash); }
+:root.website-editor .melody-library-tone:hover { background: var(--active-gradient); }
+:root.website-editor .output-volume input, :root.website-editor .learning-settings input { accent-color: var(--accent); }

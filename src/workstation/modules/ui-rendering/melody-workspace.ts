@@ -221,7 +221,7 @@ export function mountMelodyWorkspace(root: HTMLElement, options: {
   let tempoRatePreview: PhraseBody | undefined;
   let tempoPreviewBoundaryOnly = false;
   let panMoved = false;
-  const touches = vertical && options.mobileTouch && options.readLessonInput ? new Map<number, Point>() : undefined;
+  const touches = vertical && options.mobileTouch ? new Map<number, Point>() : undefined;
   let pinch: { x: number; y: number; axis?: 'x' | 'y' | 'both' } | undefined;
   let pinchFrame = 0;
   const sounding = new Set<string>();
@@ -2190,7 +2190,7 @@ export function mountMelodyWorkspace(root: HTMLElement, options: {
   }
   function paintPinch(): void {
     pinchFrame = 0;
-    const mode = options.readLessonInput?.();
+    const mode = options.readLessonInput?.() ?? 'edit';
     if (!pinch || disposed || (mode !== 'zoom' && mode !== 'edit')) return;
     const span = touchSpan(), value = body();
     if (!span || !value) return;

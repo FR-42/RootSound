@@ -1,0 +1,44 @@
+## Learning — USER CONFIRMED
+
+- Latest user request, 2026-11-06: first launch asks whether to watch guidance. Skip enters the normal
+  welcome screen; Watch starts the basic tour. The user rejected the Remotion draft and allows effects
+  layered over the real editor. Guidance adds no new music features and requires no user actions to advance.
+- No added visible descriptions, subtitles or hints. User clarified that existing application labels and
+  the initial Watch/Skip buttons remain. Spotlight, mouse-button colour, motion and keyboard drawings
+  communicate the actions. The requested curriculum includes row/time and column/pitch, playhead/transport,
+  keyboard audition, timbres/note groups/selection/editing, both scroll and zoom axes, BPM/grid/tap tempo,
+  and save/open semantics. File creation must never be required.
+- Keyboard audition already uses reference piano without selection and the selected group's timbre with
+  selection. Do not add a piano-toggle button: the assistant had misread the user's wording and corrected it.
+- Latest feedback, 2026-11-06: user considers the direction promising but still finds the result poor;
+  this is not full experience acceptance. Remove the entire guide bottom toolbar to keep one-pass viewing
+  simple. No chapter navigation, progress dragging or pause buttons. Preserve the first-use Watch/Skip choice.
+- On 2026-11-07 the user narrowed the basic lesson to roll coordinates, individual and group selection,
+  and mouse gestures. Show panning without a selection, clicking or dragging to create within the active group,
+  moving along both axes, resizing from the bottom, and right-clicking blank space to clear selection.
+  Present these actions on the same example score without captions or playback controls.
+- The user then separated note and group selection in the vertical roll. Only group selection dims
+  other groups and enables blank-space writing. Dimmed notes cannot be moved or resized. Blank drags pan with a single note selected or
+  with no selection. A bright note can be moved or resized directly from any state.
+  Right-clicking a note or sweeping with the right button erases notes in the selected group, or in any
+  group when no group is selected. Dimmed notes behave like blank space. A right click on blank space
+  clears selection.
+- Without the optional workbench, only groups are selected in the vertical roll; clicking or dragging notes keeps that selection.
+- On 2026-11-10 the user enabled individual-note selection behind a default-off Workbench setting.
+  Group selection opens timbre replacement, removal, volume and pan; note selection opens volume, pan and sounding time.
+  Sounding time is provisionally implemented as held duration in seconds.
+- Advanced tools are opt-in, initially including multiple tempo rolls. Opening work requiring disabled tools
+  must explain that requirement. An enable-and-open convenience is an implementation choice, not silent consent.
+  Source: hands-on-guidance.
+
+## Public website — USER CONFIRMED
+
+- Keep the 简乐 public name and the existing repository/release identifiers. Website layout and in-editor
+  learning have separate scopes: preserve the image-first deck above the editable online score.
+- The image deck uses brief text, left/right navigation and fluid transitions, without automatic page rotation.
+  Six pages and their current generation tools are implementation state, not a fixed permanent page count.
+- The user's supplied 40-note piano score at 148 BPM is the fixed public example. Each visit starts with a
+  fresh editable copy; visitor edits must not overwrite the public example or imply cloud autosave.
+- Retain GitHub, Windows and Mac download entry points. Local source/build changes do not publish remotely.
+  Sources: D-2026-11-04-chinese-name, guide-deck and website-example. See docs/WEBSITE.md.
+

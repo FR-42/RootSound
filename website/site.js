@@ -10,8 +10,8 @@
       });
       if (!response.ok) return;
       const patterns = {
-        windows: /^RootSound-Windows-x64-.*-Setup\.exe$/,
-        mac: /^RootSound-macOS-arm64-.*\.pkg$/,
+        windows: /^(?:RootSound-Windows-x64-.*-Setup|简乐安装)\.exe$/,
+        mac: /^(?:RootSound-macOS-arm64-.*|简乐安装)\.pkg$/,
       };
       const releases = await response.json();
       const release = releases.find(item => !item.draft && Object.values(patterns).every(pattern =>
@@ -33,13 +33,4 @@
     }
   }
   void refreshDownloads();
-  const guideEntry = document.querySelector('.guide-entry');
-  const editor = document.querySelector('.music-editor');
-  guideEntry.addEventListener('click', event => {
-    if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey ||
-        editor.contentDocument?.URL !== editor.src || editor.contentDocument.readyState !== 'complete') return;
-    event.preventDefault();
-    editor.scrollIntoView({ block: 'nearest' });
-    editor.contentWindow.postMessage({ type: 'jianle:start-guide' }, location.origin);
-  });
 })();

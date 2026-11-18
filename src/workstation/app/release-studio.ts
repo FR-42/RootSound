@@ -11,7 +11,6 @@ import type { ProjectDirectoriesPort } from '../contracts/project-directory.ts';
 import type { SamplePayloadPort } from '../contracts/sampling.ts';
 import type { TimbreFilesPort } from '../contracts/timbre-files.ts';
 import { createWorkspacePreferences } from './platform/preferences.ts';
-import { createMusicGuideDocument } from './music-guide-document.ts';
 import { createLearningSettings } from './platform/learning-settings.ts';
 import { createMusicWorkspaceState } from './platform/music-workspace-state.ts';
 import { createProjectSetup, projectName } from './project-setup.ts';
@@ -27,22 +26,9 @@ import { normalizeImportedTimbreNames } from './curated-timbre-names.ts';
 export interface ReleasePlatform {
   storage: MaterialStorage;
   projectDirectories?: ProjectDirectoriesPort;
-  demoProject?: { id: string; name: string; format?: never; startWithGuide?: boolean; mobileGuide?: boolean };
+  demoProject?: { id: string; name: string; format?: never; mobileWeb?: boolean };
   timbreFiles: TimbreFilesPort;
   samplePayloads?: SamplePayloadPort;
-}
-
-const desktopGuideChoiceKey = 'rootsound.desktop-guide-choice.v1';
-
-function firstDesktopGuideChoice(storage: Storage, previousStatus: string) {
-  if (previousStatus !== 'new') return undefined;
-  try {
-    const choice = storage.getItem(desktopGuideChoiceKey);
-    if (choice === 'yes' || choice === 'no') return undefined;
-  } catch {}
-  return (watch: boolean) => {
-    try { storage.setItem(desktopGuideChoiceKey, watch ? 'yes' : 'no'); } catch {}
-  };
 }
 
 export async function mountReleaseStudio(root: HTMLElement, platform: ReleasePlatform, navigate?: () => void) {
@@ -78,11 +64,8 @@ export async function mountReleaseStudio(root: HTMLElement, platform: ReleasePla
     const studio = mountStudio(root, { phrase, song, sound: runtime, hasPrevious: !!current,
       projectName: current?.name, doubleClickIntervalMs: state?.doubleClickIntervalMs, preferences, learning,
       workspaceState: current ? createMusicWorkspaceState(localStorage, current.id) : undefined,
-      musicGuide: { createDocument: name => createMusicGuideDocument(name, !!platform.demoProject),
-        createSound: createBrowserSoundRuntime, mobileWeb: platform.demoProject?.mobileGuide },
       initialEntry: current ? 'song' : 'welcome', demo: !!platform.demoProject,
-      startWithGuide: platform.demoProject?.startWithGuide,
-      onFirstGuideChoice: directories && firstDesktopGuideChoice(localStorage, learning.read().guides.basics.status),
+      mobileWeb: platform.demoProject?.mobileWeb,
       desktopPointerUx: !!directories,
       projectSetup: directories && createProjectSetup(directories, savedDetails => {
         if (savedDetails) sessionStorage.setItem('rootsound.saved-details.v1', 'true');
@@ -124,9 +107,9 @@ export async function mountReleaseStudio(root: HTMLElement, platform: ReleasePla
     });
     const prepareClose = createProjectClosePreparation({ flush: () => studio.prepareClose(), chooseSave: directories?.browse ? studio.saveForClose : undefined,
       prepareSave: () => { if (current?.format) throw new Error('请先保存为 .rootsound 文件。'); prepareFile(); }, name: () => song.readDraft()?.name });
-    const warmup = platform.demoProject && !platform.demoProject.startWithGuide
+    const warmup = platform.demoProject
       ? requestAnimationFrame(() => { void phrase.preparePreview().catch(() => {}); }) : undefined;
-    return { openGuide: studio.openGuide, prepareClose, awaitingCloseChoice: studio.awaitingCloseChoice, dispose() {
+    return { prepareClose, awaitingCloseChoice: studio.awaitingCloseChoice, dispose() {
       if (warmup !== undefined) cancelAnimationFrame(warmup);
       studio.dispose(); void runtime.dispose();
     } };

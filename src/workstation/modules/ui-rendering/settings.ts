@@ -7,7 +7,7 @@ import './workspace.css';
 import './settings.css';
 
 type LearningSettingsOptions = {
-  requiresTempoRolls?: boolean; inline?: boolean; appearance?: WorkspacePreferencesPort; onChange?(): void; onReplayGuide?(): void;
+  requiresTempoRolls?: boolean; inline?: boolean; appearance?: WorkspacePreferencesPort; onChange?(): void;
 };
 
 export function showLearningSettings(root: HTMLElement, preferences: LearningSettingsPort | undefined, options: LearningSettingsOptions): (() => void) | undefined {
@@ -77,12 +77,6 @@ export function mountLearningSettings(root: HTMLElement, dialog: WorkspacePanel,
   }
   if (tempoRolls && editorControls) dialog.append(tempoRolls);
   if (preferences || options.appearance) dialog.append(problem);
-  if (options.onReplayGuide) {
-    const replay = document.createElement('button'); replay.type = 'button'; replay.className = 'secondary learning-replay-guide';
-    replay.textContent = '重新观看引导';
-    replay.addEventListener('click', () => { dialog.close(); options.onReplayGuide!(); });
-    dialog.append(replay);
-  }
   return () => disposeAppearance?.();
 }
 

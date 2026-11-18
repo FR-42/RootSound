@@ -8,6 +8,9 @@ await mkdir(root,{recursive:true});
 // Retire old generated tutorials as well as replacing current files.
 await rm(path.join(root,'guides'),{recursive:true,force:true});
 await cp('website',root,{recursive:true});
+const colors = await readFile('src/workstation/app/release-colors.css', 'utf8');
+await writeFile(path.join(root, 'assets/app-colors.css'), colors.replace('../modules/ui-rendering/tone-card-back.svg', './tone-card-back.svg'));
+await cp('src/workstation/modules/ui-rendering/tone-card-back.svg', path.join(root, 'assets/tone-card-back.svg'));
 await build({configFile:path.resolve('vite.web.config.ts')});
 const bank = 'rootsound-studio-v1';
 const source = path.join('public/instruments', bank);

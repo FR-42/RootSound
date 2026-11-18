@@ -1,37 +1,38 @@
-# 网页版与本地构建
+# 官网与在线编辑器
 
-简乐首页「动手试试」首次打开时询问「是否观看引导」。「是」从第一幕开始，结束后进入
-编辑区。「否」直接进入编辑区。「设置」中的「重新观看引导」和首页的「操作引导」可随时
-重看，练习使用独立乐谱，退出时回到原来的草稿。
+官网：https://fr-42.github.io/RootSound/ 。独立体验：https://fr-42.github.io/RootSound/play/ 。
 
-手机网页的引导从第三幕起显示播放／暂停。引导各幕和普通编辑区都提供「右键」。
-开启后，点按或划过音符可以删除，点按空白处可以取消选中。拖动音符时，预览会向
-手指左侧偏移，松手后的音高和时间按拖动距离计算。缩放一幕起可用双指横向缩放音高、
-纵向缩放时间，斜向可同时缩放。
+官网保留在线编辑体验，已移除全部操作引导入口、首次观看询问、重看按钮和场景启动逻辑。
+旧的 `play/?guide=1` 链接直接进入编辑器；历史浏览器的观看选择不再影响启动。
 
-网页体验区复用桌面版的钢琴卷帘和编辑操作，初始曲目为 40 个钢琴音符、148 BPM 的示例。
-示例草稿留在当前页面。文件保存在桌面版进行。
+在线体验仍使用用户提供的 40 音符、148 BPM 示例，每次访问建立独立的内存草稿。
+只提供三角钢琴，按需准备其 WAV 采样。保留手机端右键模拟、删除、手指左侧拖动预览和双指缩放。
+文件保存仍由桌面版承担，不暗示网站云端自动保存。
 
-网页只提供三角钢琴。进入编辑区后在后台准备示例曲所需的 WAV 采样。
+## 视觉来源
 
-公开页面为 https://fr-42.github.io/RootSound/。独立体验入口为 https://fr-42.github.io/RootSound/play/。
+官网与在线编辑器共用 `src/workstation/app/release-colors.css` 的软件颜色变量。
+构建将该文件和卡背 SVG 复制到网站 assets；在线编辑器直接导入同一文件，
+Vite 仅将桌面专用颜色选择器映射到网页卷帘。网页布局适配位于 `website/styles.css`
+和 `src/workstation/app/website-editor.css`，不复制一套近似调色板。
 
-旧六页动图和复现说明保存在 history/2026-11-08-website-guide。
+官网沿用品牌、简介、下载、GitHub、鸣谢及“建议使用非 Edge 浏览器”。
+下载识别已发布的旧版命名和“简乐安装.exe / 简乐安装.pkg”，需要同一发布中的双平台资源配对。
+API 暂不可用时保留当前已发布 preview.10 的有效下载链接；本地 preview.11 不等于已发布。
 
-## 源码与命令
-
-website/ 是宣传页，web/index.html 和 src/workstation/app/web-demo.ts 是在线编辑器。
-scripts/build-web-demo.mjs 构建共用编辑器，并附带录音采样及许可，输出 .cache/website。
+## 构建、检查与发布
 
 ```powershell
-npm.cmd run build:website
+npm.cmd run check
 npm.cmd run test:website
+node scripts/test-web-demo.mjs
 ```
 
-scripts/test-web-demo.mjs 在隔离隐藏 Electron 中测试真实构建；需要本机额外缓存，
-不是干净克隆默认测试的前置条件。它不操作用户桌面、不打开物理声卡。
-手机真机／Safari／实际音频设备和听感不能由隐藏 Chromium 结果代替。
+构建输出 `.cache/website`；只携带三角钢琴采样与许可。
+真实浏览器检查使用隔离、不可见、离屏 Electron，覆盖首访、旧入口、颜色值、
+1440/768/390/320 宽度、示例播放、手机删除/拖动/缩放、下载自动匹配。
+音频测试使用离线时钟，不代表手机真机、Safari 或扬声器听感验收。
 
-.github/workflows/pages.yml 仍是仓库的 Pages 构建／部署流程，使用 Node 24。
-首页从 GitHub 的公开发布中读取配对的 Windows EXE 和 Mac PKG 安装包。
-暂时没有可用安装包时，首页提供发布记录入口。
+`.github/workflows/pages.yml` 在 main 推送后构建并部署现有 GitHub Pages。
+本次用户已批准官网发布；GitHub Release 继续由用户手动发布，不上传安装包。
+此前引导说明保存在 [历史快照](../history/2026-11-19-website-guide-removal/WEBSITE.md)。

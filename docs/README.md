@@ -10,7 +10,7 @@
 | 当前能做什么、不能据此声称什么 | [当前状态](CURRENT_STATE.md) |
 | 使用 Windows 程序 | [桌面使用](WINDOWS_DESKTOP.md) |
 | 音乐格式、保存与表示限制 | [音乐文件](MUSIC_FILES.md) |
-| 桌面操作引导 | [操作引导](GUIDANCE.md) |
+| 已撤下的旧操作引导 | [撤下状态与历史](GUIDANCE.md) |
 | 音色来源和执行边界 | [GM 音色](GM_INSTRUMENTS.md) |
 | 源码入口与模块职责 | [架构](ARCHITECTURE.md) |
 | 安装依赖、构建与并行开发 | [开发](DEVELOPMENT.md) |

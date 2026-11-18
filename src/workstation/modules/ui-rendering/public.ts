@@ -18,8 +18,6 @@ import { showLearningSettings, showFeatureGate } from './settings.ts';
 import { applyRollAppearance } from './roll-appearance.ts';
 import { needsTempoRolls } from './guidance-flow.ts';
 import { mountPhraseComposition } from './phrase-composition.ts';
-import { mountMusicGuide, type MusicGuideFactory } from './music-guide.ts';
-import { mountGuidanceInvitation } from './guidance-invitation.ts';
 import { mountRoundPointer } from './round-pointer.ts';
 import { attachEdgeGesture } from './pointer-gestures.ts';
 import { createProjectWelcome } from './project-welcome.ts';
@@ -30,7 +28,7 @@ import './studio.css';
 import './theme.css';
 export { confirmFormatSave } from './format-save-warning.ts';
 export type { MusicGuideDocument } from './music-guide.ts';
-export { showLearningSettings, showFeatureGate, needsTempoRolls, mountMusicGuide };
+export { showLearningSettings, showFeatureGate, needsTempoRolls };
 
 export interface StudioOptions {
   timbre?: TimbreEditorPort;
@@ -68,11 +66,9 @@ export interface StudioOptions {
   recognition?: MelodyRecognitionPort;
   preferences?: WorkspacePreferencesPort;
   learning?: LearningSettingsPort;
-  musicGuide?: MusicGuideFactory;
+  mobileWeb?: boolean;
   demo?: boolean;
   desktopPointerUx?: boolean;
-  startWithGuide?: boolean;
-  onFirstGuideChoice?(watch: boolean): void;
   workspaceState?: MusicWorkspaceStatePort;
   references?: ReferenceEditingPort;
   previewContent?(contentId: string, signal?: AbortSignal): Promise<PlaybackSession>;
@@ -88,12 +84,11 @@ function element<K extends keyof HTMLElementTagNameMap>(tag: K, className = '', 
 /** A project opens directly into its sole editable music score. */
 export function mountStudio(root: HTMLElement, options: StudioOptions): {
   dispose(): void;
-  openGuide(): Promise<void>;
   saveForClose(signal?: AbortSignal): Promise<ProjectSaveChoice>;
   awaitingCloseChoice(): boolean;
   prepareClose(options?: { allowProjectDialog?: boolean }): Promise<void>;
 } {
-  let disposed = false, guideOpen = false;
+  let disposed = false;
   let frameNotes = options.demo === true;
   let editor: ReturnType<typeof mountPhraseComposition> | undefined;
   let page: { dispose(): void } | undefined;
@@ -114,7 +109,6 @@ export function mountStudio(root: HTMLElement, options: StudioOptions): {
       inline: options.desktopPointerUx,
       requiresTempoRolls: !options.demo && inMusic && needsTempoRolls(options.phrase?.read().body),
       onChange: () => editor?.refresh(),
-      onReplayGuide: options.demo ? () => { void openGuide(); } : undefined,
     }) ?? closeSettings;
   }
   async function saveInLibrary(mode: 'edit' | 'exit' | 'close' | 'details' = 'edit', forceCopy = false, signal?: AbortSignal): Promise<ProjectSaveChoice> {
@@ -187,16 +181,11 @@ export function mountStudio(root: HTMLElement, options: StudioOptions): {
       welcome.tabIndex = -1;
       const library = mountProjectLibrary(root, welcome, service, startProject, undefined, true);
       const edge = attachEdgeGesture(welcome, 'bottom', {
-        enabled: () => !root.querySelector('.project-library-overlay:not([hidden]), dialog[open], .workspace-inline-panel[open], .guidance-invitation'),
+        enabled: () => !root.querySelector('.project-library-overlay:not([hidden]), dialog[open], .workspace-inline-panel[open]'),
         open: () => library.open(),
       });
       page = { dispose() { edge.dispose(); library.dispose(); } };
       return;
-    }
-    if (options.musicGuide) {
-      const guide = element('button', 'music-guide-launch', '操作引导'); guide.type = 'button';
-      guide.addEventListener('click', () => { void openGuide(); });
-      welcome.append(guide);
     }
     if (options.learning) {
       const button = element('button', 'welcome-settings', '设置'); button.type = 'button';
@@ -228,7 +217,7 @@ export function mountStudio(root: HTMLElement, options: StudioOptions): {
       workspaceState: options.workspaceState, frameNotesOnMount: frameNotes,
       desktopPointerUx: options.desktopPointerUx,
       readPointerSensitivity: options.desktopPointerUx ? readPointerSensitivity : undefined,
-      mobileWeb: options.demo && options.musicGuide?.mobileWeb,
+      mobileWeb: options.demo && options.mobileWeb,
       readWorkbench: () => !options.desktopPointerUx && !options.demo && options.learning?.read().workbench === true,
       enableGainCurve: !options.demo,
       readMultipleTempoRolls: options.demo ? () => false : options.learning ? () => options.learning!.read().multipleTempoRolls : undefined,
@@ -260,37 +249,9 @@ export function mountStudio(root: HTMLElement, options: StudioOptions): {
     }
     frameNotes = false;
   }
-  function showGuide(resume: () => void) {
-    leave();
-    guideOpen = true;
-    page = mountMusicGuide(root, options.musicGuide!, () => { guideOpen = false; resume(); });
-  }
-  async function openGuide() {
-    if (disposed || guideOpen || !options.musicGuide || root.querySelector('dialog[open], .workspace-inline-panel[open]')) return;
-    guideOpen = true;
-    const resume = editor ? showMusic : showWelcome;
-    try {
-      await editor?.flush();
-      if (disposed) return;
-      showGuide(resume);
-    } catch (error) {
-      guideOpen = false;
-      editor?.notify(error instanceof Error ? error.message : String(error), true);
-    }
-  }
   const initialView = options.initialEntry && options.initialEntry !== 'welcome' ? showMusic : showWelcome;
-  if (options.startWithGuide && options.musicGuide) showGuide(initialView);
-  else if (options.onFirstGuideChoice && options.musicGuide) {
-    const remember = options.onFirstGuideChoice;
-    root.replaceChildren();
-    function choose(watch: boolean) {
-      remember(watch);
-      if (watch) showGuide(initialView);
-      else initialView();
-    }
-    page = mountGuidanceInvitation(root, { onWatch: () => choose(true), onSkip: () => choose(false) });
-  } else initialView();
-  return { openGuide, saveForClose: signal => options.desktopPointerUx ? chooseDesktopExit('close', signal) : saveInLibrary('close', false, signal),
+  initialView();
+  return { saveForClose: signal => options.desktopPointerUx ? chooseDesktopExit('close', signal) : saveInLibrary('close', false, signal),
     awaitingCloseChoice: () => saveLibraryAwaitingInput?.() || exitChoice?.awaitingChoice() || false, async prepareClose(closeOptions = {}) {
     if (disposed) throw new Error('当前页面已关闭。');
     // Toolbar actions have already flushed their edits before invoking the project service.
