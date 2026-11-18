@@ -85,9 +85,12 @@ let stage='setup',expression='',win;
  const downloads=await parentJs("[...document.querySelectorAll('.platform-download:not([hidden])')].map(a=>a.href)");
  assert.equal(downloads.length,2);assert(downloads.every(url=>url.startsWith('https://github.com/FR-42/RootSound/releases/download/')));
  const site=fs.readFileSync(path.resolve('website/site.js'),'utf8');
- await parentJs("(()=>{const releases=[{assets:[{name:'简乐安装.exe',size:123000000,browser_download_url:'https://github.com/FR-42/RootSound/releases/download/test/simple.exe'},{name:'简乐安装.pkg',size:234000000,browser_download_url:'https://github.com/FR-42/RootSound/releases/download/test/simple.pkg'}]}];window.fetch=async()=>({ok:true,json:async()=>releases});return true})()");
+ for(const fileBase of ['简乐安装','default']){
+ const target=fileBase==='default'?'default':'simple';
+ await parentJs("(()=>{const releases=[{assets:[{name:'"+fileBase+".exe',size:123000000,browser_download_url:'https://github.com/FR-42/RootSound/releases/download/test/"+target+".exe'},{name:'"+fileBase+".pkg',size:234000000,browser_download_url:'https://github.com/FR-42/RootSound/releases/download/test/"+target+".pkg'}]}];window.fetch=async()=>({ok:true,json:async()=>releases});return true})()");
  await parentJs('(()=>{'+site+';return true})()');
- await wait(()=>parentJs("document.querySelector('[data-platform=windows]').href.endsWith('/simple.exe')"));
+ await wait(()=>parentJs("document.querySelector('[data-platform=windows]').href.endsWith('/"+target+".exe')"));
+ }
  const key=async name=>{
   await js('document.body.dispatchEvent(new KeyboardEvent("keydown",{key:'+JSON.stringify(name)+',code:'+JSON.stringify(name===' '?'Space':name)+',bubbles:true,cancelable:true}))');
   await js('document.body.dispatchEvent(new KeyboardEvent("keyup",{key:'+JSON.stringify(name)+',code:'+JSON.stringify(name===' '?'Space':name)+',bubbles:true,cancelable:true}))');

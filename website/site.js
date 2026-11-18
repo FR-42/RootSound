@@ -10,8 +10,8 @@
       });
       if (!response.ok) return;
       const patterns = {
-        windows: /^(?:RootSound-Windows-x64-.*-Setup|简乐安装)\.exe$/,
-        mac: /^(?:RootSound-macOS-arm64-.*|简乐安装)\.pkg$/,
+        windows: /^(?:RootSound-Windows-x64-.*-Setup|简乐安装|default)\.exe$/,
+        mac: /^(?:RootSound-macOS-arm64-.*|简乐安装|default)\.pkg$/,
       };
       const releases = await response.json();
       const release = releases.find(item => !item.draft && Object.values(patterns).every(pattern =>

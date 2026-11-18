@@ -23,8 +23,9 @@
 网页布局适配位于 `website/styles.css` 和 `src/workstation/app/website-editor.css`。
 
 官网沿用品牌、简介、下载、GitHub、鸣谢及“建议使用非 Edge 浏览器”。
-下载识别已发布的旧版命名和“简乐安装.exe / 简乐安装.pkg”，需要同一发布中的双平台资源配对。
-API 暂不可用时保留当前已发布 preview.10 的有效下载链接；本地 preview.11 不等于已发布。
+下载识别已发布的旧版命名、“简乐安装.exe / 简乐安装.pkg”和“default.exe / default.pkg”，需要同一发布中的双平台资源配对。
+用户已发布 preview261119（preview.11），资源实际命名为 default.exe 和 default.pkg。
+API 暂不可用时仍保留该发布的有效下载链接，Windows 约 677 MB、Mac 约 671 MB。
 
 ## 构建、检查与发布
 
