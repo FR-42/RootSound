@@ -1,6 +1,3 @@
-import './release-colors.css';
-import './website-editor.css';
-
 function loadEditor() {
   return Promise.all([
     import('../../../website/examples/starter.json'),
@@ -19,11 +16,14 @@ let studio: Awaited<ReturnType<typeof import('./release-studio.ts')['mountReleas
 async function start() {
   const [{ default: starterExample }, { commitMusicDocument }, { createBrowserTimbreFiles },
     { mountReleaseStudio, showReleaseStartupError }, { createWebExampleModel }, { WEBSITE_PIANO }] = await loadEditor();
+  await import('./release-colors.css');
+  await import('./website-editor.css');
   try {
     const example = createWebExampleModel(starterExample, undefined, WEBSITE_PIANO);
     commitMusicDocument(example.library, example.song, example.score);
     let text = example.readLibrary();
     studio = await mountReleaseStudio(root, {
+      pointerUx: true,
       demoProject: { id: 'website-starter', name: starterExample.name,
         mobileWeb: matchMedia('(pointer: coarse) and (hover: none)').matches && Math.min(screen.width, screen.height) < 600 },
       storage: { read: () => text, write: value => { text = value; } },

@@ -101,7 +101,11 @@ Earlier wording and source IDs are preserved in [the original record](../history
 - On 2026-11-19 the user approved retaining the online editor, removing all website guidance and matching
   the current application's visual style. Existing guide URLs open the regular editor directly.
 - Share the application's release-colors.css palette and current component treatments; keep existing brand,
-  description, GitHub, Windows/Mac downloads, thanks and the Edge browser advice without new teaching copy.
+  description, GitHub, Windows/Mac downloads, thanks and the Edge browser advice with only the operation text explicitly supplied by the user.
+- Follow-up correction approved on 2026-11-19: the website must use the current composing interface,
+  including left/right edge gestures, tone cards and the details page without Save/Save As/Exit.
+  Reusing colors alone does not meet this requirement. Keep the user-supplied mouse and edge-operation
+  description below the online experience, without reviving the obsolete staged guide.
 - The supplied 40-note piano score at 148 BPM remains the public example; every visit edits a fresh memory
   copy. Keep only the grand piano and preserve mobile right-button simulation, dragging and pinch zoom.
 - Website publication is authorized for this task. GitHub Release publication remains manual; this website

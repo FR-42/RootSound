@@ -11,8 +11,8 @@
   <meta property="og:url" content="https://fr-42.github.io/RootSound/">
   <link rel="canonical" href="https://fr-42.github.io/RootSound/">
   <link rel="icon" href="assets/icon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="styles.css?v=11">
-  <script src="site.js?v=11" defer></script>
+  <link rel="stylesheet" href="styles.css?v=12">
+  <script src="site.js?v=12" defer></script>
   <title>简乐</title>
 </head>
 <body>
@@ -31,7 +31,18 @@
       <header class="playground-heading">
         <h2 id="playground-title">动手试试</h2>
       </header>
-      <iframe class="music-editor" src="play/?v=19" title="简乐在线编曲" allow="autoplay"></iframe>
+      <iframe class="music-editor" src="play/?v=20" title="简乐在线编曲" allow="autoplay"></iframe>
+      <div class="editor-instructions">
+        <p>左键空白：点击召唤播放线，按住拖动卷帘</p>
+        <p>左键音符：点击试听，按住可拖动此音符</p>
+        <p>右键：点击空白试听此列音调、点击/按住滑动可删除音符</p>
+        <p>滚轮：空白处可滑动卷帘，音符上可编辑音符时长、选中音色卡的状态下不能滑动卷帘但可以添加音符</p>
+        <p>新增机制：</p>
+        <ol>
+          <li>卷帘向鼠标相对于画面中心的方向移动，可以点击中键（点击滚轮）开启/关闭这个功能</li>
+          <li>边缘判定：鼠标快速向某个边缘滑动来触发，左边缘触发音色卡、右边缘触发详情页、在软件欢迎界面下边缘触发乐曲库（网站上没有这个的预览）</li>
+        </ol>
+      </div>
     </section>
     <nav class="downloads" aria-label="下载简乐">
       <a class="platform-download" data-platform="windows" href="https://github.com/FR-42/RootSound/releases/download/preview261113/RootSound-Windows-x64-0.1.0-preview.10-Setup.exe" aria-label="下载 Windows 64 位版">

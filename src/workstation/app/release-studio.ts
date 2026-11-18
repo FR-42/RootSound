@@ -26,6 +26,7 @@ import { normalizeImportedTimbreNames } from './curated-timbre-names.ts';
 export interface ReleasePlatform {
   storage: MaterialStorage;
   projectDirectories?: ProjectDirectoriesPort;
+  pointerUx?: boolean;
   demoProject?: { id: string; name: string; format?: never; mobileWeb?: boolean };
   timbreFiles: TimbreFilesPort;
   samplePayloads?: SamplePayloadPort;
@@ -66,7 +67,7 @@ export async function mountReleaseStudio(root: HTMLElement, platform: ReleasePla
       workspaceState: current ? createMusicWorkspaceState(localStorage, current.id) : undefined,
       initialEntry: current ? 'song' : 'welcome', demo: !!platform.demoProject,
       mobileWeb: platform.demoProject?.mobileWeb,
-      desktopPointerUx: !!directories,
+      desktopPointerUx: platform.pointerUx ?? !!directories,
       projectSetup: directories && createProjectSetup(directories, savedDetails => {
         if (savedDetails) sessionStorage.setItem('rootsound.saved-details.v1', 'true');
         runtime.stopAll();

@@ -29,6 +29,10 @@ main { width: min(1240px, calc(100% - 80px)); margin: 12px auto 0; }
 .release-history:hover { color: var(--accent); }
 a:focus-visible { outline: 2px solid var(--playline); outline-offset: 5px; }
 .site-thanks { padding: 36px 20px 40px; text-align: center; color: var(--muted); font-size: 12px; line-height: 1.9; }
+.editor-instructions { margin: 24px auto 0; max-width: 980px; color: var(--muted); font-size: 14px; line-height: 1.9; }
+.editor-instructions p { margin: 8px 0; }
+.editor-instructions ol { padding-left: 1.6em; margin: 8px 0; }
+.editor-instructions li + li { margin-top: 8px; }
 @keyframes site-color-drift { from { transform: translate3d(-2%, -1%, 0) scale(1); opacity: .7; } to { transform: translate3d(3%, 2%, 0) scale(1.06); opacity: 1; } }
 @media (max-width: 760px) {
   .header-inner, main { width: calc(100% - 32px); }

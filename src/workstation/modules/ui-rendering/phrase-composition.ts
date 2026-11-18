@@ -641,6 +641,7 @@ export function mountPhraseComposition(root: HTMLElement, options: {
     return button;
   }
   let mobileTouch = options.mobileTouch;
+  let mobileRight: HTMLButtonElement | undefined;
   if (!editorControls && options.onSettings) files.append(fileAction('设置', 'song-save song-settings', 'settings', () => { void execute(options.onSettings); }));
   if (options.mobileWeb) {
     let rightMode = false;
@@ -650,6 +651,7 @@ export function mountPhraseComposition(root: HTMLElement, options: {
     });
     right.setAttribute('aria-pressed', 'false');
     files.append(right);
+    mobileRight = right;
     mobileTouch = { readRightButton: () => rightMode };
   }
   if (options.onSave) {
@@ -677,6 +679,8 @@ export function mountPhraseComposition(root: HTMLElement, options: {
     editorControlsContent.append(identity, files, controls);
     editorControls.append(editorControlsContent);
   } else topbar.append(identity, controls, files);
+  const mobileControls = editorControls && options.mobileWeb ? node('div', 'song-mobile-controls') : undefined;
+  if (mobileControls) mobileControls.append(playButton, mobileRight!, fileAction('设置', 'song-save song-settings', 'settings', () => setEditorSettings(!isEditorSettingsOpen())));
   const main = node('main', 'phrase-composition-main'); const sectionControls = node('aside', 'phrase-composition-controls');
   const openCreation = action('创作', 'phrase-composition-control phrase-composition-open-creation', () => { void execute(() => showSection('melody')); });
   openCreation.setAttribute('aria-label', '进入创作'); openCreation.title = '进入创作';
@@ -750,6 +754,7 @@ export function mountPhraseComposition(root: HTMLElement, options: {
     paintOverview();
   });
   melodySection.append(playhead); viewport.append(melodySection, phraseConsole); canvas.append(ruler, viewport); main.append(sectionControls, canvas, divider); page.append(topbar, main, melodyRegion, notice); root.replaceChildren(page);
+  if (mobileControls) { page.classList.add('has-mobile-controls'); page.append(mobileControls); }
   function layoutSections(): void {
     const height = viewport.clientHeight;
     if (!splitInitialized) { splitRatio = defaultPhraseSplit(current.body, height); splitInitialized = true; }

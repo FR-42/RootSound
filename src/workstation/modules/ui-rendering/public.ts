@@ -220,7 +220,7 @@ export function mountStudio(root: HTMLElement, options: StudioOptions): {
       mobileWeb: options.demo && options.mobileWeb,
       readWorkbench: () => !options.desktopPointerUx && !options.demo && options.learning?.read().workbench === true,
       enableGainCurve: !options.demo,
-      readMultipleTempoRolls: options.demo ? () => false : options.learning ? () => options.learning!.read().multipleTempoRolls : undefined,
+      readMultipleTempoRolls: options.learning ? () => options.learning!.read().multipleTempoRolls : undefined,
       readDrumLanes: () => !options.desktopPointerUx && !options.demo && options.learning?.read().drumLanes === true,
       onSettings: !options.desktopPointerUx && (options.demo || options.learning) ? () => settings(true) : undefined,
       readEditorSettings: options.desktopPointerUx ? body => ({
