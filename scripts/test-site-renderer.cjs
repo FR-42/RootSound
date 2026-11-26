@@ -26,9 +26,12 @@ const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
       const result = await js(`({ width: innerWidth, content: document.documentElement.scrollWidth,
         images: [...document.images].every(i => i.complete && i.naturalWidth > 0),
         noTrial: !document.querySelector('iframe,a[href*="play/"],.editor-instructions'),
-        downloads: [...document.querySelectorAll('[data-platform]')].every(a => a.href.startsWith('https://github.com/FR-42/RootSound/releases/download/')) })`);
+        downloads: [...document.querySelectorAll('[data-platform]')].every(a => a.href.includes('/formal261126/')),
+        beginnerFeatures: document.querySelectorAll('.beginner-feature').length === 2 && [...document.querySelectorAll('.beginner-feature')].every(node => {
+          const box = node.getBoundingClientRect(); return box.width > 0 && box.left >= 0 && box.right <= innerWidth;
+        }) })`);
       assert(result.content <= result.width, JSON.stringify(result));
-      assert(result.images && result.noTrial && result.downloads, JSON.stringify(result));
+      assert(result.images && result.noTrial && result.downloads && result.beginnerFeatures, JSON.stringify(result));
       sizes.push(result);
       if (width === 1440 || width === 390) {
         const height = await js('document.documentElement.scrollHeight');
