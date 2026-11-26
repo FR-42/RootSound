@@ -78,7 +78,7 @@ try {
         Install-To $setup $location
         $caseSeeds = Join-Path $location "app-$Version/resources/app/seed-projects"
         if ($seed.Invoke($null, [object[]]@([string]$caseSeeds, [string]$location)) -ne 0) { throw "Existing project was seeded: $case" }
-        if (@(Compare-Object $expected @(Read-ProjectTree $library)).Count -ne 0) { throw "Project tree changed: $case" }
+        if (($expected -join "`n") -cne (@(Read-ProjectTree $library) -join "`n")) { throw "Project tree changed: $case" }
     }
     $report = [ordered]@{ passed = $true; version = $Version; finalInstallerExecuted = $true; freshInstallation = $true; upgradedFrom = $PreviousVersion;
         projectTreePreserved = $true; existingEmptyProjectPreserved = $true; repeatedInstallationPreserved = $true; existingUnregisteredLibraryPreserved = $true; freshlySeededProjects = $manifest.projects.Count
