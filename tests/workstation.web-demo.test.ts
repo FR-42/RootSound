@@ -6,7 +6,9 @@ import vm from 'node:vm';
 test('website introduces beginner pitch tools and downloads without restoring the online editor', async () => {
   const html = await readFile('.cache/website/index.html', 'utf8');
   assert(!/<iframe|动手试试|editor-instructions|在线编曲/.test(html));
-  assert.match(html, /你好，/);
+  assert(!html.includes('你想创作什么'));
+  assert.equal(html.match(/<h1[^>]*>(.*?)<\/h1>/s)?.[1]?.replace(/<[^>]*>/g, ''), '一款轻量化、极简的音乐创作软件，旨在让所有人都能享受创作音乐的魅力。');
+  assert(html.indexOf('class="downloads"') > html.indexOf('class="product"'));
   assert.match(html, /assets\/workspace\.jpg/);
   assert.match(html, /哼出来，找到音高/);
   assert.match(html, /按住左 Alt 键并哼唱/);
