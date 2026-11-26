@@ -1,6 +1,6 @@
 # 本地安装包
 
-2026-11-26：本次版本为 `0.1.0-preview.13`。用户批准根项目提交和推送；GitHub Release 仍由用户手动发布，本地准备不包含上传安装包或创建发布标签。
+2026-11-26：本次修正版为 `0.1.0-preview.14`。用户批准修正 Windows 向导、引导项目缺失时的创建行为、重建双平台安装包及根项目提交和推送；GitHub Release 仍由用户手动发布。
 
 ## 平台与入口
 
@@ -26,6 +26,7 @@ macOS ARM64 使用 Electron、同一套编辑器源码和跨平台文件服务�
 ## 安装与升级
 
 - Windows 首次默认优先 `D:\Apps\RootSound`，没有 D 盘时寻找其他非 C 的本地磁盘。允许用户手动选择 C 盘。成功安装后记住位置，后续升级继续使用该位置。
+- preview.14 修正自绘背景覆盖路径输入框和“更改位置”按钮的问题。首页可直接编辑路径或打开系统目录选择器；取消选择保留原路径。路径页、安装进度和完成页使用统一的浅色背景、标题与音符图形。开发用界面预览具有独立标题且禁用安装，不作为安装包交付。
 - 每版程序位于安装根目录的 `app-<version>`。歌曲默认位于安装根目录的 `project`，与版本目录分开。
 - 新版先解压到临时目录，校验文件清单后再改名发布并更新快捷方式。下载文件名为“简乐安装.exe”，版本信息保留在文件属性中。
 - 清理只删除文件清单中路径与 SHA256 都匹配的旧程序文件。修改过的文件、清单外的用户文件、自建空目录及链接目标保留。运行中的程序或私有运行时被占用时保留旧版，关闭后重运行安装包清理。
@@ -35,7 +36,7 @@ macOS ARM64 使用 Electron、同一套编辑器源码和跨平台文件服务�
 
 ## 构建入口
 
-`scripts/Build-Release.ps1 -Version 0.1.0-preview.13 -UseCachedRuntimes`
+`scripts/Build-Release.ps1 -Version 0.1.0-preview.14 -UseCachedRuntimes`
 
 运行环境清单位于 `.cache/release-dependencies/manifest.json` 和 `desktop/installer/native-runtime-lock.json`。后者固定 Windows Desktop Runtime 与私有 WebView2 的来源、版本和校验值。构建阶段验证 WebView2 主程序的微软 Authenticode 签名。此验证不等于给简乐安装包签名。
 
@@ -45,7 +46,7 @@ macOS ARM64 使用 Electron、同一套编辑器源码和跨平台文件服务�
 
 - `scripts/Test-InstallerUpgrade.ps1`：隔离的升级、文件占用、失败及用户文件保护检查。
 - `scripts/Test-NativeRelease.ps1`：私有运行环境、资源、演示导入和已安装启动器检查，不显示窗口、不播放声音。
-- `scripts/Test-ReleaseInstaller.ps1`：实际成品的静默首次安装、preview.11 升级、同版本重装、已有空项目目录、没有安装记录的已有歌曲目录、同名演示曲、歌曲树一致性与快捷方式目标检查。
+- `scripts/Test-ReleaseInstaller.ps1 -Version 0.1.0-preview.14 -PreviousVersion 0.1.0-preview.13`：实际成品的静默首次安装、旧版升级、同版本重装、已有空项目目录、没有安装记录的已有歌曲目录、同名演示曲、歌曲树一致性与快捷方式目标检查。
 - `scripts/verify-installers.py`：独立读取 Mac XAR/CPIO，检查包内容、权限、链接、自定义目录和更新声明。
 
 这些检查不代表安装界面的人工视觉验收，也不代表真实 Mac 运行验收。Windows 安装包尚无可信 Authenticode 签名，Mac 尚无 Developer ID 签名／公证，因此系统信任提示仍可能出现。

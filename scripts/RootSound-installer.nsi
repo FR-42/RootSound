@@ -13,7 +13,11 @@ Unicode true
 !define VERSION_NUMBER "0.1.0.11"
 !endif
 Name "简乐 ${VERSION}"
+!ifdef UI_PREVIEW
+Caption "简乐安装 · 界面预览"
+!else
 Caption "简乐安装"
+!endif
 OutFile "${OUTPUT}"
 Icon "${APP_ICON}"
 InstallDir ""
@@ -24,15 +28,18 @@ InstProgressFlags smooth colored
 InstallColors 332E3C F7F7FA
 SetDatablockOptimize on
 XPStyle on
-BrandingText "简乐"
+BrandingText " "
+ManifestDPIAware true
 VIProductVersion "${VERSION_NUMBER}"
 VIAddVersionKey /LANG=2052 "ProductName" "简乐"
 VIAddVersionKey /LANG=2052 "FileDescription" "简乐安装程序"
 VIAddVersionKey /LANG=2052 "ProductVersion" "${VERSION}"
 VIAddVersionKey /LANG=2052 "FileVersion" "${VERSION}"
 VIAddVersionKey /LANG=2052 "LegalCopyright" "RootSound"
+!ifndef UI_PREVIEW_PROGRESS
 Page custom LocationPage LocationLeave
-Page instfiles
+!endif
+Page instfiles "" ProgressShow ProgressLeave
 Page custom FinishPage FinishLeave
 LoadLanguageFile "${NSISDIR}\Contrib\Language files\SimpChinese.nlf"
 
@@ -45,6 +52,9 @@ Var BitmapHandle
 Var TitleFont
 Var BodyFont
 Var Launch
+Var UiScale
+Var PageWidth
+Var PageHeight
 
 Function FindDrive
   ${If} $9 != "C:\"
@@ -77,41 +87,160 @@ Function .onInit
       ${GetDrives} "HDD" FindDrive
     ${EndIf}
   ${EndIf}
-  CreateFont $TitleFont "Microsoft YaHei UI" 24 500
+  CreateFont $TitleFont "Microsoft YaHei UI" 32 500
   CreateFont $BodyFont "Microsoft YaHei UI" 11 400
   InitPluginsDir
   File /oname=$PLUGINSDIR\background.bmp "${APP_ART}"
   SetCtlColors $HWNDPARENT 332E3C F7F7FA
 FunctionEnd
 
+Function .onGUIInit
+  System::Call 'user32::GetDpiForWindow(p $HWNDPARENT) i .r0'
+  ${If} $0 == 0
+    StrCpy $0 96
+  ${EndIf}
+  StrCpy $UiScale $0
+  IntOp $1 680 * $0
+  IntOp $1 $1 / 96
+  IntOp $2 440 * $0
+  IntOp $2 $2 / 96
+  System::Call 'user32::SetWindowPos(p $HWNDPARENT, p 0, i 0, i 0, i r1, i r2, i 6)'
+  System::Alloc 16
+  Pop $5
+  System::Call 'user32::GetClientRect(p $HWNDPARENT, p r5)'
+  System::Call '*$5(i .r0, i .r0, i .r1, i .r2)'
+  System::Free $5
+  IntOp $3 24 * $UiScale
+  IntOp $3 $3 / 96
+  IntOp $PageWidth $1 - $3
+  IntOp $PageWidth $PageWidth - $3
+  IntOp $4 86 * $UiScale
+  IntOp $4 $4 / 96
+  IntOp $PageHeight $2 - $4
+  IntOp $4 54 * $UiScale
+  IntOp $4 $4 / 96
+  IntOp $4 $2 - $4
+  IntOp $6 34 * $UiScale
+  IntOp $6 $6 / 96
+  IntOp $7 128 * $UiScale
+  IntOp $7 $7 / 96
+  IntOp $8 $1 - $3
+  IntOp $8 $8 - $7
+  GetDlgItem $0 $HWNDPARENT 1
+  System::Call 'user32::SetWindowPos(p r0, p 0, i r8, i r4, i r7, i r6, i 4)'
+  GetDlgItem $0 $HWNDPARENT 2
+  IntOp $7 88 * $UiScale
+  IntOp $7 $7 / 96
+  System::Call 'user32::SetWindowPos(p r0, p 0, i r3, i r4, i r7, i r6, i 4)'
+  GetDlgItem $0 $HWNDPARENT 3
+  ShowWindow $0 ${SW_HIDE}
+  StrCpy $0 0
+  lineScan:
+    System::Call 'user32::FindWindowExW(p $HWNDPARENT, p r0, w "Static", p 0) p .r0'
+    ${If} $0 != 0
+      System::Call 'user32::GetWindowLongW(p r0, i -16) i .r1'
+      IntOp $1 $1 & 31
+      ${If} $1 == 16
+        ShowWindow $0 ${SW_HIDE}
+      ${EndIf}
+      Goto lineScan
+    ${EndIf}
+FunctionEnd
+
 Function MakePage
   nsDialogs::Create 1018
   Pop $Dialog
   SetCtlColors $Dialog 332E3C F7F7FA
+  IntOp $0 24 * $UiScale
+  IntOp $0 $0 / 96
+  System::Call 'user32::SetWindowPos(p $Dialog, p 0, i r0, i r0, i $PageWidth, i $PageHeight, i 4)'
   ${NSD_CreateBitmap} 0 0 100% 100% ""
   Pop $Bitmap
   ${NSD_SetStretchedImage} $Bitmap "$PLUGINSDIR\background.bmp" $BitmapHandle
-  ${NSD_CreateLabel} 20u 18u 240u 40u "简乐"
+  System::Call 'user32::SetWindowPos(p $Bitmap, p 1, i 0, i 0, i 0, i 0, i 19)'
+  ${NSD_CreateLabel} 6% 9% 62% 20% "简乐"
   Pop $0
   SetCtlColors $0 332E3C transparent
   SendMessage $0 ${WM_SETFONT} $TitleFont 1
-  ${NSD_CreateLabel} 22u 62u 250u 14u "${VERSION}"
+  ${NSD_CreateLabel} 6% 31% 70% 8% "${VERSION}"
   Pop $0
   SetCtlColors $0 5E5667 transparent
   SendMessage $0 ${WM_SETFONT} $BodyFont 1
 FunctionEnd
 
+Function ProgressShow
+  FindWindow $Dialog "#32770" "" $HWNDPARENT
+  IntOp $0 24 * $UiScale
+  IntOp $0 $0 / 96
+  System::Call 'user32::SetWindowPos(p $Dialog, p 0, i r0, i r0, i $PageWidth, i $PageHeight, i 4)'
+  SetCtlColors $Dialog 332E3C F7F7FA
+  GetDlgItem $0 $Dialog 1027
+  ShowWindow $0 ${SW_HIDE}
+  GetDlgItem $0 $Dialog 1016
+  ShowWindow $0 ${SW_HIDE}
+  GetDlgItem $0 $Dialog 1006
+  ShowWindow $0 ${SW_HIDE}
+  GetDlgItem $0 $Dialog 1031
+  ShowWindow $0 ${SW_HIDE}
+  GetDlgItem $0 $HWNDPARENT 1028
+  ShowWindow $0 ${SW_HIDE}
+  GetDlgItem $0 $HWNDPARENT 3
+  ShowWindow $0 ${SW_HIDE}
+  System::Call 'user32::CreateWindowExW(i 0, w "Static", w "", i 0x5400010E, i 0, i 0, i $PageWidth, i $PageHeight, p $Dialog, p 0, p 0, p 0) p .r0'
+  StrCpy $Bitmap $0
+  ${NSD_SetStretchedImage} $Bitmap "$PLUGINSDIR\background.bmp" $BitmapHandle
+  IntOp $1 $PageWidth * 6
+  IntOp $1 $1 / 100
+  IntOp $2 $PageHeight * 9
+  IntOp $2 $2 / 100
+  IntOp $3 $PageWidth * 88
+  IntOp $3 $3 / 100
+  IntOp $4 $PageHeight * 20
+  IntOp $4 $4 / 100
+  System::Call 'user32::CreateWindowExW(i 0x20, w "Static", w "简乐", i 0x54000100, i r1, i r2, i r3, i r4, p $Dialog, p 0, p 0, p 0) p .r0'
+  SetCtlColors $0 332E3C transparent
+  SendMessage $0 ${WM_SETFONT} $TitleFont 1
+  IntOp $2 $PageHeight * 31
+  IntOp $2 $2 / 100
+  IntOp $4 $PageHeight * 8
+  IntOp $4 $4 / 100
+  System::Call 'user32::CreateWindowExW(i 0x20, w "Static", w "${VERSION}", i 0x54000100, i r1, i r2, i r3, i r4, p $Dialog, p 0, p 0, p 0) p .r0'
+  SetCtlColors $0 5E5667 transparent
+  SendMessage $0 ${WM_SETFONT} $BodyFont 1
+  IntOp $2 $PageHeight * 52
+  IntOp $2 $2 / 100
+  System::Call 'user32::CreateWindowExW(i 0x20, w "Static", w "正在安装", i 0x54000100, i r1, i r2, i r3, i r4, p $Dialog, p 0, p 0, p 0) p .r0'
+  SetCtlColors $0 5E5667 transparent
+  SendMessage $0 ${WM_SETFONT} $BodyFont 1
+  IntOp $2 $PageHeight * 66
+  IntOp $2 $2 / 100
+  IntOp $4 7 * $UiScale
+  IntOp $4 $4 / 96
+  GetDlgItem $0 $Dialog 1004
+  System::Call 'user32::SetWindowPos(p r0, p 0, i r1, i r2, i r3, i r4, i 4)'
+  System::Call 'uxtheme::SetWindowTheme(p r0, w "", w "")'
+  SendMessage $0 0x409 0 0xCCA59F
+  SendMessage $0 0x2001 0 0xF1EDEE
+  System::Call 'user32::SetWindowPos(p $Bitmap, p 1, i 0, i 0, i 0, i 0, i 19)'
+FunctionEnd
+
+Function ProgressLeave
+  ${NSD_FreeBitmap} $BitmapHandle
+FunctionEnd
+
 Function LocationPage
   Call MakePage
-  ${NSD_CreateLabel} 22u 91u 240u 14u "安装位置"
+  ${NSD_CreateLabel} 6% 52% 65% 8% "安装位置"
   Pop $0
   SetCtlColors $0 332E3C transparent
   SendMessage $0 ${WM_SETFONT} $BodyFont 1
-  ${NSD_CreateText} 22u 111u 198u 24u "$INSTDIR"
+  ${NSD_CreateText} 6% 64% 68% 13% "$INSTDIR"
   Pop $PathInput
   SetCtlColors $PathInput 332E3C E4E8F2
-  ${NSD_CreateButton} 226u 111u 55u 24u "更改位置"
+  SendMessage $PathInput ${WM_SETFONT} $BodyFont 1
+  ${NSD_CreateButton} 77% 64% 17% 13% "更改位置"
   Pop $0
+  SendMessage $0 ${WM_SETFONT} $BodyFont 1
   ${NSD_OnClick} $0 BrowseLocation
   GetDlgItem $0 $HWNDPARENT 1
   ${If} ${FileExists} "$INSTDIR\RootSound.lnk"
@@ -119,6 +248,10 @@ Function LocationPage
   ${Else}
     SendMessage $0 ${WM_SETTEXT} 0 "STR:安装"
   ${EndIf}
+  System::Call 'user32::SetWindowPos(p $Bitmap, p 1, i 0, i 0, i 0, i 0, i 19)'
+!ifdef UI_PREVIEW
+  EnableWindow $0 0
+!endif
   nsDialogs::Show
   ${NSD_FreeBitmap} $BitmapHandle
 FunctionEnd
@@ -169,18 +302,21 @@ FunctionEnd
 
 Function FinishPage
   Call MakePage
-  ${NSD_CreateLabel} 22u 94u 250u 22u "安装完成"
+  ${NSD_CreateLabel} 6% 50% 80% 12% "安装完成"
   Pop $0
   SetCtlColors $0 332E3C transparent
   SendMessage $0 ${WM_SETFONT} $BodyFont 1
-  ${NSD_CreateCheckbox} 22u 118u 220u 18u "打开简乐"
+  ${NSD_CreateCheckbox} 6% 68% 80% 12% "打开简乐"
   Pop $Launch
-  SetCtlColors $Launch 332E3C F1F2F6
+  SetCtlColors $Launch 332E3C transparent
+!ifndef UI_PREVIEW
   ${NSD_Check} $Launch
+!endif
   GetDlgItem $0 $HWNDPARENT 1
   SendMessage $0 ${WM_SETTEXT} 0 "STR:完成"
   GetDlgItem $0 $HWNDPARENT 3
   ShowWindow $0 ${SW_HIDE}
+  System::Call 'user32::SetWindowPos(p $Bitmap, p 1, i 0, i 0, i 0, i 0, i 19)'
   nsDialogs::Show
   ${NSD_FreeBitmap} $BitmapHandle
 FunctionEnd
@@ -227,6 +363,10 @@ Function ProtectExistingProjects
 FunctionEnd
 
 Section
+!ifdef UI_PREVIEW_PROGRESS
+  Sleep 20000
+  Goto done
+!endif
   Call ValidateLocation
   IfErrors invalid
   IfFileExists "$AppDirectory\resources\app\rootsound-installed" existing

@@ -117,12 +117,19 @@ export function createProjectSetup(directories: ProjectDirectoriesPort, enter: (
   source?: { read(): string; songDraftId(): string; name?(): string; hasDeferredChanges?(): boolean;
     flushDraft?(): void | Promise<void>; prepareSave?(target?: 'source' | 'rootsound'): void | Promise<void>; renamed?(name: string): void }): ProjectSetupPort {
   let busy = false;
+  let guidePreparation: Promise<import('../contracts/project-directory.ts').ProjectDirectory> | undefined;
   async function exclusive<T>(action: () => Promise<T>): Promise<T> {
     if (busy) throw new Error('正在处理项目，请稍候。');
     busy = true;
     try { return await action(); } finally { busy = false; }
   }
   return {
+    prepareGuideProject(rememberedId) {
+      return guidePreparation ??= exclusive(async () => {
+        const { prepareGuideProject } = await import('./guide-project.ts');
+        return prepareGuideProject(directories, rememberedId);
+      }).finally(() => { guidePreparation = undefined; });
+    },
     async defaultLocation() { return (await directories.read()).defaultLocation; },
     chooseLocation: current => directories.chooseLocation(current),
     create: (input, location) => exclusive(async () => {

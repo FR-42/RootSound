@@ -4,7 +4,37 @@ import { mkdir, mkdtemp, readFile, writeFile, rename, symlink } from 'node:fs/pr
 import path from 'node:path';
 import { createRequire } from 'node:module';
 import { createInitialProjectLibrary, renameProjectLibrary } from '../src/workstation/app/project-setup.ts';
+import { prepareGuideProject } from '../src/workstation/app/guide-project.ts';
+import { createDesktopProjectDirectories } from '../src/workstation/app/platform/project-directories.ts';
+import guideTemplate from '../src/workstation/app/templates/first-creation.json' with { type: 'json' };
 const { HostClient } = createRequire(import.meta.url)('../desktop/electron/rpc.cjs');
+
+test('the real file service prepares a missing guide in the project root without opening or overwriting user music', async () => {
+  const root = path.resolve('.test-output/guide-host-fixtures'); await mkdir(root, { recursive: true });
+  const directory = await mkdtemp(path.join(root, 'case-'));
+  const host = new HostClient('dotnet', path.resolve('.cache/release-host/RootSound.Host.dll'), directory);
+  const bridge = Object.fromEntries(['Read', 'Browse', 'CreateDetached', 'Inspect', 'OpenKnown'].map(method =>
+    [method, (...args) => host.call(`project.${method}`, args)]));
+  const projects = createDesktopProjectDirectories(bridge);
+  try {
+    const location = (await projects.read()).defaultLocation;
+    await mkdir(location, { recursive: true });
+    const original = path.join(location, '初次创作.rootsound');
+    const userData = JSON.stringify({ format: 'RootSoundWorkspace', version: 2, id: 'f93e5365-63de-463d-8ac8-85fd58390cc1', name: '初次创作', createdAtUtc: new Date().toISOString(), libraryText: createInitialProjectLibrary('初次创作') });
+    await writeFile(original, userData);
+    const guide = await prepareGuideProject(projects);
+    assert.equal(path.dirname(guide.path), location);
+    assert.equal(guide.name, '初次创作（引导）');
+    assert.equal(await readFile(original, 'utf8'), userData);
+    assert.equal((await projects.read()).current, undefined);
+    const saved = JSON.parse(await readFile(guide.path, 'utf8'));
+    const phrase = text => JSON.parse(text).drafts.find(draft => draft.kind === 'rootsound.phrase').body;
+    assert.deepEqual(phrase(saved.libraryText), phrase(guideTemplate.libraryText));
+    assert.deepEqual(await prepareGuideProject(projects, guide.id), guide);
+    assert.equal((await projects.browse()).entries.filter(entry => entry.kind === 'project').length, 2);
+    assert.equal((await projects.open(guide.path)).status, 'opened');
+  } finally { host.close(); }
+});
 
 test('portable desktop host creates, edits without autosave, saves, reopens, copies, renames, imports and deletes only fixture projects', async () => {
   const root = path.resolve('.test-output/release-host-fixtures'); await mkdir(root, { recursive: true });

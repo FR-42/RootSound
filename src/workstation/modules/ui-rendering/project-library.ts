@@ -11,7 +11,7 @@ export function mountProjectLibrary(container: HTMLElement, trigger: HTMLElement
   onNew: () => void, save?: {
     source?: ProjectDirectory; name: string; original?: () => Promise<void>; discard?: () => Promise<void>;
     copy(name: string, path: string): Promise<void>; finish(choice: ProjectSaveChoice): void;
-  }, desktopPointerUx = false, guide?: WelcomeLibraryGuide): { open(): void; dispose(): void; awaitingInput(): boolean; refreshGuide(): void } {
+  }, desktopPointerUx = false, guide?: WelcomeLibraryGuide): { open(): void; dispose(): void; awaitingInput(): boolean; refreshGuide(reload?: boolean): void } {
   const welcomeLibrary = desktopPointerUx && !save;
   const welcomePage = welcomeLibrary ? trigger.closest<HTMLElement>('.welcome') : null;
   let libraryMotion: Animation | undefined;
@@ -957,7 +957,7 @@ export function mountProjectLibrary(container: HTMLElement, trigger: HTMLElement
       return expanded && (choosingFolder || !loading && !opening && !deleting && !renaming && !naming);
     },
     open: openLibrary,
-    refreshGuide() { if (expanded) render(); },
+    refreshGuide(reload = false) { if (expanded) { if (reload) void load(''); else render(); } },
     dispose() {
       if (disposed) return;
       edgeGesture?.dispose(); libraryMotion?.cancel();

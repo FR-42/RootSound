@@ -197,8 +197,8 @@ export function mountStudio(root: HTMLElement, options: StudioOptions): {
     root.replaceChildren(welcome);
     if (desktopPointerUx) {
       welcome.tabIndex = -1;
-      let refreshLibrary = () => {};
-      const guide = canGuide ? mountWelcomeGuide(root, welcome, () => refreshLibrary()) : undefined;
+      let refreshLibrary: (reload?: boolean) => void = () => {};
+      const guide = canGuide ? mountWelcomeGuide(root, welcome, reload => refreshLibrary(reload), 'prepareGuideProject' in service ? service.prepareGuideProject : undefined) : undefined;
       const library = mountProjectLibrary(root, welcome, service, startProject, undefined, true, guide);
       refreshLibrary = library.refreshGuide;
       page = { dispose() { guide?.dispose(); library.dispose(); } };

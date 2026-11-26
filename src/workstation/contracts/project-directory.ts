@@ -51,6 +51,7 @@ export interface ProjectDirectoriesPort {
 }
 /** Application orchestration exposed to the minimal creation pages. */
 export interface ProjectSetupPort {
+  prepareGuideProject?(rememberedId?: string): Promise<ProjectDirectory>;
   defaultLocation(): Promise<string>;
   chooseLocation(current: string): Promise<ProjectLocationResult>;
   create(name: string, location: string): Promise<void>;

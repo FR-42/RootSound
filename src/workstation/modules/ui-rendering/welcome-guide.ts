@@ -18,7 +18,7 @@ const demoKey = 'rootsound.welcome-guide-project.v1';
 const completionKey = 'rootsound.welcome-guide-complete.v1';
 
 export function rememberGuideProject(project: ProjectDirectory): void {
-  localStorage.setItem(demoKey, JSON.stringify({ id: project.id, name: project.name }));
+  localStorage.setItem(demoKey, JSON.stringify({ id: project.id, name: project.name, path: project.path }));
 }
 export function markGuideCompletion(complete: boolean): void {
   if (complete) sessionStorage.setItem(completionKey, 'true');
@@ -110,7 +110,8 @@ export function paintGuideShape(context: CanvasRenderingContext2D, time: number,
   context.stroke();
 }
 
-export function mountWelcomeGuide(root: HTMLElement, welcome: HTMLElement, refreshLibrary: () => void): WelcomeLibraryGuide & { dispose(): void } {
+export function mountWelcomeGuide(root: HTMLElement, welcome: HTMLElement, refreshLibrary: (reload?: boolean) => void,
+  prepareProject?: (rememberedId?: string) => Promise<ProjectDirectory>): WelcomeLibraryGuide & { dispose(): void } {
   const introduction = welcome.querySelector<HTMLElement>('.project-welcome-introduction')!;
   const hint = document.createElement('p');
   hint.className = 'welcome-guide-edge-hint';
@@ -155,6 +156,32 @@ export function mountWelcomeGuide(root: HTMLElement, welcome: HTMLElement, refre
   let frame = 0, timer = 0, libraryOpen = false;
   let step: 'welcome' | 'library' | 'complete' | undefined;
   let escapedGuide = false;
+  let project: ProjectDirectory | undefined;
+  let preparation: Promise<void> | undefined;
+  let projectError = '';
+  let request = 0;
+  let disposed = false;
+
+  function ensureProject(): void {
+    if (!prepareProject || preparation) return;
+    const current = ++request;
+    let rememberedId: string | undefined;
+    try { rememberedId = JSON.parse(localStorage.getItem(demoKey) ?? 'null')?.id; } catch {}
+    projectError = '';
+    preparation = prepareProject(rememberedId).then(value => {
+      if (disposed || current !== request) return;
+      project = value;
+      rememberGuideProject(value);
+    }, error => {
+      if (disposed || current !== request) return;
+      projectError = error instanceof Error ? error.message : String(error);
+      message.textContent = projectError;
+      panel.setAttribute('role', 'alert');
+    }).finally(() => {
+      preparation = undefined;
+      if (!disposed && step === 'library') refreshLibrary(true);
+    });
+  }
 
   function animate(time: number): void {
     if (!libraryOpen && buttonContext) paintGuideShape(buttonContext, time, false, reducedMotion.matches);
@@ -212,6 +239,8 @@ export function mountWelcomeGuide(root: HTMLElement, welcome: HTMLElement, refre
     mouse.setAttribute('aria-hidden', 'true');
     instruction.append(mouse, '滑动到边缘');
     message.replaceChildren(title, instruction);
+    project = undefined;
+    ensureProject();
     syncMotion();
   }
   function finish(): void {
@@ -291,6 +320,24 @@ export function mountWelcomeGuide(root: HTMLElement, welcome: HTMLElement, refre
     target(entries, directory, loading) {
       if (step !== 'library') return undefined;
       if (loading) return null;
+      if (prepareProject) {
+        if (projectError) return undefined;
+        if (preparation) return null;
+        if (!project) { ensureProject(); return null; }
+        const entry = entries.find(item => item.kind === 'project' && item.id === project!.id);
+        if (entry) {
+          message.textContent = `这次先打开《${project.name}》这首音乐吧`;
+          return entry.path;
+        }
+        const separator = project.path.includes('\\') ? '\\' : '/';
+        const normalized = (value: string) => value.replace(/\\/gu, '/').replace(/\/$/u, '').toLocaleLowerCase();
+        const parent = normalized(project.path.slice(0, project.path.lastIndexOf(separator)));
+        const folder = entries.find(item => item.kind === 'folder' && normalized(item.path) === parent);
+        if (folder) return folder.path;
+        project = undefined;
+        ensureProject();
+        return null;
+      }
       const inDemoFolder = directory?.split(/[/\\]/u).filter(Boolean).at(-1) === demoFolder;
       let rememberedId: string | undefined;
       try { rememberedId = JSON.parse(localStorage.getItem(demoKey) ?? 'null')?.id; } catch {}
@@ -314,6 +361,8 @@ export function mountWelcomeGuide(root: HTMLElement, welcome: HTMLElement, refre
       return () => sessionStorage.removeItem(canvasKey);
     },
     dispose() {
+      disposed = true;
+      request++;
       observer.disconnect();
       document.removeEventListener('keydown', escape, true);
       for (const type of completionInputs) window.removeEventListener(type, dismissCompletion, true);
