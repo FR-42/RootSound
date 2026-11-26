@@ -191,7 +191,7 @@ export function mountCoCreationWorkspace(root: HTMLElement, options: {
         description.append(node('p', 'co-section-label', view.body.round ? '留下来的这一份' : '你的旋律起点'));
         const title = node('h2', 'co-current-title'); title.tabIndex = -1;
         const name = node('input', 'co-current-name'); name.type = 'text'; name.maxLength = 4096;
-        name.setAttribute('aria-label', '当前结果名称'); name.title = '直接修改当前结果名称';
+        name.setAttribute('aria-label', '当前结果名称');
         name.value = renameEdit?.value ?? view.currentPhrase.name; renameField = name;
         const beginName = () => {
           if (!renameEdit && lastView?.currentPhrase) renameEdit = {

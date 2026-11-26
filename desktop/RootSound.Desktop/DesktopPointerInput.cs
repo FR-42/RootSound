@@ -80,17 +80,15 @@ internal sealed class DesktopPointerInput : IDisposable
 
     private readonly Form window;
     private readonly Action<string> send;
-    private readonly Action<Point, Rectangle> observePointer;
     private readonly System.Windows.Forms.Timer timer = new() { Interval = 16 };
     private readonly bool registered;
     private int dx, dy;
     private bool pressed, pending;
 
-    public DesktopPointerInput(Form window, Action<string> send, Action<Point, Rectangle> observePointer)
+    public DesktopPointerInput(Form window, Action<string> send)
     {
         this.window = window;
         this.send = send;
-        this.observePointer = observePointer;
         const uint inputSink = 0x100;
         registered = RegisterRawInputDevices(new Device { Page = 1, Usage = 2, Flags = inputSink, Target = window.Handle }, 1, (uint)Marshal.SizeOf<Device>());
         timer.Tick += (_, _) => Flush();
@@ -109,7 +107,7 @@ internal sealed class DesktopPointerInput : IDisposable
             dx = Math.Clamp(dx + value.Mouse.X, -8192, 8192);
             dy = Math.Clamp(dy + value.Mouse.Y, -8192, 8192);
         }
-        pressed |= (value.Mouse.Buttons & 0x0015) != 0;
+        pressed |= (value.Mouse.Buttons & 0x0155) != 0;
         pending = true;
     }
 
@@ -124,8 +122,7 @@ internal sealed class DesktopPointerInput : IDisposable
         bool maximized = window.WindowState == FormWindowState.Maximized;
         var cursor = Cursor.Position;
         var client = window.RectangleToScreen(window.ClientRectangle);
-        observePointer(cursor, client);
-        var edge = ReadEdgePosition(handle, maximized)
+        var edge = (maximized ? ReadEdgePosition(handle) : null)
             ?? EdgePosition(cursor, client, maximized ? Screen.FromControl(window).Bounds : null);
         if (edge is not { } position) return;
         send(JsonSerializer.Serialize(new
@@ -144,7 +141,7 @@ internal sealed class DesktopPointerInput : IDisposable
         return foreground != IntPtr.Zero && (foreground == handle || GetAncestor(foreground, root) == handle);
     }
 
-    private static (double X, double Y)? ReadEdgePosition(IntPtr handle, bool maximized)
+    private static (double X, double Y)? ReadEdgePosition(IntPtr handle)
     {
         const int perMonitorAware = -3;
         const int extendedFrameBounds = 9;
@@ -157,7 +154,7 @@ internal sealed class DesktopPointerInput : IDisposable
             if (DwmGetWindowAttribute(handle, extendedFrameBounds, out var frame, Marshal.SizeOf<Frame>()) != 0
                 && !GetWindowRect(handle, out frame)) return null;
             var monitor = new MonitorInfo { Size = Marshal.SizeOf<MonitorInfo>() };
-            Rectangle? screen = maximized && GetMonitorInfoW(MonitorFromWindow(handle, nearestMonitor), ref monitor)
+            Rectangle? screen = GetMonitorInfoW(MonitorFromWindow(handle, nearestMonitor), ref monitor)
                 ? monitor.Bounds.ToRectangle() : null;
             return EdgePosition(cursor, frame.ToRectangle(), screen);
         }
@@ -173,11 +170,7 @@ internal sealed class DesktopPointerInput : IDisposable
 
     private static double EdgeCoordinate(int offset, int size)
     {
-        const int tolerance = 2;
-        int lastPixel = size - 1;
-        if (offset >= 0 && offset <= tolerance) return 0;
-        if (offset <= lastPixel && offset >= lastPixel - tolerance) return 1;
-        return offset / (double)lastPixel;
+        return offset / (double)(size - 1);
     }
 
     public void Reset()

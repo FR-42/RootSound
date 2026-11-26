@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using System.Security.Cryptography;
 
 namespace RootSound.Desktop;
 
@@ -16,6 +17,8 @@ public sealed record ProjectLibraryPage(
 public sealed partial class ProjectDirectoryManager
 {
     private string? selectedLibraryRoot;
+    private sealed record LibraryTransfer(string Source, string Destination, bool Moved, string[] Contents);
+    private readonly Stack<LibraryTransfer> libraryTransfers = new();
     private readonly Dictionary<string, (long Length, DateTime Modified, ProjectDirectoryInfo Project)> listingHeaders = new(StringComparer.OrdinalIgnoreCase);
 
     private ProjectDirectoryInfo ReadListedProject(string path)
@@ -159,6 +162,137 @@ public sealed partial class ProjectDirectoryManager
             finally { RemoveEmptyDeletionDirectory(staging); }
         }
     }
+
+    public void TransferLibraryEntry(string source, string directory, bool move)
+    {
+        lock (gate)
+        {
+            ThrowIfDisposed();
+            source = RequireTransferEntry(source);
+            directory = ResolveLibraryFolder(directory);
+            if (!Directory.Exists(directory) || IsKnownProjectPath(directory))
+                throw new IOException("请选择用于粘贴的文件夹。");
+            bool folder = Directory.Exists(source);
+            if (folder && WithinLibrary(directory, source))
+                throw new IOException("不能把文件夹粘贴到它自己或它的子目录。");
+            var entries = folder ? LibraryTree(source) : [source];
+            string destination = Path.Combine(directory, Path.GetFileName(source));
+            if (move && SamePath(source, destination)) return;
+            if (move && Path.Exists(destination)) throw new IOException("当前目录已有同名文件或文件夹。");
+            if (!move && Path.Exists(destination))
+            {
+                string extension = folder ? "" : Path.GetExtension(source);
+                string name = folder ? Path.GetFileName(source) : Path.GetFileNameWithoutExtension(source);
+                int number = 1;
+                do
+                {
+                    destination = Path.Combine(directory, name + (number == 1 ? " - 副本" : $" - 副本 ({number})") + extension);
+                    number++;
+                } while (Path.Exists(destination));
+            }
+            using var ownership = ClaimLibraryFiles(entries);
+            if (move)
+            {
+                var contents = TransferContents(source, entries);
+                MoveLibraryItem(source, destination, folder);
+                libraryTransfers.Push(new(source, destination, true, contents));
+            }
+            else
+            {
+                string staged = Path.Combine(directory, ".rootsound-create-" + Guid.NewGuid().ToString("N"));
+                try
+                {
+                    foreach (string entry in entries)
+                    {
+                        string target = SamePath(entry, source) ? staged : Path.Combine(staged, Path.GetRelativePath(source, entry));
+                        if (IsLink(entry)) throw new IOException("复制过程中发现目录链接。");
+                        if (Directory.Exists(entry)) Directory.CreateDirectory(target);
+                        else
+                        {
+                            File.Copy(entry, target);
+                            File.SetAttributes(target, File.GetAttributes(target) & ~FileAttributes.ReadOnly);
+                        }
+                    }
+                    var contents = TransferContents(staged, folder ? LibraryTree(staged, true) : [staged]);
+                    MoveLibraryItem(staged, destination, folder);
+                    libraryTransfers.Push(new(source, destination, false, contents));
+                }
+                finally
+                {
+                    if (Directory.Exists(staged)) Directory.Delete(staged, true);
+                    else File.Delete(staged);
+                }
+            }
+            listingHeaders.Clear();
+        }
+    }
+
+    public void UndoLibraryTransfer()
+    {
+        lock (gate)
+        {
+            ThrowIfDisposed();
+            if (!libraryTransfers.TryPeek(out var change)) return;
+            string destination = RequireTransferEntry(change.Destination);
+            bool folder = Directory.Exists(destination);
+            var entries = folder ? LibraryTree(destination) : [destination];
+            using var ownership = ClaimLibraryFiles(entries);
+            if (!change.Contents.SequenceEqual(TransferContents(destination, entries)))
+                throw new IOException("粘贴的内容已发生变化，无法撤销这次操作。");
+            if (change.Moved)
+            {
+                string parent = ResolveLibraryFolder(Path.GetDirectoryName(change.Source)!);
+                if (!Directory.Exists(parent) || Path.Exists(change.Source))
+                    throw new IOException("原位置已不存在或已有同名文件。");
+                MoveLibraryItem(destination, change.Source, folder);
+            }
+            else
+            {
+                string staged = Path.Combine(Path.GetDirectoryName(destination)!, ".rootsound-delete-" + Guid.NewGuid().ToString("N"));
+                MoveLibraryItem(destination, staged, folder);
+                try
+                {
+                    if (folder) Directory.Delete(staged, true);
+                    else File.Delete(staged);
+                }
+                catch
+                {
+                    if (Path.Exists(staged) && !Path.Exists(destination)) MoveLibraryItem(staged, destination, folder);
+                    throw;
+                }
+            }
+            libraryTransfers.Pop();
+            listingHeaders.Clear();
+        }
+    }
+
+    private string RequireTransferEntry(string path)
+    {
+        path = FullDirectory(path);
+        string parent = ResolveLibraryFolder(Path.GetDirectoryName(path) ?? "");
+        if (SamePath(path, LibraryRootFor(path)) || !Path.Exists(path) || IsLink(path) ||
+            IsLibraryStagingName(Path.GetFileName(path)) || IsKnownProjectPath(parent) ||
+            !Directory.Exists(path) && !IsKnownProjectPath(path) && NativeDocumentFiles.Format(path) is null)
+            throw new IOException("请重新选择乐曲库中的文件或文件夹。");
+        if (current is not null && WithinLibrary(current.Path, path))
+            throw new IOException("其中的歌曲正在编辑，请先退出歌曲。");
+        return path;
+    }
+
+    private static void MoveLibraryItem(string source, string destination, bool folder)
+    {
+        if (folder) Directory.Move(source, destination);
+        else File.Move(source, destination);
+    }
+
+    private static string[] TransferContents(string root, IEnumerable<string> entries) =>
+        entries.Select(entry =>
+        {
+            string name = Path.GetRelativePath(root, entry);
+            if (Directory.Exists(entry)) return $"目录:{name}";
+            using var stream = File.OpenRead(entry);
+            return $"文件:{name}:{Convert.ToHexString(SHA256.HashData(stream))}";
+        }).Order(StringComparer.Ordinal).ToArray();
 
     public void RenameLibraryEntry(string path, string name)
     {

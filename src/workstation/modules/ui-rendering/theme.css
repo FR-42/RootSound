@@ -1,4 +1,5 @@
 :root {
+  --playline-fade: linear-gradient(to bottom, #e7c762 0, #fff0ad 2px, #fff0ad00 100%);
   color-scheme: light;
   --surface-base: #fafbfd;
   --surface: #ffffff;
@@ -13,6 +14,8 @@
   color: var(--text);
 }
 #app { -webkit-user-select: none; user-select: none; }
+:where(#app :focus) { outline: none; }
+:where(#app) :focus-visible:not(:where(.melody-note, .melody-scroll)) { outline: 2px solid var(--focus-color, var(--accent)); }
 :where(#app) :where(input:read-write, textarea:read-write, [contenteditable]:read-write) {
   -webkit-user-select: text;
   user-select: text;
@@ -49,7 +52,7 @@ body, .welcome, .studio { background: var(--surface-base); color: var(--text); }
 .melody-tone.is-selected { outline-color: var(--accent); background: var(--surface-hover); }
 .melody-note { color: #122334; box-shadow: inset 0 0 0 1px #0005; }
 .melody-note.is-dim { opacity: .22; }
-.melody-note.is-selected { box-shadow: inset 0 0 0 1px #101b2b, inset 0 0 0 2px #eef4ff; }
+.melody-note:is(.is-selected, :focus-visible) { box-shadow: inset 0 0 0 1px var(--accent), inset 0 0 0 2px #eef4ff; }
 .melody-family-remove:hover { background: #fbe9ec; color: var(--danger); }
 .melody-library-category:hover, .melody-library-category.is-active, .melody-library-tone.is-on-shelf,
 .project-library .project-library-tile:hover { background: var(--surface-hover); color: var(--text); }

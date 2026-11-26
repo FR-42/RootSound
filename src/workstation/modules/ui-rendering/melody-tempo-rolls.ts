@@ -1,7 +1,9 @@
 import type { PhraseBody, PhraseEditorPort } from '../../contracts/phrase.ts';
-import { phraseBarBeats, phraseMeterBeatLength, phraseTempoBoundary, phraseTempoSpans, phraseStepsAtBeat } from '../../contracts/phrase-time.ts';
+import { phraseBarBeats, phraseMeterBeatLength, phraseTempoBoundary, phraseTempoSpans, phraseStepsAtBeat, withPhraseGridOffset } from '../../contracts/phrase-time.ts';
 import type { MelodyView } from './melody-geometry.ts';
 import { showTapTempo } from './tap-tempo.ts';
+import { createTapTempo } from './tap-tempo-model.ts';
+import { estimateScoreTempo } from './score-tempo.ts';
 import { attachMelodyTempoInput } from './melody-tempo-input.ts';
 import { MAX_PHRASE_BEATS } from '../../contracts/phrase-limits.ts';
 import type { LearningAction } from '../../contracts/guidance.ts';
@@ -14,8 +16,9 @@ export function mountMelodyTempoRolls(options: {
   root: HTMLElement; dock: HTMLElement; ruler: HTMLElement; bands: HTMLElement; extend: HTMLButtonElement; end: HTMLButtonElement;
   phrase: PhraseEditorPort; readBody(): PhraseBody | undefined; readView(): MelodyView; scale(): number; height(): number;
   flush(): boolean; changed(committed?: boolean, preserveSounding?: boolean): void; preview(body?: PhraseBody, boundaryOnly?: boolean): void; navigate(seconds: number): void; report(message: string): void;
+  gridVisibilityChanged?(): void;
   gridChanged?(steps: number, bpm: number): void;
-  readMultipleTempoRolls?(): boolean; previewRate(value?: number, sectionId?: string): void; inGuide?: boolean; onLearningAction?(action: LearningAction): void;
+  readMultipleTempoRolls?(): boolean; previewRate(value?: number, sectionId?: string): void; inGuide?: boolean; beatLinesOnly?: boolean; desktopTapTempo?: boolean; onLearningAction?(action: LearningAction): void;
 }) {
   let active: string | undefined, opened = false, disposed = false;
   let selected: string | undefined;
@@ -27,24 +30,37 @@ export function mountMelodyTempoRolls(options: {
     raw: number; snapped: number; moved: boolean } | undefined;
   let frame = 0, suppressClickUntil = 0;
   const markers = new Map<string, { band: HTMLElement; block: HTMLElement; button: HTMLButtonElement }>();
-  const button = element('button', 'melody-tempo-button', '120'); button.type = 'button'; button.title = 'BPM';
-  button.setAttribute('aria-label', 'BPM'); button.setAttribute('aria-expanded', 'false');
+  const button = element('button', 'melody-tempo-button', '120');
+  button.type = 'button';
+  button.setAttribute('aria-label', 'BPM');
+  button.setAttribute('aria-expanded', 'false');
   const panel = element('div', 'melody-tempo-panel'); panel.hidden = true;
+  panel.classList.toggle('is-compact-tempo', options.beatLinesOnly === true);
   const field = element('label', 'melody-tempo-field', 'BPM'), input = element('input', 'melody-tempo-input melody-tempo-rate-input');
-  input.type = 'number'; input.min = String(MIN_TEMPO_BPM); input.max = String(MAX_TEMPO_BPM); input.step = 'any'; input.setAttribute('aria-label', '当前卷帘 BPM');
+  input.type = 'number'; input.min = String(MIN_TEMPO_BPM); input.max = String(MAX_TEMPO_BPM); input.step = 'any'; input.setAttribute('aria-label', '当前画布 BPM');
   const rateControl = element('span', 'melody-tempo-rate');
   const scrubIcon = element('span', 'melody-tempo-scrub-mark'); scrubIcon.setAttribute('aria-hidden', 'true');
   rateControl.append(input, scrubIcon); field.append(rateControl);
   const rateInput = attachMelodyTempoInput(input, rateControl, {
-    read: readTempo,
-    preview(value) { options.previewRate(value, active); },
+    read: () => desktopSuggestion() ?? readTempo(),
+    preview(value) { if (desktopSuggestion() === undefined) options.previewRate(value, active); },
+    adjusted() { if (desktopSuggestion() !== undefined) armTimeout(); },
     commit(value) {
+      const candidate = desktopSuggestion();
+      if (candidate !== undefined) {
+        if (candidate !== value) {
+          pulse.reset();
+          lastTap = -Infinity;
+          showSuggestion(value);
+        }
+        return;
+      }
       try { apply(value); }
       catch (error) { options.report(error instanceof Error ? error.message : String(error)); paint(); }
     },
   });
   function makeGrid(readId: () => string | undefined, className: string) {
-    const grid = element('select', className); grid.setAttribute('aria-label', '每拍细分'); grid.title = '每拍细分';
+    const grid = element('select', className); grid.setAttribute('aria-label', '每拍细分');
     for (let count = 2; count <= 9; count++) { const choice = element('option', '', `${count} 份`); choice.value = String(count); grid.append(choice); }
     grid.addEventListener('pointerdown', event => event.stopPropagation());
     grid.addEventListener('keydown', event => event.stopPropagation());
@@ -62,17 +78,19 @@ export function mountMelodyTempoRolls(options: {
   }
   function makeTap(readId: () => string | undefined) {
     const trigger = element('button', 'melody-tap-tempo song-tap-tempo', '敲击定速'); trigger.type = 'button';
-    trigger.title = '敲击节奏设置 BPM'; trigger.setAttribute('aria-label', '敲击定速');
+    trigger.setAttribute('aria-label', '敲击定速');
     trigger.addEventListener('pointerdown', event => event.stopPropagation());
-    trigger.addEventListener('click', () => {
-      if (tap) return; const id = readId(); close();
-      tap = showTapTempo(options.root, {
-        inGuide: options.inGuide,
-        onApply(value) { active = id; return apply(value); },
-        onClose() { tap = undefined; },
-      });
-    });
+    trigger.addEventListener('click', () => openTap(readId()));
     return trigger;
+  }
+  function openTap(id?: string): void {
+    if (tap) return;
+    close();
+    tap = showTapTempo(options.root, {
+      inGuide: options.inGuide,
+      onApply(value) { active = id; return apply(value); },
+      onClose() { tap = undefined; },
+    });
   }
   const grid = makeGrid(() => active, 'melody-grid-select melody-tempo-grid');
   const gridField = element('label', 'melody-tempo-grid-field', '每拍细分'); gridField.append(grid);
@@ -93,12 +111,202 @@ export function mountMelodyTempoRolls(options: {
       options.changed();
     } catch (error) { options.report(error instanceof Error ? error.message : String(error)); paint(); }
   });
-  panel.append(field, makeTap(() => active), gridField, meterField); options.dock.append(button); options.root.append(panel);
+  const pulse = createTapTempo();
+  let tapping = false, suggestion: number | undefined, tapTimeout = 0, lastTap = -Infinity;
+  const tapButton = element('button', 'melody-tap-tempo');
+  const analyzeButton = options.desktopTapTempo ? undefined : element('button', 'melody-analyze-tempo', '分析');
+  const analysisStatus = analyzeButton ? element('output', 'melody-tempo-status', '无法确定 BPM') : undefined;
+  tapButton.type = 'button';
+  if (analyzeButton) analyzeButton.type = 'button';
+  function desktopSuggestion(): number | undefined {
+    return options.desktopTapTempo ? suggestion : undefined;
+  }
+  function showSuggestion(value?: number): void {
+    suggestion = value;
+    input.value = String(Math.round(value ?? readTempo()));
+    if (analyzeButton && analysisStatus) {
+      analysisStatus.hidden = true;
+      tapButton.textContent = '敲拍';
+      analyzeButton.textContent = value === undefined ? '分析' : '应用';
+      return;
+    }
+    tapButton.textContent = value === undefined ? '' : '应用';
+    tapButton.classList.toggle('is-space-key', value === undefined);
+    tapButton.setAttribute('aria-label', value === undefined ? '空格定速' : '应用 BPM');
+  }
+  function resetSuggestion(): void {
+    window.clearTimeout(tapTimeout);
+    pulse.reset();
+    lastTap = -Infinity;
+    tapping = false;
+    tapButton.removeAttribute('aria-pressed');
+    showSuggestion();
+  }
+  function armTimeout(): void {
+    window.clearTimeout(tapTimeout);
+    tapTimeout = window.setTimeout(() => {
+      if (desktopSuggestion() !== undefined) rateInput.cancel();
+      resetSuggestion();
+    }, 7000);
+  }
+  function tapBeat(): void {
+    const now = performance.now();
+    if (now - lastTap < 60000 / MAX_TEMPO_BPM) return;
+    lastTap = now;
+    const { bpm } = pulse.tap(now);
+    if (!options.desktopTapTempo || bpm !== undefined) showSuggestion(bpm);
+    if (options.desktopTapTempo) armTimeout();
+  }
+  function applySuggestion(): void {
+    if (desktopSuggestion() !== undefined) rateInput.flush();
+    if (suggestion === undefined) return;
+    try { if (apply(suggestion)) close(); }
+    catch (error) { options.report(error instanceof Error ? error.message : String(error)); resetSuggestion(); }
+  }
+  function beginTapping(): void {
+    if (tapping) return;
+    rateInput.flush();
+    tapping = true;
+    tapButton.setAttribute('aria-pressed', 'true');
+  }
+  resetSuggestion();
+  tapButton.addEventListener('click', () => {
+    if (desktopSuggestion() !== undefined) { applySuggestion(); return; }
+    beginTapping();
+    if (options.desktopTapTempo) armTimeout();
+    else tapBeat();
+  });
+  analyzeButton?.addEventListener('click', () => {
+    if (suggestion !== undefined) { applySuggestion(); return; }
+    rateInput.flush();
+    resetSuggestion();
+    const body = options.readBody();
+    const bpm = body && estimateScoreTempo(body, active);
+    if (bpm === undefined) { analysisStatus!.hidden = false; return; }
+    showSuggestion(bpm);
+  });
+  function cancelTapForRateEdit(): void {
+    if (tapping && desktopSuggestion() === undefined) resetSuggestion();
+  }
+  rateControl.addEventListener('pointerdown', cancelTapForRateEdit, true);
+  rateControl.addEventListener('wheel', cancelTapForRateEdit, { capture: true });
+  input.addEventListener('keydown', event => {
+    if (event.key === 'ArrowUp' || event.key === 'ArrowDown') cancelTapForRateEdit();
+  }, true);
+  input.addEventListener('input', () => {
+    if (!tapping) return;
+    const typed = input.value;
+    resetSuggestion();
+    input.value = typed;
+  });
+  panel.append(field);
+  if (options.beatLinesOnly) {
+    const actions = element('div', 'melody-tempo-actions'); actions.append(tapButton); panel.append(actions);
+    if (analyzeButton && analysisStatus) { actions.append(analyzeButton); panel.append(analysisStatus); }
+  } else panel.append(makeTap(() => active));
+  if (!options.beatLinesOnly) panel.append(gridField, meterField);
+  options.root.append(panel);
+  options.dock.append(button);
+  const gridHandle = options.beatLinesOnly ? element('button', 'melody-grid-shift') : undefined;
+  const hiddenGrids = new Set<string | undefined>();
+  let gridVisibilityVersion = 0;
+  let gridPressed: boolean | undefined;
+  let gridShift: { body: PhraseBody; sectionId?: string; pointerId: number; fromX: number; fromY: number; offset: number; initial: number;
+    beatsPerPixel: number; panel: HTMLElement; frame: number; moved: boolean; dragging: boolean } | undefined;
+  function gridHidden(id?: string): boolean {
+    return hiddenGrids.has(id) && !(gridShift?.dragging && gridShift.sectionId === id);
+  }
+  function toggleGrid(id?: string): void {
+    if (!hiddenGrids.delete(id)) hiddenGrids.add(id);
+    gridVisibilityVersion++;
+    refreshGridControls();
+    options.gridVisibilityChanged?.();
+  }
+  function refreshGridControls(body = options.readBody()): void {
+    if (!gridHandle) return;
+    const allHidden = !!body && phraseTempoSpans(body).every(span => hiddenGrids.has(span.id));
+    if (allHidden && opened) close();
+    button.hidden = allHidden;
+    options.dock.closest('.song-details-tempo')?.classList.toggle('are-beat-grids-hidden', allHidden);
+  }
+  if (gridHandle) {
+    gridHandle.type = 'button';
+    gridHandle.setAttribute('aria-label', '隐藏拍线');
+    gridHandle.addEventListener('click', event => {
+      if (event.detail === 0 && !gridShift) toggleGrid(active);
+    });
+    options.dock.append(gridHandle);
+    gridHandle.addEventListener('pointerdown', event => {
+      const details = options.dock.closest<HTMLElement>('.song-editor-controls');
+      if (event.button !== 0 || gridShift || drag || !details?.hasAttribute('open') || !options.flush()) return;
+      close();
+      const body = options.readBody();
+      if (!body) return;
+      const span = phraseTempoSpans(body).find(item => item.id === active);
+      if (!span) return;
+      const initial = span.gridOffsetBeats ?? 0;
+      gridShift = { body, sectionId: span.id, pointerId: event.pointerId, fromX: event.clientX, fromY: event.clientY, initial, offset: initial,
+        beatsPerPixel: span.tempoBpm / (60 * options.scale()), panel: details, frame: 0, moved: false, dragging: false };
+      event.preventDefault();
+      event.stopPropagation();
+      gridHandle.setPointerCapture(event.pointerId);
+    });
+    gridHandle.addEventListener('lostpointercapture', event => { if (gridShift?.pointerId === event.pointerId) finishGridShift(false); });
+  }
+  function moveGridShift(event: PointerEvent): void {
+    const shift = gridShift;
+    if (!shift || shift.pointerId !== event.pointerId) return;
+    const dy = event.clientY - shift.fromY;
+    shift.moved ||= Math.hypot(event.clientX - shift.fromX, dy) >= 4;
+    const started = !shift.dragging && Math.abs(dy) >= 4;
+    if (started) {
+      shift.dragging = true;
+      shift.panel.classList.add('is-shifting-beats');
+      if (hiddenGrids.has(shift.sectionId)) gridVisibilityVersion++;
+    }
+    if (!shift.dragging) return;
+    const cycle = phraseBarBeats(shift.body);
+    const rawOffset = shift.initial - dy * shift.beatsPerPixel;
+    const offset = ((rawOffset % cycle) + cycle) % cycle;
+    if (!started && Math.abs(offset - shift.offset) < 1e-9) return;
+    shift.offset = offset;
+    if (!shift.frame) shift.frame = requestAnimationFrame(() => {
+      shift.frame = 0;
+      options.preview(withPhraseGridOffset(shift.body, shift.sectionId, shift.offset), true);
+    });
+  }
+  function finishGridShift(commit: boolean, render = true, tap = false): void {
+    const shift = gridShift;
+    if (!shift) return;
+    gridShift = undefined;
+    if (gridHandle?.hasPointerCapture(shift.pointerId)) gridHandle.releasePointerCapture(shift.pointerId);
+    if (!shift.dragging) {
+      if (commit && tap && !shift.moved) toggleGrid(shift.sectionId);
+      return;
+    }
+    cancelAnimationFrame(shift.frame);
+    shift.panel.classList.remove('is-shifting-beats');
+    if (hiddenGrids.has(shift.sectionId)) gridVisibilityVersion++;
+    options.preview();
+    let changed = false;
+    try {
+      if (commit && Math.abs(shift.offset - shift.initial) >= 1e-9) {
+        options.phrase.setTempoGridOffset(shift.sectionId, shift.offset);
+        changed = true;
+      }
+    } catch (error) { options.report(error instanceof Error ? error.message : String(error)); }
+    if (render) options.changed(changed, true);
+  }
   const menu = element('div', 'melody-tempo-menu'); menu.hidden = true; menu.setAttribute('role', 'menu');
   const remove = element('button', '', '删除'); remove.type = 'button'; remove.setAttribute('role', 'menuitem');
   menu.append(remove); options.root.append(menu);
   const hint = element('div', 'melody-tempo-resize-hint'); hint.hidden = true; options.root.append(hint);
-  function close() { rateInput.flush(); opened = false; panel.hidden = true; button.setAttribute('aria-expanded', 'false'); }
+  function close() {
+    if (desktopSuggestion() !== undefined) rateInput.cancel();
+    else rateInput.flush();
+    resetSuggestion();
+    opened = false; panel.hidden = true; button.setAttribute('aria-expanded', 'false');
+  }
   function closeMenu(focus = false) {
     menu.hidden = true; menuSection = undefined;
     if (focus) menuAnchor?.focus();
@@ -106,6 +314,9 @@ export function mountMelodyTempoRolls(options: {
   }
   function open(id: string | undefined, anchor: HTMLElement) {
     closeMenu(); rateInput.flush(); selected = id ?? 'first'; active = id; opened = true; paint(); panel.hidden = false; button.setAttribute('aria-expanded', 'true');
+    const inDetails = anchor === button && !!options.dock.closest('.song-details-tempo');
+    (inDetails ? options.dock : options.root).append(panel);
+    if (inDetails) { panel.style.left = ''; panel.style.top = ''; return; }
     const rect = anchor.getBoundingClientRect(), height = panel.getBoundingClientRect().height;
     const top = rect.bottom + 4 + height > window.innerHeight ? Math.max(4, rect.top - height - 4) : rect.bottom + 4;
     panel.style.left = `${rect.left}px`; panel.style.top = `${top}px`;
@@ -128,8 +339,9 @@ export function mountMelodyTempoRolls(options: {
     if (disposed || !options.flush()) return false;
     const previous = readTempo();
     if (previous === value) return true;
-    if (active) options.phrase.setTempoSection(active, value); else options.phrase.setTempo(value, { preserveNoteDurations: false });
-    options.changed(); paint(); if (previous !== value) options.onLearningAction?.('change-tempo');
+    if (active) options.phrase.setTempoSection(active, value, { preserveTimeline: true });
+    else options.phrase.setTempo(value, { preserveTimeline: true });
+    options.changed(true, true); paint(); if (previous !== value) options.onLearningAction?.('change-tempo');
     return true;
   }
   function addRoll() {
@@ -192,12 +404,14 @@ export function mountMelodyTempoRolls(options: {
     catch (error) { options.report(error instanceof Error ? error.message : String(error)); }
   }
   const move = (event: PointerEvent) => {
+    if (gridShift) { moveGridShift(event); return; }
     const d = drag; if (!d || d.pointerId !== event.pointerId) return;
     event.preventDefault(); const pixels = event.clientY - d.fromY;
     if (Math.abs(pixels) > 3) d.moved = true; if (!d.moved) return;
     const clamp = (beat: number) => Math.max(d.minimum, Math.min(d.maximum, beat));
     d.raw = clamp(d.start + pixels / d.scale * d.bpm / 60);
-    if (d.id) {
+    if (d.id && options.beatLinesOnly) d.snapped = d.raw;
+    else if (d.id) {
       const first = Math.ceil((d.minimum - d.gridOrigin) / d.beatSize - 1e-10);
       const last = Math.floor((d.maximum - d.gridOrigin) / d.beatSize + 1e-10);
       const beat = Math.max(first, Math.min(last, Math.round((d.raw - d.gridOrigin) / d.beatSize)));
@@ -224,9 +438,19 @@ export function mountMelodyTempoRolls(options: {
     if (render) options.changed(changed, true);
     if (changed) options.onLearningAction?.('resize-roll');
   }
-  const up = (event: PointerEvent) => { if (drag?.pointerId === event.pointerId) finishResize(true); };
-  const cancel = (event: PointerEvent) => { if (drag?.pointerId === event.pointerId) finishResize(false); };
+  const up = (event: PointerEvent) => {
+    if (gridShift?.pointerId === event.pointerId) { moveGridShift(event); finishGridShift(true, true, true); }
+    if (drag?.pointerId === event.pointerId) {
+      if (drag.id && options.beatLinesOnly) move(event);
+      finishResize(true);
+    }
+  };
+  const cancel = (event: PointerEvent) => {
+    if (gridShift?.pointerId === event.pointerId) finishGridShift(false);
+    if (drag?.pointerId === event.pointerId) finishResize(false);
+  };
   function cancelInteraction(): boolean {
+    if (gridShift) { finishGridShift(false); return true; }
     if (!menu.hidden) { closeMenu(true); return true; }
     if (drag) { finishResize(false); return true; }
     if (opened) { rateInput.cancel(); close(); button.focus(); return true; }
@@ -236,15 +460,41 @@ export function mountMelodyTempoRolls(options: {
     if (event.key === 'Escape' && !event.defaultPrevented && cancelInteraction()) event.preventDefault();
   };
   document.addEventListener('pointermove', move); document.addEventListener('pointerup', up); document.addEventListener('pointercancel', cancel); document.addEventListener('keydown', escape);
-  options.end.addEventListener('pointerdown', event => beginResize(event, undefined, options.end));
+  if (options.phrase.autoRollLength) {
+    options.end.disabled = true; options.end.setAttribute('aria-hidden', 'true');
+  }
+  options.end.addEventListener('pointerdown', event => { if (!options.phrase.autoRollLength) beginResize(event, undefined, options.end); });
   options.end.addEventListener('lostpointercapture', event => { if (drag?.capture === options.end && drag.pointerId === event.pointerId) finishResize(false); });
   options.end.addEventListener('keydown', event => {
-    if (!['ArrowUp', 'ArrowDown'].includes(event.key) || !options.flush()) return;
+    if (options.phrase.autoRollLength || !['ArrowUp', 'ArrowDown'].includes(event.key) || !options.flush()) return;
     event.preventDefault(); event.stopPropagation();
     try { const body = options.readBody()!; options.phrase.setLastTempoRollLength(body.lengthBeats + (event.key === 'ArrowUp' ? -1 : 1) * phraseBarBeats(body)); options.changed(); }
     catch (error) { options.report(error instanceof Error ? error.message : String(error)); }
   });
-  panel.addEventListener('keydown', event => { event.stopPropagation(); if (event.key === 'Escape') { event.preventDefault(); rateInput.cancel(); close(); button.focus(); } });
+  panel.addEventListener('keydown', event => {
+    event.stopPropagation();
+    if (event.key === 'Escape') { event.preventDefault(); rateInput.cancel(); close(); button.focus(); }
+    if (options.desktopTapTempo) return;
+    if (tapping && event.target !== input && (event.code === 'Space' || event.key === ' ')) {
+      event.preventDefault(); if (!event.repeat) tapBeat();
+    }
+    if (suggestion !== undefined && event.target === tapButton && event.key === 'Enter') {
+      event.preventDefault(); if (!event.repeat) applySuggestion();
+    }
+  });
+  function tapKeys(event: KeyboardEvent): void {
+    if (!options.desktopTapTempo || !opened || event.code !== 'Space' && event.key !== ' ' ||
+        event.altKey || event.ctrlKey || event.metaKey || event.shiftKey ||
+        event.target !== input && (event.target as HTMLElement | null)?.closest?.('input, textarea, [contenteditable="true"]')) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    if (!event.repeat) {
+      beginTapping();
+      tapBeat();
+    }
+  }
+  document.addEventListener('keydown', tapKeys, true);
+
   function paint(body = options.readBody(), geometry?: { scale: number; height: number }) {
     if (disposed || !body) return;
     const spans = phraseTempoSpans(body), view = options.readView();
@@ -265,15 +515,23 @@ export function mountMelodyTempoRolls(options: {
     const chosen = selected && spans.find(span => (span.id ?? 'first') === selected);
     const dockSpan = chosen || spans.find(span => span.endSeconds >= visibleEnd - 1e-8) || spans.at(-1)!;
     if (!opened && !tap) active = dockSpan.id;
+    refreshGridControls(body);
+    if (gridHandle) {
+      const hidden = hiddenGrids.has(active);
+      if (gridPressed !== hidden) {
+        gridPressed = hidden;
+        gridHandle.setAttribute('aria-pressed', String(hidden));
+      }
+    }
     const panelSpan = spans.find(span => span.id === active) ?? dockSpan;
     const gridValue = String(phraseStepsAtBeat(body, panelSpan.startBeat));
     if (grid.value !== gridValue) grid.value = gridValue;
     const sectionId = dockSpan.id ?? 'first';
     if (options.dock.dataset.sectionId !== sectionId) options.dock.dataset.sectionId = sectionId;
     const dockBpm = String(Math.round(dockSpan.tempoBpm));
-    if (button.textContent !== dockBpm) { button.textContent = dockBpm; button.title = `BPM ${dockBpm}`; }
+    if (button.textContent !== dockBpm) button.textContent = dockBpm;
     const panelBpm = String(Math.round(panelSpan.tempoBpm));
-    if (document.activeElement !== input && input.value !== panelBpm) input.value = panelBpm;
+    if (suggestion === undefined && document.activeElement !== input && input.value !== panelBpm) input.value = panelBpm;
     const seen = new Set<string>();
     for (const [index, span] of basic ? [] : spans.entries()) {
       const top = (span.startSeconds - view.leftSeconds) * scale, bottom = (span.endSeconds - view.leftSeconds) * scale;
@@ -285,7 +543,10 @@ export function mountMelodyTempoRolls(options: {
         const band = element('div', 'melody-bpm-roll'), marker = element('button', 'melody-tempo-marker'); marker.type = 'button';
         marker.addEventListener('pointerdown', event => beginResize(event, span.id, marker));
         marker.addEventListener('lostpointercapture', event => { if (drag?.pointerId === event.pointerId) finishResize(false); });
-        marker.addEventListener('click', () => { if (performance.now() >= suppressClickUntil) open(span.id, marker); });
+        marker.addEventListener('click', () => {
+          if (performance.now() < suppressClickUntil) return;
+          open(span.id, marker);
+        });
         marker.addEventListener('keydown', event => {
           if (!span.id || !['ArrowUp', 'ArrowDown'].includes(event.key)) return;
           event.preventDefault(); event.stopPropagation(); if (!options.flush()) return;
@@ -316,14 +577,16 @@ export function mountMelodyTempoRolls(options: {
       item.block.style.translate = `0 ${Math.max(0, Math.min(top - 9, height - 20)) - top}px`;
       const bpm = String(Math.round(span.tempoBpm));
       if (item.button.textContent !== bpm) item.button.textContent = bpm;
-      item.button.title = `卷帘 ${index + 1} · ${bpm} 拍/分钟`;
-      item.button.setAttribute('aria-label', `卷帘 ${index + 1} BPM`);
+      item.button.setAttribute('aria-label', `画布 ${index + 1} BPM`);
     }
     for (const [id, item] of markers) if (!seen.has(id)) { item.band.remove(); item.block.remove(); markers.delete(id); }
     options.extend.hidden = basic;
   }
-  return { paint, addRoll, selectAt, cancelInteraction, flush() { rateInput.flush(); finishResize(true); }, isDragging: () => !!drag,
-    dispose() { finishResize(false, false); disposed = true; rateInput.cancel(); tap?.dispose(); panel.remove(); menu.remove(); hint.remove();
+  return { paint, addRoll, selectAt, gridHidden, readGridVisibility: () => gridVisibilityVersion, cancelInteraction,
+    setOpen(visible: boolean) { if (visible) open(active, button); else close(); },
+    closeControls() { finishGridShift(false); close(); },
+    flush() { rateInput.flush(); finishResize(true); finishGridShift(true); }, isDragging: () => !!drag || !!gridShift,
+    dispose() { finishGridShift(false, false); finishResize(false, false); disposed = true; window.clearTimeout(tapTimeout); rateInput.cancel(); tap?.dispose(); panel.remove(); menu.remove(); hint.remove();
       document.removeEventListener('pointerdown', outside); document.removeEventListener('pointermove', move); document.removeEventListener('pointerup', up);
-      document.removeEventListener('pointercancel', cancel); document.removeEventListener('keydown', escape); } };
+      document.removeEventListener('pointercancel', cancel); document.removeEventListener('keydown', escape); document.removeEventListener('keydown', tapKeys, true); } };
 }

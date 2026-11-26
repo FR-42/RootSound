@@ -35,10 +35,10 @@ const noteEditPrompts: ReadonlyArray<readonly [action: LearningAction, text: str
   ['undo', '回退键可以撤销上一步操作'],
 ];
 const scenes = [
-  { title: '卷帘', lines: ['核心创作画布'], wait: enterDelayMs },
-  { title: '音符', lines: ['音符散落在卷帘上'], wait: enterDelayMs },
+  { title: '画布', lines: ['核心创作画布'], wait: enterDelayMs },
+  { title: '音符', lines: ['音符散落在画布上'], wait: enterDelayMs },
   { title: '播放线', lines: ['播放线匀速向下，碰到音符就发声', '按空格开始或暂停'], wait: 0 },
-  { title: '琴键与列线', lines: ['卷帘分列，列与琴键一一对应，表示音调。'], wait: 0 },
+  { title: '琴键与列线', lines: ['画布分列，列与琴键一一对应，表示音调。'], wait: 0 },
   { title: 'BPM', lines: ['BPM 值 × 一拍的时长 = 一分钟', '相邻两条横线之间是一拍', '点击左下角数字以改变 BPM'], wait: 0 },
   { title: '音色', lines: [], wait: 0 },
   { title: '缩放', lines: ['Control + 滚轮竖直缩放，Shift + Control + 滚轮水平缩放'], wait: 5000 },
@@ -366,7 +366,7 @@ export function mountMusicGuide(root: HTMLElement, factory: MusicGuideFactory, o
     const copy = element('div', 'music-guide-copy');
     copy.append(...scene.lines.map(line => element('p', '', line)));
     if (step === keysStep) {
-      actionPrompt = element('p', 'music-guide-prompt', '拖动卷帘下边缘可改变乐曲长度');
+      actionPrompt = element('p', 'music-guide-prompt', '拖动画布下边缘可改变乐曲长度');
       copy.append(actionPrompt);
       awaitedAction = 'resize-roll';
     }

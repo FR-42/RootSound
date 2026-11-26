@@ -2,21 +2,23 @@ import type { ProjectDirectory, ProjectLibraryEntry, ProjectLibraryPage, Project
 import { showProjectNameDialog } from './project-save-as.ts';
 import { libraryIcon } from './library-icon.ts';
 import { attachEdgeGesture } from './pointer-gestures.ts';
+import type { WelcomeLibraryGuide } from './welcome-guide.ts';
 import './project-library.css';
 import './pointer-ux.css';
 
 /** The welcome page's only entry: discover songs, create one, or pick a file. */
-export function mountProjectLibrary(container: HTMLElement, trigger: HTMLElement, service: Pick<ProjectSetupPort, 'open' | 'list' | 'browse' | 'remove' | 'rename' | 'createFolder' | 'renameEntry' | 'removeEntry' | 'reveal' | 'chooseLibraryFolder' | 'readLibraryDuration'> & Partial<Pick<ProjectSetupPort, 'create' | 'startNew'>>,
+export function mountProjectLibrary(container: HTMLElement, trigger: HTMLElement, service: Pick<ProjectSetupPort, 'open' | 'list' | 'browse' | 'remove' | 'rename' | 'createFolder' | 'renameEntry' | 'removeEntry' | 'transferEntry' | 'undoEntryTransfer' | 'reveal' | 'chooseLibraryFolder' | 'readLibraryDuration'> & Partial<Pick<ProjectSetupPort, 'create' | 'startNew'>>,
   onNew: () => void, save?: {
     source?: ProjectDirectory; name: string; original?: () => Promise<void>; discard?: () => Promise<void>;
     copy(name: string, path: string): Promise<void>; finish(choice: ProjectSaveChoice): void;
-  }, desktopPointerUx = false): { open(): void; dispose(): void; awaitingInput(): boolean } {
+  }, desktopPointerUx = false, guide?: WelcomeLibraryGuide): { open(): void; dispose(): void; awaitingInput(): boolean; refreshGuide(): void } {
   const welcomeLibrary = desktopPointerUx && !save;
   const welcomePage = welcomeLibrary ? trigger.closest<HTMLElement>('.welcome') : null;
   let libraryMotion: Animation | undefined;
   let disposed = false; let expanded = false; let opening = false; let generation = 0;
   let projects: ProjectDirectory[] = []; let loading = false; let error = '';
   let page: ProjectLibraryPage | undefined;
+  let guideTarget: string | null | undefined;
   let pageSize = 12;
   let pageIndex = 0;
   let readingDuration = false;
@@ -33,7 +35,12 @@ export function mountProjectLibrary(container: HTMLElement, trigger: HTMLElement
   let candidate: ProjectLibraryEntry | undefined; let deleting = false; let naming = false;
   let editing: { project: ProjectLibraryEntry; input: HTMLInputElement } | undefined; let renaming = false;
   let contextTarget: HTMLButtonElement | undefined;
+  let sourceClipboard: { path: string; cut: boolean } | undefined;
+  let pointedEntry: string | undefined;
   const overlay = document.createElement('div'); overlay.className = 'project-library-overlay'; overlay.hidden = true;
+  const bridgeNotes = welcomePage?.classList.contains('is-desktop-welcome') &&
+    document.documentElement?.classList.contains('windows-desktop-colors');
+  if (bridgeNotes) welcomePage?.classList.add('has-library-bridge');
   const dialog = document.createElement('section'); dialog.className = save ? 'project-library is-saving' : 'project-library';
   dialog.setAttribute('role', desktopPointerUx ? 'region' : 'dialog');
   if (!desktopPointerUx) dialog.setAttribute('aria-modal', 'true');
@@ -65,11 +72,11 @@ export function mountProjectLibrary(container: HTMLElement, trigger: HTMLElement
   const footer = document.createElement('footer'); footer.className = 'project-library-footer';
   const pagination = document.createElement('div'); pagination.className = 'project-library-pagination'; pagination.hidden = true;
   const previousPage = document.createElement('button'); previousPage.type = 'button'; previousPage.textContent = '‹'; previousPage.setAttribute('aria-label', '上一页');
-  previousPage.title = '上一页（←）'; previousPage.setAttribute('aria-keyshortcuts', 'ArrowLeft');
-  const pageNumber = document.createElement('input'); pageNumber.type = 'number'; pageNumber.min = '1'; pageNumber.title = '输入页码跳转'; pageNumber.setAttribute('aria-label', '页码');
+  previousPage.setAttribute('aria-keyshortcuts', 'ArrowLeft');
+  const pageNumber = document.createElement('input'); pageNumber.type = 'number'; pageNumber.min = '1'; pageNumber.setAttribute('aria-label', '页码');
   const pageTotal = document.createElement('span');
   const nextPage = document.createElement('button'); nextPage.type = 'button'; nextPage.textContent = '›'; nextPage.setAttribute('aria-label', '下一页');
-  nextPage.title = '下一页（→）'; nextPage.setAttribute('aria-keyshortcuts', 'ArrowRight');
+  nextPage.setAttribute('aria-keyshortcuts', 'ArrowRight');
   pagination.append(previousPage, pageNumber, pageTotal, nextPage); footer.append(pagination);
   const saveActions = document.createElement('div'); saveActions.className = 'project-library-save-actions';
   const discard = document.createElement('button'); discard.type = 'button'; discard.textContent = '直接退出';
@@ -89,7 +96,7 @@ export function mountProjectLibrary(container: HTMLElement, trigger: HTMLElement
     copyName.type = 'text'; copyName.value = save.name; copyName.maxLength = 80; copyName.required = true;
     copyName.autocomplete = 'off'; copyName.spellcheck = false; copyName.setAttribute('aria-label', '乐曲名称');
     submitCopy.type = 'submit'; submitCopy.textContent = '保存';
-    copyForm.append(copyName, submitCopy); footer.append(copyForm);
+    copyForm.append(copyName, submitCopy);
     copyForm.addEventListener('submit', event => {
       event.preventDefault();
       if (!page || submitCopy.disabled) return;
@@ -112,6 +119,13 @@ export function mountProjectLibrary(container: HTMLElement, trigger: HTMLElement
     dialog.tabIndex = -1;
     const directory = document.createElement('div'); directory.className = 'project-library-directory';
     directory.append(navigation, actions);
+    if (copyForm) {
+      closeButton.classList.add('project-library-save-back');
+      closeButton.setAttribute('aria-label', '取消另存为');
+      closeButton.replaceChildren(libraryIcon('back'));
+      directory.prepend(closeButton);
+      directory.append(copyForm);
+    }
     grid.tabIndex = 0; grid.setAttribute('aria-label', '乐曲库文件列表');
     dialog.append(directory, folderForm, note, problem, grid, footer, contextMenu);
   } else {
@@ -120,10 +134,42 @@ export function mountProjectLibrary(container: HTMLElement, trigger: HTMLElement
     dialog.append(header, navigation, grid, note, problem, footer, contextMenu);
   }
   overlay.append(dialog); container.append(overlay);
-  const returnGesture = welcomeLibrary ? attachEdgeGesture(overlay, 'top', {
-    enabled: () => expanded && !opening && !deleting && !candidate && !renaming && !naming
-      && !editing && folderForm.hidden && !contextTarget,
-    open: () => close(),
+  if (guide) {
+    function protectGuide(event: Event): void {
+      if (guideTarget === undefined) return;
+      if (event.type === 'click' && event.target instanceof Element && event.target.closest('.is-welcome-guide-target')) return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+    }
+    overlay.addEventListener('click', protectGuide, true);
+    overlay.addEventListener('contextmenu', protectGuide, true);
+  }
+  let welcomeLift = 0;
+  const clearWelcomeMotion = () => {
+    welcomeLift = 0;
+    welcomePage?.classList.remove('is-welcome-lifting');
+    welcomePage?.style.removeProperty('--welcome-pointer-lift');
+  };
+  const canUseLibraryEdge = () => expanded
+      ? guideTarget === undefined && !opening && !deleting && !candidate && !renaming && !naming && !editing && folderForm.hidden && !contextTarget
+      : overlay.inert || overlay.hidden && !container.querySelector('.project-library-overlay:not([hidden]), dialog[open], .workspace-inline-panel[open]');
+  const edgeGesture = welcomePage ? attachEdgeGesture(container, ['right', 'left', 'top', 'bottom'], {
+    enabled: canUseLibraryEdge,
+    open: () => { if (expanded) close(); else openLibrary(); },
+    preview: (x, y) => {
+      if (expanded && !bridgeNotes) return;
+      if (!expanded) welcomePage.classList.remove('is-welcome-library-returning');
+      const edgeBand = .18;
+      const insetX = Math.min(x, 1 - x);
+      const inset = expanded ? Math.min(insetX, y, 1 - y) : insetX;
+      const proximity = Math.max(0, Math.min(1, (edgeBand - inset) / edgeBand));
+      const lift = 38 * proximity ** 1.25;
+      if (lift === welcomeLift) return;
+      welcomeLift = lift;
+      welcomePage.classList.toggle('is-welcome-lifting', lift > 0);
+      welcomePage.style.setProperty('--welcome-pointer-lift', `${expanded ? lift : -lift}px`);
+    },
+    clearPreview: clearWelcomeMotion,
   }) : undefined;
   if (!desktopPointerUx) overlay.addEventListener('wheel', event => {
     event.preventDefault(); event.stopPropagation();
@@ -171,7 +217,8 @@ export function mountProjectLibrary(container: HTMLElement, trigger: HTMLElement
   function animateLibrary(open: boolean): Animation | undefined {
     if (!welcomeLibrary || typeof dialog.animate !== 'function') return;
     const style = getComputedStyle(dialog);
-    const from = open ? { transform: 'translateY(28%)', opacity: 0 } : { transform: style.transform, opacity: Number(style.opacity) };
+    const from = open && !libraryMotion ? { transform: 'translateY(28%)', opacity: 0 }
+      : { transform: style.transform, opacity: Number(style.opacity) };
     libraryMotion?.cancel();
     libraryMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches ? undefined : dialog.animate([
       from, { transform: open ? 'translateY(0)' : 'translateY(28%)', opacity: open ? 1 : 0 },
@@ -183,7 +230,9 @@ export function mountProjectLibrary(container: HTMLElement, trigger: HTMLElement
     durationQueue.clear();
     closeContextMenu(); editing = undefined; endDrag();
     expanded = false; generation++; loading = false; updateExpanded(false);
-    welcomePage?.classList.remove('is-library-open');
+    welcomePage?.classList.add('is-welcome-library-returning');
+    setWelcomeLibraryOpen(false);
+    clearWelcomeMotion();
     const finish = () => {
       if (disposed) return;
       overlay.hidden = true; overlay.inert = false;
@@ -285,12 +334,17 @@ export function mountProjectLibrary(container: HTMLElement, trigger: HTMLElement
   copy.addEventListener('click', () => { void nameCopy(); });
   async function openProject(path?: string): Promise<void> {
     if (save || disposed || opening || deleting || candidate || renaming || editing || !expanded) return;
+    const cancelGuideHandoff = path && path === guideTarget ? guide?.prepareCanvas() : undefined;
     opening = true; error = ''; render();
     try {
       // Successful native opens reload the application. A cancelled picker leaves
       // this library available so the user can choose a different starting point.
       await service.open(path);
-    } catch (reason) { if (!disposed) error = reason instanceof Error ? reason.message : String(reason); }
+      if (path && path === guideTarget) guide?.complete();
+    } catch (reason) {
+      cancelGuideHandoff?.();
+      if (!disposed) error = reason instanceof Error ? reason.message : String(reason);
+    }
     finally {
       opening = false;
       if (!disposed) {
@@ -319,14 +373,22 @@ export function mountProjectLibrary(container: HTMLElement, trigger: HTMLElement
       const custom = tile('打开', 'project-library-custom', () => { void openProject(); }, '选择音乐文件', 'folder');
       if (page && service.createFolder) actions.append(tile('新建文件夹', 'project-library-new-folder', () => { void newFolder(); }, '新建文件夹', 'folderPlus'));
       if (!save) actions.append(create, custom);
-      custom.title = '打开简乐、MIDI 或 MusicXML 文件';
     }
     const entries: ProjectLibraryEntry[] = page?.entries ?? projects.map(project => ({ kind: 'project', ...project }));
+    const previousGuideTarget = guideTarget;
+    guideTarget = expanded ? guide?.target(entries, page?.path, loading) : undefined;
+    if (guide) {
+      const guided = guideTarget !== undefined;
+      overlay.classList.toggle('is-welcome-guided-library', guided);
+      navigation.inert = actions.inert = footer.inert = guided;
+      grid.tabIndex = guided ? -1 : 0;
+      if (guided) closeButton.disabled = true;
+    }
     const totalPages = Math.max(1, Math.ceil(entries.length / pageSize));
     grid.className = 'project-library-grid' + (!desktopPointerUx && totalPages > 1 ? ' has-pages' : '');
     pageIndex = Math.min(pageIndex, totalPages - 1);
     pagination.hidden = desktopPointerUx || totalPages <= 1;
-    footer.hidden = !save && pagination.hidden;
+    footer.hidden = (!save || desktopPointerUx) && pagination.hidden;
     dialog.style?.setProperty('--library-page-rows', String(pageSize));
     pageNumber.value = String(pageIndex + 1); pageNumber.max = String(totalPages); pageTotal.textContent = `/ ${totalPages}`;
     navigationBusy();
@@ -338,7 +400,13 @@ export function mountProjectLibrary(container: HTMLElement, trigger: HTMLElement
       list.style.height = `${entries.length * rowHeight}px`;
       list.replaceChildren();
       mountedRows.clear();
+      const targetIndex = guideTarget ? entries.findIndex(entry => entry.path === guideTarget) : -1;
+      if (targetIndex >= 0 && guideTarget !== previousGuideTarget) {
+        const offset = targetIndex * rowHeight;
+        if (offset < grid.scrollTop || offset + rowHeight > grid.scrollTop + grid.clientHeight) grid.scrollTop = offset;
+      }
       renderList();
+      if (targetIndex >= 0 && !opening) mountedRows.get(targetIndex)?.focus({ preventScroll: true });
     } else grid.replaceChildren(...entries.slice(pageIndex * pageSize, (pageIndex + 1) * pageSize).map(renderEntry));
     queueFit();
   }
@@ -348,13 +416,11 @@ export function mountProjectLibrary(container: HTMLElement, trigger: HTMLElement
       item = tile(entry.name, 'project-library-folder', () => {
         if (!loading) void load(entry.path);
       }, `打开文件夹 ${entry.name}`);
-      item.title = entry.path;
     } else if (entry.kind === 'midi' || entry.kind === 'document') {
       item = tile(entry.name, 'project-library-midi', () => {
         if (save || editing) return;
         void openProject(entry.path);
       }, save ? entry.name : `打开 ${entry.name}`);
-      item.title = save ? entry.name : `打开 ${entry.name}`;
     } else {
       item = tile(entry.name, 'project-library-song', () => {
         if (save || dragged || editing || Date.now() < suppressOpenUntil) return;
@@ -371,9 +437,13 @@ export function mountProjectLibrary(container: HTMLElement, trigger: HTMLElement
         });
         item.addEventListener('dragend', () => { suppressOpenUntil = Date.now() + 180; endDrag(); });
       }
-      item.title = entry.name;
     }
     decorateEntry(entry, item);
+    if (guideTarget !== undefined) {
+      const allowed = entry.path === guideTarget;
+      item.classList.toggle('is-welcome-guide-target', allowed);
+      if (!allowed) item.disabled = true;
+    }
     return item;
   }
   function queueList(): void {
@@ -484,6 +554,9 @@ export function mountProjectLibrary(container: HTMLElement, trigger: HTMLElement
   }
   function decorateEntry(entry: ProjectLibraryEntry, item: HTMLButtonElement): void {
     if (desktopPointerUx) {
+      item.dataset.libraryPath = entry.path;
+      item.addEventListener('pointerenter', () => { pointedEntry = entry.path; });
+      item.addEventListener('pointerleave', () => { if (pointedEntry === entry.path) pointedEntry = undefined; });
       const art = document.createElement('span'); art.className = 'project-library-entry-icon';
       art.setAttribute('aria-hidden', 'true');
       const icon = entry.kind === 'folder' ? 'folder' : welcomeLibrary ? 'note' : entry.kind === 'midi' ? 'musicLibrary' : 'score';
@@ -498,7 +571,8 @@ export function mountProjectLibrary(container: HTMLElement, trigger: HTMLElement
     const canRename = entry.kind === 'project' ? service.rename : service.renameEntry;
     const canDelete = desktopPointerUx && save ? undefined : entry.kind === 'project' ? service.remove : service.removeEntry;
     const canReveal = !save && entry.kind !== 'folder' && !!service.reveal;
-    if (!canRename && !canDelete && !canReveal) return;
+    const canSaveHere = !!copyName && entry.kind === 'folder';
+    if (!canRename && !canDelete && !canReveal && !canSaveHere) return;
     item.setAttribute('aria-haspopup', 'menu');
     item.addEventListener('contextmenu', event => {
       event.preventDefault();
@@ -513,6 +587,13 @@ export function mountProjectLibrary(container: HTMLElement, trigger: HTMLElement
       };
       if (canRename) addAction('改名', 'rename', () => beginRename(entry, item));
       if (canReveal) addAction('打开所在文件夹', 'folder', () => { void reveal(entry); });
+      if (canSaveHere) addAction('保存到此处', 'folder', () => {
+        void load(entry.path).then(() => {
+          if (disposed || loading || error || !expanded) return;
+          copyName?.focus({ preventScroll: true });
+          copyName?.select?.();
+        });
+      });
       if (canDelete) addAction('删除', 'trash', () => requestDelete(entry));
       contextMenu.hidden = false;
       const { width, height } = contextMenu.getBoundingClientRect();
@@ -741,6 +822,62 @@ export function mountProjectLibrary(container: HTMLElement, trigger: HTMLElement
     } catch (reason) { if (!disposed && request === generation) error = reason instanceof Error ? reason.message : String(reason); }
     finally { if (!disposed && request === generation) { loading = false; render(); } }
   }
+  function openLibrary(): void {
+    if (disposed || expanded || (!overlay.hidden && !overlay.inert) || opening) return;
+    expanded = true; overlay.hidden = false; updateExpanded(true);
+    overlay.inert = false;
+    clearWelcomeMotion();
+    welcomePage?.classList.remove('is-welcome-library-returning');
+    if (welcomePage) welcomePage.inert = true;
+    setWelcomeLibraryOpen(true);
+    const guided = guide?.enterLibrary();
+    animateLibrary(true);
+    void load(guided ? page?.root : save?.source?.pendingSave ? save.source.path : undefined);
+    if (copyName) copyName.focus({ preventScroll: true }); else focusLibrary();
+  }
+  function handleFileShortcut(event: KeyboardEvent): boolean {
+    if (!desktopPointerUx || event.altKey || !event.ctrlKey || event.metaKey || event.shiftKey || event.isComposing ||
+      candidate || editing || !folderForm.hidden ||
+      [event.target, document.activeElement].some(target => {
+        const element = target as HTMLElement | null;
+        return ['input', 'textarea', 'select'].includes(element?.tagName?.toLowerCase() ?? '') || element?.isContentEditable;
+      })) return false;
+    const key = event.key.toLowerCase();
+    if (!['c', 'x', 'v', 'z'].includes(key) || !service.transferEntry) return false;
+    event.preventDefault();
+    event.stopPropagation();
+    if (opening || loading || deleting || choosingFolder || renaming || event.repeat) return true;
+    if (key === 'c' || key === 'x') {
+      const row = contextTarget ?? (document.activeElement as HTMLElement | null)?.closest<HTMLElement>('.project-library-tile');
+      const path = row?.dataset.libraryPath ?? pointedEntry;
+      if (path && page?.entries.some(entry => entry.path === path)) {
+        sourceClipboard = { path, cut: key === 'x' };
+        closeContextMenu(true);
+      }
+      return true;
+    }
+    const clipboard = sourceClipboard;
+    const directory = page?.path;
+    const transfer = key === 'z' ? service.undoEntryTransfer :
+      (clipboard && directory ? () => service.transferEntry!(clipboard.path, directory, clipboard.cut) : undefined);
+    if (!transfer) return true;
+    closeContextMenu(true);
+    opening = true;
+    void transfer().then(async () => {
+      if (key === 'v' && clipboard?.cut && clipboard === sourceClipboard) sourceClipboard = undefined;
+      if (!disposed && expanded) {
+        durationCache.clear();
+        await load(directory);
+        focusLibrary();
+      }
+    }, reason => {
+      if (disposed || !expanded) return;
+      error = reason instanceof Error ? reason.message : String(reason);
+      render();
+      focusLibrary();
+    }).finally(() => { opening = false; if (!disposed && expanded) navigationBusy(); });
+    return true;
+  }
   closeButton.addEventListener('click', () => close());
   overlay.addEventListener('pointerdown', event => {
     if (contextTarget) {
@@ -752,6 +889,8 @@ export function mountProjectLibrary(container: HTMLElement, trigger: HTMLElement
   const key = (event: KeyboardEvent) => {
     if (!expanded || disposed || naming || event.defaultPrevented) return;
     if (desktopPointerUx && container.querySelector('dialog[open], .workspace-inline-panel[open]:not(.song-exit-choice)')) return;
+    if (guideTarget !== undefined) return;
+    if (handleFileShortcut(event)) return;
     if (contextTarget) {
       if (event.key === 'Tab') closeContextMenu(true);
       else {
@@ -817,19 +956,14 @@ export function mountProjectLibrary(container: HTMLElement, trigger: HTMLElement
     awaitingInput() {
       return expanded && (choosingFolder || !loading && !opening && !deleting && !renaming && !naming);
     },
-    open() {
-      if (disposed || !overlay.hidden || opening) return;
-      expanded = true; overlay.hidden = false; updateExpanded(true);
-      if (welcomePage) welcomePage.inert = true;
-      setWelcomeLibraryOpen(true);
-      animateLibrary(true);
-      void load(save?.source?.pendingSave ? save.source.path : undefined);
-      if (copyName) copyName.focus({ preventScroll: true }); else focusLibrary();
-    },
+    open: openLibrary,
+    refreshGuide() { if (expanded) render(); },
     dispose() {
       if (disposed) return;
-      returnGesture?.dispose(); libraryMotion?.cancel();
+      edgeGesture?.dispose(); libraryMotion?.cancel();
+      welcomePage?.classList.remove('is-welcome-library-returning');
       if (!overlay.hidden) setWelcomeLibraryOpen(false);
+      welcomePage?.classList.remove('has-library-bridge');
       if (welcomePage) welcomePage.inert = false;
       listResize?.disconnect(); durationQueue.clear();
       if (warmup !== undefined) cancelIdleCallback(warmup);

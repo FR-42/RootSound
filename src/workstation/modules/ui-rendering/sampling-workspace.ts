@@ -81,7 +81,7 @@ export function mountSamplingWorkspace(root: HTMLElement, options: {
     if (!available()) return;
     replace('record', () => sampling.startRecording());
   });
-  importButton.title = '不超过 16 MiB、120 秒的可解码音频'; recordButton.title = `最长 ${MAX_RECORDING_SECONDS} 秒`;
+
   acquire.append(importButton, recordButton);
   main.append(acquire);
 

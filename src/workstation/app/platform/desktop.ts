@@ -14,6 +14,15 @@ export const DESKTOP_ORIGIN = 'https://rootsound.local';
 
 /** 原生宿主只通过已声明能力提供磁盘存储及文件对话框。 */
 export interface DesktopBridge {
+  readInitialStorage?(): Promise<unknown>;
+  asyncStorage?: {
+    StartWriteScopedIfUnchanged(value: string, scope: string, revision: string): Promise<unknown>;
+    ReadWriteResult(): Promise<unknown>;
+    BeginWriteChunks?(scope: string, revision: string): Promise<unknown>;
+    AppendWriteChunk?(value: string): Promise<unknown>;
+    CommitWriteChunks?(): Promise<unknown>;
+    AbortWriteChunks?(): Promise<unknown>;
+  };
   storage: {
     Read(): unknown;
     Write(value: string): unknown;
@@ -70,7 +79,9 @@ function hostBridge(): DesktopBridge {
   try { projectDirectories = host?.projectDirectories; } catch { /* Older hosts cannot create managed project folders. */ }
   let timbreFiles: DesktopBridge['timbreFiles'];
   try { timbreFiles = host?.timbreFiles; } catch { /* An older host keeps existing work usable. */ }
-  return { storage, files, audioFiles, projectFiles, sampleFiles, projectDirectories, timbreFiles };
+  const asyncStorage = (host as typeof host & { storage?: { Read(): Promise<unknown> } })?.storage;
+  return { storage, files, audioFiles, projectFiles, sampleFiles, projectDirectories, timbreFiles, asyncStorage: asyncStorage as DesktopBridge['asyncStorage'],
+    ...(asyncStorage ? { readInitialStorage: () => asyncStorage.Read() } : {}) };
 }
 
 function checkSize(text: string): void {
@@ -94,6 +105,21 @@ export function createDesktopPlatform(bridge: DesktopBridge = hostBridge()): {
 } {
   let storageScope: string | undefined;
   let observed: { value: string | null; revision: string } | undefined;
+  function observeStorage(raw: unknown): string | null {
+    const result = response(raw);
+    if (result.ok === false) responseError(result, 'error');
+    if (result.ok !== true || (result.value !== null && typeof result.value !== 'string')) {
+      fail('素材库读取结果无效，尚未覆盖原有数据。');
+    }
+    if (result.scope !== undefined) {
+      if (typeof result.scope !== 'string' || !result.scope || storageScope !== undefined && storageScope !== result.scope)
+        fail('项目已切换，请重新打开界面后继续。');
+      storageScope = result.scope;
+    } else if (bridge.projectDirectories) fail('项目存储缺少隔离标识，请关闭旧窗口后重新打开 RootSound。');
+    const value = result.value as string | null;
+    observed = typeof result.revision === 'string' && result.revision ? { value, revision: result.revision } : undefined;
+    return value;
+  }
   return {
     ...(bridge.projectDirectories ? { projectDirectories: createDesktopProjectDirectories(bridge.projectDirectories) } : {}),
     sampleFiles: createDesktopSampleFiles(bridge.sampleFiles),
@@ -119,21 +145,41 @@ export function createDesktopPlatform(bridge: DesktopBridge = hostBridge()): {
       },
     },
     storage: {
-      read() {
-        const result = response(bridge.storage.Read());
-        if (result.ok === false) responseError(result, 'error');
-        if (result.ok !== true || (result.value !== null && typeof result.value !== 'string')) {
-          fail('素材库读取结果无效，尚未覆盖原有数据。');
+      ...(bridge.asyncStorage ? { async writeIfUnchangedAsync(value: string, expected: string | null) {
+        if ((!observed || observed.value !== expected) && this.read() !== expected)
+          fail('素材库已被其他窗口修改，请重新打开后继续。原数据未被覆盖。');
+        if (!observed || storageScope === undefined) { this.write(value); return; }
+        const native = bridge.asyncStorage!;
+        let result: Record<string, unknown>;
+        if (value.length > 1_000_000 && native.BeginWriteChunks && native.AppendWriteChunk && native.CommitWriteChunks && native.AbortWriteChunks) {
+          const check = (raw: unknown) => {
+            const result = response(raw);
+            if (result.ok !== true) responseError(result, 'error');
+            return result;
+          };
+          check(await native.BeginWriteChunks(storageScope, observed.revision));
+          try {
+            for (let offset = 0; offset < value.length;) {
+              await new Promise(resolve => setTimeout(resolve, 0));
+              let end = Math.min(value.length, offset + 512 * 1024);
+              const code = value.charCodeAt(end - 1);
+              if (end < value.length && code >= 0xd800 && code <= 0xdbff) end--;
+              check(await native.AppendWriteChunk(value.slice(offset, end)));
+              offset = end;
+            }
+            result = check(await native.CommitWriteChunks());
+          } catch (error) { await native.AbortWriteChunks().catch(() => {}); throw error; }
+        } else result = response(await native.StartWriteScopedIfUnchanged(value, storageScope, observed.revision));
+        while (result.ok === true && result.pending === true) {
+          await new Promise(resolve => setTimeout(resolve, 16));
+          result = response(await bridge.asyncStorage!.ReadWriteResult());
         }
-        if (result.scope !== undefined) {
-          if (typeof result.scope !== 'string' || !result.scope || storageScope !== undefined && storageScope !== result.scope)
-            fail('项目已切换，请重新打开界面后继续。');
-          storageScope = result.scope;
-        } else if (bridge.projectDirectories) fail('项目存储缺少隔离标识，请关闭旧窗口后重新打开 RootSound。');
-        const value = result.value as string | null;
-        observed = typeof result.revision === 'string' && result.revision ? { value, revision: result.revision } : undefined;
-        return value;
-      },
+        if (result.ok === false) responseError(result, 'error');
+        if (result.ok !== true || typeof result.revision !== 'string' || !result.revision) fail('素材库写入结果无效，无法确认保存成功。');
+        observed = { value, revision: result.revision };
+      } } : {}),
+      ...(bridge.readInitialStorage ? { async readInitial() { return observeStorage(await bridge.readInitialStorage!()); } } : {}),
+      read() { return observeStorage(bridge.storage.Read()); },
       write(value) {
         if (storageScope !== undefined && !bridge.storage.WriteScoped) fail('当前窗口缺少项目隔离保存，请重新打开 RootSound。');
         const result = response(storageScope === undefined ? bridge.storage.Write(value) : bridge.storage.WriteScoped!(value, storageScope));

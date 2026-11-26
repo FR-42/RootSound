@@ -83,9 +83,9 @@ await js("document.querySelector('.melody-tone-pile').click()");
 check(await js("!document.querySelector('.melody-library-deck').inert&&window.__deckNodes.every((node,index)=>document.querySelectorAll('.melody-library-card')[index]===node)"),'a second click reverses the gathering without replacing cards');
 await wait("!document.querySelector('.melody-library-deck').classList.contains('is-deck-moving')");
 check(await js("!!document.querySelector('.melody-library-tone [data-instrument-icon=studio-steel-guitar]')&&[...document.querySelectorAll('.melody-library-tone')].some(n=>n.textContent.includes('木吉他'))"),'the steel-string guitar is available with its icon in the song tone deck');
-check(await js("(()=>{const stack=document.querySelector('.melody-card-backs i');return getComputedStyle(stack,'::after').backgroundImage.includes('url(')&&getComputedStyle(stack).borderTopColor==='rgb(216, 189, 205)'})()"),'the printed back pattern and distinct paper edges remain on the deck');
+check(await js("(()=>{const stack=document.querySelector('.melody-card-backs i');return getComputedStyle(stack,'::after').backgroundImage.includes('url(')&&getComputedStyle(stack).backgroundColor==='rgb(255, 255, 255)'&&getComputedStyle(stack).borderTopColor==='rgb(214, 215, 223)'})()"),'the dotted note pattern is printed on white card backs with distinct paper edges');
 const backPattern=fs.readFileSync(${JSON.stringify(path.resolve('src/workstation/modules/ui-rendering/tone-card-back.svg'))},'utf8');
-check((backPattern.match(/<path /g)??[]).length===2&&!/<circle|ellipse/.test(backPattern),'the selected original flow pattern contains two strokes and no center dot');
+check(backPattern.includes('id="dots"')&&backPattern.includes('id="shadow"')&&backPattern.includes('<ellipse'),'the card back has a note and a dotted shadow');
 await js("void(Element.prototype.getBoundingClientRect=window.__deckOriginalMeasure)");
 await js("document.querySelector('.melody-tone-library').dispatchEvent(new Event('cancel',{cancelable:true}))");
 await wait("!!document.querySelector('.song-editor-controls[open]')");
@@ -116,7 +116,7 @@ async function openHomeLibrary(){
   const entry="document.querySelector('.is-desktop-welcome')";
   await wait('!!'+entry);
   check(!await js(libraryOpen),'returning home shows the welcome page before opening the library');
-  await js('(()=>{const page='+entry+";for(const y of [.68,.985])page.dispatchEvent(new PointerEvent('pointermove',{pointerType:'mouse',bubbles:true,clientX:innerWidth/2,clientY:(innerHeight-1)*y}))})()");
+  await js('(()=>{const page='+entry+";for(const x of [.43,.74,1])page.dispatchEvent(new PointerEvent('pointermove',{pointerType:'mouse',bubbles:true,clientX:(innerWidth-1)*x,clientY:innerHeight/2}))})()");
   await wait(homeOpen);
 }
 const esc=()=>js("document.activeElement.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true,cancelable:true}))");
@@ -242,9 +242,9 @@ const reloaded=new Promise(resolve=>win.webContents.once('did-finish-load',resol
 await openHomeLibrary();
 await wait(homeOpen+"&&!!document.querySelector('.project-library-song')");
 for(let i=0;i<2;i++){
-  await js("(()=>{const library=document.querySelector('.is-welcome-library:not([hidden])');for(const y of [.3,0])library.dispatchEvent(new PointerEvent('pointermove',{pointerType:'mouse',bubbles:true,clientX:innerWidth/2,clientY:(innerHeight-1)*y}))})()");
+  await js("(()=>{const library=document.querySelector('.is-welcome-library:not([hidden])');for(const x of [.43,.74,1])library.dispatchEvent(new PointerEvent('pointermove',{pointerType:'mouse',bubbles:true,clientX:(innerWidth-1)*x,clientY:innerHeight/2}))})()");
   await wait('!('+libraryOpen+')');
-  check(await js("!document.querySelector('.is-desktop-welcome button')&&document.activeElement===document.querySelector('.is-desktop-welcome')"),'returning through the top edge leaves the welcome page without a library button');
+  check(await js("!document.querySelector('.is-desktop-welcome .welcome-actions button')&&document.activeElement===document.querySelector('.is-desktop-welcome')"),'returning through the right edge leaves the welcome page without a library button');
   await openHomeLibrary();
 }
 check(await js("!document.querySelector('.project-library-copy-form, .project-exit-actions')"),'the welcome library shows no editor actions');

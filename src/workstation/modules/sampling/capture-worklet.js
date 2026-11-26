@@ -5,7 +5,7 @@ class RootSoundCaptureProcessor extends AudioWorkletProcessor {
     this.maximum = options.processorOptions.maxFrames;
     this.frames = 0;
     this.used = 0;
-    this.batch = new Float32Array(4096);
+    this.batch = new Float32Array(options.processorOptions.batchFrames ?? 4096);
     this.finished = false;
     this.port.onmessage = event => { if (event.data?.type === 'stop') this.finish(); };
   }

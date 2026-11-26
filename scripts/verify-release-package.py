@@ -1,5 +1,5 @@
 """Check release scope, Mac modes/links and sealed resources without launching UI."""
-import hashlib,json,os,pathlib,plistlib,posixpath,stat,struct,tempfile,zipfile
+import hashlib,json,os,pathlib,plistlib,posixpath,re,stat,struct,tempfile,zipfile
 from verify_macos_signatures import verify_macho
 
 ROOT=pathlib.Path(__file__).resolve().parents[1]
@@ -18,8 +18,15 @@ for platform in ['windows','mac']:
         assert all(not name.startswith('/') and '..' not in name.split('/') for name in names)
         assert not any(any(part in name.split('/') for part in ['.git','.cache','.test-output','experiments','legacy','node_modules','project','data','timbres']) for name in names)
         assert not any(name.endswith(('.mid','.midi','.pdb','.cs','.ts','.py','.map','.tmp','.bak')) for name in names)
-        assert not any('capture-worklet-' in name or 'melody-worker-' in name or 'default_app.asar' in name for name in names)
+        assert not any('melody-worker-' in name or 'default_app.asar' in name for name in names)
         prefix=basename+('/resources/app/' if platform=='windows' else '/RootSound.app/Contents/Resources/app/')
+        assets=prefix+'ui/assets/'
+        worklets={name.removeprefix(assets) for name in names if name.startswith(assets+'capture-worklet-')}
+        references=set()
+        for name in names:
+            if name.startswith(assets) and name.endswith('.js') and name.removeprefix(assets) not in worklets:
+                references.update(re.findall(r'capture-worklet-[\w-]+\.js', package.read(name).decode('utf-8')))
+        assert references == worklets, 'Live microphone worklet references must resolve in the release'
         requested={prefix+'seed-projects/'+item['name'] for item in plan.get('projects',[])}
         assert {name for name in names if name.endswith('.rootsound')}==requested
         for item in plan.get('projects',[]):

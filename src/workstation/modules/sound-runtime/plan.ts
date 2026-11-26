@@ -1,5 +1,6 @@
 import {readMidiExpressionMessage,MAX_MIDI_EXPRESSION_EVENTS,type TimedMidiExpressionLane} from '../../contracts/midi-expression.ts';
 import type { BasicWaveform, PcmAudio, SampleSoundPlan, SoundPlan, SoundAuditionOptions, SoundGainPoint } from '../../contracts/sound.ts';
+import { MAX_NOTE_GAIN_DB, MIN_NOTE_GAIN_DB } from '../../contracts/phrase-limits.ts';
 import { CURVE_LIMITS, dbAmplitude, gainAtTime, GAIN_CURVE_LIMIT_DB, MAX_GAIN_CURVE_POINTS, sampleGainCurve, segmentAfter } from '../../contracts/gain-curve.ts';
 import type { OutputProcessingPlan } from '../../contracts/post-production.ts';
 import { pcmShape, preparedPcm, readPcmSnapshot, samePcm, type PcmSnapshot } from './pcm.ts';
@@ -20,7 +21,7 @@ export type SampleSourceSnapshot = SampleSoundPlan['source'] & {
 export type ScheduledSound = SoundPlan | (Omit<SampleSoundPlan, 'source'> & { source: SampleSourceSnapshot });
 export type ScheduledPitch = { points: readonly SoundGainPoint[]; distance: readonly number[] };
 type ScheduledEvent = { atSeconds: number; sound: ScheduledSound; pan?: number; songAtSeconds?: number; noteId?: string; groupId?: string;
-  gainCurve?: readonly SoundGainPoint[]; pitchCurve?: ScheduledPitch; duration: number };
+  noteGain?: number; gainCurve?: readonly SoundGainPoint[]; pitchCurve?: ScheduledPitch; duration: number };
 
 export interface ScheduledPreview {
   readonly events: readonly ScheduledEvent[];
@@ -295,9 +296,10 @@ export function readPreview(value: unknown, options: { allowEmptySequence?: bool
     const gainCurve = gainPoints && sampleGainCurve(gainPoints).map(point => ({ ...point, atSeconds: point.atSeconds - curveStart }));
     const pitchPoints = options.audition?.pitchCurve && readGainPoints(options.audition.pitchCurve, CURVE_LIMITS.pitch);
     const pitchCurve = pitchPoints?.length ? scheduledPitch(sampleGainCurve(pitchPoints).map(point => ({ ...point, atSeconds: point.atSeconds - curveStart }))) : undefined;
-    const gain = gainPoints?.length ? dbAmplitude(Math.max(...gainPoints.map(point => point.db))) : 1;
+    const noteGain = dbAmplitude(number(options.audition?.noteGainDb ?? 0, '音符音量', MIN_NOTE_GAIN_DB, MAX_NOTE_GAIN_DB));
+    const gain = (gainPoints?.length ? dbAmplitude(Math.max(...gainPoints.map(point => point.db))) : 1) * noteGain;
     const amplitude=sounds.reduce((sum,sound)=>sum+noteAmplitude(sound)*(sound.kind==='sample'?samplePeak(sound, pan):1)*gain,0);
-    const events = sounds.map(sound => ({ atSeconds: 0, sound, duration: eventDuration(sound, 0, pitchCurve),
+    const events = sounds.map(sound => ({ atSeconds: 0, sound, ...(noteGain === 1 ? {} : { noteGain }), duration: eventDuration(sound, 0, pitchCurve),
       ...(pan === undefined ? {} : { pan }), ...(gainCurve?.length ? { gainCurve } : {}), ...(pitchCurve ? { pitchCurve } : {}) }));
     return {
       events,
@@ -386,12 +388,12 @@ export function readPreview(value: unknown, options: { allowEmptySequence?: bool
   const boundaries: { time: number; amplitude: number; sources: number }[] = [];
   const expanded=Array.from(input.events).flatMap((raw:unknown)=>{
     const event=object(raw,'音乐音符');
-    fields(event,['atSeconds','sound','pan','gainCurveId','pitchCurveId','noteId','groupId'],'音乐音符');
+    fields(event,['atSeconds','sound','pan','gainCurveId','pitchCurveId','noteId','groupId','noteGainDb'],'音乐音符');
     return recordingLayers(event.sound).map(sound=>({...event,sound}));
   });
   const scheduled = Array.from(expanded, (raw: unknown) => {
     const event = object(raw, '音乐音符');
-    fields(event, ['atSeconds', 'sound', 'pan', 'gainCurveId', 'pitchCurveId', 'noteId', 'groupId'], '音乐音符');
+    fields(event, ['atSeconds', 'sound', 'pan', 'gainCurveId', 'pitchCurveId', 'noteId', 'groupId', 'noteGainDb'], '音乐音符');
     if (event.groupId !== undefined && (typeof event.groupId !== 'string' || !event.groupId || event.groupId.length > 1024)) throw new Error('音符的音色分组无效。');
     if (event.noteId !== undefined && (typeof event.noteId !== 'string' || !event.noteId)) throw new Error('音符标识无效。');
     const songAtSeconds = number(event.atSeconds, '音符开始时间（秒）', 0, duration);
@@ -415,11 +417,12 @@ export function readPreview(value: unknown, options: { allowEmptySequence?: bool
     durationSeconds = Math.max(durationSeconds, end);
     const gainCurve = typeof event.gainCurveId === 'string' ? gainCurves.get(event.gainCurveId) : undefined;
     if (event.gainCurveId !== undefined && !gainCurve) throw new Error('找不到音符对应的音量增益曲线。');
-    const amplitude = noteAmplitude(sound) * (gainCurve?.peak ?? 1) * (sound.kind === 'sample' ? samplePeak(sound, pan) : sound.sources.reduce((sum, source) => sum + source.level, 0));
+    const noteGain = dbAmplitude(number(event.noteGainDb ?? 0, '音符音量', MIN_NOTE_GAIN_DB, MAX_NOTE_GAIN_DB));
+    const amplitude = noteAmplitude(sound) * noteGain * (gainCurve?.peak ?? 1) * (sound.kind === 'sample' ? samplePeak(sound, pan) : sound.sources.reduce((sum, source) => sum + source.level, 0));
     const sourceCount = sound.kind === 'sample' ? 1 : sound.sources.length;
     boundaries.push({ time: atSeconds, amplitude, sources: sourceCount });
     boundaries.push({ time: end, amplitude: -amplitude, sources: -sourceCount });
-    return { atSeconds, sound, duration: sounding, ...(typeof event.groupId === 'string' ? { groupId: event.groupId } : {}), ...(typeof event.noteId === 'string' && input.editableNotes ? { noteId: event.noteId } : {}), ...(pan === undefined ? {} : { pan }), ...(gainCurve?.points.length ? { gainCurve: gainCurve.points } : {}),
+    return { atSeconds, sound, duration: sounding, ...(noteGain === 1 ? {} : { noteGain }), ...(typeof event.groupId === 'string' ? { groupId: event.groupId } : {}), ...(typeof event.noteId === 'string' && input.editableNotes ? { noteId: event.noteId } : {}), ...(pan === undefined ? {} : { pan }), ...(gainCurve?.points.length ? { gainCurve: gainCurve.points } : {}),
       ...(pitchCurve ? { pitchCurve } : {}), ...(transport ? { songAtSeconds } : {}) };
   });
   // Treat sub-nanosecond rounding differences as simultaneous only for the peak bound;

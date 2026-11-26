@@ -19,7 +19,9 @@ export interface LearningSettingsPort {
 /** Report committed user actions, not tutorial clicks or synthetic input. */
 export type LearningAction =
   | 'play' | 'pause-space' | 'resume-space' | 'reset' | 'drag-playhead-ruler'
+  | 'audition-pitch' | 'seek-right' | 'erase-right' | 'wheel-duration' | 'highlight-scale' | 'highlight-column' | 'hum-pitch' | 'note-gain-key'
   | 'pan' | 'scroll-x' | 'scroll-y' | 'zoom-x' | 'zoom-y'
+  | 'open-tones' | 'close-tones' | 'open-details' | 'deselect-top'
   | 'add-group' | 'select-group' | 'draw-note' | 'move-note' | 'resize-note'
   | 'delete-note' | 'undo' | 'deselect' | 'save' | 'export' | 'exit'
   | 'add-roll' | 'change-tempo' | 'change-grid' | 'resize-roll';

@@ -19,9 +19,10 @@ import { createSongEditor, createSongReferenceAdapter } from '../src/workstation
 import { musicClockVoice } from './music-clock-fixture.ts';
 import { initialMelodyView, melodyScale, melodyDuration, melodySeconds } from '../src/workstation/modules/ui-rendering/melody-geometry.ts';
 import { gainAtTime } from '../src/workstation/contracts/gain-curve.ts';
-import { phraseBeatSeconds, phraseGainTimeline } from '../src/workstation/contracts/phrase-time.ts';
+import { phraseBeatSeconds, phraseGainTimeline, phraseHeldSeconds } from '../src/workstation/contracts/phrase-time.ts';
 const hooks = registerHooks({ load(url, context, next) { return url.endsWith('.css') ? { format: 'module', source: '', shortCircuit: true } : next(url, context); } });
 const { mountStudio } = await import('../src/workstation/modules/ui-rendering/public.ts'); hooks.deregister();
+const { mountProjectLibrary } = await import('../src/workstation/modules/ui-rendering/project-library.ts');
 const { mountMelodyWorkspace } = await import('../src/workstation/modules/ui-rendering/melody-workspace.ts');
 const { showTapTempo } = await import('../src/workstation/modules/ui-rendering/tap-tempo.ts');
 const { mountPhraseComposition } = await import('../src/workstation/modules/ui-rendering/phrase-composition.ts');
@@ -29,7 +30,11 @@ type FakeEvent = Record<string, unknown> & { type: string; target: Element; prev
 let navigationHeight: number | undefined;
 /** In-memory event DOM only; no browser, screen, device, or audio is accessed. */
 class Element {
-  tagName: string; className = ''; style: Record<string, unknown> & { setProperty(name: string, value: string): void } = { setProperty(name, value) { this[name] = value; } }; dataset: Record<string, string> = {};
+  tagName: string; className = ''; dataset: Record<string, string> = {};
+  style: Record<string, unknown> & { setProperty(name: string, value: string): void; removeProperty(name: string): void } = {
+    setProperty(name, value) { this[name] = value; },
+    removeProperty(name) { delete this[name]; },
+  };
   parentElement?: Element; children: Element[] = []; attributes = new Map<string, string>();
   value = ''; title = ''; hidden = false; disabled = false; tabIndex = 0; clientWidth = 1000; private height = 700; scrollTop = 0; scrollLeft = 0;
   get clientHeight(): number { return navigationHeight !== undefined && (this.classList.contains('melody-scroll') || this.classList.contains('phrase-composition-section')) ? navigationHeight : this.height; }
@@ -97,6 +102,7 @@ class Input extends Element { checked = false; }
 class Select extends Element {}
 class TextArea extends Element {}
 class Document extends Element {
+  body = new Element('body');
   activeElement?: Element;
   createElement(tag: string): Element { return tag === 'input' ? new Input(tag) : new Element(tag); }
   createElementNS(_namespace: string, tag: string): Element { return this.createElement(tag); }
@@ -106,7 +112,7 @@ function installDom() {
   const document = new Document('document'); const window = new Element('window'); const timers: ReturnType<typeof setTimeout>[] = [];
   const frames = new Map<number, FrameRequestCallback>(); let serial = 0;
   Object.assign(window, { innerWidth: 1280, innerHeight: 850, setTimeout(callback: () => void, delay: number) { const timer = setTimeout(callback, delay); timer.unref(); timers.push(timer); return Number(timer); }, clearTimeout });
-  const replacements = { document, window, HTMLElement: Element, HTMLInputElement: Input, HTMLSelectElement: Select, HTMLTextAreaElement: TextArea,
+  const replacements = { document, window, sessionStorage: { getItem: () => null, removeItem() {} }, HTMLElement: Element, HTMLInputElement: Input, HTMLSelectElement: Select, HTMLTextAreaElement: TextArea,
     getComputedStyle(element: Element) { return { opacity: element.hidden ? '0' : '1' }; },
     Node: Element, requestAnimationFrame(callback: FrameRequestCallback) { frames.set(++serial, callback); return serial; }, cancelAnimationFrame(id: number) { frames.delete(id); } };
   const previous = new Map<string, PropertyDescriptor | undefined>();
@@ -222,8 +228,12 @@ test('unified music opens in the piano roll, plays and tracks unsaved changes th
       assert.equal(root.querySelector('.tap-tempo-value')!.textContent,'150');
       assert.equal(phrase.read().body!.tempoBpm,120,'tapping alone cannot change the project');
       assert.equal(plans.length,1,'tap keys cannot start playback');
+      const oldBody = phrase.read().body!, oldNote = oldBody.parts[0]!.notes[0]!;
       root.querySelector('.tap-tempo-apply')!.emit('click');await settle();
-      assert.equal(phrase.read().body!.tempoBpm,150);assert.equal(phrase.read().body!.parts[0]!.notes[0]!.durationSeconds,.4);
+      const newBody = phrase.read().body!, newNote = newBody.parts[0]!.notes[0]!;
+      assert.equal(newBody.tempoBpm,150);
+      assert.equal(phraseBeatSeconds(newBody, newNote.startBeat), phraseBeatSeconds(oldBody, oldNote.startBeat));
+      assert.equal(phraseHeldSeconds(newBody, newNote), phraseHeldSeconds(oldBody, oldNote));
       assert.equal(saves,1,'applying tempo is a working edit, not a disk save');
       assert(!unsaved.hidden, 'another edit brings the marker back');
       failSave = true;
@@ -312,7 +322,7 @@ test('tap dialog supports mouse and keyboard, reset, cancel and listener cleanup
   }finally{dialog.dispose();dom.restore();}
 });
 
-function editableRoll(options: { workbench?: boolean; workspaceState?: MusicWorkspaceStatePort; performance?: boolean; orientation?: 'vertical'; playing?: boolean; multipleRolls?: boolean; readDrumLanes?(): boolean; onLearningAction?(action: LearningAction): void } = {}) {
+function editableRoll(options: { workbench?: boolean; workspaceState?: MusicWorkspaceStatePort; performance?: boolean; orientation?: 'vertical'; playing?: boolean; multipleRolls?: boolean; desktopPointerUx?: boolean; readDrumLanes?(): boolean; onLearningAction?(action: LearningAction): void } = {}) {
   const dom=installDom();let text=createInitialProjectLibrary('交互测试');
   const library=createMaterialLibrary({read:()=>text,write:value=>{text=value;}});
   const tones=createTimbrePlayback(library,undefined,undefined,musicClockVoice),phrase=createPhraseEditor(library,tones);
@@ -326,6 +336,7 @@ function editableRoll(options: { workbench?: boolean; workspaceState?: MusicWork
   const seeks: number[] = [];
   const commits: boolean[] = [];
   const mount=()=>mountMelodyWorkspace(root as unknown as HTMLElement,{phrase,sound,gridBpm:()=>120,workspaceState:options.workspaceState,orientation:options.orientation,readPerformanceMode:()=>!!options.performance,
+    desktopPointerUx: options.desktopPointerUx,
     readIsPlaying:options.playing===undefined?undefined:()=>options.playing!,
     readMultipleTempoRolls: options.multipleRolls === undefined ? undefined : () => options.multipleRolls!, onLearningAction: options.onLearningAction,
     readDrumLanes: options.readDrumLanes,
@@ -339,7 +350,7 @@ function editableRoll(options: { workbench?: boolean; workspaceState?: MusicWork
     sounds,auditions,cleanup(){roll.dispose();dom.restore();}};
 }
 
-test('the studio library filters by actual instruments, separate drum kits and custom sounds', () => {
+test('the studio library offers melodic instruments and custom sounds while excluding drum kits', () => {
   let drumLanes = false;
   const f = editableRoll({ orientation: 'vertical', readDrumLanes: () => drumLanes });
   try {
@@ -351,22 +362,17 @@ test('the studio library filters by actual instruments, separate drum kits and c
     assert(!names().some(name => name.startsWith('录音室鼓')));
     drumLanes = true; f.roll.refresh();
     assert.deepEqual(new Set(tabs().map(tab => tab.textContent)),
-      new Set(['全部', '钢琴', '木管', '贝斯', '吉他', '弦乐', '铜管', '录音室鼓 A', '录音室鼓 B']));
+      new Set(['全部', '钢琴', '木管', '贝斯', '吉他', '弦乐', '铜管']));
+    assert(!names().some(name => name.startsWith('录音室鼓')));
     select('钢琴');
     assert.deepEqual(names(), ['三角钢琴']);
-    for (const kit of ['录音室鼓 A', '录音室鼓 B']) {
-      select(kit);
-      assert.equal(names().length, 11);
-      assert(names().every(name => name.startsWith(kit)));
-    }
-    assert(names().includes('录音室鼓 B · 底鼓'));
     for (let i = f.sounds.length - 1; i >= 0; i--) {
       if (f.sounds[i]!.name.startsWith('录音室鼓 B')) f.sounds.splice(i, 1);
     }
     f.sounds.push({ ...f.sounds[0]!, id: 'custom-tone', name: '自制钢琴' });
     f.roll.refresh();
     assert(!tabs().some(tab => tab.textContent === '录音室鼓 B'));
-    assert.equal(tabs().find(tab => tab.textContent === '全部')!.attributes.get('aria-pressed'), 'true');
+    assert.equal(tabs().find(tab => tab.textContent === '钢琴')!.attributes.get('aria-pressed'), 'true');
     select('自定义');
     assert.deepEqual(names(), ['自制钢琴']);
   } finally { f.cleanup(); }
@@ -757,6 +763,79 @@ test('music shell restores playhead before the roll can persist a new context',a
   }finally{composition.dispose();f.cleanup();}
 });
 
+test('each window edge opens and closes the welcome library once per contact', async () => {
+  const dom = installDom(), root = new Element('main'), welcome = new Element('section');
+  welcome.className = 'welcome';
+  root.append(welcome);
+  const library = mountProjectLibrary(root as unknown as HTMLElement, welcome as unknown as HTMLElement, {
+    async open() {}, async list() { return []; },
+  }, () => {}, undefined, true);
+  const overlay = root.querySelector('.project-library-overlay')!;
+  const move = (x: number, y: number) => root.emit('pointermove', { clientX: x, clientY: y });
+  try {
+    for (const [x, y] of [[1279, 360], [0, 360], [700, 0], [700, 849]] as const) {
+      move(700, 520); move(x, y); await settle();
+      assert(!overlay.hidden);
+      move(x, y); move(x, y);
+      assert(!overlay.hidden);
+      move(700, 520); move(x, y); await settle();
+      assert(overlay.hidden);
+    }
+  } finally { library.dispose(); dom.restore(); }
+});
+
+test('the desktop Save As back arrow cancels without writing', async () => {
+  const dom = installDom(), root = new Element('main'), trigger = new Element('button');
+  const choices: string[] = [];
+  let writes = 0;
+  const library = mountProjectLibrary(root as unknown as HTMLElement, trigger as unknown as HTMLElement, {
+    async open() {}, async list() { return []; },
+  }, () => {}, {
+    name: '未保存编辑', async copy() { writes++; }, finish(choice) { choices.push(choice); },
+  }, true);
+  try {
+    library.open(); await settle();
+    const back = root.querySelector('.project-library-save-back')!;
+    assert.equal(back.attributes.get('aria-label'), '取消另存为');
+    back.click();
+    assert.deepEqual(choices, ['cancelled']);
+    assert.equal(writes, 0);
+    assert.equal(root.querySelector('.project-library-overlay')!.hidden, true);
+  } finally { library.dispose(); dom.restore(); }
+});
+
+test('desktop exit hint survives motion, clears after other input or timeout, and re-arms', async () => {
+  const f = editableRoll(); f.roll.dispose();
+  let exits = 0, expire: (() => void) | undefined;
+  const timers = f.window as unknown as Pick<Window, 'setTimeout' | 'clearTimeout'>;
+  const setTimer = timers.setTimeout;
+  timers.setTimeout = (callback, duration) => {
+    if (duration !== 3000 || typeof callback !== 'function') return setTimer(callback, duration);
+    expire = () => callback();
+    return 0;
+  };
+  const sound = { stopAll() {}, stop() {}, cancelAudition() {}, subscribe() { return () => {}; }, position() { return 0; } } as unknown as SoundRuntimePort;
+  const composition = mountPhraseComposition(f.root as unknown as HTMLElement, {
+    phrase: f.phrase, sound, directMusic: true, desktopPointerUx: true,
+    onSave() {}, onExit() { exits++; }, readUnsavedChanges: async () => true,
+  });
+  try {
+    await settle();
+    composition.showControls();
+    const exit = f.root.querySelector('.song-exit')!;
+    const armed = () => f.root.querySelector('.is-exit-armed') !== undefined;
+    exit.click(); await settle();
+    assert(armed()); assert.equal(exits, 0);
+    f.document.emit('pointermove'); assert(armed());
+    f.document.emit('wheel'); assert(!armed());
+    exit.click(); await settle();
+    assert(armed()); assert.equal(exits, 0);
+    assert(expire); expire(); assert(!armed());
+    exit.click(); exit.click(); await settle();
+    assert.equal(exits, 1);
+  } finally { composition.dispose(); f.cleanup(); }
+});
+
 test('desktop Escape cancels a drag before opening and closing the editor controls panel', async () => {
   const f = editableRoll(); f.roll.dispose();
   let level = 1;
@@ -782,7 +861,7 @@ test('desktop Escape cancels a drag before opening and closing the editor contro
     assert.equal(panel.hidden, true);
     f.document.emit('keydown', { key: 'Escape', target: scroll });
     assert.equal(panel.hidden, false);
-    assert(panel.querySelector('.learning-feature'));
+    assert.equal(panel.querySelector('.learning-feature'), undefined);
     const rates = panel.querySelectorAll('.song-rate-choice');
     assert.deepEqual(rates.map(choice => choice.textContent), ['0.5x', '0.75x', '1x']);
     for (let index = 0; index < rates.length; index++) {
@@ -874,8 +953,8 @@ test('desktop erasure and undo reach the same playback session during device sta
     const erase = (id: string) => {
       const note = f.note(id), bounds = note.getBoundingClientRect();
       const input = { button: 2, pointerId: 92, clientX: bounds.left + bounds.width / 2 - scroll.scrollLeft, clientY: bounds.top + bounds.height / 2 };
-      scroll.emit('pointerdown', { ...input, target: note });
-      f.document.emit('pointerup', input);
+      scroll.emit('pointerdown', { ...input, target: note, timeStamp: 100 });
+      f.document.emit('pointerup', { ...input, timeStamp: 300 });
       assert(!f.note(id));
     };
     erase(f.a);
@@ -902,7 +981,7 @@ test('vertical roll transposes time, pitches, gestures, resize and physical whee
     assert(Number(keys[0]!.dataset.frequencyHz)<Number(keys.at(-1)!.dataset.frequencyHz));
     assert(keys.every(key=>key.style.width==='32px'),'white and black keys have equal pitch width');
     assert(keys.filter(key=>key.textContent).every(key=>/^C-?\d+$/u.test(key.textContent)),'only C octave names are printed');
-    assert(keys.every(key=>key.title.startsWith(key.dataset.pitchLabel!)),'all pitches remain readable on hover');
+    assert(keys.every(key=>!key.title),'pitch hover tips are absent');
     assert.equal(f.note(f.a).style.width,'30px');
     const initial=f.roll.readViewport(),before=structuredClone(f.phrase.read().body);
     scroll.emit('wheel',{target:canvas,deltaY:64,clientX:200,clientY:100});let next=f.roll.readViewport();
@@ -1165,7 +1244,7 @@ test('dragging a BPM label previews only the boundary, snaps to a beat and suppo
     const lower=f.phrase.addNote(f.first,{startBeat:18,durationBeats:.5,durationSeconds:.25,frequencyHz:660,velocity:.7});f.roll.refresh();
     const scroll=f.root.querySelector('.melody-scroll')!,canvas=f.root.querySelector('.melody-canvas')!;
     scroll.emit('wheel',{target:canvas,deltaY:1800,clientX:200,clientY:100});f.flushFrames();
-    let marker=f.root.querySelectorAll('.melody-tempo-marker').find(m=>m.attributes.get('aria-label')==='卷帘 2 BPM')!;
+    let marker=f.root.querySelectorAll('.melody-tempo-marker').find(m=>m.attributes.get('aria-label')==='画布 2 BPM')!;
     const scale=melodyScale(f.roll.readViewport(),scroll.clientHeight-48,melodyDuration(f.phrase.read().body!));
     const before=f.read(),viewport=f.roll.readViewport(),original=f.phrase.read().body!;
     const markerTop = Number.parseFloat(String(marker.parentElement!.style.top));
@@ -1183,7 +1262,7 @@ test('dragging a BPM label previews only the boundary, snaps to a beat and suppo
     assert.equal(body.parts[0]!.notes.find(n=>n.id===late)!.startBeat,14);
     assert.equal(body.parts[0]!.notes.find(n=>n.id===lower)!.startBeat,18);
     f.phrase.undo();assert.equal(f.phrase.read().body!.tempoSections![0]!.startBeat,16);assert(f.phrase.read().body!.parts[0]!.notes.some(n=>n.id===late));f.roll.refresh();
-    marker=f.root.querySelectorAll('.melody-tempo-marker').find(m=>m.attributes.get('aria-label')==='卷帘 2 BPM')!;
+    marker=f.root.querySelectorAll('.melody-tempo-marker').find(m=>m.attributes.get('aria-label')==='画布 2 BPM')!;
     const restored=f.read();marker.emit('pointerdown',{clientY:100});f.document.emit('pointermove',{clientY:100+scale});f.flushFrames();
     f.document.emit('pointercancel');assert.equal(f.read(),restored);assert(f.root.querySelector('.melody-tempo-resize-hint')!.hidden);
     assert(!marker.hasPointerCapture(1));
@@ -1192,6 +1271,27 @@ test('dragging a BPM label previews only the boundary, snaps to a beat and suppo
     marker.emit('keydown',{key:'ArrowDown'});body=f.phrase.read().body!;assert.equal(body.tempoSections![0]!.startBeat,18);
     assert.equal(body.tempoSections![0]!.id,section);
   }finally{f.cleanup();}
+});
+
+test('desktop BPM boundaries retain the fractional position on pointer release', () => {
+  const f = editableRoll({ orientation: 'vertical', multipleRolls: true, desktopPointerUx: true });
+  try {
+    f.phrase.setLength(16);
+    f.phrase.addTempoSection();
+    f.roll.refresh();
+    const scroll = f.root.querySelector('.melody-scroll')!;
+    f.roll.frameNotes();
+    const marker = f.root.querySelectorAll('.melody-tempo-marker').find(node => node.attributes.get('aria-label') === '画布 2 BPM')!;
+    const before = f.phrase.read().body!;
+    const scale = melodyScale(f.roll.readViewport(), scroll.clientHeight, melodyDuration(before));
+    marker.emit('pointerdown', { clientY: 100 });
+    f.document.emit('pointermove', { clientY: 100 + .18 * scale });
+    f.flushFrames();
+    f.document.emit('pointerup', { clientY: 100 + .215 * scale });
+    assert(Math.abs(f.phrase.read().body!.tempoSections![0]!.startBeat - 16.43) < 1e-8);
+    f.phrase.undo();
+    assert.deepEqual(f.phrase.read().body, before);
+  } finally { f.cleanup(); }
 });
 
 test('note creation and dragging snap to a nearby visible grid line across a BPM boundary', () => {
@@ -1405,13 +1505,13 @@ test('a large canvas pan reveals the locator and the head hint also identifies a
   }finally{f.cleanup();}
 });
 
-test('narrow pitch columns stack C octave labels and keep every full pitch available on hover',()=>{
+test('narrow pitch columns stack C octave labels without hover tips',()=>{
   const f=editableRoll({orientation:'vertical'});try{
     const scroll=f.root.querySelector('.melody-scroll')!,canvas=f.root.querySelector('.melody-canvas')!,before=structuredClone(f.phrase.read().body);
     scroll.emit('wheel',{target:canvas,ctrlKey:true,shiftKey:true,deltaY:1000,clientX:0,clientY:100});
     let keys=f.root.querySelectorAll('.melody-key');assert(keys.some(key=>key.textContent==='C\n4'));
     assert(keys.filter(key=>key.textContent).every(key=>/^C\n-?\d+$/u.test(key.textContent)&&key.classList.contains('is-stacked-label')));
-    assert(keys.every(key=>key.title.startsWith(key.dataset.pitchLabel!)));
+    assert(keys.every(key=>!key.title));
     scroll.emit('wheel',{target:canvas,ctrlKey:true,shiftKey:true,deltaY:-1000,clientX:0,clientY:100});
     keys=f.root.querySelectorAll('.melody-key');assert(keys.some(key=>key.textContent==='C4'));
     assert(keys.every(key=>!key.classList.contains('is-stacked-label')));assert.deepEqual(f.phrase.read().body,before);
@@ -1449,61 +1549,81 @@ test('single-roll mode keeps the draggable end and blocks adding tempo sections'
   } finally { f.cleanup(); }
 });
 
-test('desktop requires multi-roll mode until deleting back to one roll through the control menu', async()=>{
+test('desktop opens old multi-tempo songs directly and allows switching once the last boundary is removed', async () => {
   const f = editableRoll({ orientation: 'vertical' }); let studio: ReturnType<typeof mountStudio> | undefined;
   try {
     f.roll.dispose(); f.phrase.setLength(4);
     const lower = f.phrase.addTempoSection();
+    f.phrase.setTempoSection(lower, 80);
     f.phrase.addNote(f.first, { startBeat: 5, durationBeats: .5, frequencyHz: 440, velocity: .75 });
-    const before = structuredClone(f.phrase.read().body!);
-    let raw: string | null = null;
-    const learning = createLearningSettings({ getItem: () => raw, setItem(_key,value) { raw = value; } });
-    learning.record('basics', { status: 'learning', step: 1 });
+    commitMusicDocument(f.library, f.song, f.phrase);
+    openMusicDocument(f.library, f.song, f.phrase);
+    const learning = createLearningSettings({ getItem: () => null, setItem() {} });
     const sound = { stopAll() {}, stop() {}, cancelAudition() {}, subscribe() { return () => {}; }, position() { return 0; } } as unknown as SoundRuntimePort;
     studio = mountStudio(f.root as unknown as HTMLElement, { timbre: createTimbreEditor(f.library), phrase: f.phrase,
-      song: f.song, sound, learning, hasPrevious: true, initialEntry: 'song' });
-    assert(f.root.querySelector('.learning-feature-gate')); assert.equal(f.root.querySelector('.melody-workspace'), undefined);
-    const gate = f.root.querySelector('.learning-feature-gate')!;
-    const enable = gate.querySelectorAll('button').find(node => node.textContent === '启用并打开')!;
-    enable.emit('click'); await settle();
-    assert.equal(learning.read().multipleTempoRolls, true); assert(f.root.querySelector('.melody-workspace'));
-    assert.equal(f.root.querySelector('.guidance-invitation'), undefined);
-    assert.equal(f.root.querySelector('.guidance-shell'), undefined);
-    assert.deepEqual(f.phrase.read().body, before, 'unlocking only changes local visibility, never music');
-    const blocks = () => f.root.querySelectorAll('.melody-tempo-block');
-    const first = blocks().find(block => block.dataset.sectionId === 'first')!;
-    assert(!first.hidden);
-    const marker = first.querySelector('.melody-tempo-marker')!;
-    assert.equal(marker.textContent, '120');
-    marker.emit('pointerdown', { clientY: 8 });
-    f.document.emit('pointermove', { clientY: 170 }); f.document.emit('pointerup');
-    assert.deepEqual(f.phrase.read().body, before);
-    marker.emit('click');
-    assert.equal(f.root.querySelector('.melody-tempo-input')!.value, '120');
-    const openSettings = async () => {
-      f.root.querySelector('.song-settings')!.emit('click'); await settle();
-      return f.root.querySelector('.learning-settings')!;
+      song: f.song, sound, learning, desktopPointerUx: true, hasPrevious: true, initialEntry: 'song' });
+    await settle();
+    assert(f.root.querySelector('.melody-workspace'));
+    assert.equal(f.root.querySelector('.learning-feature-gate'), undefined);
+    const marker = f.root.querySelectorAll('.melody-tempo-block').find(node => node.dataset.sectionId === lower)!;
+    assert.equal(marker.querySelector('button')!.textContent, '80');
+    f.document.emit('keydown', { key: 'Escape' });
+    const settings = f.root.querySelector('.song-editor-controls')!;
+    const currentSwitch = () => {
+      const tempo = settings.querySelector('.song-details-tempo');
+      assert(tempo);
+      assert(tempo.querySelector('.melody-tempo-dock'));
+      const row = tempo.querySelector('.song-details-tempo-more')!;
+      assert.equal(row.children[0]?.classList.contains('melody-extend'), true);
+      const control = row.querySelector('.learning-roll-switch')?.querySelector('input');
+      assert(control instanceof Input);
+      assert.equal(control.attributes.get('aria-label'), '多 BPM');
+      return control;
     };
-    let settings = await openSettings();
-    const switchInput = () => settings.querySelectorAll('input').find(input => input.attributes.get('aria-label') === '多卷帘') as Input;
-    assert(switchInput().disabled); settings.close();
-    const menu = f.root.querySelector('.melody-tempo-menu')!;
-    first.emit('contextmenu', { clientX: 18, clientY: 8 });
-    assert(!menu.hidden); assert(menu.querySelector('button')!.disabled);
-    f.document.emit('keydown', { key: 'Escape' }); assert(menu.hidden);
-    const lowerBlock = blocks().find(block => block.dataset.sectionId === lower)!;
-    assert(!lowerBlock.hidden);
-    lowerBlock.emit('contextmenu', { clientX: 18, clientY: 100 });
-    const remove = menu.querySelector('button')!;
-    assert(!menu.hidden); assert.equal(remove.textContent, '删除'); assert(!remove.disabled);
-    remove.emit('click');
-    assert(menu.hidden);
+    assert(!settings.hidden);
+    assert.equal(currentSwitch().checked, true);
+    assert.equal(currentSwitch().disabled, true);
+    const grip = settings.querySelector('.melody-grid-shift')!;
+    function toggleFrom(block: Element) {
+      block.querySelector('button')!.emit('click');
+      grip.emit('pointerdown', { clientX: 50, clientY: 70 });
+      f.document.emit('pointerup', { clientX: 50, clientY: 70 });
+    }
+    const hiddenLines = () => f.root.querySelectorAll('.melody-grid-line').map(line => line.hidden);
+    const original = f.phrase.read().body;
+    const upper = f.root.querySelectorAll('.melody-tempo-block').find(node => node.dataset.sectionId === 'first')!;
+    toggleFrom(marker);
+    const lowerHidden = hiddenLines();
+    assert(lowerHidden.includes(true) && lowerHidden.includes(false));
+    toggleFrom(upper);
+    assert(hiddenLines().every(Boolean));
+    const tempo = settings.querySelector('.song-details-tempo')!;
+    assert(tempo.querySelector('.melody-tempo-button')!.hidden);
+    assert(tempo.classList.contains('are-beat-grids-hidden'));
+    assert(!grip.hidden);
+    toggleFrom(marker);
+    assert(!tempo.querySelector('.melody-tempo-button')!.hidden);
+    assert(!tempo.classList.contains('are-beat-grids-hidden'));
+    assert.deepEqual(hiddenLines(), lowerHidden.map(hidden => !hidden));
+    toggleFrom(upper);
+    assert(hiddenLines().every(hidden => !hidden));
+    assert.deepEqual(f.phrase.read().body, original);
+    f.document.emit('keydown', { key: 'Escape' });
+    const noteCount = f.phrase.read().body!.parts.flatMap(part => part.notes).length;
+    marker.emit('contextmenu', { clientX: 30, clientY: 60 });
+    f.root.querySelector('.melody-tempo-menu')!.querySelector('button')!.emit('click');
     assert.equal(f.phrase.read().body!.tempoSections, undefined);
-    assert.deepEqual(f.phrase.read().body!.parts, before.parts);
-    settings = await openSettings();
-    assert(!switchInput().disabled);
-    switchInput().checked = false; switchInput().emit('change');
-    assert.equal(learning.read().multipleTempoRolls, false);
+    assert.equal(f.phrase.read().body!.parts.flatMap(part => part.notes).length, noteCount);
+    f.document.emit('keydown', { key: 'Escape' });
+    assert(!currentSwitch().checked && !currentSwitch().disabled);
+    currentSwitch().checked = true;
+    currentSwitch().emit('change');
+    assert.equal(learning.read().multipleTempoRolls, true);
+    const add = settings.querySelector('.melody-extend')!;
+    assert.equal(add.hidden, false);
+    add.emit('click');
+    assert.equal(f.phrase.read().body!.tempoSections?.length, 1);
+    assert.equal(currentSwitch().disabled, true);
   } finally { studio?.dispose(); f.cleanup(); }
 });
 

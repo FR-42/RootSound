@@ -557,6 +557,11 @@ export function createBrowserSoundRuntime(): SoundRuntimePort {
     }
   }
 
+  function setNoteGain(sessionId: string, noteId: string, gainDb: number): void {
+    const voice = active;
+    if (voice?.session.id === sessionId && voice.session.status === 'playing') voice.windowed?.setNoteGain(noteId, gainDb);
+  }
+
   function setNotesDeleted(sessionId: string, noteIds: readonly string[], deleted: boolean): void {
     const voice = active;
     if (!voice || voice.session.id !== sessionId || voice.session.status !== 'playing') return;
@@ -669,6 +674,7 @@ export function createBrowserSoundRuntime(): SoundRuntimePort {
     cancelAudition,
     update,
     pause,
+    setNoteGain,
     setNotesDeleted,
     setSoloGroup,
     resume,

@@ -7,6 +7,7 @@ import { createTimbrePlayback, createTimbreReferenceAdapter } from '../src/works
 import { createPhraseEditor, createPhrasePlayback, createPhraseReferenceAdapter } from '../src/workstation/modules/phrase/public.ts';
 import { createSongEditor, createSongReferenceAdapter } from '../src/workstation/modules/song/public.ts';
 import { createMidiProjectLibrary } from '../src/workstation/app/midi-project.ts';
+import { phraseBeatSeconds, phraseHeldSeconds } from '../src/workstation/contracts/phrase-time.ts';
 import { musicClockVoice } from './music-clock-fixture.ts';
 
 function open(text: string) {
@@ -58,6 +59,29 @@ test('music edits stay in the working snapshot; saving/reopening retains notes, 
   assert.equal(reopened.score.previewPlan().events[0]!.atSeconds, .75);
   assert.equal(reopened.score.previewPlan().events[0]!.sound.note.holdSeconds, .4);
   const stable = reopened.snapshot(); commitMusicDocument(reopened.library, reopened.song, reopened.score); assert.equal(reopened.snapshot(), stable);
+});
+
+test('per-note gain is undoable and survives saving and reopening without changing MIDI velocity or level', () => {
+  const f = open(createInitialProjectLibrary('单音符增益'));
+  const tone = f.library.listContentInfo().find(item => item.kind === 'rootsound.timbre')!;
+  const partId = f.score.addPart(tone.id);
+  const input = { startBeat: 0, durationBeats: 1, frequencyHz: 440, velocity: .7, level: .8 };
+  const id = f.score.addNote(partId, input);
+  const nextId = f.score.addNote(partId, { ...input, startBeat: 1 });
+  const draftId = f.score.read().draft!.id;
+  f.score.setNoteWritesDeferred!(true);
+  f.score.editDraftNote!(draftId, partId, { kind: 'gain', id, gainDb: 6 });
+  assert.equal(f.score.previewPlan().events[0]!.noteGainDb, 6);
+  f.score.undo();
+  assert.equal(f.score.previewPlan().events[0]!.noteGainDb, undefined);
+  f.score.redo();
+  assert.equal(f.score.previewPlan().events[0]!.noteGainDb, 6);
+  assert.throws(() => f.score.editDraftNote!(draftId, partId, { kind: 'gain', id, gainDb: 7 }), /音符音量/);
+  f.score.flushNoteWrites!();
+  commitMusicDocument(f.library, f.song, f.score);
+  const reopened = open(f.snapshot()).score;
+  assert.deepEqual(reopened.read().body!.parts[0]!.notes, [{ ...input, id, gainDb: 6 }, { ...input, id: nextId, startBeat: 1 }]);
+  assert.deepEqual(reopened.previewPlan().events.map(event => event.noteGainDb), [6, undefined]);
 });
 
 test('gain curves save with their own card and compile against the current tempo', () => {
@@ -142,4 +166,43 @@ test('flattening retains silent undefined-tone notes so users can assign another
   assert.equal(merged.score.read().body!.parts[0]!.notes.length, 2);
   commitMusicDocument(merged.library, merged.song, merged.score);
   assert.equal(open(merged.snapshot()).score.read().body!.parts[0]!.notes.length, 2);
+});
+
+test('an old multi-BPM native song opens and saves with its roll map, timing and hidden material', () => {
+  const f = open(createInitialProjectLibrary('旧变速工程'));
+  const tone = f.library.listContentInfo().find(item => item.kind === 'rootsound.timbre')!;
+  const part = f.score.addPart(tone.id);
+  f.score.setLength(4);
+  const second = f.score.addTempoSection();
+  f.score.setTempoSection(second, 80);
+  f.score.addNote(part, { startBeat: 3, durationBeats: 2, frequencyHz: 440, velocity: .7 });
+  f.score.addNote(part, { startBeat: 5, durationBeats: .5, durationSeconds: .3, frequencyHz: 220, velocity: .5 });
+  f.score.setPartGainCurve(part, [{ beat: 3, db: 0 }, { beat: 5, db: -5 }]);
+  f.score.setPartPerformanceCurve(part, 'pitch', [{ beat: 5, db: 2 }]);
+  const old = f.score.read().body!;
+  old.parts[0]!.hiddenNotes = [{ sectionId: second,
+    note: { id: 'hidden', startBeat: old.lengthBeats, durationBeats: 1, durationSeconds: .75, frequencyHz: 330, velocity: .5 } }];
+  old.midiExpression = [{ id: 'lane', events: [{ type: 'controller', controller: 64, value: 0, beat: 5, order: 2 }],
+    hiddenEvents: [{ sectionId: second, event: { type: 'controller', controller: 64, value: 0, beat: old.lengthBeats, order: 3 } }] }];
+  f.library.updateDraft(f.score.read().draft!.id, { body: old });
+  commitMusicDocument(f.library, f.song, f.score);
+  const original = f.snapshot();
+  const migrated = open(original), body = migrated.score.read().body!;
+  assert.equal(body.tempoBpm, 120);
+  assert.deepEqual(body.tempoSections, old.tempoSections);
+  const sourceId = migrated.score.read().draft!.sourceId!;
+  assert.equal(JSON.stringify(migrated.library.readContent(sourceId)!.body), JSON.stringify(f.library.readContent(sourceId)!.body));
+  const timing = (body: typeof old) => body.parts[0]!.notes.map(note => [
+    phraseBeatSeconds(body, note.startBeat), phraseHeldSeconds(body, note)]);
+  assert.deepEqual(timing(body), timing(old));
+  const curves = (body: typeof old) => [...body.parts[0]!.gainCurve!, ...body.parts[0]!.performanceCurves!.pitch!]
+    .map(point => phraseBeatSeconds(body, point.beat));
+  assert.deepEqual(curves(body), curves(old));
+  assert.equal(phraseBeatSeconds(body, body.midiExpression![0]!.events[0]!.beat), phraseBeatSeconds(old, 5));
+  assert.equal(body.parts[0]!.hiddenNotes![0]!.sectionId, second);
+  assert.equal(body.parts[0]!.hiddenNotes![0]!.note.durationSeconds, .75);
+  assert.equal(body.midiExpression![0]!.hiddenEvents![0]!.sectionId, second);
+  commitMusicDocument(migrated.library, migrated.song, migrated.score);
+  const reopened = open(migrated.snapshot()).score.read().body!;
+  assert.deepEqual(reopened, body);
 });

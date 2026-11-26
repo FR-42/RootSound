@@ -18,14 +18,6 @@ export function paintCardBacks(stack: HTMLElement, count: number): void {
   stack.replaceChildren(...backs);
 }
 
-export function arrangeToneCards(cards: HTMLElement[], angle: number): void {
-  const centre = (cards.length - 1) / 2;
-  cards.forEach((card, index) => {
-    card.style.setProperty('--card-turn', `${(index - centre) * Math.min(5, angle / Math.max(1, centre))}deg`);
-    card.style.setProperty('--card-layer', String(index + 1));
-  });
-}
-
 export function mountToneHand(row: HTMLElement) {
   let cards: HTMLElement[] = [], position = 0, target = 0, frame = 0;
   let slots = 7, spacing = 72, bounds: DOMRect | undefined;
@@ -56,6 +48,7 @@ export function mountToneHand(row: HTMLElement) {
     paint();
   }
   function update(next: HTMLElement[]): void {
+    if (cards.length === next.length && cards.every((card, index) => card === next[index])) return;
     const first = cards[Math.round(target)]?.dataset.partId;
     cards = next;
     const retained = first ? cards.findIndex(card => card.dataset.partId === first) : -1;
@@ -76,16 +69,32 @@ export function mountToneHand(row: HTMLElement) {
   return { update, measure, wheel, dispose() { cancelAnimationFrame(frame); window.removeEventListener('resize', measure); } };
 }
 
-export function showToneCardFace(button: HTMLButtonElement): void {
+const photographedInstruments = new Set(['piano', 'sax', 'bass', 'guitar', 'steel-guitar', 'violin', 'viola', 'cello',
+  'flute', 'trumpet', 'trombone', 'horn', 'dizi', 'kick', 'snare', 'hat', 'tom', 'crash', 'ride']);
+
+function photoKey(key?: string): string {
+  const name = key?.replace(/^studio-/, '') ?? '';
+  const drum = name.replace(/^(black-pearl|red-zeppelin)-/, '');
+  if (drum.startsWith('hat-')) return 'hat';
+  if (drum.startsWith('tom-')) return 'tom';
+  return drum === 'rim' ? 'snare' : drum;
+}
+
+export function showToneCardFace(button: HTMLButtonElement, key?: string): void {
   const name = document.createElement('span');
   const art = document.createElement('span');
   name.className = 'melody-card-name';
   art.className = 'melody-card-art';
   name.textContent = button.textContent;
   art.setAttribute('aria-hidden', 'true');
-  const icon = button.querySelector('svg');
-  if (icon) art.append(icon);
+  const imageKey = photoKey(key);
+  if (photographedInstruments.has(imageKey)) {
+    const photo = document.createElement('img');
+    photo.src = new URL(`./instrument-photos/${imageKey}.webp`, import.meta.url).href; photo.alt = ''; photo.decoding = 'async'; photo.draggable = false;
+    art.append(photo);
+  }
   button.classList.remove('has-instrument-icon');
+  button.classList.add('melody-photo-card');
   button.replaceChildren(name, art);
 }
 
@@ -102,9 +111,9 @@ export function setMiniToneDrag(data: DataTransfer, card: HTMLElement): void {
 
 type CardPicture = { bounds: DOMRect; card: HTMLElement };
 
-export function takeToneCardPicture(card: HTMLElement, release?: Pick<DragEvent, 'clientX' | 'clientY'>): CardPicture | undefined {
+export function takeToneCardPicture(card: HTMLElement, release?: Pick<DragEvent, 'clientX' | 'clientY'>, origin?: DOMRect): CardPicture | undefined {
   if (!animateCards(card)) return;
-  const bounds = card.getBoundingClientRect();
+  const bounds = origin ?? card.getBoundingClientRect();
   if (!bounds.width || !bounds.height) return;
   return {
     bounds: release ? new DOMRect(release.clientX - bounds.width / 2, release.clientY - bounds.height / 2, bounds.width, bounds.height) : bounds,
@@ -120,9 +129,7 @@ export function flyToneCard(picture: CardPicture | undefined, target: HTMLElemen
   const { bounds: from, card } = picture;
   const frame = workspace.getBoundingClientRect();
   const dx = to.left + to.width / 2 - from.left - from.width / 2;
-  const mask = kind === 'return' ? target.closest('.melody-tone-hand-mask')?.getBoundingClientRect() : undefined;
-  const visibleHeight = mask ? Math.max(0, Math.min(to.bottom, mask.bottom) - to.top) : to.height;
-  const dy = to.top + visibleHeight / 2 - from.top - from.height / 2;
+  const dy = to.top + to.height / 2 - from.top - from.height / 2;
   card.classList.remove('is-card-arriving', 'is-group-dragging');
   card.classList.add('melody-card-flight');
   card.inert = true;
@@ -133,10 +140,13 @@ export function flyToneCard(picture: CardPicture | undefined, target: HTMLElemen
   });
   workspace.append(card);
   if (kind !== 'stack') target.classList.add('is-card-arriving');
-  const selection = kind === 'pin' || kind === 'return';
-  const scale = Math.min(.78, Math.max(.18, visibleHeight / from.height));
+  const selection = kind === 'pin';
+  const scale = Math.min(.78, Math.max(.18, to.height / from.height));
   const bend = Math.min(51, Math.hypot(dx, dy) * .12);
-  const frames = selection ? Array.from({ length: 13 }, (_, index) => {
+  const frames = kind === 'return' ? [
+    { transform: 'translate(0px, 0px) scale(1)', opacity: .92 },
+    { transform: `translate(${dx}px, ${dy}px) scale(${to.width / from.width}, ${to.height / from.height})`, opacity: 1 },
+  ] : selection ? Array.from({ length: 13 }, (_, index) => {
     const t = index / 12;
     const small = .31;
     const size = t < .38 ? 1 + (small - 1) * (t / .38) : small + (scale - small) * ((t - .38) / .62);
@@ -149,7 +159,7 @@ export function flyToneCard(picture: CardPicture | undefined, target: HTMLElemen
     { transform: `translate(${dx * .58}px, ${dy * .58 - 13}px) scale(.9)`, opacity: 1 },
     { transform: `translate(${dx}px, ${dy}px) scale(${scale})`, opacity: 0 },
   ];
-  const animation = card.animate(frames, { duration: selection ? 335 : 230, easing: 'cubic-bezier(.2,.67,.24,1)' });
+  const animation = card.animate(frames, { duration: selection ? 335 : kind === 'return' ? 195 : 230, easing: 'cubic-bezier(.2,.67,.24,1)' });
   if (kind !== 'stack') arrivals.set(target, animation);
   const finish = () => {
     flights.delete(card);
@@ -198,81 +208,112 @@ export function toneCardPositions(container: HTMLElement): Map<string, number> {
   }));
 }
 
-export function mountToneDeck(workspace: HTMLElement, row: HTMLElement, strip: HTMLElement, left: HTMLElement, right: HTMLElement) {
-  let cards: HTMLElement[] = [];
-  let start = 0;
-  let count = 7;
-  let wheel = 0;
-  let firstSpread = true;
+export function mountToneDeck(row: HTMLElement, strip: HTMLElement, fan?: { workspace: HTMLElement; pile: HTMLElement }) {
   let gathering = false;
   let disposed = false;
   let motion: Animation[] = [];
-  const limit = () => Math.max(0, cards.length - count);
-  function paint(): void {
-    if (disposed) return;
-    const available = strip.clientWidth || row.clientWidth - 100;
-    if (available > 0) count = Math.min(7, Math.max(3, Math.floor(available / 72)));
-    start = Math.min(start, limit());
-    const visible = cards.slice(start, start + count);
-    for (const card of [...strip.children]) if (!visible.includes(card as HTMLElement)) card.remove();
-    visible.forEach((card, index) => {
-      if (strip.children[index] !== card) strip.insertBefore(card, strip.children[index] ?? null);
+  let flightLayer: HTMLElement | undefined;
+  let flying: { card: HTMLElement; clone: HTMLElement; face: HTMLElement; stacked: string }[] = [];
+  function clearFlights(): void {
+    flightLayer?.remove();
+    flightLayer = undefined;
+    for (const { card } of flying) card.classList.remove('is-deck-flying');
+    flying = [];
+  }
+  function animateFan({ workspace, pile }: NonNullable<typeof fan>, closed?: () => void): void {
+    const resuming = !!flightLayer;
+    if (!flightLayer) {
+      const slots = Array.from(pile.querySelectorAll<HTMLElement>('.melody-card-backs i'), card => ({
+        bounds: card.getBoundingClientRect(), width: card.offsetWidth, height: card.offsetHeight,
+      }));
+      const viewport = strip.getBoundingClientRect();
+      const area = workspace.getBoundingClientRect();
+      flightLayer = document.createElement('div');
+      flightLayer.className = 'melody-library-deck melody-deck-flights';
+      flightLayer.inert = true;
+      flightLayer.setAttribute('aria-hidden', 'true');
+      for (const card of Array.from(strip.children) as HTMLElement[]) {
+        const rect = card.getBoundingClientRect();
+        if (!rect.width || !rect.height || rect.bottom <= viewport.top || rect.top >= viewport.bottom) continue;
+        const index = flying.length % slots.length;
+        const slot = slots[index];
+        if (!slot?.width || !slot.height) continue;
+        const clone = card.cloneNode(true) as HTMLElement;
+        const face = clone.querySelector<HTMLElement>('.melody-library-tone');
+        if (!face) continue;
+        const back = document.createElement('span');
+        back.className = 'melody-deck-flight-back';
+        if (index === 0) back.classList.add('has-note-mark');
+        clone.prepend(back);
+        clone.classList.remove('is-card-arriving');
+        Object.assign(clone.style, {
+          left: `${rect.left - area.left}px`, top: `${rect.top - area.top}px`,
+          width: `${rect.width}px`, height: `${rect.height}px`,
+          zIndex: String(7 - index),
+        });
+        const dx = slot.bounds.left + slot.bounds.width / 2 - (rect.left + rect.width / 2);
+        const dy = slot.bounds.top + slot.bounds.height / 2 - (rect.top + rect.height / 2);
+        const stacked = `translate(${dx}px, ${dy}px) rotate(${index * 15}deg) scale(${slot.width / rect.width}, ${slot.height / rect.height})`;
+        flying.push({ card, clone, face, stacked });
+        flightLayer.append(clone);
+      }
+      workspace.append(flightLayer);
+      for (const { card } of flying) card.classList.add('is-deck-flying');
+    }
+    const current = resuming ? flying.map(({ clone, face }) => ({
+      transform: getComputedStyle(clone).transform, opacity: Number(getComputedStyle(face).opacity),
+    })) : undefined;
+    for (const animation of motion) animation.cancel();
+    const spread = 'translate(0px, 0px) rotate(0deg) scale(1)';
+    const animations = flying.flatMap(({ clone, face, stacked }, index) => {
+      const delay = resuming ? 0 : Math.min(6, gathering ? flying.length - index - 1 : index) * 10;
+      const timing: KeyframeAnimationOptions = { duration: 245, delay, fill: 'both' };
+      const travel = clone.animate([
+        { transform: current?.[index]?.transform ?? (gathering ? spread : stacked) },
+        { transform: gathering ? stacked : spread },
+      ], { ...timing, easing: 'cubic-bezier(.26,.62,.26,1)' });
+      const reveal = face.animate(resuming ? [
+        { opacity: current?.[index]?.opacity }, { opacity: gathering ? 0 : 1 },
+      ] : gathering ? [
+        { opacity: 1 }, { opacity: 1, offset: .37 }, { opacity: 0, offset: .85 }, { opacity: 0 },
+      ] : [
+        { opacity: 0 }, { opacity: 0, offset: .14 }, { opacity: 1, offset: .64 }, { opacity: 1 },
+      ], timing);
+      return [travel, reveal];
     });
-    arrangeToneCards(visible, 7);
-    paintCardBacks(left, start);
-    paintCardBacks(right, Math.max(0, cards.length - start - visible.length));
-  }
-  function step(direction: number): void {
-    const next = Math.max(0, Math.min(limit(), start + direction));
-    if (next === start) return;
-    const departing = (direction > 0 ? strip.firstElementChild : strip.lastElementChild) as HTMLElement;
-    const old = toneCardPositions(strip);
-    const leaving = takeToneCardPicture(departing);
-    const incomingStack = direction > 0 ? right : left;
-    const dealt = takeToneCardPicture(incomingStack);
-    start = next;
-    paint();
-    slideToneCards(strip, old);
-    flyToneCard(leaving, direction > 0 ? left : right, workspace, 'stack');
-    flyToneCard(dealt, (direction > 0 ? strip.lastElementChild : strip.firstElementChild) as HTMLElement, workspace, 'deal');
-  }
-  function scroll(event: WheelEvent): void {
-    if (gathering) return;
-    if (event.ctrlKey || event.metaKey) return;
-    event.preventDefault();
-    const delta = Math.abs(event.deltaY) >= Math.abs(event.deltaX) ? event.deltaY : event.deltaX;
-    if (!delta) return;
-    if (Math.sign(wheel) !== Math.sign(delta)) wheel = 0;
-    wheel += delta * (event.deltaMode === 1 ? 24 : event.deltaMode === 2 ? 80 : 1);
-    if (Math.abs(wheel) < 32) return;
-    step(Math.sign(wheel)); wheel = 0;
-  }
-  function keys(event: KeyboardEvent): void {
-    if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
-    event.preventDefault(); event.stopPropagation();
-    step(event.key === 'ArrowRight' ? 1 : -1);
+    motion = animations;
+    void Promise.allSettled(animations.map(animation => animation.finished)).then(() => {
+      if (disposed || motion !== animations) return;
+      motion = [];
+      for (const animation of animations) animation.cancel();
+      clearFlights();
+      closed?.();
+    });
   }
   function animateSpread(pile: HTMLElement, closed?: () => void): void {
     if (disposed) return;
     gathering = !!closed;
     row.inert = gathering;
     if (!animateCards(strip)) { closed?.(); return; }
-    const moving = [...strip.children, left, right].filter(card => card.childElementCount) as HTMLElement[];
-    const current = motion.length ? moving.map(card => {
+    if (fan) { animateFan(fan, closed); return; }
+    const view = strip.getBoundingClientRect();
+    const moving = Array.from(strip.children, card => ({ card: card as HTMLElement, bounds: card.getBoundingClientRect() }))
+      .filter(({ bounds }) => bounds.bottom > view.top && bounds.top < view.bottom);
+    const current = motion.length ? moving.map(({ card }) => {
       const { translate, scale, opacity } = getComputedStyle(card);
       return { translate, scale, opacity };
     }) : undefined;
     for (const animation of motion) animation.cancel();
-    row.classList.add('is-deck-moving');
     const origin = pile.getBoundingClientRect();
+    const boxes = current ? moving.map(({ card }) => card.getBoundingClientRect()) : moving.map(({ bounds }) => bounds);
     const spread = { translate: '0px 0px', scale: '1', opacity: '1' };
-    const destinations = moving.map(card => ({ card, box: card.getBoundingClientRect() }));
-    const animations = destinations.map(({ card, box }, index) => {
+    const animations = moving.map(({ card }, index) => {
+      const box = boxes[index]!;
       const x = origin.left + origin.width / 2 - box.left - box.width / 2;
       const y = origin.top + origin.height / 2 - box.top - box.height / 2;
-      const stacked = { translate: `${x}px ${y}px`, scale: '.55', opacity: '0' };
+      const stacked = { translate: x + 'px ' + y + 'px', scale: '.55', opacity: '0' };
       return card.animate([current?.[index] ?? (gathering ? spread : stacked), gathering ? stacked : spread],
-        { duration: 240, delay: current ? 0 : 14 * index, fill: 'both', easing: 'cubic-bezier(.2,.74,.24,1)' });
+        { duration: 240, delay: current ? 0 : Math.min(10, index) * 14, fill: 'both', easing: 'cubic-bezier(.2,.74,.24,1)' });
     });
     motion = animations;
     void Promise.allSettled(animations.map(animation => animation.finished)).then(() => {
@@ -280,34 +321,21 @@ export function mountToneDeck(workspace: HTMLElement, row: HTMLElement, strip: H
       motion = [];
       closed?.();
       for (const animation of animations) animation.cancel();
-      row.classList.remove('is-deck-moving');
     });
   }
-  row.addEventListener('wheel', scroll, { passive: false });
-  row.addEventListener('keydown', keys);
-  window.addEventListener('resize', paint);
   return {
     setCards(next: HTMLElement[]) {
-      if (!firstSpread && next.length === cards.length && next.every((card, index) => card === cards[index])) return;
-      const first = cards[start]?.dataset.timbreId;
-      cards = next;
-      const retained = first ? cards.findIndex(card => card.dataset.timbreId === first) : -1;
-      start = firstSpread ? Math.min(2, Math.max(0, limit() - 1)) : Math.max(0, retained);
-      firstSpread = false;
-      paint();
+      const top = strip.scrollTop;
+      strip.replaceChildren(...next);
+      strip.scrollTop = top;
     },
-    resize: paint,
     dealFrom(pile: HTMLElement) { animateSpread(pile); },
-    toggle(pile: HTMLElement, closed: () => void) {
-      animateSpread(pile, gathering ? undefined : closed);
-    },
+    toggle(pile: HTMLElement, closed: () => void) { animateSpread(pile, gathering ? undefined : closed); },
     dispose() {
       disposed = true;
       for (const animation of motion) animation.cancel();
       motion = [];
-      row.removeEventListener('wheel', scroll);
-      row.removeEventListener('keydown', keys);
-      window.removeEventListener('resize', paint);
+      clearFlights();
     },
   };
 }

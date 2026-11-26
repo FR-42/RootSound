@@ -93,6 +93,7 @@ export interface SoundSequencePlan {
     /** -1 is left, 1 is right; omitted values are centered. */
     readonly pan?: number;
     readonly gainCurveId?: string;
+    readonly noteGainDb?: number;
     readonly pitchCurveId?: string;
   }[];
 }
@@ -135,7 +136,7 @@ export type SoundRuntimeEvent =
   | { readonly type: 'session'; readonly session: PlaybackSession }
   | { readonly type: 'device'; readonly status: SoundDeviceStatus; readonly error?: string };
 
-export type SoundAuditionOptions = { keepAttack?: true; overlap?: true; pan?: number; preserveNoteLevel?: true; gainCurve?: readonly SoundGainPoint[]; pitchCurve?: readonly SoundGainPoint[]; gainCurveStartSeconds?: number };
+export type SoundAuditionOptions = { keepAttack?: true; overlap?: true; pan?: number; preserveNoteLevel?: true; noteGainDb?: number; gainCurve?: readonly SoundGainPoint[]; pitchCurve?: readonly SoundGainPoint[]; gainCurveStartSeconds?: number };
 
 export interface SoundRuntimePort {
   /** Listening gain only; affects playback and key auditions, never export or saved notes. */
@@ -160,6 +161,7 @@ export interface SoundRuntimePort {
   update(sessionId: string, plan: PlayableNotePlan | SoundSequencePlan, options?: { preserveSounding?: boolean; elapsedSeconds?: number }): PlaybackSession | undefined;
   /** Freeze the transport, cancel future attacks and let sounding notes release on the shared device. */
   pause?(sessionId: string): PlaybackSession | undefined;
+  setNoteGain?(sessionId: string, noteId: string, gainDb: number): void;
   setNotesDeleted?(sessionId: string, noteIds: readonly string[], deleted: boolean): void;
   setSoloGroup?(sessionId: string, groupId?: string): void;
   /** Continue the paused sequence at its retained source ages, optionally applying edits. */

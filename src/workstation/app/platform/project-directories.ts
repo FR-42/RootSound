@@ -17,12 +17,19 @@ export interface NativeProjectDirectoriesBridge {
   CreateLibraryFolder?(path: string, name: string): Promise<unknown>;
   RenameLibraryEntry?(path: string, name: string): Promise<unknown>;
   DeleteLibraryEntry?(path: string): Promise<unknown>;
+  TransferLibraryEntry?(path: string, directory: string, mode: string): Promise<unknown>;
+  UndoLibraryTransfer?(): Promise<unknown>;
+  ReadLibraryTransfer?(): Promise<unknown>;
   RevealLibrarySong?(path: string, id: string): Promise<unknown>;
   Delete?(path: string, expectedId: string): Promise<unknown>;
   Inspect?(path: string, expectedId: string): Promise<unknown>;
   Rename?(path: string, expectedId: string, name: string, libraryText: string, token: string): Promise<unknown>;
   OpenKnown?(path: string): Promise<unknown>;
   Save?(name?: string): Promise<unknown>;
+  StartSave?(name?: string): Promise<unknown>;
+  StartCreateCopy?(name: string, location: string, libraryText: string): Promise<unknown>;
+  StartExit?(mode: string, name?: string): Promise<unknown>;
+  ReadProjectOperation?(): Promise<unknown>;
   FinishLoading?(): Promise<unknown>;
   OpenDocument?(path: string, token: string, libraryText: string): Promise<unknown>;
   ReadDocument?(): Promise<unknown>;
@@ -30,6 +37,15 @@ export interface NativeProjectDirectoriesBridge {
 }
 
 function fail(message = '项目服务返回无效结果，请关闭旧窗口后重新打开 RootSound。'): never { throw new Error(message); }
+async function completeLibraryTransfer(bridge: NativeProjectDirectoriesBridge, action: () => Promise<unknown>): Promise<void> {
+  if ((await call(action)).status !== 'started') fail();
+  for (;;) {
+    const result = await call(() => bridge.ReadLibraryTransfer!());
+    if (result.status === 'ready') return;
+    if (result.status !== 'pending') fail();
+    await new Promise(resolve => setTimeout(resolve, 35));
+  }
+}
 async function call(action: () => Promise<unknown>): Promise<Record<string, unknown>> {
   let raw: unknown;
   try { raw = await action(); }
@@ -40,6 +56,15 @@ async function call(action: () => Promise<unknown>): Promise<Record<string, unkn
   const result = value as Record<string, unknown>;
   if (result.status === 'error') return fail(typeof result.message === 'string' && result.message.trim() ? result.message : '项目操作未能完成。');
   return result;
+}
+async function completeProjectOperation(bridge: NativeProjectDirectoriesBridge, action: () => Promise<unknown>): Promise<Record<string, unknown>> {
+  const started = await call(action);
+  if (started.status !== 'started') return fail();
+  for (;;) {
+    const result = await call(() => bridge.ReadProjectOperation!());
+    if (result.status !== 'pending') return result;
+    await new Promise(resolve => setTimeout(resolve, 16));
+  }
 }
 function project(value: unknown): ProjectDirectory {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return fail();
@@ -133,7 +158,9 @@ export function createDesktopProjectDirectories(bridge: NativeProjectDirectories
       return project(result.project);
     } } : {}),
     ...(bridge.CreateCopy ? { async createCopy(name: string, location: string, libraryText: string) {
-      const result = await call(() => bridge.CreateCopy!(name, location, libraryText));
+      const result = bridge.StartCreateCopy && bridge.ReadProjectOperation
+        ? await completeProjectOperation(bridge, () => bridge.StartCreateCopy!(name, location, libraryText))
+        : await call(() => bridge.CreateCopy!(name, location, libraryText));
       if (result.status !== 'created') return fail();
       return project(result.project);
     } } : {}),
@@ -186,6 +213,12 @@ export function createDesktopProjectDirectories(bridge: NativeProjectDirectories
     ...(bridge.DeleteLibraryEntry ? { async removeEntry(path: string) {
       if ((await call(() => bridge.DeleteLibraryEntry!(path))).status !== 'ready') fail();
     } } : {}),
+    ...(bridge.TransferLibraryEntry && bridge.ReadLibraryTransfer ? { transferEntry(path: string, directory: string, cut: boolean) {
+      return completeLibraryTransfer(bridge, () => bridge.TransferLibraryEntry!(path, directory, cut ? 'move' : 'copy'));
+    } } : {}),
+    ...(bridge.UndoLibraryTransfer && bridge.ReadLibraryTransfer ? { undoEntryTransfer() {
+      return completeLibraryTransfer(bridge, () => bridge.UndoLibraryTransfer!());
+    } } : {}),
     ...(bridge.RevealLibrarySong ? { async reveal(entry: Exclude<ProjectLibraryEntry, { kind: 'folder' }>) {
       if ((await call(() => bridge.RevealLibrarySong!(entry.path, entry.kind === 'project' ? entry.id : ''))).status !== 'ready') fail();
     } } : {}),
@@ -236,7 +269,8 @@ export function createDesktopProjectDirectories(bridge: NativeProjectDirectories
     },
     async save(name) {
       if (!bridge.Save) return fail('当前窗口尚不支持保存项目，请关闭旧窗口后重新打开 RootSound。');
-      const result = await call(() => bridge.Save!(name ?? ''));
+      const result = bridge.StartSave && bridge.ReadProjectOperation
+        ? await completeProjectOperation(bridge, () => bridge.StartSave!(name ?? '')) : await call(() => bridge.Save!(name ?? ''));
       if (result.status !== 'saved') return fail();
       return project(result.project);
     },
@@ -259,7 +293,8 @@ export function createDesktopProjectDirectories(bridge: NativeProjectDirectories
     async exit(mode, name) {
       if (mode !== 'save' && mode !== 'discard') return fail('请选择保存退出或直接退出。');
       if (!bridge.Exit) return fail('当前窗口尚不支持退出项目，请关闭旧窗口后重新打开 RootSound。');
-      const result = await call(() => bridge.Exit!(mode, name ?? ''));
+      const result = bridge.StartExit && bridge.ReadProjectOperation
+        ? await completeProjectOperation(bridge, () => bridge.StartExit!(mode, name ?? '')) : await call(() => bridge.Exit!(mode, name ?? ''));
       if (result.status !== 'exited') return fail();
     },
   };

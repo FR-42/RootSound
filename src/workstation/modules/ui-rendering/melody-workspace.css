@@ -319,6 +319,7 @@
 .melody-roll-end::before { content: ''; position: absolute; left: 0; right: 0; top: 4px; height: 2px; background: #8292a655; }
 .melody-roll-end::after { content: ''; position: absolute; left: 0; right: 0; top: 6px; height: 14px; background: linear-gradient(to bottom, #53759445, transparent); pointer-events: none; }
 .melody-roll-end:hover::before, .melody-roll-end.is-dragging::before { background: #6c7f98; }
+.melody-roll-end:disabled { pointer-events: none; cursor: default; }
 .melody-roll-end[hidden] { display: none; }
 
 .melody-note-family[draggable="true"] { cursor: grab; }

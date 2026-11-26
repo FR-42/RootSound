@@ -117,7 +117,7 @@ async function runTest() {
   stage = 'canvas and navigation';
   await step(1);
   const firstShownAt = Date.now();
-  assert.deepEqual(await js('Array.from(document.querySelectorAll(".music-guide-word, .music-guide-copy p"), n=>n.textContent)'), ['卷帘', '核心创作画布']);
+  assert.deepEqual(await js('Array.from(document.querySelectorAll(".music-guide-word, .music-guide-copy p"), n=>n.textContent)'), ['画布', '核心创作画布']);
   assert.equal(await js('getComputedStyle(document.querySelector(".music-guide-word")).animationName'), 'music-guide-fade');
   assert.equal(await js('getComputedStyle(document.querySelector(".music-guide-words")).pointerEvents'), 'none');
   assert(await visible('.melody-scroll'));
@@ -146,7 +146,7 @@ async function runTest() {
   await key('Enter');
   assert.equal(await currentStep(), 2);
   assert.equal(await visible('.music-guide-enter'), false);
-  assert.deepEqual(await js('Array.from(document.querySelectorAll(".music-guide-word, .music-guide-copy p"), n=>n.textContent)'), ['音符', '音符散落在卷帘上']);
+  assert.deepEqual(await js('Array.from(document.querySelectorAll(".music-guide-word, .music-guide-copy p"), n=>n.textContent)'), ['音符', '音符散落在画布上']);
   assert.equal(await js('document.querySelectorAll(".music-guide-copy p *").length'), 0);
   const canvas = await geometry('.melody-scroll');
   const point = [canvas.x + 190, canvas.y + 340];
@@ -284,8 +284,8 @@ async function runTest() {
   assert.equal(rollCanvas.y + rollCanvas.h, keyboard.y);
   assert.equal((await geometry('.melody-ruler-row')).y, rollCanvas.y);
   assert(await visible('.melody-roll-end'));
-  assert.equal(await js('document.querySelector(".music-guide-copy p").textContent'), '卷帘分列，列与琴键一一对应，表示音调。');
-  assert.equal(await js('document.querySelector(".music-guide-copy .music-guide-prompt").textContent'), '拖动卷帘下边缘可改变乐曲长度');
+  assert.equal(await js('document.querySelector(".music-guide-copy p").textContent'), '画布分列，列与琴键一一对应，表示音调。');
+  assert.equal(await js('document.querySelector(".music-guide-copy .music-guide-prompt").textContent'), '拖动画布下边缘可改变乐曲长度');
   assert.equal(await style('.music-guide-copy .music-guide-prompt', 'animationIterationCount'), 'infinite');
   assert(await visible('.melody-grid-line.is-bar'));
   assert.equal(await visible('.melody-grid-line:not(.is-bar)'), false);
@@ -494,8 +494,8 @@ async function runTest() {
   const actionPrompt = '.music-guide-copy p:nth-child(2)';
   const selectText = '点击左上角音色卡可以进入选中状态';
   const mutedText = '选中音色时，其他音色的音符将变暗且静默';
-  const drawText = '左键卷帘添加音符';
-  const deselectText = '右键卷帘空白处以取消选中';
+  const drawText = '左键画布添加音符';
+  const deselectText = '右键画布空白处以取消选中';
   const copyLines = () => call(() => Array.from(document.querySelectorAll('.music-guide-copy p'), line => line.textContent));
   const cardNames = selector => call(selector => Array.from(document.querySelectorAll(selector), card => card.textContent), selector);
   assert.equal(await js('document.querySelector(".melody-tempo-dock").inert'), false);

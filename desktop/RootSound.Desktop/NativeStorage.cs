@@ -10,6 +10,10 @@ public sealed class NativeStorage
     private readonly AtomicTextStore? store;
     private readonly ProjectDirectoryManager? manager;
     private readonly string scope = Guid.NewGuid().ToString("N");
+    private Task<string>? pendingWrite;
+    private System.Text.StringBuilder? writeBuffer;
+    private string? bufferScope;
+    private string? bufferRevision;
     public NativeStorage(AtomicTextStore store) => this.store = store;
     public NativeStorage(ProjectDirectoryManager manager) => this.manager = manager;
 
@@ -61,6 +65,52 @@ public sealed class NativeStorage
             return JsonSerializer.Serialize(new { ok = true, revision });
         }
         catch (Exception error) { return JsonSerializer.Serialize(new { ok = false, error = error.Message }); }
+    }
+
+    public string StartWriteScopedIfUnchanged(string value, string expectedScope, string expectedRevision)
+    {
+        if (pendingWrite is not null || writeBuffer is not null) return JsonSerializer.Serialize(new { ok = false, error = "已有一个保存操作正在进行。" });
+        pendingWrite = Task.Run(() => WriteScopedIfUnchanged(value, expectedScope, expectedRevision));
+        return "{\"ok\":true,\"pending\":true}";
+    }
+
+    public string BeginWriteChunks(string expectedScope, string expectedRevision)
+    {
+        if (pendingWrite is not null || writeBuffer is not null) return JsonSerializer.Serialize(new { ok = false, error = "已有一个保存操作正在进行。" });
+        writeBuffer = new System.Text.StringBuilder(); bufferScope = expectedScope; bufferRevision = expectedRevision;
+        return "{\"ok\":true}";
+    }
+
+    public string AppendWriteChunk(string value)
+    {
+        if (writeBuffer is null || value.Length > 1024 * 1024 || (long)writeBuffer.Length + value.Length > AtomicTextStore.MaximumBytes)
+            return JsonSerializer.Serialize(new { ok = false, error = "保存数据传输无效。" });
+        writeBuffer.Append(value);
+        return "{\"ok\":true}";
+    }
+
+    public string CommitWriteChunks()
+    {
+        if (writeBuffer is null || pendingWrite is not null) return JsonSerializer.Serialize(new { ok = false, error = "没有可提交的保存数据。" });
+        var buffer = writeBuffer; string expectedScope = bufferScope!, expectedRevision = bufferRevision!;
+        writeBuffer = null; bufferScope = bufferRevision = null;
+        pendingWrite = Task.Run(() => WriteScopedIfUnchanged(buffer.ToString(), expectedScope, expectedRevision));
+        return "{\"ok\":true,\"pending\":true}";
+    }
+
+    public string AbortWriteChunks()
+    {
+        writeBuffer = null; bufferScope = bufferRevision = null;
+        return "{\"ok\":true}";
+    }
+
+    public string ReadWriteResult()
+    {
+        var operation = pendingWrite;
+        if (operation is null) return JsonSerializer.Serialize(new { ok = false, error = "没有等待完成的保存操作。" });
+        if (!operation.IsCompleted) return "{\"ok\":true,\"pending\":true}";
+        pendingWrite = null;
+        return operation.GetAwaiter().GetResult();
     }
 
     /// <summary>Confirmed destructive edits still remain drafts until explicit project Save.</summary>

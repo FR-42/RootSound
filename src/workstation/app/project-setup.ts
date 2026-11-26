@@ -50,6 +50,23 @@ export function createProjectCopyLibrary(text: string, input: string, draftId: s
   return snapshot;
 }
 
+export async function createProjectCopyLibraryAsync(text: string, name: string, draftId: string): Promise<string> {
+  if (typeof Worker !== 'function') return createProjectCopyLibrary(text, name, draftId);
+  const worker = new Worker(new URL('./project-copy-worker.ts', import.meta.url), { type: 'module' });
+  try {
+    return await new Promise<string>((resolve, reject) => {
+      worker.onmessage = ({ data }) => {
+        if (typeof data?.error === 'string') reject(new Error(data.error));
+        else if (typeof data?.text === 'string') resolve(data.text);
+        else reject(new Error('另存为数据准备失败，请重试。'));
+      };
+      worker.onerror = () => reject(new Error('另存为数据准备失败，请重试。'));
+      worker.onmessageerror = () => reject(new Error('另存为数据准备失败，请重试。'));
+      worker.postMessage({ text, name, draftId });
+    });
+  } finally { worker.terminate(); }
+}
+
 /** Match startup's selected song draft and rename through its owner, never native JSON surgery. */
 export function renameProjectLibrary(text: string, input: string): string {
   const name = projectName(input); let snapshot = text;
@@ -138,6 +155,9 @@ export function createProjectSetup(directories: ProjectDirectoriesPort, enter: (
       if (current?.path === path) source?.renamed?.(name);
     }) } : {}),
     ...(directories.removeEntry ? { removeEntry: (path: string) => exclusive(() => directories.removeEntry!(path)) } : {}),
+    ...(directories.transferEntry ? { transferEntry: (path: string, directory: string, cut: boolean) =>
+      exclusive(() => directories.transferEntry!(path, directory, cut)) } : {}),
+    ...(directories.undoEntryTransfer ? { undoEntryTransfer: () => exclusive(() => directories.undoEntryTransfer!()) } : {}),
     ...(directories.reveal ? { reveal: (entry: Parameters<NonNullable<ProjectDirectoriesPort['reveal']>>[0]) => exclusive(() => directories.reveal!(entry)) } : {}),
     ...(source && directories.browse ? { async readSaveSource() { return (await directories.read()).current; } } : {}),
     open: path => exclusive(async () => {
@@ -197,7 +217,7 @@ export function createProjectSetup(directories: ProjectDirectoriesPort, enter: (
       const name = projectName(input);
       if (!location.trim()) throw new Error('请选择项目的存储位置。');
       await source.prepareSave?.('rootsound');
-      const text = createProjectCopyLibrary(source.read(), name, source.songDraftId());
+      const text = await createProjectCopyLibraryAsync(source.read(), name, source.songDraftId());
       if (directories.createCopy) await directories.createCopy(name, location.trim(), text);
       else await directories.create(name, location.trim(), text);
       if (mode === 'exit') await directories.exit?.('discard');

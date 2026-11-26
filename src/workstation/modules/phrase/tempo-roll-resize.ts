@@ -5,7 +5,7 @@ import { phraseBarBeats, phraseBeatSeconds, phraseHeldSeconds, phraseSecondsBeat
 function moveTempoBoundary(body: PhraseBody, id: string, startBeat: number, gridOnly: boolean): PhraseBody {
   const { index, upper, lower, ratio, beatShiftPerBeat, minimum, maximum } = phraseTempoBoundary(body, id);
   if (!Number.isFinite(startBeat) || startBeat < minimum - 1e-10 || startBeat > maximum + 1e-10)
-    throw new Error('分界线不能越过相邻卷帘或超出音乐长度范围。');
+    throw new Error('分界线不能越过相邻画布或超出音乐长度范围。');
   startBeat = Math.max(minimum, Math.min(maximum, startBeat));
   const delta = startBeat - lower.startBeat;
   if (Math.abs(delta) < 1e-10) return body;
@@ -74,7 +74,7 @@ export function resizeTempoRoll(body: PhraseBody, id: string | undefined, startB
     stored.push(...(part.hiddenNotes ?? []).map(item => ({ sectionId: item.sectionId, note: { ...item.note, durationSeconds: item.note.durationSeconds! } })));
     const notes: PhraseNote[] = [], hiddenNotes: NonNullable<typeof part.hiddenNotes> = [];
     for (const item of stored) {
-      const span = spans.get(item.sectionId); if (!span) throw new Error('被保留的音符缺少所属BPM卷帘。');
+      const span = spans.get(item.sectionId); if (!span) throw new Error('被保留的音符缺少所属BPM画布。');
       if (item.note.startBeat >= span.endBeat - span.startBeat - MIN_NOTE_BEATS) hiddenNotes.push(item);
       else {
         const start = span.startBeat + item.note.startBeat;

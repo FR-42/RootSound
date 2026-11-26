@@ -1,4 +1,4 @@
-import type { SoundRuntimePort, PlaybackSession } from '../../contracts/sound.ts';
+import type { SoundRuntimePort, PlaybackSession, SoundPlan, PlayableNotePlan } from '../../contracts/sound.ts';
 import type { SaveResult } from '../../contracts/content.ts';
 import type { TimbreEditorPort } from '../../contracts/timbre.ts';
 import type { SoundFilesPort, ProjectFilesPort } from '../../contracts/files.ts';
@@ -14,25 +14,27 @@ import type { MelodyRecognitionPort } from '../../contracts/melody-recognition.t
 import type { WorkspaceId, WorkspacePreferencesPort, MusicWorkspaceStatePort } from '../../contracts/workspace.ts';
 import type { ReferenceEditingPort } from '../../contracts/references.ts';
 import type { LearningSettingsPort } from '../../contracts/guidance.ts';
-import { showLearningSettings, showFeatureGate } from './settings.ts';
+import { showLearningSettings } from './settings.ts';
 import { applyRollAppearance } from './roll-appearance.ts';
-import { needsTempoRolls } from './guidance-flow.ts';
 import { mountPhraseComposition } from './phrase-composition.ts';
 import { mountRoundPointer } from './round-pointer.ts';
-import { attachEdgeGesture } from './pointer-gestures.ts';
 import { createProjectWelcome } from './project-welcome.ts';
 import { mountProjectStart } from './project-start.ts';
 import { mountProjectLibrary } from './project-library.ts';
+import { mountWelcomeGuide, takeCanvasGuide, rememberGuideProject, returnGuideToWelcome } from './welcome-guide.ts';
+import { createCanvasGuide } from './canvas-guide.ts';
 import { showProjectExit, showWorkspaceProjectExit } from './project-exit.ts';
 import './studio.css';
 import './theme.css';
 export { confirmFormatSave } from './format-save-warning.ts';
 export type { MusicGuideDocument } from './music-guide.ts';
-export { showLearningSettings, showFeatureGate, needsTempoRolls };
+export { showLearningSettings };
+export { mountRoundPointer };
 
 export interface StudioOptions {
   timbre?: TimbreEditorPort;
   sound: SoundRuntimePort;
+  previewWelcomePiano?(note: SoundPlan['note']): Promise<PlayableNotePlan>;
   hasPrevious: boolean;
   files?: SoundFilesPort;
   projectFiles?: ProjectFilesPort;
@@ -67,8 +69,10 @@ export interface StudioOptions {
   preferences?: WorkspacePreferencesPort;
   learning?: LearningSettingsPort;
   mobileWeb?: boolean;
+  humPitch?: boolean;
   demo?: boolean;
   desktopPointerUx?: boolean;
+  pointerMounted?: boolean;
   workspaceState?: MusicWorkspaceStatePort;
   references?: ReferenceEditingPort;
   previewContent?(contentId: string, signal?: AbortSignal): Promise<PlaybackSession>;
@@ -97,24 +101,28 @@ export function mountStudio(root: HTMLElement, options: StudioOptions): {
   let exitChoice: ReturnType<typeof showWorkspaceProjectExit> | undefined;
   let closeSettings: (() => void) | undefined;
   const appearance = options.preferences;
-  const disposePointer = options.desktopPointerUx ? mountRoundPointer(root) : undefined;
-  const readPointerSensitivity = () => (appearance?.read().pointerSensitivity ?? 65) / 100;
+  const canGuide = options.desktopPointerUx && !options.demo && document.documentElement?.classList.contains('windows-desktop-colors');
+  let pendingCanvasGuide = canGuide && takeCanvasGuide();
+  const disposePointer = options.desktopPointerUx && !options.pointerMounted ? mountRoundPointer(root) : undefined;
   const savedAppearance = appearance?.read().rollAppearance;
-  if (savedAppearance) applyRollAppearance(root, savedAppearance);
+  if (!options.desktopPointerUx && savedAppearance) applyRollAppearance(root, savedAppearance);
   function leave(): void { closeSettings?.(); closeSettings = undefined; editor?.dispose(); editor = undefined; page?.dispose(); page = undefined; options.sound.stopAll(); }
-  function settings(inMusic: boolean): void {
+  function settings(): void {
     if (!options.learning && !options.demo) return;
     closeSettings = showLearningSettings(root, options.demo ? undefined : options.learning, {
       appearance,
       inline: options.desktopPointerUx,
-      requiresTempoRolls: !options.demo && inMusic && needsTempoRolls(options.phrase?.read().body),
       onChange: () => editor?.refresh(),
     }) ?? closeSettings;
   }
   async function saveInLibrary(mode: 'edit' | 'exit' | 'close' | 'details' = 'edit', forceCopy = false, signal?: AbortSignal): Promise<ProjectSaveChoice> {
     if (signal?.aborted) return 'cancelled';
     const service = options.projectSetup!;
-    if (!service.readSaveSource || !service.saveAs) { await service.save?.(); return service.save ? 'saved' : 'cancelled'; }
+    if (!service.readSaveSource || !service.saveAs) {
+      if (forceCopy || !service.save) return 'cancelled';
+      await service.save();
+      return 'saved';
+    }
     const source = await service.readSaveSource();
     if (disposed || closeSaveLibrary || signal?.aborted) return 'cancelled';
     const writable = source && !source.format && !source.pendingSave && /\.rootsound$/iu.test(source.path);
@@ -175,21 +183,30 @@ export function mountStudio(root: HTMLElement, options: StudioOptions): {
       leave(); page = mountProjectStart(root, options.projectSetup, () => options.sound.stopAll(), showWelcome);
     };
     const service = options.projectSetup ?? { list: async () => [], open: async () => { throw new Error('请使用桌面版打开音乐项目。'); } };
-    const { page: welcome, start } = createProjectWelcome(!options.desktopPointerUx, !options.desktopPointerUx); root.replaceChildren(welcome);
-    if (options.desktopPointerUx) {
-      welcome.classList.add('is-desktop-welcome');
+    const { desktopPointerUx } = options;
+    const { page: welcome, start } = createProjectWelcome(!desktopPointerUx, !desktopPointerUx, desktopPointerUx, async frequencyHz => {
+      if (!options.previewWelcomePiano) return;
+      try {
+        const [plan] = await Promise.all([
+          options.previewWelcomePiano({ frequencyHz, holdSeconds: .35, velocity: .75 }),
+          options.sound.activate?.(),
+        ]);
+        if (!disposed && welcome.isConnected && !welcome.inert) await options.sound.audition(plan, { keepAttack: true });
+      } catch {}
+    });
+    root.replaceChildren(welcome);
+    if (desktopPointerUx) {
       welcome.tabIndex = -1;
-      const library = mountProjectLibrary(root, welcome, service, startProject, undefined, true);
-      const edge = attachEdgeGesture(welcome, 'bottom', {
-        enabled: () => !root.querySelector('.project-library-overlay:not([hidden]), dialog[open], .workspace-inline-panel[open]'),
-        open: () => library.open(),
-      });
-      page = { dispose() { edge.dispose(); library.dispose(); } };
+      let refreshLibrary = () => {};
+      const guide = canGuide ? mountWelcomeGuide(root, welcome, () => refreshLibrary()) : undefined;
+      const library = mountProjectLibrary(root, welcome, service, startProject, undefined, true, guide);
+      refreshLibrary = library.refreshGuide;
+      page = { dispose() { guide?.dispose(); library.dispose(); } };
       return;
     }
     if (options.learning) {
       const button = element('button', 'welcome-settings', '设置'); button.type = 'button';
-      button.addEventListener('click', () => settings(false));
+      button.addEventListener('click', settings);
       welcome.append(button);
     }
     const library = mountProjectLibrary(root, start, service, startProject);
@@ -200,32 +217,45 @@ export function mountStudio(root: HTMLElement, options: StudioOptions): {
     leave();
     const initialView = options.phrase?.read();
     if (!initialView?.draft) { showWelcome(); return; }
-    if (options.learning && needsTempoRolls(initialView.body) && !options.learning.read().multipleTempoRolls) {
-      showWelcome();
-      showFeatureGate(root, {
-        inline: options.desktopPointerUx,
-        onEnable() {
-          options.learning!.setMultipleTempoRolls(true);
-          showMusic();
-        },
-        async onCancel() { if (options.projectSetup?.exit) await options.projectSetup.exit('discard'); else showWelcome(); },
-      });
-      return;
-    }
     const phrase = options.phrase!;
+    const guide = pendingCanvasGuide ? createCanvasGuide(root, {
+      commitName: () => editor?.commitTitle() ?? Promise.resolve(false),
+      setTempoOpen: open => editor?.setTempoOpen(open),
+      async onComplete() {
+        await returnGuideToWelcome(root, async () => {
+          if (options.projectSetup?.exit) await options.projectSetup.exit('discard');
+          else showWelcome();
+        });
+      },
+    }) : undefined;
+    pendingCanvasGuide = false;
+    if (guide) page = { dispose: guide.dispose };
+    let tempoRollsEnabled = options.learning?.read().multipleTempoRolls === true;
     editor = mountPhraseComposition(root, { phrase, initialView, sound: options.sound, directMusic: true,
       workspaceState: options.workspaceState, frameNotesOnMount: frameNotes,
+      onSectionChange: guide ? section => { if (section === 'melody') guide.ready(); } : undefined,
+      onLearningAction: guide?.action,
+      blockSideEdges: guide?.blocksSideEdges,
       desktopPointerUx: options.desktopPointerUx,
-      readPointerSensitivity: options.desktopPointerUx ? readPointerSensitivity : undefined,
       mobileWeb: options.demo && options.mobileWeb,
+      humPitch: options.humPitch,
       readWorkbench: () => !options.desktopPointerUx && !options.demo && options.learning?.read().workbench === true,
       enableGainCurve: !options.demo,
-      readMultipleTempoRolls: options.learning ? () => options.learning!.read().multipleTempoRolls : undefined,
-      readDrumLanes: () => !options.desktopPointerUx && !options.demo && options.learning?.read().drumLanes === true,
-      onSettings: !options.desktopPointerUx && (options.demo || options.learning) ? () => settings(true) : undefined,
+      readMultipleTempoRolls: body => !options.demo && (tempoRollsEnabled || !!body?.tempoSections?.length),
+      onSettings: !options.desktopPointerUx && (options.demo || options.learning) ? settings : undefined,
       readEditorSettings: options.desktopPointerUx ? body => ({
         preferences: options.learning,
-        options: { appearance, requiresTempoRolls: needsTempoRolls(body), onChange: () => editor?.refresh() },
+        options: {
+          appearance, onChange: () => editor?.refresh(),
+          tempoRolls: !options.demo && options.learning ? {
+            enabled: tempoRollsEnabled || !!body?.tempoSections?.length,
+            required: !!body?.tempoSections?.length,
+            set(enabled) {
+              options.learning!.setMultipleTempoRolls(enabled);
+              tempoRollsEnabled = enabled;
+            },
+          } : undefined,
+        },
       }) : undefined,
       // Retired mode cannot reactivate from a previously saved preference.
       readPerformanceMode: () => false,
@@ -236,6 +266,10 @@ export function mountStudio(root: HTMLElement, options: StudioOptions): {
       async onRename(name) {
         await options.projectSetup?.renameCurrent?.(name);
         options.onRenameProject?.(name); phrase.rename(name);
+        if (guide) {
+          const project = await options.projectSetup?.readSaveSource?.();
+          if (project) rememberGuideProject(project);
+        }
       },
       readUnsavedChanges: options.projectSetup?.hasUnsavedChanges ? () => options.projectSetup!.hasUnsavedChanges!() : undefined,
       onSave: options.projectSetup?.save ? () => saveInLibrary(options.desktopPointerUx ? 'details' : 'edit') : undefined,

@@ -11,7 +11,8 @@ const clocks = new WeakMap<PhraseBody, PhraseTempoSpan[]>();
 /** All departments use the same beat/second boundary, including variable tempo. */
 export function phraseTempoSpans(body: PhraseBody): readonly PhraseTempoSpan[] {
   const cached = clocks.get(body); if (cached) return cached;
-  const points = [{ startBeat: 0, tempoBpm: body.tempoBpm, id: undefined as string | undefined }, ...(body.tempoSections ?? [])];
+  const points = [{ startBeat: 0, tempoBpm: body.tempoBpm, id: undefined as string | undefined,
+    ...(body.gridOffsetBeats === undefined ? {} : { gridOffsetBeats: body.gridOffsetBeats }) }, ...(body.tempoSections ?? [])];
   let seconds = 0;
   const spans = points.map((point, index) => {
     const endBeat = points[index + 1]?.startBeat ?? body.lengthBeats, startSeconds = seconds;
@@ -23,7 +24,7 @@ export function phraseTempoSpans(body: PhraseBody): readonly PhraseTempoSpan[] {
 export function phraseTempoBoundary(body: PhraseBody, id: string) {
   const spans = phraseTempoSpans(body);
   const index = spans.findIndex(span => span.id === id);
-  if (index < 1) throw new Error('这个BPM卷帘已不存在。');
+  if (index < 1) throw new Error('这个BPM画布已不存在。');
   const upper = spans[index - 1]!, lower = spans[index]!;
   const ratio = lower.tempoBpm / upper.tempoBpm;
   const beatShiftPerBeat = 1 - ratio;
@@ -50,6 +51,25 @@ export function phraseSecondsBeat(body: PhraseBody, seconds: number): number {
   const span = find(body, seconds, 'startSeconds'); return span.startBeat + (seconds - span.startSeconds) * span.tempoBpm / 60;
 }
 export const phraseDurationSeconds = (body: PhraseBody) => phraseBeatSeconds(body, body.lengthBeats);
+export function withPhraseGridOffset(body: PhraseBody, id: string | undefined, offset: number): PhraseBody {
+  if (id === undefined) return { ...body, gridOffsetBeats: offset || undefined };
+  return { ...body, tempoSections: body.tempoSections?.map(section => section.id === id
+    ? { ...section, gridOffsetBeats: offset || undefined } : section) };
+}
+export function phraseTempoGrid(body: PhraseBody, tempoBpm: number, sectionId?: string): PhraseBody {
+  const span = phraseTempoSpans(body).find(item => item.id === sectionId);
+  if (!span) throw new Error('这个 BPM 画布已不存在。');
+  if (span.tempoBpm === tempoBpm) return body;
+  const shift = (span.endBeat - span.startBeat) * (tempoBpm / span.tempoBpm - 1);
+  return {
+    ...body,
+    tempoBpm: sectionId === undefined ? tempoBpm : body.tempoBpm,
+    lengthBeats: body.lengthBeats + shift,
+    ...(body.tempoSections ? { tempoSections: body.tempoSections.map(section => section.id === sectionId
+      ? { ...section, tempoBpm }
+      : section.startBeat > span.startBeat ? { ...section, startBeat: section.startBeat + shift } : section) } : {}),
+  };
+}
 export function phraseGainTimeline(body: PhraseBody, points: readonly PhraseGainPoint[], ratio = 1) {
   return points.map(({ beat, ...point }) => ({ ...point, atSeconds: phraseBeatSeconds(body, beat) * ratio }));
 }

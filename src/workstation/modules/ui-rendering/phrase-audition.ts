@@ -58,7 +58,7 @@ export function createPhraseAudition(
       const output = held === undefined ? soundPlan : { ...soundPlan, note: { ...soundPlan.note, holdSeconds: held } };
       const gainCurve = note && voice.gainCurve?.length ? phraseGainTimeline(initial.body!, voice.gainCurve) : undefined;
       const pitchCurve = note && voice.performanceCurves?.pitch?.length ? phraseGainTimeline(initial.body!, voice.performanceCurves.pitch) : undefined;
-      await sound.audition(output, note ? { pan: phraseNotePan(voice, note), preserveNoteLevel: true,
+      await sound.audition(output, note ? { ...(note.gainDb ? { noteGainDb: note.gainDb } : {}), pan: phraseNotePan(voice, note), preserveNoteLevel: true,
         ...(gainCurve ? { gainCurve } : {}), ...(pitchCurve ? { pitchCurve } : {}),
         ...(gainCurve || pitchCurve ? { gainCurveStartSeconds: phraseBeatSeconds(initial.body!, note.startBeat) } : {}) } : overlap && { overlap });
     } catch (error) {
@@ -113,7 +113,7 @@ export function createPhraseAudition(
     },
     requestNote(partId, note, body, ready) {
       const duration = phraseHeldSeconds(body, note);
-      if (!preserveNoteLevel) return this.request(note.frequencyHz, duration, note.velocity, ready, note.level, partId);
+      if (!preserveNoteLevel && !note.gainDb) return this.request(note.frequencyHz, duration, note.velocity, ready, note.level, partId);
       const at = phraseBeatSeconds(body, note.startBeat);
       let performed = duration;
       const part = body.parts.find(voice => voice.id === partId);

@@ -118,6 +118,8 @@
 }
 .is-library-workspace .project-library-header { gap: 12px; margin-bottom: 18px; }
 .is-library-workspace .project-library-header h2 { color: #284052; font-size: clamp(19px, 3vw, 30px); }
+.project-library-directory .project-library-save-back { display: grid; place-items: center; flex: none; }
+.project-library-save-back svg { width: 20px; height: 20px; }
 .project-library-directory { display: flex; align-items: center; gap: 10px; flex: none; padding-bottom: 10px; }
 .is-library-workspace .project-library-navigation { flex: 1; min-width: 0; margin: 0; white-space: nowrap; }
 .is-library-workspace .project-library-navigation [aria-current] { font-weight: 650; color: #2d566b; }
@@ -155,6 +157,7 @@
 .is-library-workspace :is(.project-library-note, .project-library-error) { margin: 0 4px 8px; }
 .is-library-workspace .project-library-footer { margin: 8px 4px 0; }
 .project-library-copy-form, .project-library-folder-form { display: flex; width: 100%; align-items: center; gap: 8px; }
+.project-library-directory .project-library-copy-form { width: min(42%, 320px); min-width: min(100%, 132px); margin-inline-start: auto; }
 .project-library-folder-form { margin-bottom: 10px; }
 .project-library-folder-form[hidden] { display: none; }
 .is-library-workspace :is(.project-library-copy-form, .project-library-folder-form) input {
@@ -167,6 +170,7 @@
 @media (max-width: 640px) {
   .is-library-workspace .project-library-directory { align-items: flex-start; flex-wrap: wrap; }
   .is-library-workspace .project-library-navigation { flex-basis: 100%; }
+  .is-library-workspace .is-saving .project-library-navigation { flex-basis: calc(100% - 42px); }
 }
 @media (prefers-reduced-motion: reduce) { .is-library-workspace .project-library-tile { transition: none; } }
 

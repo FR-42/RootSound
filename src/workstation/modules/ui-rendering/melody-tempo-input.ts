@@ -3,6 +3,7 @@ import { MAX_TEMPO_BPM, MIN_TEMPO_BPM } from '../../contracts/music-limits.ts';
 export function attachMelodyTempoInput(input: HTMLInputElement, control: HTMLElement, options: {
   read(): number;
   preview(value?: number): void;
+  adjusted?(): void;
   commit(value: number): void;
 }) {
   let pending: number | undefined;
@@ -16,6 +17,7 @@ export function attachMelodyTempoInput(input: HTMLInputElement, control: HTMLEle
   function update(value: number) {
     const bounded = Math.max(MIN_TEMPO_BPM, Math.min(MAX_TEMPO_BPM, Math.round(value)));
     if (pending === bounded) return;
+    if (bounded !== (pending ?? inputValue())) options.adjusted?.();
     pending = bounded;
     if (!frame) frame = requestAnimationFrame(() => {
       frame = 0;

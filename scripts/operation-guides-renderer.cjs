@@ -5,12 +5,12 @@ const config=JSON.parse(fs.readFileSync(process.argv[2],'utf8')),root=config.roo
 app.setPath('userData',path.join(root,'profile'));app.commandLine.appendSwitch('disable-gpu');app.commandLine.appendSwitch('force-device-scale-factor','1');
 const delay=ms=>new Promise(r=>setTimeout(r,ms));
 const lessons=[
- {id:'add-voice',title:'添加音色',description:'',alt:'添加长笛后，在卷帘按下鼠标不松开，直接向下拖动写出长音符。'},
+ {id:'add-voice',title:'添加音色',description:'',alt:'添加长笛后，在画布按下鼠标不松开，直接向下拖动写出长音符。'},
  {id:'bpm',title:'BPM',description:'',alt:'左侧调整BPM，右侧以相同缩放显示拍线间距变化；按空格敲击定速。'},
  {id:'cells',title:'格数',description:'',alt:'同样一拍分别分成2格、3格、4格。'},
  {id:'zoom',title:'缩放视角',description:'',alt:'先按Ctrl和Shift滚轮横向缩放，再按Ctrl滚轮竖向缩放。'},
- {id:'editing',title:'写音符与拖动画布',description:'',alt:'单选音符时拖动空白移动卷帘。选中左侧音符组后，在空白处点击添加音符，右键取消。',version:8},
- {id:'extend',title:'延长与新增卷帘',description:'',alt:'下拉卷帘底边增加拍数，再点击下方加号添加新卷帘。'},
+ {id:'editing',title:'写音符与拖动画布',description:'',alt:'单选音符时拖动空白移动画布。选中左侧音符组后，在空白处点击添加音符，右键取消。',version:8},
+ {id:'extend',title:'延长与新增画布',description:'',alt:'下拉画布底边增加拍数，再点击下方加号添加新画布。'},
 ];
 let win,lesson,frames=[],all=[],count=0,label='',keys='',camera={cx:600,cy:310,w:1200},cursor={x:70,y:70,down:false},last='',mode='normal';
 const js=code=>{last=code.slice(0,180);return win.webContents.executeJavaScript('(async()=>('+code+'))()');};
@@ -102,7 +102,7 @@ app.whenReady().then(async()=>{try{
  await snap(700,0);
  assert.equal(await js("document.querySelectorAll('.melody-note.is-selected').length"),1);
  assert.equal(await js("document.querySelectorAll('.melody-note-family.is-selected').length"),0);
- label='单选时，拖空白移动卷帘';
+ label='单选时，拖空白移动画布';
  const from={x:775,y:370};
  const beforePan=await js('__tutorial.editor.readViewport()');
  cursor={...from,down:false};await snap(420);
@@ -134,7 +134,7 @@ app.whenReady().then(async()=>{try{
  await pointer('pointerdown',cursor.x,cursor.y,'.melody-roll-end');cursor.down=true;const edgeY=cursor.y;
  for(let i=1;i<=28;i++){cursor.y=edgeY+300*i/28;await pointer('pointermove',cursor.x,cursor.y);await snap(34,0);}await pointer('pointerup',cursor.x,cursor.y);cursor.down=false;
  const lengthAfterEdge=await js('__tutorial.model.score.read().body.lengthBeats');assert(lengthAfterEdge>lengthBeforeEdge);label=`${lengthBeforeEdge}拍 → ${lengthAfterEdge}拍`;await snap(900,0);
- await js("document.querySelector('.melody-scroll').dispatchEvent(new WheelEvent('wheel',{bubbles:true,cancelable:true,deltaY:100000,clientX:900,clientY:300}))");await delay(80);label='下方＋，新建一段卷帘';await focus('.melody-extend',1100);await click('.melody-extend',300);
- assert.equal(await js('__tutorial.model.score.read().body.tempoSections.length'),1);assert((await js('__tutorial.model.score.read().body.lengthBeats'))>lengthAfterEdge);label='新的卷帘，接在后面';camera={cx:600,cy:310,w:1100};await snap(1400,300);await end();
+ await js("document.querySelector('.melody-scroll').dispatchEvent(new WheelEvent('wheel',{bubbles:true,cancelable:true,deltaY:100000,clientX:900,clientY:300}))");await delay(80);label='下方＋，新建一段画布';await focus('.melody-extend',1100);await click('.melody-extend',300);
+ assert.equal(await js('__tutorial.model.score.read().body.tempoSections.length'),1);assert((await js('__tutorial.model.score.read().body.lengthBeats'))>lengthAfterEdge);label='新的画布，接在后面';camera={cx:600,cy:310,w:1100};await snap(1400,300);await end();
  const result={width:1200,height:620,pixelRatio:2,lessons:all};fs.writeFileSync(path.join(root,'manifest.json'),JSON.stringify(result));fs.writeFileSync(path.join(root,'report.json'),JSON.stringify({passed:true,version:7,chapters:all.length,frames:count,seconds:all.reduce((n,l)=>n+l.duration,0)/1000,visibleWindow:false,physicalAudio:false,userProjectsRead:false}));win.destroy();app.exit(0);
 }catch(error){fs.writeFileSync(path.join(root,'report.json'),JSON.stringify({error:String(error),stack:error.stack,last,chapter:lesson?.id}));app.exit(1);}});

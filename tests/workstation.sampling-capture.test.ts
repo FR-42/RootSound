@@ -3,6 +3,8 @@ import { test } from 'node:test';
 import { readFileSync } from 'node:fs';
 import { runInNewContext } from 'node:vm';
 import { createBrowserSampleCapture, createBrowserSampleDecoder } from '../src/workstation/modules/sampling/browser.ts';
+import { mountHumPitch } from '../src/workstation/modules/ui-rendering/hum-pitch.ts';
+import { createHumPitchTracker, frequencyPitchClass, majorGuidePitchRole, recognizeHum } from '../src/workstation/modules/pitch-guide/public.ts';
 import { encodeFloatWav } from '../src/workstation/modules/sampling/audio.ts';
 
 class Track {
@@ -39,9 +41,12 @@ class Context {
   static module: Promise<void> = Promise.resolve();
   state = 'suspended'; sampleRate = 8000; closed = 0;
   destination = new Node(); input = new Node(); onstatechange: (() => void) | null = null;
-  audioWorklet = { addModule: (url: string) => { assert(url.endsWith('capture-worklet.js')); return Context.module; } };
+  loads = 0;
+  audioWorklet = { addModule: (url: string) => { this.loads++; assert(url.endsWith('capture-worklet.js')); return Context.module; } };
   constructor() { Context.instances.push(this); }
   createMediaStreamSource(_stream: unknown) { return this.input; }
+  createAnalyser() { return Object.assign(new Node(), { fftSize: 1024, smoothingTimeConstant: 0,
+    getByteFrequencyData(data: Uint8Array) { data.fill(180); } }); }
   async resume() { this.state = 'running'; }
   async close() { this.closed++; this.state = 'closed'; }
   suspend() { this.state = 'suspended'; this.onstatechange?.(); }
@@ -184,4 +189,235 @@ test('manual worklet stop flushes all accumulated frames once and never emits th
   worklet.process([[new Float32Array([0.25, -0.5])]], [[]]); worklet.port.onmessage!({ data: { type: 'stop' } });
   assert.deepEqual(messages[0]!.data, new Float32Array([0.25, -0.5])); assert.equal(messages[1]!.type, 'done');
   assert.equal(worklet.process([[new Float32Array([1])]], [[]]), false); assert.equal(messages.length, 2);
+});
+
+function hummedTone(hz: number, rate = 48000): Float32Array {
+  return Float32Array.from({ length: rate * .65 }, (_, i) => {
+    const t = i / rate;
+    const phase = 2 * Math.PI * hz * t + .26 * Math.sin(2 * Math.PI * 5 * t);
+    return .16 * Math.sin(phase) + .08 * Math.sin(2 * phase);
+  });
+}
+
+test('steady hum identifies the pitch class across octaves and maps the first five major notes', async () => {
+  for (const hz of [110, 220, 440, 466.1638, 261.6256]) {
+    assert.equal(await recognizeHum(hummedTone(hz), 48000), frequencyPitchClass(hz));
+  }
+  const quietHum = hummedTone(220).map(sample => sample * .025);
+  assert.equal(await recognizeHum(quietHum, 48000), 9);
+  const strongHarmonic = Float32Array.from({ length: 32000 }, (_, i) => {
+    const phase = 2 * Math.PI * 196 * i / 48000;
+    return .048 * Math.sin(phase) + .18 * Math.sin(3 * phase);
+  });
+  assert.equal(await recognizeHum(strongHarmonic, 48000), 7);
+  const quick = hummedTone(329.6276).slice(0, 8600);
+  assert.equal(await recognizeHum(quick, 48000), 4);
+  const gliding = hummedTone(261.6256);
+  for (let i = 0; i < 8500; i++) gliding[i] = .16 * Math.sin(2 * Math.PI * (200 * i / 48000 + (61.6256 / 17000) * i ** 2 / 48000));
+  assert.equal(await recognizeHum(gliding, 48000), 0);
+  assert.equal(await recognizeHum(new Float32Array(48000), 48000), undefined);
+  let seed = 17;
+  const noise = Float32Array.from({ length: 48000 }, () => {
+    seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+    return seed / 2 ** 32 - .5;
+  });
+  assert.equal(await recognizeHum(noise, 48000), undefined);
+  const alternating = new Float32Array(62400);
+  alternating.set(hummedTone(220)); alternating.set(hummedTone(261.6256), 31200);
+  assert.equal(await recognizeHum(alternating, 48000), undefined);
+  const pitches = Array.from({ length: 12 }, (_, pitch) => pitch);
+  assert.deepEqual(pitches.filter(pitch => majorGuidePitchRole(pitch, 0, true)), [0, 2, 4, 5, 7]);
+  assert.deepEqual(pitches.filter(pitch => majorGuidePitchRole(pitch, 10, true)), [0, 2, 3, 5, 10]);
+  assert.equal(majorGuidePitchRole(10, 10), 'tonic');
+});
+
+test('streaming pitch rejects noise, follows changes, and distinguishes octaves', () => {
+  const pitches: number[] = [];
+  const tracker = createHumPitchTracker(midi => pitches.push(midi));
+  const rate = 44100;
+  const push = (sound: Float32Array) => {
+    for (let at = 0; at < sound.length; at += 793) tracker.push(sound.subarray(at, at + 793), rate);
+  };
+  let seed = 17;
+  const noise = Float32Array.from({ length: rate }, () => {
+    seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+    return (seed / 2 ** 32 - .5) * .055;
+  });
+  noise[1200] = .9;
+  push(new Float32Array(rate));
+  push(noise);
+  assert.deepEqual(pitches, []);
+  push(hummedTone(220, rate).map((value, i) => value * .45 + noise[i]! * .55));
+  assert.deepEqual(pitches, [57]);
+  push(noise);
+  assert.deepEqual(pitches, [57]);
+  push(hummedTone(440, rate).slice(0, Math.floor(rate * .22)));
+  assert.deepEqual(pitches, [57, 69]);
+  push(hummedTone(493.8833, rate).slice(0, Math.floor(rate * .06)));
+  push(noise);
+  assert.deepEqual(pitches, [57, 69]);
+  push(hummedTone(293.6648, rate).slice(0, Math.floor(rate * .22)));
+  assert.deepEqual(pitches, [57, 69, 62]);
+});
+
+test('live hum keeps weak fundamentals while following scales and real octave jumps', () => {
+  const rate = 48000;
+  const scale = [60, 62, 64, 65, 67, 69, 71, 72];
+  const scan = (notes: number[], ms: number, levels: (index: number) => [number, number], noise = 0) => {
+    const pitches: number[] = [];
+    const tracker = createHumPitchTracker(midi => pitches.push(midi));
+    let phase = 0, seed = 17;
+    for (const [index, midi] of notes.entries()) {
+      const [base, harmonic] = levels(index);
+      const step = 2 * Math.PI * 440 * 2 ** ((midi - 69) / 12) / rate;
+      for (let at = 0; at < ms; at += 20) {
+        const chunk = Float32Array.from({ length: 960 }, () => {
+          phase += step;
+          seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+          return base * Math.sin(phase) + harmonic * Math.sin(2 * phase) + noise * (seed / 2 ** 32 - .5);
+        });
+        tracker.push(chunk, rate);
+      }
+    }
+    return pitches;
+  };
+  assert.deepEqual(scan([57, 57, 57], 340, i => i === 1 ? [.006, .12] : [.12, .04]), [57]);
+  assert.deepEqual(scan([57, 69, 57], 220, () => [.12, .04]), [57, 69, 57]);
+  assert.deepEqual(scan(scale, 100, () => [.12, .04]), scale);
+  assert.deepEqual(scan([...scale].reverse().map(note => note - 5), 100, () => [.12, .04]),
+    [67, 66, 64, 62, 60, 59, 57, 55]);
+  assert.deepEqual(scan(scale, 220, i => i % 2 ? [.006, .12] : [.12, .04], .01), scale);
+  assert.deepEqual(scan([72, 76, 79, 81, 84, 87], 200, () => [.09, 0]), [72, 76, 79, 81, 84, 87]);
+});
+
+test('live hum holds its column through weak fundamentals and semitone boundary drift', () => {
+  const rate = 48000;
+  const pitches: number[] = [];
+  const tracker = createHumPitchTracker(midi => pitches.push(midi));
+  let phase = 0;
+  function hum(frequency: number, fundamental: number, secondHarmonic: number, frames = 25): void {
+    const step = 2 * Math.PI * frequency / rate;
+    for (let i = 0; i < frames; i++) {
+      tracker.push(Float32Array.from({ length: 960 }, () => {
+        phase += step;
+        return fundamental * Math.sin(phase) + secondHarmonic * Math.sin(phase * 2);
+      }), rate);
+    }
+  }
+
+  hum(220, .10, .05);
+  hum(220, .0017, .12);
+  hum(220, .10, .05);
+  assert.deepEqual(pitches, [57]);
+  hum(220 * 2 ** (37 / 1200), .10, .05);
+  hum(220 * 2 ** (65 / 1200), .10, .05);
+  hum(220 * 2 ** (37 / 1200), .10, .05);
+  assert.deepEqual(pitches, [57]);
+  hum(220 * 2 ** (1 / 12), .10, .05, 6);
+  assert.deepEqual(pitches, [57, 58]);
+  hum(440 * 2 ** (1 / 12), .10, .05, 11);
+  hum(220 * 2 ** (1 / 12), .10, .05, 11);
+  assert.deepEqual(pitches, [57, 58, 70, 58]);
+});
+
+test('left Alt streams without a badge, keeps the final stable note, and cancels interrupted sessions', async () => environment(async (_stream, requests) => {
+  const original = Object.getOwnPropertyDescriptor(globalThis, 'window');
+  Object.defineProperty(globalThis, 'window', { configurable: true, value: new EventTarget() });
+  const doc = new EventTarget();
+  const host = { ownerDocument: doc };
+  const pitches: Array<[number | undefined, boolean | undefined]> = [];
+  const errors: string[] = [];
+  const pitch = mountHumPitch(host as unknown as HTMLElement, {
+    canStart: () => true, showPitch: (value, released) => pitches.push([value, released]), report: error => errors.push(error),
+  });
+  const send = (type: string, code: string, repeat = false) =>
+    doc.dispatchEvent(Object.assign(new Event(type, { cancelable: true }), { code, key: code, repeat }));
+  const wait = async (until: () => boolean) => {
+    for (let i = 0; i < 50 && !until(); i++) await new Promise(resolve => setTimeout(resolve, 2));
+    assert(until());
+  };
+  const begin = async (count: number) => {
+    send('keydown', 'AltLeft');
+    send('keydown', 'AltLeft', true);
+    await wait(() => Worklet.instances.length === count);
+    return Worklet.instances[count - 1]!;
+  };
+  try {
+    send('keydown', 'AltRight'); send('keyup', 'AltRight');
+    assert.equal(requests.length, 0);
+    send('keydown', 'AltLeft'); send('keyup', 'AltLeft');
+    assert.equal(Worklet.instances.length, 0);
+    const first = await begin(1);
+    assert.equal(requests.length, 2);
+    assert.equal(first.options.processorOptions!.maxFrames, Infinity);
+    first.port.send({ type: 'chunk', data: hummedTone(220, 8000) });
+    first.port.send({ type: 'chunk', data: hummedTone(261.6256, 8000).slice(0, 1800) });
+    assert.deepEqual(pitches, [[57, undefined], [60, undefined]]);
+    send('keyup', 'AltLeft');
+    assert(first.disconnected);
+    assert.deepEqual(pitches.at(-1), [60, true]);
+    pitch.dismissResult();
+    assert.deepEqual(pitches.at(-1), [undefined, false]);
+    const silence = await begin(2);
+    silence.port.send({ type: 'chunk', data: new Float32Array(3200) });
+    send('keyup', 'AltLeft');
+    assert(silence.disconnected);
+    assert.equal(pitches.length, 4);
+    const interrupted = await begin(3);
+    interrupted.port.send({ type: 'chunk', data: hummedTone(220, 8000) });
+    send('keydown', 'Escape');
+    assert(interrupted.disconnected);
+    send('keyup', 'AltLeft');
+    assert.deepEqual(pitches.slice(-2), [[57, undefined], [undefined, false]]);
+    const blurred = await begin(4);
+    window.dispatchEvent(new Event('blur'));
+    assert(blurred.disconnected);
+    assert.equal(Context.instances.length, 1);
+    assert.equal(Context.instances[0]!.loads, 1);
+    assert.deepEqual(errors, []);
+  } finally {
+    pitch.dispose();
+    if (original) Object.defineProperty(globalThis, 'window', original);
+    else Reflect.deleteProperty(globalThis, 'window');
+  }
+}));
+
+test('hum capture prepares the audio module in parallel with permission and reuses it after stop', async t => {
+  const device = deferred<Stream>(), loading = deferred<void>();
+  await environment(async () => {
+    const input = createBrowserSampleCapture({ reuseEngine: true });
+    try {
+      const start = performance.now();
+      const first = input.start(() => {});
+      assert.equal(Context.instances[0]?.loads, 1);
+      assert.equal(Worklet.instances.length, 0);
+      await new Promise(resolve => setTimeout(resolve, 35));
+      loading.resolve();
+      assert.equal(Worklet.instances.length, 0);
+      device.resolve(new Stream());
+      const recording = await first;
+      const firstReady = performance.now() - start;
+      Worklet.instances[0]!.port.send({ type: 'chunk', data: hummedTone(220, 8000) });
+      const stop = performance.now();
+      recording.stop();
+      const pcm = await recording.result;
+      assert.equal(await recognizeHum(pcm.channels[0]!, pcm.sampleRate), 9);
+      const stopToResult = performance.now() - stop;
+      const restart = performance.now();
+      const next = await input.start(() => {});
+      const warmReady = performance.now() - restart;
+      next.cancel();
+      await assert.rejects(next.result, /取消/);
+      assert.equal(Context.instances.length, 1);
+      assert.equal(Context.instances[0]!.loads, 1);
+      t.diagnostic('simulated first setup ' + firstReady.toFixed(1) + ' ms, repeat ' + warmReady.toFixed(1) +
+        ' ms, stop to pitch ' + stopToResult.toFixed(1) + ' ms');
+    } finally { input.dispose(); }
+  }, (() => {
+    let first = true;
+    return () => {
+      if (first) { first = false; return device.promise; }
+      return Promise.resolve(new Stream());
+    };
+  })(), loading.promise);
 });

@@ -28,7 +28,10 @@ function node<K extends keyof HTMLElementTagNameMap>(tag: K, className = '', tex
 function action(text: string, className: string, callback: () => void): HTMLButtonElement {
   const button = node('button', className, text); button.type = 'button'; button.addEventListener('click', callback); return button;
 }
-type Icon = 'play' | 'pause' | 'stop' | 'tempo' | 'settings' | 'save' | 'copy' | 'exit';
+type Icon = 'play' | 'pause' | 'stop' | 'tempo' | 'settings' | 'save' | 'copy' | 'save-file' | 'copy-file' | 'exit';
+const destinationFile = 'M8 7.5v-3h9l5 5v12H8V17.5M17 4.5v5h5';
+const rearFileOutline = 'M8 18.5H4v-17h9l3 3';
+const fileArrowHead = 'M10 9.5l3 3-3 3';
 function icon(kind: Icon): SVGSVGElement {
   const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg'); svg.setAttribute('viewBox', '0 0 24 24'); svg.setAttribute('aria-hidden', 'true');
   const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
@@ -37,6 +40,8 @@ function icon(kind: Icon): SVGSVGElement {
     settings: 'M10 3h4l.5 2.3 1.6.9 2.2-.7 2 3.5-1.6 1.6v1.8l1.6 1.6-2 3.5-2.2-.7-1.6.9-.5 2.3h-4l-.5-2.3-1.6-.9-2.2.7-2-3.5 1.6-1.6v-1.8L3.7 9l2-3.5 2.2.7 1.6-.9zM14.7 11.5a2.7 2.7 0 1 1-5.4 0 2.7 2.7 0 0 1 5.4 0z',
     save: 'M5 4.5h12l2.5 2.5v12.5H5zM8 4.5v5h8v-5M8 19.5v-6h8v6',
     copy: 'M9 8h11v12H9zM16 8V4H5v12h4',
+    'save-file': destinationFile + 'M5 12.5h8' + fileArrowHead,
+    'copy-file': rearFileOutline + destinationFile + 'M6 12.5h7' + fileArrowHead,
     exit: 'M11 5H5v14h6m-2-7h11m-4-4 4 4-4 4' }[kind]);
   path.setAttribute('fill', ['play', 'pause', 'stop'].includes(kind) ? 'currentColor' : 'none'); path.setAttribute('stroke', 'currentColor'); path.setAttribute('stroke-width', '1.5'); path.setAttribute('stroke-linejoin', 'round'); path.setAttribute('stroke-linecap', 'round'); svg.append(path); return svg;
 }
@@ -48,15 +53,16 @@ export function mountPhraseComposition(root: HTMLElement, options: {
   initialView?: PhraseView;
   directMusic?: boolean;
   desktopPointerUx?: boolean;
-  readPointerSensitivity?(): number;
+  humPitch?: boolean;
   workspaceState?: MusicWorkspaceStatePort;
   onSettings?(): void;
   readEditorSettings?(body: PhraseView['body']): { preferences: Parameters<typeof mountLearningSettings>[2]; options: Parameters<typeof mountLearningSettings>[3] };
-  readMultipleTempoRolls?(): boolean;
+  readMultipleTempoRolls?(body?: PhraseView['body']): boolean;
   readDrumLanes?(): boolean;
   readWorkbench?(): boolean;
   enableGainCurve?: boolean;
   onLearningAction?(action: LearningAction): void;
+  blockSideEdges?(side: 'left' | 'right' | 'top'): boolean;
   readLessonInput?: Parameters<typeof mountMelodyWorkspace>[1]['readLessonInput'];
   mobileTouch?: Parameters<typeof mountMelodyWorkspace>[1]['mobileTouch'];
   mobileWeb?: boolean;
@@ -76,14 +82,16 @@ export function mountPhraseComposition(root: HTMLElement, options: {
   onChangeNoteGroupTimbre?(partId: string, timbreId: string): void;
   onRemoveTimbre?(id: string, section: PhraseSection | 'all'): void;
   onReorderTimbres?(id: string, targetIndex: number): void;
-}): { dispose(): void; refresh(): void; notify(message: string, error?: boolean): void; flush(): Promise<void>; hideControls(): void; showControls(saved?: boolean): void; frameNotes(reserveEndSpace?: boolean): void; previewTempoRate(value?: number): void } {
+}): { dispose(): void; refresh(): void; notify(message: string, error?: boolean): void; flush(): Promise<void>; commitTitle(): Promise<boolean>; setTempoOpen(open: boolean): void; hideControls(): void; showControls(saved?: boolean): void; frameNotes(reserveEndSpace?: boolean): void; previewTempoRate(value?: number): void } {
   const { phrase, sound } = options;
   const deferDraftEdits = options.desktopPointerUx && options.directMusic;
   const liveNoteDeletion = deferDraftEdits && !!phrase.subscribeNoteDeletions && !!sound.setNotesDeleted;
   let unsubscribeNoteDeletions: (() => void) | undefined;
   if (deferDraftEdits) phrase.setNoteWritesDeferred?.(true);
-  let disposed = false; let current = options.initialView ?? phrase.read(); let draftId = current.draft?.id;
+  const readView = () => phrase.read(deferDraftEdits ? { includeCatalog: false, sharedDraft: true } : undefined);
+  let disposed = false; let current = options.initialView ?? readView(); let draftId = current.draft?.id;
   let exitArmed = false, exitChecking = false, exitAgain = false;
+  let exitHintTimer = 0, exitInputVersion = 0;
   let controlsRequested = false, saveFeedbackRequested = false;
   let saveFeedback: Animation[] = [];
   let view: MelodyView = { leftSeconds: 0, zoom: current.body ? 8 / (current.body.lengthBeats * 60 / current.body.tempoBpm) : 1, rowHeight: 24 };
@@ -147,7 +155,7 @@ export function mountPhraseComposition(root: HTMLElement, options: {
   const transport = createPhraseCompositionTransport({ runtime: sound, tempoBpm: tempo, lengthBeats: length, durationSeconds: duration, readBody: playbackBody,
     reuseBody: deferDraftEdits,
     prepare: preparePlayback, readPlan() {
-      const plan = phrase.previewPlan(playbackBody(), { allowSilence: true, ...(liveNoteDeletion ? { editableNotes: true } : {}) });
+      const plan = phrase.previewPlan(playbackBody(), { allowSilence: true, ...(liveNoteDeletion || sound.setNoteGain && options.desktopPointerUx ? { editableNotes: true } : {}) });
       return options.directMusic ? { ...plan, preserveNoteLevel: true } : plan;
     },
     onChange(next) {
@@ -174,7 +182,7 @@ export function mountPhraseComposition(root: HTMLElement, options: {
     }
   }
   function sync(snapshot?: PhraseView): void {
-    current = snapshot ?? phrase.read();
+    current = snapshot ?? readView();
     if (draftId !== current.draft?.id) {
       draftId = current.draft?.id;
       if (!keepDraftViewport || !current.body) {
@@ -191,6 +199,11 @@ export function mountPhraseComposition(root: HTMLElement, options: {
     if (document.activeElement !== subdivisionSelect) subdivisionSelect.value = String(phraseStepsPerBeat(current.body));
     subdivisionButton.textContent = `${phraseStepsPerBeat(current.body)} 份`;
     syncConsole();
+    const tempoSwitch = editorControls?.querySelector('.learning-roll-switch')?.querySelector('input');
+    if (tempoSwitch) {
+      tempoSwitch.disabled = !!current.body?.tempoSections?.length;
+      tempoSwitch.checked = options.readMultipleTempoRolls?.(current.body) === true;
+    }
     for (const button of fileButtons) button.disabled = busy && !(exitChecking && button.classList.contains('song-exit')) || !current.draft;
     if (playButton) playButton.disabled = busy || !current.body;
     tempoInput.disabled = busy || !current.body;
@@ -230,7 +243,7 @@ export function mountPhraseComposition(root: HTMLElement, options: {
     const width = headWidth; const x = (Math.max(0, Math.min(duration(), seconds)) - view.leftSeconds) * melodyScale(view, width, duration());
     playhead.hidden = x < 0 || x > width; handle.hidden = playhead.hidden;
     playhead.style.left = `${Math.min(width - 1, Math.max(0, x))}px`; handle.style.left = `${Math.min(width - 1, Math.max(0, x))}px`;
-    handle.setAttribute('aria-valuenow', String(beat)); handle.setAttribute('aria-valuemax', String(length())); handle.title = `${Number(beat.toFixed(3))} 拍`;
+    handle.setAttribute('aria-valuenow', String(beat)); handle.setAttribute('aria-valuemax', String(length()));
     viewport.dataset.leftBeat = String(view.leftSeconds * tempo() / 60); viewport.dataset.zoom = String(view.zoom * duration() / 8);
     viewport.dataset.leftSeconds = String(view.leftSeconds); viewport.dataset.visibleSeconds = String(8 / view.zoom);
     return seconds;
@@ -291,7 +304,7 @@ export function mountPhraseComposition(root: HTMLElement, options: {
         if (!next) throw new Error('音乐名称不能为空。');
         if (next !== current.draft?.name) { if (options.onRename) await options.onRename(next); else phrase.rename(next); }
         titleInput = undefined;
-        if (!disposed) { current = phrase.read(); updateTitle(); syncConsole(); void updateUnsavedMarker(); }
+        if (!disposed) { current = readView(); updateTitle(); syncConsole(); void updateUnsavedMarker(); }
         return true;
       } catch (error) { report(error instanceof Error ? error.message : String(error), true); return false; }
       finally { titleCommit = undefined; }
@@ -300,7 +313,7 @@ export function mountPhraseComposition(root: HTMLElement, options: {
     return titleCommit;
   }
   async function execute(callback: (() => FileActionResult | Promise<FileActionResult>) | undefined, keepView = false,
-    onPreparationError?: (error: unknown) => void | Promise<void>): Promise<void> {
+    onPreparationError?: (error: unknown) => void | Promise<void>, refreshAfter = true): Promise<void> {
     if (busy || disposed || !callback) return;
     busy = true;
     try {
@@ -321,18 +334,31 @@ export function mountPhraseComposition(root: HTMLElement, options: {
       if (disposed) return;
       keepDraftViewport = keepView;
       await action();
-      if (!disposed) refresh();
+      if (!disposed && refreshAfter) refresh();
     }
     catch (error) { report(error instanceof Error ? error.message : String(error), true); }
     finally { busy = false; if (!disposed) { sync(); restoreControls(); } keepDraftViewport = false; }
   }
   function armExit(armed: boolean): void {
+    window.clearTimeout(exitHintTimer);
+    exitHintTimer = 0;
     exitArmed = armed;
     if (armed) {
+      exitHintTimer = window.setTimeout(() => armExit(false), 3000);
       for (const animation of saveFeedback) animation.cancel();
       saveFeedback = [];
     }
     files.classList.toggle('is-exit-armed', armed);
+  }
+  function dismissExitHint(event: Event): void {
+    if (!exitArmed && !exitChecking) return;
+    const key = event as KeyboardEvent;
+    const onExit = (event.target as HTMLElement | null)?.closest?.('.song-exit');
+    if (onExit && ((event.type === 'pointerdown' || event.type === 'mousedown') && (event as MouseEvent).button === 0
+      || event.type === 'keydown' && !key.repeat && (key.key === 'Enter' || key.key === ' '))) return;
+    exitInputVersion++;
+    exitAgain = false;
+    armExit(false);
   }
   function restoreControls(): void {
     if (disposed || busy) return;
@@ -363,27 +389,33 @@ export function mountPhraseComposition(root: HTMLElement, options: {
       if (result === 'cancelled' || result === 'discarded') return result;
       if (editorControls) { controlsRequested = true; saveFeedbackRequested = true; }
       return result;
-    }, true);
+    }, true, undefined, false);
   }
   async function exitProject(): Promise<void> {
     if (exitChecking) { exitAgain = true; return; }
     if (busy || disposed || !options.onExit) return;
     exitChecking = true; exitAgain = false;
-    const wasArmed = exitArmed;
+    const inputVersion = exitInputVersion;
     try {
       await execute(async () => {
         if (exitArmed) { await options.onExit!(); return; }
         let dirty: boolean;
         try { dirty = options.readUnsavedChanges ? await options.readUnsavedChanges() : !unsavedMarker.hidden; }
-        catch (error) { armExit(true); throw error; }
-        if (dirty && !exitArmed) {
+        catch (error) {
+          if (inputVersion !== exitInputVersion || disposed) return;
+          armExit(true);
+          throw error;
+        }
+        if (inputVersion !== exitInputVersion || disposed) return;
+        if (dirty) {
           armExit(true);
           if (!exitAgain) return;
         }
         await options.onExit!();
       }, true, async error => {
-        if (wasArmed || exitAgain) await options.onExit!();
-        else { armExit(true); report(error instanceof Error ? error.message : String(error), true); }
+        if (disposed || inputVersion !== exitInputVersion) return;
+        armExit(true);
+        report(error instanceof Error ? error.message : String(error), true);
       });
     } finally { exitChecking = false; exitAgain = false; if (!disposed) sync(); }
   }
@@ -446,10 +478,14 @@ export function mountPhraseComposition(root: HTMLElement, options: {
     else view = clampMelodyView({ ...view, leftSeconds: view.leftSeconds + (event.deltaX || event.deltaY) / melodyScale(view, headWidth, duration()) }, duration());
     scheduleOverview();
   }
+  const editingControl = (target: EventTarget | null): boolean => {
+    const element = target as HTMLElement | null;
+    return !!(element?.matches?.('input:not([type="range"]), textarea, select') || element?.isContentEditable);
+  };
   const key = (event: KeyboardEvent) => {
     if (options.readLessonToolbar?.() === false) return;
     if (event.defaultPrevented || disposed) return;
-    const toggleSettings = event.key === 'Escape' && editorControls && !busy && !event.repeat && !event.isComposing && !titleInput;
+    const toggleSettings = event.key === 'Escape' && editorControls && !busy && !event.repeat && !event.isComposing && !titleInput && !editingControl(event.target);
     const ignoreToneLibrary = options.desktopPointerUx ? ':not(.melody-tone-library)' : '';
     if (root.querySelector(`dialog[open], .workspace-inline-panel[open]:not(.song-editor-controls):not([inert])${ignoreToneLibrary}, .project-library-overlay:not([hidden])`)) return;
     if (toggleSettings) {
@@ -496,6 +532,9 @@ export function mountPhraseComposition(root: HTMLElement, options: {
   let controlsReturnFocus: HTMLElement | null = null;
   let disposeEditorSettings: (() => void) | undefined;
   let controlsMotion: Animation | undefined;
+  const tempoControls = node('div', 'song-details-tempo');
+  const tempoMore = node('div', 'song-details-tempo-more');
+  tempoControls.append(tempoMore);
   const editorControlsContent = node('div', 'song-editor-control-actions');
   const isEditorSettingsOpen = () => editorControls?.hasAttribute('open') === true;
   function fadeEditorSettings(panel: HTMLElement, open: boolean): Animation | undefined {
@@ -519,14 +558,22 @@ export function mountPhraseComposition(root: HTMLElement, options: {
     const settings = options.readEditorSettings?.(current.body);
     disposeEditorSettings = mountLearningSettings(root, editorControls, settings?.preferences, { ...settings?.options, inline: true }, editorControlsContent);
     fadeEditorSettings(editorControls, true);
+    const tempoSwitch = editorControls.querySelector('.learning-roll-switch');
+    tempoMore.querySelector('.learning-roll-switch')?.remove();
+    if (tempoSwitch) tempoMore.append(tempoSwitch);
+    editorControls.append(tempoControls);
     editorControls.showModal();
     sectionEditor?.settingsVisibilityChanged();
   }
   if (editorControls) {
     editorControls.classList.add('song-editor-controls');
+    editorControls.addEventListener('cancel', event => {
+      if (titleInput || editingControl(document.activeElement) || sectionEditor?.cancelInteraction()) event.preventDefault();
+    });
     const hide = editorControls.close;
     editorControls.close = () => {
       if (!isEditorSettingsOpen()) return;
+      armExit(false);
       editorControls.removeAttribute('open');
       editorControls.inert = true;
       const previewing = editorControls.classList.contains('is-previewing');
@@ -552,10 +599,9 @@ export function mountPhraseComposition(root: HTMLElement, options: {
     };
   }
   const topbar = editorControls ?? node('header', 'song-topbar');
-  title = node('div', 'song-project-name'); title.title = '双击修改名称';
+  title = node('div', 'song-project-name');
   const unsavedMarker = node('span', 'song-project-unsaved', '*');
   unsavedMarker.hidden = true;
-  unsavedMarker.title = '有未保存的改动';
   unsavedMarker.setAttribute('role', 'img');
   unsavedMarker.setAttribute('aria-label', '有未保存的改动');
   const titleGroup = node('div', 'phrase-composition-title');
@@ -569,11 +615,15 @@ export function mountPhraseComposition(root: HTMLElement, options: {
       if (event.key === 'Enter') { event.preventDefault(); event.stopPropagation(); void commitTitle(); }
       if (event.key === 'Escape' && !titleCommit) { event.preventDefault(); event.stopPropagation(); titleInput = undefined; updateTitle(); }
     });
-    field.focus(); field.select();
+    field.focus();
+    if (editorControls) {
+      field.setSelectionRange(0, field.value.length, 'backward');
+      field.scrollLeft = 0;
+    } else field.select();
   });
   const controls = node('div', 'song-transport');
   const stopButton = action('', 'song-icon-button song-stop', () => { if (!disposed) { finishGesture(); spaceAction = undefined; transport.stop(); options.onLearningAction?.('reset'); } });
-  stopButton.setAttribute('aria-label', '停止并回到开头'); stopButton.title = '停止并回到开头'; stopButton.append(icon('stop'));
+  stopButton.setAttribute('aria-label', '停止并回到开头'); stopButton.append(icon('stop'));
   playButton = action('', 'song-icon-button song-play', togglePlayback);
   const clock = options.directMusic ? undefined : node('output', 'song-clock', '00:00.000');
   clock?.setAttribute('aria-label', '当前时间');
@@ -582,20 +632,20 @@ export function mountPhraseComposition(root: HTMLElement, options: {
   tempoInput = node('input'); tempoInput.type = 'number'; tempoInput.min = String(MIN_TEMPO_BPM); tempoInput.max = String(MAX_TEMPO_BPM); tempoInput.step = '1'; tempoInput.setAttribute('aria-label', 'BPM');
   tempoInput.addEventListener('change', () => {
     if (disposed || busy || !current.body) return;
-    try { const value = Number(tempoInput.value); if (!Number.isFinite(value) || value < MIN_TEMPO_BPM || value > MAX_TEMPO_BPM) throw new Error(`BPM 需在 ${MIN_TEMPO_BPM} 至 ${MAX_TEMPO_BPM} 之间。`); sectionEditor?.flush(); phrase.setTempo(value, { preserveNoteDurations: false }); refresh(); }
+    try { const value = Number(tempoInput.value); if (!Number.isFinite(value) || value < MIN_TEMPO_BPM || value > MAX_TEMPO_BPM) throw new Error(`BPM 需在 ${MIN_TEMPO_BPM} 至 ${MAX_TEMPO_BPM} 之间。`); sectionEditor?.flush(); phrase.setTempo(value, { preserveTimeline: true }); refresh(); }
     catch (error) { tempoInput.value = String(Math.round(tempo())); report(error instanceof Error ? error.message : String(error), true); }
   });
   const tapTempo = action('敲击定速', 'song-tap-tempo', () => { void execute(() => {
     if(tapTempoDialog)return;
     tapTempoDialog=showTapTempo(root,{onApply(value){
       if(disposed||busy||!current.body)throw new Error('当前音乐尚未准备好，请稍后重试。');
-      sectionEditor?.flush();phrase.setTempo(value,{preserveNoteDurations:false});refresh();
+      sectionEditor?.flush();phrase.setTempo(value,{preserveTimeline:true});refresh();
     },onClose(){tapTempoDialog=undefined;}});
   }); });
   bpmLabel.append(tempoInput); bpmPanel.append(bpmLabel,tapTempo); bpm.append(bpmButton, bpmPanel);
   const subdivision = node('div', 'song-popover');
   subdivisionButton = action('4 份', 'song-icon-button phrase-grid-button', () => {});
-  subdivisionButton.setAttribute('aria-label', '设置每拍细分'); subdivisionButton.title = '每拍细分';
+  subdivisionButton.setAttribute('aria-label', '设置每拍细分');
   const subdivisionPanel = node('div', 'song-popover-panel phrase-grid-panel'); const subdivisionLabel = node('label', '', '每拍细分');
   subdivisionSelect = node('select', 'phrase-grid-select'); subdivisionSelect.setAttribute('aria-label', '每拍细分');
   for (let count = 2; count <= 9; count++) { const option = node('option', '', `${count} 份`); option.value = String(count); subdivisionSelect.append(option); }
@@ -634,9 +684,11 @@ export function mountPhraseComposition(root: HTMLElement, options: {
   }
   syncPlaybackRate();
   const files = node('div', 'song-file-actions');
-  function fileAction(label: string, className: string, glyph: 'settings' | 'save' | 'copy' | 'exit', callback: () => void): HTMLButtonElement {
+  const desktopFileIcons = !!editorControls && document.documentElement?.classList.contains('windows-desktop-colors')
+    && !document.documentElement.classList.contains('website-editor');
+  function fileAction(label: string, className: string, glyph: Icon, callback: () => void): HTMLButtonElement {
     const button = action('', `${className} song-file-icon`, callback);
-    button.title = label; button.setAttribute('aria-label', label);
+    button.setAttribute('aria-label', label);
     button.append(icon(glyph));
     return button;
   }
@@ -655,11 +707,11 @@ export function mountPhraseComposition(root: HTMLElement, options: {
     mobileTouch = { readRightButton: () => rightMode };
   }
   if (options.onSave) {
-    const save = fileAction('保存', 'song-save song-save-project', 'save', () => saveProject());
+    const save = fileAction('保存', 'song-save song-save-project', desktopFileIcons ? 'save-file' : 'save', () => saveProject());
     files.append(save); fileButtons.push(save);
   }
   if (editorControls && options.onSaveAs) {
-    const copy = fileAction('另存为', 'song-save-copy', 'copy', () => saveProject(true));
+    const copy = fileAction('另存为', 'song-save-copy', desktopFileIcons ? 'copy-file' : 'copy', () => saveProject(true));
     files.append(copy); fileButtons.push(copy);
   }
   if (options.onExit) {
@@ -671,7 +723,7 @@ export function mountPhraseComposition(root: HTMLElement, options: {
   }
   const identity = node('div', 'phrase-composition-identity');
   const back = action('‹', 'song-icon-button phrase-melody-back', () => { void execute(showOverview); });
-  back.title = '返回音乐'; back.setAttribute('aria-label', '返回音乐'); back.hidden = true;
+  back.setAttribute('aria-label', '返回音乐'); back.hidden = true;
   const sectionLabel = node('span', 'phrase-composition-section-label', '创作'); sectionLabel.hidden = true;
   if (options.directMusic) identity.append(titleGroup);
   else identity.append(back, titleGroup, node('span', 'song-project-kind', '音乐'), sectionLabel);
@@ -683,7 +735,7 @@ export function mountPhraseComposition(root: HTMLElement, options: {
   if (mobileControls) mobileControls.append(playButton, mobileRight!, fileAction('设置', 'song-save song-settings', 'settings', () => setEditorSettings(!isEditorSettingsOpen())));
   const main = node('main', 'phrase-composition-main'); const sectionControls = node('aside', 'phrase-composition-controls');
   const openCreation = action('创作', 'phrase-composition-control phrase-composition-open-creation', () => { void execute(() => showSection('melody')); });
-  openCreation.setAttribute('aria-label', '进入创作'); openCreation.title = '进入创作';
+  openCreation.setAttribute('aria-label', '进入创作');
   openCreation.addEventListener('keydown', event => { if (event.key === ' ' || event.key === 'Enter') event.stopPropagation(); });
   sectionControls.append(node('div', 'phrase-composition-control-spacer'), openCreation, node('div', 'phrase-composition-control', '音乐控制台'));
   const canvas = node('div', 'phrase-composition-canvas'); ruler = node('div', 'phrase-composition-ruler');
@@ -733,7 +785,7 @@ export function mountPhraseComposition(root: HTMLElement, options: {
   const melodyRegion = node('div', 'phrase-melody-region'); melodyRegion.hidden = true;
   const divider = node('div', 'phrase-composition-divider'); divider.tabIndex = 0;
   divider.setAttribute('role', 'separator'); divider.setAttribute('aria-orientation', 'horizontal');
-  divider.setAttribute('aria-label', '调整创作与音乐控制台高度'); divider.title = '拖动调整高度';
+  divider.setAttribute('aria-label', '调整创作与音乐控制台高度');
   const grip = node('span', 'phrase-composition-divider-grip'); grip.setAttribute('aria-hidden', 'true'); divider.append(grip);
   divider.addEventListener('pointerdown', event => {
     event.stopPropagation();
@@ -814,7 +866,7 @@ export function mountPhraseComposition(root: HTMLElement, options: {
   }
   async function showSection(_section: PhraseSection, initial?: PhraseView): Promise<void> {
     if (sectionEditor || disposed) return;
-    current = initial ?? phrase.read();
+    current = initial ?? readView();
     if (!detailViewInitialized) {
       const restored = options.workspaceState?.read();
       if (restored) await transport.seek(restored.playheadSeconds);
@@ -827,10 +879,11 @@ export function mountPhraseComposition(root: HTMLElement, options: {
       enableGainCurve: options.enableGainCurve,
       readMultipleTempoRolls: options.readMultipleTempoRolls, readDrumLanes: options.readDrumLanes,
       readWorkbench: options.readWorkbench, onLearningAction: options.onLearningAction, readLessonInput: options.readLessonInput,
+      blockSideEdges: options.blockSideEdges,
       mobileTouch,
+      humPitch: options.humPitch,
       desktopPointerUx: options.desktopPointerUx,
-      readPointerSensitivity: options.readPointerSensitivity,
-      editorSettings: editorControls ? { isOpen: isEditorSettingsOpen, setOpen: setEditorSettings } : undefined,
+      editorSettings: editorControls ? { isOpen: isEditorSettingsOpen, setOpen: setEditorSettings, tempoControls, tempoMore } : undefined,
       orientation: options.directMusic ? 'vertical' : 'horizontal',
       showPlayheadTime: options.directMusic,
       workspaceState: options.workspaceState,
@@ -845,6 +898,7 @@ export function mountPhraseComposition(root: HTMLElement, options: {
       onCreateNoteGroup: options.onCreateNoteGroup,
       onChangeNoteGroupTimbre: options.onChangeNoteGroupTimbre,
       onChange: changedInEditor,
+      onNoteGain: transport.setNoteGain,
       onPreview(body) { if (disposed || body === previewBody) return; previewBody = body; refreshEditedPlayback(); },
       onPlaybackFamilyChange(id) { if (disposed) return; transport.setSoloGroup(id); },
       readPlayhead: () => transport.position(),
@@ -868,17 +922,18 @@ export function mountPhraseComposition(root: HTMLElement, options: {
   ruler.addEventListener('lostpointercapture', lostCapture); viewport.addEventListener('lostpointercapture', lostCapture);
   divider.addEventListener('lostpointercapture', lostCapture);
   viewport.addEventListener('wheel', wheel, { passive: false }); ruler.addEventListener('wheel', wheel, { passive: false });
+  const exitHintInputs = ['pointerdown', 'mousedown', 'wheel', 'keydown'] as const;
+  if (editorControls) for (const type of exitHintInputs) document.addEventListener(type, dismissExitHint, true);
   document.addEventListener('pointermove', move); document.addEventListener('pointerup', up); document.addEventListener('pointercancel', cancel); document.addEventListener('keydown', key);
   const resize = () => { if (!sectionEditor) scheduleOverview(); };
   window.addEventListener('resize', resize);
   if (typeof ResizeObserver !== 'undefined') { observer = new ResizeObserver(resize); observer.observe(viewport); }
-  sync(current); if (!options.directMusic) paintOverview(); updatePlayback();
   const initialSection = options.directMusic ? 'melody' : options.initialSection;
+  const opensSection = !!initialSection && initialSection !== 'overview';
+  busy = opensSection;
+  sync(current); if (!options.directMusic) paintOverview(); updatePlayback();
   if (options.directMusic) main.hidden = true;
-  if (initialSection && initialSection !== 'overview') {
-    // Initial mounting is read-only setup, not a file action. Avoid execute's
-    // repeated full-score reads, save flushing and second editor repaint.
-    busy = true; sync(current);
+  if (opensSection) {
     void showSection(initialSection, current).catch(error => report(error instanceof Error ? error.message : String(error), true))
       .finally(() => { if (!disposed) { busy = false; sync(current); restoreControls(); } });
   }
@@ -893,9 +948,11 @@ export function mountPhraseComposition(root: HTMLElement, options: {
     controlsMotion?.cancel(); controlsMotion = undefined;
     for (const animation of saveFeedback) animation.cancel();
     disposeEditorSettings?.(); speed?.dispose(); outputVolume.dispose();
+    window.clearTimeout(exitHintTimer);
+    if (editorControls) for (const type of exitHintInputs) document.removeEventListener(type, dismissExitHint, true);
     document.removeEventListener('pointermove', move); document.removeEventListener('pointerup', up); document.removeEventListener('pointercancel', cancel); document.removeEventListener('keydown', key);
     window.removeEventListener('resize', resize);
-  }, refresh, notify: report, hideControls() { setEditorSettings(false); }, showControls(saved = false) {
+  }, refresh, notify: report, commitTitle, setTempoOpen(open: boolean) { sectionEditor?.setTempoOpen(open); }, hideControls() { setEditorSettings(false); }, showControls(saved = false) {
     controlsRequested = true; saveFeedbackRequested ||= saved; restoreControls();
   }, frameNotes(reserveEndSpace) { sectionEditor?.frameNotes(reserveEndSpace); }, previewTempoRate(value) { sectionEditor?.previewTempoRate(value); }, async flush() {
     if (disposed) throw new Error('当前音乐页面已关闭。');

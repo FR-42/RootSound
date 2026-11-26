@@ -2,7 +2,7 @@ export type {
   JsonValue, ContentRecord, ContentInfo, Draft, NewContent, DraftChanges, DraftSnapshot, DraftHistory, DraftEditOptions,
   SaveConfirmation, SaveResult, MaterialStorage, MaterialLibrary, MaterialTransaction, MaterialTransactionResult,
 } from '../../contracts/content.ts';
-export { createMaterialLibrary } from './library.ts';
+export { createMaterialLibrary, openLargeMaterialLibrary } from './library.ts';
 export { createMaterialCatalog } from './catalog.ts';
 export { createReferenceEditing } from './reference-editing.ts';
 export { createProjectPackages } from './project.ts';

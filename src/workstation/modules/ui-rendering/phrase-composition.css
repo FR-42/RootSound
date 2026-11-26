@@ -43,10 +43,16 @@
 }
 .music-editor .song-editor-controls .song-file-icon { border: 1px solid var(--editor-edge); background: #fff; color: var(--editor-ink); }
 .music-editor .song-editor-controls .song-file-icon:enabled:hover { background: var(--editor-hover); }
-.music-editor .song-editor-controls .song-project-name { display: block; font-size: clamp(19px, 2.3vw, 29px); }
-.music-editor .song-editor-controls .song-project-name-input { max-width: 100%; }
-.music-editor .song-editor-controls :is(.phrase-composition-identity, .phrase-composition-title, .song-project-name):has(.song-project-name-input) { width: 100%; }
-.music-editor .song-editor-controls .song-project-name-input { box-sizing: border-box; width: 100%; padding: 8px 12px; }
+.music-editor .song-editor-controls .phrase-composition-identity,
+.music-editor .song-editor-controls .phrase-composition-title { width: 100%; }
+.music-editor .song-editor-controls .song-project-name {
+  display: block; flex: 1; font-size: clamp(19px, 2.3vw, 29px); line-height: 1.25; text-align: end;
+}
+.music-editor .song-editor-controls .song-project-name:not(:has(input)),
+.music-editor .song-editor-controls .song-project-name-input { padding: 0 12px; }
+.music-editor .song-editor-controls .song-project-name-input {
+  display: block; box-sizing: border-box; width: 100%; max-width: 100%; border: 0; text-align: inherit;
+}
 .phrase-composition-studio .song-transport { justify-self: center; }
 .phrase-composition-studio .song-file-actions { min-width: 0; overflow-x: auto; scrollbar-width: none; }
 .phrase-composition-studio .song-touch-right { min-height: 38px; }

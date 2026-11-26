@@ -35,10 +35,6 @@ function icon(kind: 'play' | 'pause' | 'stop' | 'tempo' | 'volume' | 'solo' | 'm
   path.setAttribute('fill', ['play', 'pause', 'stop'].includes(kind) ? 'currentColor' : 'none');
   path.setAttribute('stroke', 'currentColor'); path.setAttribute('stroke-width', '1.5'); path.setAttribute('stroke-linejoin', 'round'); svg.append(path); return svg;
 }
-function timeLabel(seconds: number): string {
-  const sign = seconds < 0 ? '−' : ''; const value = Math.abs(seconds);
-  return `${sign}${Math.floor(value / 60)}:${(value % 60).toFixed(value % 1 > .01 ? 1 : 0).padStart(2, '0')}`;
-}
 type PickedClip = SongClipRef & { clip: SongClip; trackIndex: number };
 type Point = { x: number; y: number };
 type DragMove = { trackId: string; seconds: number };
@@ -321,7 +317,7 @@ export function mountSongWorkspace(root: HTMLElement, options: {
         card.addEventListener('dragend', () => { resetShelfDrag(); dropPreview = undefined; hideTrash(); paint(); });
         phraseCards.set(phrase.id, card); paletteList.append(card);
       }
-      card.textContent = phrase.name; card.title = phrase.name; const color = playlistPhraseColor(phrase.id);
+      card.textContent = phrase.name; const color = playlistPhraseColor(phrase.id);
       card.style.backgroundColor = color; card.style.color = playlistColorInk(color); card.classList.toggle('is-selected', selectedPhrase === phrase.id);
       card.setAttribute('aria-selected', String(selectedPhrase === phrase.id));
     }
@@ -404,7 +400,7 @@ export function mountSongWorkspace(root: HTMLElement, options: {
             if (active()) { openError.textContent = reason instanceof Error ? reason.message : String(reason); openError.hidden = false; }
           } finally { opening = false; }
         });
-        tile.draggable = true; tile.dataset.phraseId = phrase.id; tile.title = phrase.name; tile.classList.toggle('is-on-shelf', visible.has(phrase.id));
+        tile.draggable = true; tile.dataset.phraseId = phrase.id; tile.classList.toggle('is-on-shelf', visible.has(phrase.id));
         tile.classList.toggle('is-selected', visible.has(phrase.id)); tile.setAttribute('aria-pressed', String(visible.has(phrase.id)));
         tile.setAttribute('aria-label', `${visible.has(phrase.id) ? '隐藏' : '显示'}${phrase.name}`);
         tile.addEventListener('dragstart', event => {
@@ -849,7 +845,6 @@ export function mountSongWorkspace(root: HTMLElement, options: {
     control.classList.toggle('is-selected', selectedTrack === track.id); control.setAttribute('aria-label', `${track.name}，行调控`);
     const color = action('', 'song-row-color', () => { selectRow(track.id); colorRow(track.id); }); color.style.background = track.color ?? '#cbd3dc'; color.setAttribute('aria-label', `为${track.name}选择颜色`);
     const name = node('input', 'song-row-name'); name.value = track.name; name.maxLength = 32; name.readOnly = true; name.setAttribute('aria-label', `第${trackIndex + 1}行名称`);
-    name.title = '双击修改名称';
     name.addEventListener('click', () => { if (name.readOnly) { selectRow(track.id); viewport.focus({ preventScroll: true }); } });
     name.addEventListener('dblclick', event => { event.preventDefault(); event.stopPropagation(); finishGesture(false); activateRowName(name, track.id); });
     name.addEventListener('blur', () => {
@@ -867,7 +862,7 @@ export function mountSongWorkspace(root: HTMLElement, options: {
       updateInspector();
     });
     name.addEventListener('keydown', event => { if (event.key === 'Enter') { event.preventDefault(); name.blur(); viewport.focus(); } else if (event.key === 'Escape') { name.value = current.body?.tracks.find(item => item.id === track.id)?.name ?? track.name; name.blur(); viewport.focus(); } });
-    const remove = action('×', 'song-row-delete', () => deleteRow(track.id)); remove.setAttribute('aria-label', `删除${track.name}，连续点击两次`); remove.classList.toggle('is-armed', deleteArmed === track.id); remove.title = deleteArmed === track.id ? '再次点击删除这一行' : '连续点击两次删除';
+    const remove = action('×', 'song-row-delete', () => deleteRow(track.id)); remove.setAttribute('aria-label', `删除${track.name}，连续点击两次`); remove.classList.toggle('is-armed', deleteArmed === track.id);
     const solo = action('', 'song-row-mix-button song-row-solo', () => mutate(() => song.toggleTrackSolo(track.id)));
     solo.append(icon('solo')); solo.setAttribute('aria-label', `独奏${track.name}`); solo.setAttribute('aria-pressed', String(track.solo)); solo.classList.toggle('is-on', track.solo);
     const mute = action('', 'song-row-mix-button song-row-mute', () => mutate(() => song.toggleTrackMute(track.id)));
@@ -887,7 +882,7 @@ export function mountSongWorkspace(root: HTMLElement, options: {
     name.setAttribute('aria-label', `第${index + 1}行名称`);
     const color = control.querySelector<HTMLElement>('.song-row-color')!; color.style.background = track.color ?? '#cbd3dc'; color.setAttribute('aria-label', `为${track.name}选择颜色`);
     const remove = control.querySelector<HTMLElement>('.song-row-delete')!; remove.classList.toggle('is-armed', deleteArmed === track.id);
-    remove.setAttribute('aria-label', `删除${track.name}，连续点击两次`); remove.title = deleteArmed === track.id ? '再次点击删除这一行' : '连续点击两次删除';
+    remove.setAttribute('aria-label', `删除${track.name}，连续点击两次`);
     for (const [kind, enabled] of [['solo', track.solo], ['mute', track.muted]] as const) {
       const button = control.querySelector<HTMLElement>(`.song-row-${kind}`)!;
       button.classList.toggle('is-on', enabled); button.setAttribute('aria-pressed', String(enabled)); button.setAttribute('aria-label', `${kind === 'solo' ? '独奏' : '静默'}${track.name}`);
@@ -969,7 +964,6 @@ export function mountSongWorkspace(root: HTMLElement, options: {
       block.classList.toggle('is-selected', isSelected); block.setAttribute('aria-pressed', String(isSelected));
       if (created || refreshContent) {
         block.textContent = phraseById.get(clip.phraseId)?.name ?? '音乐';
-        block.title = `${block.textContent} · ${timeLabel(seconds)} · 音量 ${Math.round((clip.level ?? 1) * 100)}% · 声像 ${Math.round((clip.pan ?? track.pan) * 100)}`;
         const color = track.color ?? playlistPhraseColor(clip.phraseId);
         block.style.backgroundColor = color; block.style.color = playlistColorInk(color); block.style.borderLeftColor = color;
       }
@@ -1044,7 +1038,7 @@ export function mountSongWorkspace(root: HTMLElement, options: {
   }
   function popover(label: string, contents: HTMLElement, kind?: 'tempo' | 'volume'): HTMLElement {
     const wrapper = node('div', 'song-popover'); const button = action(kind ? '' : label, 'song-icon-button', () => {});
-    if (kind) button.append(icon(kind)); button.setAttribute('aria-label', label); button.title = label;
+    if (kind) button.append(icon(kind)); button.setAttribute('aria-label', label);
     contents.classList.add('song-popover-panel'); wrapper.append(button, contents); return wrapper;
   }
   function render(): void {
@@ -1052,7 +1046,6 @@ export function mountSongWorkspace(root: HTMLElement, options: {
     cancelAnimationFrame(viewFrame); viewFrame = 0; clipNodes.clear(); rowNodes.clear(); rowCache.clear(); gridNodes = []; createSongButton = undefined;
     const page = node('div', 'song-studio'); const top = node('header', 'song-topbar');
     const projectTitle = node('div', 'song-project-name', options.projectName?.() ?? current.draft?.name ?? '新项目');
-    projectTitle.title = '双击修改项目名称';
     projectTitle.addEventListener('dblclick', () => {
       if (exiting || projectTitle.querySelector('input')) return;
       const previous = projectTitle.textContent ?? ''; const input = node('input', 'song-project-name-input'); input.value = previous; input.maxLength = 80;

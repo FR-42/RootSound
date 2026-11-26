@@ -1,4 +1,4 @@
-import type { CardDwellTiming, PointerPanMode } from './pointer-gestures.ts';
+import type { CardDwellTiming } from './pointer-gestures.ts';
 
 export const ROUND_POINTER_DIAMETER = 25;
 
@@ -17,20 +17,16 @@ export function mountRoundPointer(root: HTMLElement): () => void {
   document.body.append(pointer);
   root.classList.add('has-round-pointer');
 
-  let followingPanOutside = false;
   let timing: CardDwellTiming | null = null;
   let frame = 0;
   function move(event: PointerEvent) {
     if (event.pointerType !== 'mouse') { hide(); return; }
-    followingPanOutside = false;
     pointer.hidden = false;
     pointer.style.translate = `${event.clientX}px ${event.clientY}px`;
   }
   function hide() {
     pointer.hidden = true;
     dwellReset();
-    pointer.style.setProperty('--pan-dot-x', '0px');
-    pointer.style.setProperty('--pan-dot-y', '0px');
   }
   function dwellReset() {
     cancelAnimationFrame(frame);
@@ -50,39 +46,21 @@ export function mountRoundPointer(root: HTMLElement): () => void {
     timing = (event as CustomEvent<CardDwellTiming | null>).detail;
     if (timing) { pointer.classList.add('is-counting'); tick(); }
   }
-  function pan(event: Event) {
-    const { x, y, clientX, clientY } = (event as CustomEvent<{ x: number; y: number; clientX: number; clientY: number }>).detail;
-    const magnitude = Math.hypot(x, y);
-    const offset = magnitude ? 3 + 5.5 * Math.sqrt(Math.min(1, magnitude)) : 0;
-    const scale = magnitude ? offset / magnitude : 0;
-    pointer.style.setProperty('--pan-dot-x', `${x * scale}px`);
-    pointer.style.setProperty('--pan-dot-y', `${y * scale}px`);
-    if (!magnitude) { if (followingPanOutside) hide(); followingPanOutside = false; return; }
-    if (pointer.hidden || followingPanOutside) {
-      const bound = (value: number, limit: number) => Math.max(11, Math.min(limit - 11, value));
-      followingPanOutside = true;
-      pointer.hidden = false;
-      pointer.style.translate = `${bound(clientX, window.innerWidth)}px ${bound(clientY, window.innerHeight)}px`;
-    }
+  function moveToLayer(event: Event) {
+    const layer = (event as CustomEvent<HTMLDialogElement | null>).detail;
+    (layer ?? document.body).append(pointer);
   }
-  const panMode = (event: Event) => {
-    const mode = (event as CustomEvent<PointerPanMode>).detail;
-    pointer.classList.toggle('has-pan-dot', mode !== 'off');
-    pointer.classList.toggle('is-pan-waiting', mode === 'waiting');
-  };
-  document.addEventListener('rootsound-pan', pan);
-  document.addEventListener('rootsound-pan-mode', panMode);
-  root.addEventListener('pointermove', move, true);
-  root.addEventListener('pointerleave', hide);
+  document.addEventListener('rootsound-round-pointer-layer', moveToLayer);
+  document.addEventListener('pointermove', move, true);
+  document.addEventListener('pointerleave', hide);
   document.addEventListener('rootsound-dwell', dwell);
   window.addEventListener('blur', hide);
   return () => {
-    document.removeEventListener('rootsound-pan', pan);
-    document.removeEventListener('rootsound-pan-mode', panMode);
     dwellReset();
-    root.removeEventListener('pointermove', move, true);
-    root.removeEventListener('pointerleave', hide);
+    document.removeEventListener('pointermove', move, true);
+    document.removeEventListener('pointerleave', hide);
     document.removeEventListener('rootsound-dwell', dwell);
+    document.removeEventListener('rootsound-round-pointer-layer', moveToLayer);
     window.removeEventListener('blur', hide);
     root.classList.remove('has-round-pointer');
     pointer.remove();

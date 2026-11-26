@@ -4,6 +4,35 @@ import { MAX_AUDIO_FILE_BYTES, MAX_SOUND_FILE_BYTES } from '../src/workstation/c
 import { createDesktopPlatform, isDesktopOrigin, type DesktopBridge } from '../src/workstation/app/platform/desktop.ts';
 import { createBrowserAudioFiles, createBrowserSoundFiles } from '../src/workstation/app/platform/browser-files.ts';
 
+test('large background writes yield between chunks and preserve Unicode at chunk boundaries', async () => {
+  const f = bridgeFixture();
+  f.bridge.storage.Read = () => JSON.stringify({ ok: true, value: 'before', scope: 'scope', revision: 'r1' });
+  let text = '', aborted = false, fail = false, ticks = 0;
+  f.bridge.asyncStorage = {
+    async StartWriteScopedIfUnchanged() { throw Error('large write must use chunks'); },
+    async ReadWriteResult() { return JSON.stringify({ ok: true, revision: 'r2' }); },
+    async BeginWriteChunks(scope, revision) { assert.equal(scope, 'scope'); assert.ok(['r1', 'r2'].includes(revision)); text = ''; return '{"ok":true}'; },
+    async AppendWriteChunk(value) {
+      assert.ok(value.length <= 512 * 1024);
+      assert.ok(!/[\uD800-\uDBFF]$/u.test(value));
+      if (fail) return '{"ok":false,"error":"传输失败"}';
+      text += value; return '{"ok":true}';
+    },
+    async CommitWriteChunks() { return '{"ok":true,"pending":true}'; },
+    async AbortWriteChunks() { aborted = true; return '{"ok":true}'; },
+  };
+  const storage = createDesktopPlatform(f.bridge).storage;
+  assert.equal(storage.read(), 'before');
+  const payload = 'a'.repeat(512 * 1024 - 1) + '🎵' + 'b'.repeat(600_000);
+  const timer = setInterval(() => { ticks++; }, 0);
+  try { await storage.writeIfUnchangedAsync!(payload, 'before'); } finally { clearInterval(timer); }
+  assert.equal(text, payload);
+  assert.ok(ticks >= 2);
+  fail = true;
+  await assert.rejects(storage.writeIfUnchangedAsync!(payload, payload), /传输失败/);
+  assert.equal(aborted, true);
+});
+
 function bridgeFixture() {
   let stored: string | null = null;
   let opened: unknown = { status: 'opened', name: '夜雨.rssound', text: '{"name":"夜雨"}' };
@@ -51,6 +80,21 @@ test('desktop library reads and writes preserve the actual saved Chinese text', 
   storage.write('{"name":"窗边的第一声"}');
   assert.deepEqual(fixture.writes, ['{"name":"窗边的第一声"}']);
   assert.equal(storage.read(), '{"name":"窗边的第一声"}');
+});
+
+test('asynchronous startup read retains the native revision and project scope for the first write', async () => {
+  const { bridge } = bridgeFixture();
+  bridge.readInitialStorage = async () => JSON.stringify({ ok: true, value: 'old', scope: 'project', revision: 'r1' });
+  bridge.storage.Read = () => { throw new Error('startup must not use the synchronous bridge'); };
+  bridge.storage.WriteScopedIfUnchanged = (value, scope, revision) => {
+    assert.deepEqual([value, scope, revision], ['new', 'project', 'r1']);
+    return JSON.stringify({ ok: true, revision: 'r2' });
+  };
+  const { storage } = createDesktopPlatform(bridge);
+  assert.equal(await storage.readInitial!(), 'old');
+  storage.writeIfUnchanged!('new', 'old');
+  bridge.readInitialStorage = async () => JSON.stringify({ ok: true, value: 'other', scope: 'different' });
+  await assert.rejects(storage.readInitial!(), /项目已切换/);
 });
 
 test('native storage failures and invalid responses cannot appear as an empty library or successful save', () => {

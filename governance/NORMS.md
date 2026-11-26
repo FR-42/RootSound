@@ -138,11 +138,13 @@ user's actual instructions.
   The user lifted this deferral on 2026-11-05 and requested syncing all four
   worktrees. Preserve branch names and edits; fast-forward clean branches where possible.
 
-## N18 · Do not add unsolicited annotations — ACTIVE
+## N18 · Add annotations only when explicitly requested — ACTIVE
 
-- Do not add code comments or explanatory UI annotations/tooltips on your own.
+- Do not add any annotations unless the user explicitly requests them. This includes
+  code comments, explanatory text in the desktop app and website, and hover tooltips.
   The user specifically requested removal of the note-group drag tooltip.
 - Origin: user's explicit instruction, 2026-11-05: “把你写的注释给删掉……以后不要写注释”.
+- Reaffirmed by the user on 2026-11-19: “没有特殊要求，不得加任何注释”.
 - Update, 2026-11-08: a behavior change does not authorize changing existing user-facing wording.
   Keep guide prompts and other user-authored copy verbatim unless the user requests a text change.
 
@@ -169,3 +171,8 @@ user's actual instructions.
 - Organize views and controls within the workspace. RootSound prohibits
   expandable pop-up windows and expandable bars in future designs and revisions.
 - Origin: user's explicit instruction, 2026-11-16.
+
+## N22 · Default selection and focus must never show a black outline — ACTIVE
+
+- This applies to all controls and editable objects, including after a mouse selection followed by keyboard input.
+- Origin: user's explicit instruction, 2026-11-20.

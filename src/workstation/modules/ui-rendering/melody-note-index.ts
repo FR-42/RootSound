@@ -108,6 +108,7 @@ export function createMelodyNoteIndex(body: PhraseBody, parts: readonly PhrasePa
       if (previous.length !== found.length || found.some((item, index) => item !== previous[index])) previous = found;
       return previous;
     },
+    nearbyStarts(start: number, end: number): IndexedMelodyNote[] { return scan(start, end, true); },
     visible(start: number, end: number): IndexedMelodyNote[] { return scan(start, end, false); },
   };
 }

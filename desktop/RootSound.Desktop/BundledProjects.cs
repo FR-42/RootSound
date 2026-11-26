@@ -5,6 +5,19 @@ namespace RootSound.Desktop;
 
 internal static class BundledProjects
 {
+    internal static int SeedForInstallation(string source, string dataRoot)
+    {
+        if (File.Exists(Path.Combine(dataRoot, ".skip-bundled-projects")) ||
+            File.Exists(Path.Combine(dataRoot, ".bundled-projects.json"))) return 0;
+        string library = Path.Combine(dataRoot, "project");
+        FileAttributes? attributes = null;
+        try { attributes = File.GetAttributes(library); }
+        catch (FileNotFoundException) { }
+        catch (DirectoryNotFoundException) { }
+        if (attributes.HasValue) return 0;
+        return Seed(source, dataRoot);
+    }
+
     internal static int Seed(string source, string dataRoot)
     {
         string manifest = Path.Combine(source, "manifest.json");

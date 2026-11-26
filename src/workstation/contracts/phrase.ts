@@ -30,6 +30,7 @@ export type PhraseNote = {
   velocity: number;
   /** Per-note output gain; omitted older notes use unity gain. */
   level?: number;
+  gainDb?: number;
   /** Per-note stereo position; omitted older notes are centered. */
   pan?: number;
   /** Source ordering at simultaneous MIDI keys/pedals; ordinary edits need no order. */
@@ -56,6 +57,7 @@ export type PhraseBody = {
   version: 1;
   timeUnit: 'beat';
   tempoBpm: number;
+  gridOffsetBeats?: number;
   /** Additional sequential BPM rolls; the first roll starts at beat0/tempoBpm. */
   tempoSections?: {
     id: string; startBeat: number; tempoBpm: number; stepsPerBeat?: number;
@@ -109,11 +111,12 @@ export interface PhraseEditorPort {
   open(contentId: string): void;
   openDraft(draftId: string): void;
   rename(name: string): void;
-  setTempo(tempoBpm: number, options?: { preserveNoteDurations?: boolean }): void;
+  setTempo(tempoBpm: number, options?: { preserveNoteDurations?: boolean; preserveTimeline?: boolean }): void;
   setMeter(beatsPerBar: number, beatUnit: number): void;
   addTempoSection(): string;
   removeTempoSection(id: string): void;
-  setTempoSection(id: string, tempoBpm: number): void;
+  setTempoSection(id: string, tempoBpm: number, options?: { preserveTimeline?: boolean }): void;
+  setTempoGridOffset(id: string | undefined, offsetBeats: number): void;
   /** Change one roll's grid, retaining all note timing and other rolls' resolutions. */
   setTempoSectionSteps(id: string | undefined, stepsPerBeat: number): void;
   previewTempoSectionStart(id: string, startBeat: number, gridOnlyBase?: PhraseBody): PhraseBody;
@@ -124,6 +127,7 @@ export interface PhraseEditorPort {
   setStepsPerBeat(stepsPerBeat: number): void;
   setMasterLevel(level: number): void;
   setLength(lengthBeats: number): void;
+  readonly autoRollLength?: boolean;
   addPart(timbreId: string, section?: PhraseSection): string;
   setPartTimbre(partId: string, timbreId: string): void;
   setPartMix(partId: string, changes: { level?: number; pan?: number }): void;
@@ -141,7 +145,7 @@ export interface PhraseEditorPort {
   /** Each bulk operation validates and persists once, with one undo step. */
   addNotes(partId: string, inputs: Array<Omit<PhraseNote, 'id'>>): string[];
   updateNote(partId: string, noteId: string, changes: Partial<Omit<PhraseNote, 'id'>>): void;
-  updateNotes(updates: PhraseNoteUpdate[]): void;
+  updateNotes(updates: PhraseNoteUpdate[], removals?: PhraseNoteRef[]): void;
   /** Transfer a note to another tone within its section, preserving its identity. */
   moveNote(partId: string, noteId: string, targetPartId: string, changes?: Partial<Omit<PhraseNote, 'id'>>): void;
   removeNote(partId: string, noteId: string): void;
@@ -151,6 +155,7 @@ export interface PhraseEditorPort {
   prepareNoteAudition?(partId: string, pitches: readonly number[]): Promise<void>;
   editDraftNote?(draftId: string, partId: string, edit: { kind: 'add'; note: PhraseNote }
     | { kind: 'duration'; id: string; durationBeats: number; durationSeconds?: number }
+    | { kind: 'gain'; id: string; gainDb?: number }
     | { kind: 'remove'; id: string }): { draft: Draft; body: PhraseBody };
   editDraftParts?(draftId: string, edit: PhraseDraftPartEdit): string | undefined;
   setNoteWritesDeferred?(deferred: boolean): void;

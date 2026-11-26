@@ -131,7 +131,6 @@ export function mountSynthWorkspace(root: HTMLElement, options: Options) {
   const typingKeys = ['KeyA', 'KeyW', 'KeyS', 'KeyE', 'KeyD', 'KeyF', 'KeyT', 'KeyG', 'KeyY', 'KeyH', 'KeyU', 'KeyJ', 'KeyK'];
   names.forEach((label, index) => {
     const key = button(`${label}${index === 12 ? 5 : 4}`, label.includes('♯') ? 'synth-key is-black' : 'synth-key', () => { frequency = 261.625565 * 2 ** (index / 12); void audition(); });
-    key.title = `键盘 ${typingKeys[index]!.slice(3)}`;
     const blackPosition = new Map([[1, 1], [3, 2], [6, 4], [8, 5], [10, 6]]).get(index);
     if (blackPosition !== undefined) key.style.left = `${blackPosition / 8 * 100}%`;
     keyboard.append(key);
@@ -186,7 +185,7 @@ export function mountSynthWorkspace(root: HTMLElement, options: Options) {
       const row = node('article', 'synth-source'); const head = node('header'); const on = node('input'); on.type = 'checkbox'; on.setAttribute('aria-label', `启用声源 ${i + 1}`);
       const wave = node('select'); wave.setAttribute('aria-label', `声源 ${i + 1} 波形`);
       waves.forEach(([id, label]) => { const option = node('option', '', label); option.value = id; wave.append(option); });
-      const remove = button('×', 'quiet', () => mutate(value => { value.sources.splice(i, 1); })); remove.title = '移除声源'; remove.setAttribute('aria-label', `移除声源 ${i + 1}`); remove.disabled = current.sources.length === 1;
+      const remove = button('×', 'quiet', () => mutate(value => { value.sources.splice(i, 1); })); remove.setAttribute('aria-label', `移除声源 ${i + 1}`); remove.disabled = current.sources.length === 1;
       head.append(on, node('span', 'synth-source-number', String(i + 1)), wave, remove); row.append(head);
       range(row, `声源 ${i + 1} 音量`, 0, 1, .01, value => value.sources[i]!.level, (value, n) => { value.sources[i]!.level = n; }, percent, false, sourceBindings);
       const tuning = node('details', 'synth-tuning'); tuning.append(node('summary', '', '音高与微调'));

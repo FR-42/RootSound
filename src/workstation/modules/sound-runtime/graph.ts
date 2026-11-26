@@ -20,7 +20,7 @@ type GraphStart =
   | { kind: 'noise'; node: AudioBufferSourceNode; gain: GainNode; atSeconds: number; duration: number; level: number }
   | { kind: 'sample'; node: AudioBufferSourceNode; atSeconds: number; duration: number; plan: Extract<ScheduledSound, { kind: 'sample' }>; pitchCurve?: ScheduledPitch };
 export interface SoundGraph {
-  readonly envelopes: { atSeconds: number; duration: number; plan: ScheduledSound; node: GainNode; automation?: { node: GainNode; points: readonly SoundGainPoint[] } }[];
+  readonly envelopes: { atSeconds: number; duration: number; plan: ScheduledSound; node: GainNode; noteGain: number; automation?: { node: GainNode; points: readonly SoundGainPoint[] } }[];
   readonly starts: GraphStart[];
   readonly pans: { atSeconds: number; node: StereoPannerNode; pan: number }[];
   readonly output?: { node: GainNode; preview: ScheduledPreview };
@@ -48,7 +48,7 @@ export function releaseScheduledNotes(graph: SoundGraph, starts: ReadonlyMap<Aud
     }
   }
   let end = now;
-  for (const { atSeconds, node, plan, duration } of graph.envelopes) {
+  for (const { atSeconds, node, plan, noteGain, duration } of graph.envelopes) {
     const age = now - origin - atSeconds;
     if (!soundingOnsets.has(atSeconds) || age <= 0 || age >= duration) continue;
     let tail = duration - age;
@@ -58,7 +58,7 @@ export function releaseScheduledNotes(graph: SoundGraph, starts: ReadonlyMap<Aud
       else {
         const level = plan.kind === 'sample' && plan.envelopeBaked ? 1 : envelopeValue(plan.envelope, plan.note.holdSeconds, age);
         node.gain.cancelScheduledValues(now);
-        node.gain.setValueAtTime(level * noteAmplitude(plan) * normalization, now);
+        node.gain.setValueAtTime(level * noteAmplitude(plan) * normalization * noteGain, now);
       }
       node.gain.linearRampToValueAtTime(0, now + tail);
     }
@@ -157,7 +157,7 @@ export function allocateGraph(audio: BaseAudioContext, preview: ScheduledPreview
     const envelope = audio.createGain();
     resources.gains.push(envelope);
     const automation = event.gainCurve ? { node: audio.createGain(), points: event.gainCurve } : undefined;
-    graph.envelopes.push({ atSeconds: event.atSeconds, duration: event.duration, plan, node: envelope, ...(automation ? { automation } : {}) });
+    graph.envelopes.push({ atSeconds: event.atSeconds, duration: event.duration, plan, node: envelope, noteGain: event.noteGain ?? 1, ...(automation ? { automation } : {}) });
     // Use the same equal-power path at center and on either side. Bypassing the
     // panner only for zero would make its level jump as a slider crosses center.
     const panner = audio.createStereoPanner();
@@ -215,15 +215,14 @@ export function allocateGraph(audio: BaseAudioContext, preview: ScheduledPreview
 
 
 
-export function scheduleGraph(graph: SoundGraph, normalization: number, start: number, fromSeconds = 0, transitionSeconds = 0): void {
-  if (graph.output) scheduleOutput(graph.output.node.gain, graph.output.preview, start, fromSeconds);
+export function scheduleEnvelopes(graph: SoundGraph, normalization: number, start: number, fromSeconds = 0, transitionSeconds = 0): void {
   for (const scheduled of graph.envelopes) {
     const plan = scheduled.plan;
     const envelope = scheduled.node;
     const noteStart = start + scheduled.atSeconds;
     const release = noteStart + plan.note.holdSeconds;
     const end = release + plan.envelope.releaseSeconds;
-    const amplitude = noteAmplitude(plan) * normalization;
+    const amplitude = noteAmplitude(plan) * normalization * scheduled.noteGain;
     if (scheduled.automation) {
       const { node, points } = scheduled.automation;
       const from = Math.max(scheduled.atSeconds, fromSeconds);
@@ -296,6 +295,11 @@ export function scheduleGraph(graph: SoundGraph, normalization: number, start: n
     if (plan.envelope.releaseSeconds === 0) envelope.gain.setValueAtTime(0, release);
     else envelope.gain.linearRampToValueAtTime(0, end);
   }
+}
+
+export function scheduleGraph(graph: SoundGraph, normalization: number, start: number, fromSeconds = 0, transitionSeconds = 0): void {
+  if (graph.output) scheduleOutput(graph.output.node.gain, graph.output.preview, start, fromSeconds);
+  scheduleEnvelopes(graph, normalization, start, fromSeconds, transitionSeconds);
   for (const scheduled of graph.starts) {
     const time = start + Math.max(scheduled.atSeconds, fromSeconds);
     if (scheduled.kind !== 'noise' && scheduled.pitchCurve) {

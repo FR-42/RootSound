@@ -19,6 +19,7 @@ export function createPlaylistTransport(options: {
   pause(): void;
   stop(allowScheduledTail?: boolean): void;
   setRate(rate: number): void;
+  setNoteGain(noteId: string, gainDb: number): void;
   setNotesDeleted(ids: readonly string[], deleted: boolean): void;
   setSoloGroup(groupId?: string): void;
   seek(seconds: number): Promise<void>;
@@ -33,6 +34,7 @@ export function createPlaylistTransport(options: {
   let soloGroupId: string | undefined;
   let generation = 0; let editGeneration = 0; let disposed = false; let pendingDevice = false;
   const pendingNoteChanges = new Map<string, boolean>();
+  const pendingNoteGains = new Map<string, number>();
 
   function positionAt(elapsed: number): number {
     return Math.min(duration, Math.max(0, anchorPosition + Math.max(0, elapsed - anchorElapsed) * rate));
@@ -72,7 +74,7 @@ export function createPlaylistTransport(options: {
   function pause(): void {
     if (disposed) return;
     generation++; editGeneration++;
-    pendingNoteChanges.clear();
+    pendingNoteChanges.clear(); pendingNoteGains.clear();
     cursor = position();
     if (preparing) {
       preparing = false;
@@ -92,7 +94,7 @@ export function createPlaylistTransport(options: {
     if (disposed) return;
     generation++; editGeneration++;
     const cancelDevice = pendingDevice;
-    pendingNoteChanges.clear();
+    pendingNoteChanges.clear(); pendingNoteGains.clear();
     stopTail();
     if (allowScheduledTail && playing) tailId = id;
     pendingDevice = false; playing = false; preparing = false;
@@ -130,6 +132,7 @@ export function createPlaylistTransport(options: {
         if (removed.length) runtime.setNotesDeleted?.(session.id, removed, true);
         if (restored.length) runtime.setNotesDeleted?.(session.id, restored, false);
       }
+      if (playing) for (const [noteId, gainDb] of pendingNoteGains) runtime.setNoteGain?.(session.id, noteId, gainDb);
       const currentElapsed = runtime.position(session.id) ?? previousElapsed;
       cursor = Math.min(duration, requestedPosition + Math.max(0, currentElapsed - previousElapsed) * plan.transport!.rate);
       anchorPosition = cursor; anchorElapsed = currentElapsed;
@@ -138,8 +141,13 @@ export function createPlaylistTransport(options: {
     } catch (error) {
       if (!disposed && request === generation) { pendingDevice = false; playing = false; options.onError(error); }
     } finally {
-      if (!disposed && request === generation) { pendingNoteChanges.clear(); preparing = false; changed(); }
+      if (!disposed && request === generation) { pendingNoteChanges.clear(); pendingNoteGains.clear(); preparing = false; changed(); }
     }
+  }
+  function setNoteGain(noteId: string, gainDb: number): void {
+    if (disposed || !runtime.setNoteGain) return;
+    if (pendingDevice) pendingNoteGains.set(noteId, gainDb);
+    else if (playing && id) runtime.setNoteGain(id, noteId, gainDb);
   }
   function setNotesDeleted(ids: readonly string[], deleted: boolean): void {
     if (disposed || !runtime.setNotesDeleted) return;
@@ -172,7 +180,7 @@ export function createPlaylistTransport(options: {
     if (disposed || !Number.isFinite(seconds)) return Promise.resolve();
     const continuePlaying = playing || preparing;
     generation++; editGeneration++;
-    pendingNoteChanges.clear();
+    pendingNoteChanges.clear(); pendingNoteGains.clear();
     if (pendingDevice) { pendingDevice = false; runtime.stopAll(); }
     preparing = false; playing = false; forget(true); stopTail();
     // A paused head can be placed beyond the previously played extent; edits
@@ -205,13 +213,13 @@ export function createPlaylistTransport(options: {
     if (disposed || event.type !== 'session' || event.session.id !== id || event.session.status === 'playing') return;
     if (event.session.status === 'paused') { cursor = position(); playing = false; changed(); return; }
     cursor = event.session.status === 'ended' ? 0 : position();
-    playing = false; preparing = false; pendingDevice = false; generation++; editGeneration++; pendingNoteChanges.clear(); forget(false);
+    playing = false; preparing = false; pendingDevice = false; generation++; editGeneration++; pendingNoteChanges.clear(); pendingNoteGains.clear(); forget(false);
     if (event.session.status === 'failed') options.onError(new Error(event.session.error ?? '播放未能完成。'));
     changed();
   });
-  return { toggle, pause, stop, setRate, setNotesDeleted, setSoloGroup, seek, position, refresh, dispose() {
+  return { toggle, pause, stop, setRate, setNoteGain, setNotesDeleted, setSoloGroup, seek, position, refresh, dispose() {
     if (disposed) return;
-    disposed = true; generation++; editGeneration++; unsubscribe(); pendingNoteChanges.clear();
+    disposed = true; generation++; editGeneration++; unsubscribe(); pendingNoteChanges.clear(); pendingNoteGains.clear();
     if (pendingDevice) runtime.stopAll();
     forget(true); stopTail(); playing = false; preparing = false;
   } };

@@ -1,4 +1,6 @@
-import { allocateGraph, createWindowedSampleCache, releaseGraph, releaseScheduledNotes, scheduleGraph, startGraphSource, type GraphResources, type SoundGraph } from './graph.ts';
+import { allocateGraph, createWindowedSampleCache, releaseGraph, releaseScheduledNotes, scheduleEnvelopes, scheduleGraph, startGraphSource, type GraphResources, type SoundGraph } from './graph.ts';
+import { dbAmplitude } from '../../contracts/gain-curve.ts';
+import { MAX_NOTE_GAIN_DB, MIN_NOTE_GAIN_DB } from '../../contracts/phrase-limits.ts';
 import type { ScheduledPreview } from './plan.ts';
 
 /** Device-clock lookahead; the timer only replenishes it, never supplies note timing. */
@@ -23,6 +25,7 @@ export class WindowedGraph {
   readonly #live = new Map<number, LiveEvent>();
   readonly #noteIndices = new Map<string, number[]>();
   readonly #restored = new Set<number>();
+  readonly #noteGains = new Map<string, number>();
   #cursor = 0;
   #origin = 0;
   #from = 0;
@@ -100,7 +103,8 @@ export class WindowedGraph {
     let remaining = event.sound.kind === 'sample' ? 1 : event.sound.sources.length;
     try {
       if (event.sound.kind === 'sample') this.#sampleCache.retain(event.sound.source);
-      const graph = allocateGraph(this.#audio, { ...this.#preview, output: undefined, events: [event] }, resources, () => {
+      const noteGain = event.noteId === undefined ? undefined : this.#noteGains.get(event.noteId);
+      const graph = allocateGraph(this.#audio, { ...this.#preview, output: undefined, events: [noteGain === undefined ? event : { ...event, noteGain }] }, resources, () => {
         if (--remaining === 0 && live) this.#release(live);
       }, this.graph.output?.node ?? this.fade, this.graph.groups);
       live = { index, resources, graph, end, starts: new Map() };
@@ -110,6 +114,26 @@ export class WindowedGraph {
       if (live) this.#release(live);
       else releaseGraph(resources);
       throw error;
+    }
+  }
+
+  setNoteGain(id: string, gainDb: number): void {
+    const indices = this.#noteIndices.get(id);
+    if (!indices || this.#disposed || !Number.isFinite(gainDb) || gainDb < MIN_NOTE_GAIN_DB || gainDb > MAX_NOTE_GAIN_DB) return;
+    const now = this.#audio.currentTime;
+    const gain = dbAmplitude(gainDb);
+    this.#noteGains.set(id, gain);
+    for (const index of indices) {
+      const live = this.#live.get(index);
+      if (!live || this.#origin + this.#events[index]!.atSeconds <= now) continue;
+      for (const envelope of live.graph.envelopes) {
+        envelope.noteGain = gain;
+        if (live.starts.size) {
+          envelope.node.gain.cancelScheduledValues(now);
+          envelope.automation?.node.gain.cancelScheduledValues(now);
+        }
+      }
+      if (live.starts.size) scheduleEnvelopes(live.graph, this.#preview.normalization, this.#origin);
     }
   }
 

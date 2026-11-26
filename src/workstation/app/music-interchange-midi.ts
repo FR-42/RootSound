@@ -1,5 +1,6 @@
 import { parseMidi as parseRawMidi, writeMidi, type MidiEvent } from 'midi-file';
-import { isSupportedMeter } from '../contracts/phrase-time.ts';
+import type { PhraseBody } from '../contracts/phrase.ts';
+import { isSupportedMeter, phraseBeatSeconds } from '../contracts/phrase-time.ts';
 import { parseMidi } from '../modules/midi-import/public.ts';
 import type { ExchangeScore } from './music-interchange-model.ts';
 import type { MidiExpressionLane } from '../contracts/midi-expression.ts';
@@ -91,15 +92,20 @@ function wrapMidi(output: Uint8Array, source?: Uint8Array): Uint8Array {
 /** Patch ordinary note/tempo edits into original tracks, leaving every other event intact. */
 export function createMidiPatcher(source: Uint8Array, baseline: ExchangeScore) {
   const original = parseRawMidi(unwrapMidi(source)), decoded = readExchangeMidi(source, baseline.name).score;
+  const clock: PhraseBody | undefined = baseline.tempos.length === 1 && decoded.tempos.length > 1 ? {
+    model: 'note-phrase', version: 1, timeUnit: 'beat', tempoBpm: decoded.tempos[0]!.bpm, lengthBeats: decoded.length, parts: [],
+    tempoSections: decoded.tempos.slice(1).map(({ beat, bpm }, index) => ({ id: String(index), startBeat: beat, tempoBpm: bpm })),
+  } : undefined;
+  const editorBeat = (beat: number) => clock ? phraseBeatSeconds(clock, beat) * baseline.tempos[0]!.bpm / 60 : beat;
   const aligned = decoded.parts.length === baseline.parts.length && baseline.parts.every((part,index) => {
     const from=decoded.parts[index]!;
     return part.program===from.program&&part.drum===from.drum&&part.notes.length===from.notes.length
-      &&part.notes.every((note,i)=>Math.abs(note.beat-from.notes[i]!.beat)<1e-7
+      &&part.notes.every((note,i)=>Math.abs(note.beat-editorBeat(from.notes[i]!.beat))<1e-7
         &&Math.abs(note.pitch-(part.drum??from.notes[i]!.pitch))<.001);
   });
   if(!aligned)return()=>undefined;
-  const ppq = Math.max(original.header.ticksPerBeat!,9600), scale = ppq / original.header.ticksPerBeat!;
-  const tracks = original.tracks.map(track => { let tick=0; return track.map(item=>{tick+=item.deltaTime;return {tick:Math.round(tick*scale),order:0,event:{...item,deltaTime:0}} as TimedEvent;}); });
+  const sourcePpq = original.header.ticksPerBeat!, ppq = Math.max(sourcePpq, 9600);
+  const tracks = original.tracks.map(track => { let tick=0; return track.map(item=>{tick+=item.deltaTime;return {tick:Math.round(editorBeat(tick / sourcePpq) * ppq),order:0,event:{...item,deltaTime:0}} as TimedEvent;}); });
   let eventOrder=0;
   for(const item of tracks.flatMap((items,track)=>items.map(item=>({item,track}))).sort((a,b)=>a.item.tick-b.item.tick||a.track-b.track))
     if('channel' in item.item.event||item.item.event.type==='setTempo'||item.item.event.type==='timeSignature')item.item.order=++eventOrder;

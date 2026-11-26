@@ -92,6 +92,7 @@ try {
         if (!(Test-Path -LiteralPath (Join-Path $location 'RootSound.exe'))) { throw "A protected directory was modified: $location" }
     }
     if ((Get-Content -LiteralPath $song) -ne 'fixture music') { throw 'The existing project was modified.' }
+    if (!(Test-Path -LiteralPath (Join-Path $install '.skip-bundled-projects'))) { throw 'The upgraded installation did not disable demo import.' }
     if ((Get-Content -LiteralPath $legacyUserSong) -ne 'user music outside project') { throw 'A user song in the old program folder was lost.' }
     if ((Get-Content -LiteralPath $nestedSong) -ne 'nested midi') { throw 'A nested user song was lost.' }
     if (!(Test-Path -LiteralPath (Join-Path $withProjects '自己建的空目录'))) { throw 'A user-created empty folder was removed.' }

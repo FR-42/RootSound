@@ -3,7 +3,9 @@ import { melodyScale, melodySeconds } from './melody-geometry.ts';
 import { phrasePitchRow } from './phrase-viewport.ts';
 
 const COLORS = ['#4388d8', '#e47749', '#31ad8b', '#9a68d5', '#dfa62d', '#329db8', '#d4649c', '#88ad37'];
-const WINDOWS_COLORS = ['#5776b6', '#9f536d', '#41836a', '#9868bf', '#ac7d34', '#468490', '#b15c92', '#c76a45'];
+const ROLL_COLORS = ['#70B67E', '#EE8E71', '#A88CDF', '#D6A441', '#3FAFA2', '#DA80AA', '#D86576', '#91AF4F'];
+const PIANO_COLOR = '#56A8E6';
+const isGrandPiano = (id: string) => /^rootsound[.]instrument[.]studio-piano[.]v3(?::|$)/u.test(id);
 const orderedKeyboard = (keys: readonly KeyboardPitch[]) => [...keys].sort((left, right) => right.frequencyHz - left.frequencyHz);
 const positive = (value: number | undefined, fallback: number) => Number.isFinite(value) && value! > 0 ? value! : fallback;
 const nonnegative = (value: number) => Number.isFinite(value) ? Math.max(0, value) : 0;
@@ -17,13 +19,19 @@ function toneColorIndex(timbreId: string): number {
 /** A tone keeps its visual identity across sections, reopening and part order changes. */
 export function toneColor(timbreId: string): string { return COLORS[toneColorIndex(timbreId)]!; }
 
-export function windowsToneColor(timbreId: string): string { return WINDOWS_COLORS[toneColorIndex(timbreId)]!; }
+export function rollToneColor(timbreId: string): string {
+  return isGrandPiano(timbreId) ? PIANO_COLOR : ROLL_COLORS[toneColorIndex(timbreId)]!;
+}
 
 /** One phrase-wide palette, deterministic across departments, reopening and part order. */
-export function buildPhraseToneColors(timbreIds: Iterable<string>, windowsPalette = false): Map<string, string> {
-  const palette = windowsPalette ? WINDOWS_COLORS : COLORS;
+export function buildPhraseToneColors(timbreIds: Iterable<string>, rollPalette = false): Map<string, string> {
+  const palette = rollPalette ? ROLL_COLORS : COLORS;
   const result = new Map<string, string>(); const used = new Set<number>();
   for (const id of [...new Set(timbreIds)].sort()) {
+    if (rollPalette && isGrandPiano(id)) {
+      result.set(id, PIANO_COLOR);
+      continue;
+    }
     let index = toneColorIndex(id);
     while (used.size < palette.length && used.has(index)) index = (index + 1) % palette.length;
     used.add(index); result.set(id, palette[index]!);

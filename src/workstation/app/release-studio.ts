@@ -1,4 +1,4 @@
-import { createMaterialLibrary } from '../modules/materials/public.ts';
+import { createMaterialLibrary, openLargeMaterialLibrary } from '../modules/materials/public.ts';
 import { createBrowserSoundRuntime } from '../modules/sound-runtime/public.ts';
 import { createTimbrePlayback, createTimbreReferenceAdapter, createSpectralAudio } from '../modules/timbre/public.ts';
 import { createSampleBankAudio } from '../modules/timbre/sample-bank.ts';
@@ -15,21 +15,46 @@ import { createLearningSettings } from './platform/learning-settings.ts';
 import { createMusicWorkspaceState } from './platform/music-workspace-state.ts';
 import { createProjectSetup, projectName } from './project-setup.ts';
 import { openMusicDocument, commitMusicDocument } from './music-document.ts';
+import { saveMusicDocument } from './music-save.ts';
 import { prepareProjectMelodyTimbres, listProjectTimbres, addProjectPhraseTimbre, createProjectPhraseNoteGroup, changeProjectPhraseNoteGroupTimbre,
   removeProjectTimbre, reorderProjectTimbres, requiresTimbreDeleteConfirmation } from './project-timbres.ts';
 import { readTimbreImport } from './timbre-file-import.ts';
 import { importProjectTimbre } from './project-timbre-import.ts';
 import { createProjectClosePreparation } from './project-close.ts';
 import { stageMaterialStorage } from './material-library-session.ts';
-import { normalizeImportedTimbreNames } from './curated-timbre-names.ts';
+import { mayHaveLegacyTimbreNames, normalizeImportedTimbreNames, normalizeProjectToneCards } from './curated-timbre-names.ts';
+import { studioInstrumentCatalogVersion } from '../modules/timbre/instrument-catalog.ts';
 
 export interface ReleasePlatform {
   storage: MaterialStorage;
   projectDirectories?: ProjectDirectoriesPort;
   pointerUx?: boolean;
+  pointerMounted?: boolean;
+  humPitch?: boolean;
   demoProject?: { id: string; name: string; format?: never; mobileWeb?: boolean };
   timbreFiles: TimbreFilesPort;
   samplePayloads?: SamplePayloadPort;
+}
+
+async function prepareOpeningLibrary(text: string, name: string, strictNames: boolean): Promise<string> {
+  const legacyNames = !strictNames && mayHaveLegacyTimbreNames(text);
+  const normalize = () => strictNames ? normalizeProjectToneCards(text) : legacyNames ? normalizeImportedTimbreNames(text) : text;
+  if (text.length < 1_000_000 || typeof Worker !== 'function') return normalize();
+  const seedCatalog = !text.includes('"timbreCatalogVersion":' + studioInstrumentCatalogVersion);
+  if (!strictNames && !legacyNames && !seedCatalog) return text;
+  try {
+    const worker = new Worker(new URL('./release-project-worker.ts', import.meta.url), { type: 'module' });
+    try {
+      const prepared = await new Promise<string | undefined>(resolve => {
+        worker.onmessage = ({ data }) => resolve(data?.unchanged === true ? text : typeof data?.text === 'string' ? data.text : undefined);
+        worker.onerror = () => resolve(undefined);
+        worker.onmessageerror = () => resolve(undefined);
+        worker.postMessage({ text, name, legacyNames, strictNames, seedCatalog });
+      });
+      if (prepared !== undefined) return prepared;
+    } finally { worker.terminate(); }
+  } catch { }
+  return normalize();
 }
 
 export async function mountReleaseStudio(root: HTMLElement, platform: ReleasePlatform, navigate?: () => void) {
@@ -37,20 +62,28 @@ export async function mountReleaseStudio(root: HTMLElement, platform: ReleasePla
   try {
     const state = await directories?.read();
     const current = state?.current ?? platform.demoProject;
-    const staged = current ? stageMaterialStorage(platform.storage, normalizeImportedTimbreNames) : undefined;
-    const library = createMaterialLibrary(staged?.storage, { project: { rootKind: 'rootsound.song',
-      adapters: [createTimbreReferenceAdapter(), createPhraseReferenceAdapter(), createSongReferenceAdapter(), createSampleReferenceAdapter()] } });
+    const staged = current ? stageMaterialStorage(platform.storage, undefined, await platform.storage.readInitial?.()) : undefined;
+    const raw = staged?.storage.read();
+    if (staged && current && raw != null) {
+      const prepared = await prepareOpeningLibrary(raw, current.name, document.documentElement.classList.contains('windows-desktop-colors'));
+      if (prepared !== raw) staged.storage.write(prepared);
+    }
+    const libraryOptions = { project: { rootKind: 'rootsound.song',
+      adapters: [createTimbreReferenceAdapter(), createPhraseReferenceAdapter(), createSongReferenceAdapter(), createSampleReferenceAdapter()] } };
+    const library = staged && raw && raw.length >= 1_000_000
+      ? await openLargeMaterialLibrary(staged.storage, libraryOptions)
+      : createMaterialLibrary(staged?.storage, libraryOptions);
     const sampleAudio = createSampleAudio(library, createBrowserSampleDecoder(), platform.samplePayloads);
     const bank = createSampleBankAudio(library, sampleAudio), spectral = createSpectralAudio();
     const tones = createTimbrePlayback(library, sampleAudio, spectral, bank);
-    const phrase = createPhraseEditor(library, tones);
+    const phrase = createPhraseEditor(library, tones, { autoRollLength: !!directories });
     // The song adapter is retained solely as the .rootsound compatibility boundary.
     // The former arrangement UI and its workspace are not mounted or imported.
     const song = createSongEditor(library, createPhrasePlayback(library, tones), { defaultTempoMode: 'source', initialTrackCount: 1 });
     const songId = current && openMusicDocument(library, song, phrase, current.name);
     if (current) {
       if (!songId) throw new Error('工程缺少可编辑的歌曲。');
-      if (!platform.demoProject) prepareProjectMelodyTimbres(library, songId);
+      if (!platform.demoProject) prepareProjectMelodyTimbres(library, songId, undefined, { preserveHistory: true });
       if (current.format) commitMusicDocument(library, song, phrase);
       staged!.publish();
       await directories?.finishLoading?.();
@@ -59,29 +92,33 @@ export async function mountReleaseStudio(root: HTMLElement, platform: ReleasePla
     function prepareFile() {
       if (songId) commitMusicDocument(library, song, phrase);
     }
+    let preparedFileText: string | undefined;
     const preferences = createWorkspacePreferences(localStorage, platform.demoProject ? 30 : undefined);
     const learning = createLearningSettings(localStorage);
     const projectId = () => { if (!songId) throw new Error('先打开一个音乐项目。'); return songId; };
     const studio = mountStudio(root, { phrase, song, sound: runtime, hasPrevious: !!current,
+      previewWelcomePiano: note => tones.previewPianoPlan(note),
       projectName: current?.name, doubleClickIntervalMs: state?.doubleClickIntervalMs, preferences, learning,
       workspaceState: current ? createMusicWorkspaceState(localStorage, current.id) : undefined,
       initialEntry: current ? 'song' : 'welcome', demo: !!platform.demoProject,
       mobileWeb: platform.demoProject?.mobileWeb,
+      humPitch: platform.humPitch,
       desktopPointerUx: platform.pointerUx ?? !!directories,
+      pointerMounted: platform.pointerMounted,
       projectSetup: directories && createProjectSetup(directories, savedDetails => {
         if (savedDetails) sessionStorage.setItem('rootsound.saved-details.v1', 'true');
         runtime.stopAll();
         navigate?.();
       }, {
-        read() { const value = platform.storage.read(); if (value === null) throw new Error('当前没有项目。'); return value; },
+        read() { const value = preparedFileText ?? platform.storage.read(); if (value === null) throw new Error('当前没有项目。'); return value; },
         songDraftId: projectId, name: () => song.readDraft()!.name,
         renamed(name) { song.rename(name); phrase.rename(name); },
         hasDeferredChanges: () => library.hasDeferredWrites?.() === true,
         flushDraft: () => library.flushDeferredWrites?.(),
         async prepareSave() {
+          preparedFileText = undefined;
           await studio.prepareClose({ allowProjectDialog: true });
-          prepareFile();
-          library.flushDeferredWrites?.();
+          preparedFileText = await saveMusicDocument(library, song, phrase);
         },
       }),
       projectTimbres() {

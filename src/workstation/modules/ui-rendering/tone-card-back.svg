@@ -1,4 +1,17 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 106 150" fill="none" stroke="#f0dfce" stroke-width="1.35" stroke-linecap="round">
-  <path d="M27.56 27C82.68 46.5 10.6 103.5 65.72 123"/>
-  <path d="M78.44 123C23.32 103.5 95.4 46.5 40.28 27"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 106 150">
+  <defs>
+    <pattern id="dots" width="3.4" height="3.4" patternUnits="userSpaceOnUse">
+      <circle cx="1.7" cy="1.7" r=".46" fill="#777583"/>
+    </pattern>
+    <radialGradient id="shadow">
+      <stop stop-color="#fff" stop-opacity=".7"/>
+      <stop offset="1" stop-color="#fff" stop-opacity="0"/>
+    </radialGradient>
+    <mask id="feather">
+      <ellipse cx="55" cy="91" rx="34" ry="23" fill="url(#shadow)"/>
+    </mask>
+  </defs>
+  <path d="M19 68h72v46H19z" fill="url(#dots)" mask="url(#feather)"/>
+  <path d="M57 50v34m0-34 13-4v8l-13 4" fill="none" stroke="#6b6878" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"/>
+  <ellipse cx="50.8" cy="86" rx="7.4" ry="4.8" fill="#6b6878" transform="rotate(-19 50.8 86)"/>
 </svg>

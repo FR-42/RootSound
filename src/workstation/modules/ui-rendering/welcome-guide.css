@@ -1,0 +1,148 @@
+.is-desktop-welcome .project-welcome-introduction { position: relative; }
+
+.welcome-guide-launch {
+  position: absolute;
+  inset: 0 -12px auto auto;
+  translate: 78% -42%;
+  width: clamp(44px, 5vw, 65px);
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: #674365;
+  font: inherit;
+  font-size: clamp(11px, 1vw, 14px);
+  font-weight: 650;
+  pointer-events: auto;
+}
+.welcome-guide-launch canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  transition: filter 180ms ease;
+  pointer-events: none;
+}
+.welcome-guide-launch span { position: relative; pointer-events: none; }
+.welcome-guide-launch:is(:hover, :focus-visible) canvas {
+  filter: brightness(1.05) drop-shadow(0 0 7px #c87cab94);
+}
+.welcome-guide-edge-hint {
+  position: absolute;
+  inset: calc(100% + 16px) 0 auto;
+  margin: 0;
+  text-align: center;
+  color: #a19aa5;
+  font-size: 14px;
+  letter-spacing: .06em;
+  animation: welcome-guide-hint-breathe 3.2s ease-in-out infinite;
+}
+@keyframes welcome-guide-hint-breathe {
+  0%, 100% { opacity: 0; }
+  50% { opacity: 1; }
+}
+.is-guided-welcome .welcome-guide-edge-hint { visibility: hidden; }
+
+.welcome-guide-panel {
+  position: fixed;
+  z-index: 97;
+  inset: auto auto clamp(30px, 12vh, 125px) 50%;
+  translate: -50% 0;
+  display: grid;
+  place-items: center;
+  width: min(400px, 94vw);
+  height: 112px;
+  color: #332d37;
+  pointer-events: none;
+}
+.welcome-guide-panel[hidden] { display: none; }
+.welcome-guide-panel[data-step="library"] { inset-block: clamp(42px, 12vh, 120px) auto; }
+.welcome-guide-panel canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+.welcome-guide-message {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  max-width: 85%;
+  text-align: center;
+  font-size: 15px;
+  font-weight: 620;
+}
+.welcome-guide-message span { display: flex; align-items: center; gap: 7px; font-size: 13px; font-weight: 500; }
+.welcome-guide-panel[data-step="complete"] { pointer-events: auto; cursor: pointer; }
+.welcome-guide-panel[data-step="complete"]:hover canvas { filter: brightness(1.06); }
+.welcome-guide-edges { z-index: 95; }
+.guide-return-transition {
+  position: fixed;
+  inset: 0;
+  z-index: 999;
+  background: #f6f7fb;
+  opacity: 0;
+  pointer-events: auto;
+}
+.welcome-guide-mouse {
+  display: inline-grid;
+  justify-items: center;
+  width: 12px;
+  height: 17px;
+  border: 1.3px solid currentColor;
+  border-radius: 7px;
+}
+.welcome-guide-mouse::before {
+  content: '';
+  width: 1.5px;
+  height: 5px;
+  margin-top: 3px;
+  border-radius: 1px;
+  background: currentColor;
+}
+
+.is-welcome-guided-library::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: #2f293c43;
+}
+.is-welcome-guided-library .project-library { z-index: 1; }
+.is-welcome-guided-library .project-library-grid { overflow-y: hidden; }
+.is-welcome-guided-library :is(.project-library-directory, .project-library-tile:not(.is-welcome-guide-target)) { opacity: .4; }
+.is-welcome-guided-library .project-library .project-library-tile.is-welcome-guide-target {
+  background: #fcfaff;
+  box-shadow: inset 0 0 0 1px #aa92bd;
+}
+
+.welcome-guide-dialog {
+  width: min(350px, calc(100vw - 44px));
+  box-sizing: border-box;
+  border: 0;
+  border-radius: 18px;
+  padding: 18px;
+  overflow: visible;
+  color: #332e3c;
+  background: #fbf9ff;
+  box-shadow: 0 12px 36px #3e274130;
+  font-size: 14px;
+}
+.welcome-guide-dialog::backdrop { background: #30203928; }
+.welcome-guide-dialog p { margin: 0 0 13px; }
+.welcome-guide-dialog-actions { display: flex; justify-content: flex-end; gap: 8px; }
+.welcome-guide-dialog-actions button {
+  border: 0;
+  padding: 6px 12px;
+  border-radius: 8px;
+  background: transparent;
+  color: #48375f;
+  font: inherit;
+}
+.welcome-guide-dialog-actions button:hover { background: #eee8f8; }
+.welcome-guide-dialog-actions .is-primary { background: #e8def7; font-weight: 650; }
+.welcome-guide-dialog-actions .is-primary:hover { background: #ddcef1; }
+
+@media (prefers-reduced-motion: reduce) {
+  .welcome-guide-edge-hint { animation: none; }
+  .welcome-guide-launch canvas { transition: none; }
+}

@@ -14,7 +14,7 @@ def create_art(directory):
         for x in range(width):
             warm = math.exp(-(((x / width - .18) / .7) ** 2 + ((y / height - .15) / .8) ** 2) * 2)
             cool = math.exp(-(((x / width - .95) / .65) ** 2 + ((y / height - .85) / .7) ** 2) * 2)
-            row.extend(round(base - a * warm - b * cool) for base, a, b in [(255, 0, 20), (253, 21, 26), (250, 32, 0)])
+            row.extend(round(base - a * warm - b * cool) for base, a, b in [(250, 0, 12), (250, 10, 9), (253, 9, 0)])
         rows.append(bytes(row))
     def chunk(kind, value):
         return struct.pack('>I', len(value)) + kind + value + struct.pack('>I', zlib.crc32(kind + value))

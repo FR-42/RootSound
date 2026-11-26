@@ -1,3 +1,4 @@
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -7,6 +8,9 @@ namespace RootSound.Desktop;
 /// <summary>Checks only use the supplied test root. No windows or audio devices are opened.</summary>
 internal static class ProjectDirectoriesSelfTests
 {
+    [DllImport("user32.dll", ExactSpelling = true)]
+    private static extern IntPtr SendMessageW(IntPtr window, uint message, IntPtr wParam, IntPtr lParam);
+
     public static int Run(string testRoot, string? onlyCase = null)
     {
         string run = Path.Combine(Path.GetFullPath(testRoot), "single-file-projects-" + Guid.NewGuid().ToString("N"));
@@ -34,6 +38,62 @@ internal static class ProjectDirectoriesSelfTests
             using var reopened = new ProjectDirectoryManager(root);
             reopened.Open(p.Path);
             Check(reopened.ReadLibrary().Value == text, "种子完整重开");
+        });
+
+        Case("background-save-and-exit", root =>
+        {
+            using var entered = new ManualResetEventSlim();
+            using var release = new ManualResetEventSlim();
+            using var manager = new ProjectDirectoryManager(root, null, _ => { entered.Set(); if (!release.Wait(5000)) throw new IOException("保存等待超时"); });
+            var project = manager.Create("后台保存", manager.DefaultLocation, Library("original"));
+            manager.FinishLoading();
+            var storage = new NativeStorage(manager);
+            var snapshot = manager.ReadLibraryVersioned();
+            Check(JsonDocument.Parse(storage.StartWriteScopedIfUnchanged(Library("edited"), snapshot.Scope, snapshot.Revision)).RootElement.GetProperty("pending").GetBoolean(), "草稿提交在后台启动");
+            string Poll(Func<string> read, string pendingField)
+            {
+                var clock = System.Diagnostics.Stopwatch.StartNew();
+                while (clock.ElapsedMilliseconds < 5000)
+                {
+                    string value = read(); using var parsed = JsonDocument.Parse(value);
+                    if (pendingField == "pending" ? !parsed.RootElement.TryGetProperty("pending", out _) : parsed.RootElement.GetProperty("status").GetString() != "pending") return value;
+                    Thread.Sleep(5);
+                }
+                throw new IOException("后台操作超时");
+            }
+            Check(JsonDocument.Parse(Poll(storage.ReadWriteResult, "pending")).RootElement.GetProperty("ok").GetBoolean(), "后台草稿完成");
+            var bridge = new NativeProjectDirectories(manager, _ => null, () => null);
+            Check(JsonDocument.Parse(bridge.StartSave()).RootElement.GetProperty("status").GetString() == "started", "保存立即返回");
+            Check(entered.Wait(5000), "后台进入写盘");
+            Check(JsonDocument.Parse(bridge.ReadProjectOperation()).RootElement.GetProperty("status").GetString() == "pending", "写盘期间可查询状态");
+            Check(JsonDocument.Parse(bridge.StartSave()).RootElement.GetProperty("status").GetString() == "error", "重复保存不启动");
+            release.Set();
+            Check(JsonDocument.Parse(Poll(bridge.ReadProjectOperation, "status")).RootElement.GetProperty("status").GetString() == "saved", "后台保存完成");
+            Check(DiskLibrary(project.Path) == Library("edited") && !manager.HasUnsavedChanges, "实际文件包含最新修改");
+            bridge.StartExit("discard");
+            Check(JsonDocument.Parse(Poll(bridge.ReadProjectOperation, "status")).RootElement.GetProperty("status").GetString() == "exited" && manager.Current is null, "后台退出完成");
+            manager.Open(project.Path);
+            Check(manager.ReadLibrary().Value == Library("edited"), "退出后可完整重开");
+            var version = manager.ReadLibraryVersioned();
+            storage.BeginWriteChunks(version.Scope, version.Revision);
+            storage.AppendWriteChunk(Library("aborted")); storage.AbortWriteChunks();
+            Check(manager.ReadLibrary().Value == Library("edited"), "未提交的分块不修改草稿");
+            string chunked = Library("中文🎵");
+            storage.BeginWriteChunks(version.Scope, version.Revision);
+            storage.AppendWriteChunk(chunked[..20]); storage.AppendWriteChunk(chunked[20..]); storage.CommitWriteChunks();
+            Check(JsonDocument.Parse(Poll(storage.ReadWriteResult, "pending")).RootElement.GetProperty("ok").GetBoolean()
+                && manager.ReadLibrary().Value == chunked, "分块提交保留完整 Unicode 文本");
+            manager.WriteLibrary(Library("edited"));
+            bridge.StartCreateCopy("后台副本", manager.DefaultLocation, manager.ReadLibrary().Value!);
+            Check(JsonDocument.Parse(Poll(bridge.ReadProjectOperation, "status")).RootElement.GetProperty("status").GetString() == "created", "后台另存为完成");
+            Check(DiskLibrary(project.Path) == Library("edited") && DiskLibrary(manager.Current!.Path) == Library("edited"), "另存为保留原件和副本全部内容");
+            using var failed = new ProjectDirectoryManager(Path.Combine(root, "failure"), null, _ => throw new IOException("模拟写入失败"));
+            var original = failed.Create("失败保留", failed.DefaultLocation, Library("before"));
+            failed.FinishLoading(); failed.WriteLibrary(Library("after"));
+            var failedBridge = new NativeProjectDirectories(failed, _ => null, () => null);
+            failedBridge.StartSave();
+            Check(JsonDocument.Parse(Poll(failedBridge.ReadProjectOperation, "status")).RootElement.GetProperty("status").GetString() == "error", "后台错误明确返回");
+            Check(failed.HasUnsavedChanges && failed.ReadLibrary().Value == Library("after") && DiskLibrary(original.Path) == Library("before"), "保存失败保留修改和原文件");
         });
 
         Case("untitled-first-save", root =>
@@ -81,6 +141,42 @@ internal static class ProjectDirectoriesSelfTests
             ExpectFailure(() => manager.DeleteLibraryEntry(root), "拒绝库外路径");
             manager.DeleteLibraryEntry(moved);
             Check(!Directory.Exists(moved) && !Directory.EnumerateFileSystemEntries(manager.DefaultLocation).Any(), "删除嵌套目录及文件");
+        });
+
+        Case("library-clipboard", root =>
+        {
+            using var manager = new ProjectDirectoryManager(root);
+            string home = manager.DefaultLocation;
+            string source = Path.Combine(home, "Source");
+            string other = Path.Combine(home, "Other");
+            string inner = Path.Combine(source, "Inside");
+            Directory.CreateDirectory(inner);
+            Directory.CreateDirectory(other);
+            string midi = Path.Combine(inner, "Song.mid");
+            File.WriteAllText(midi, "original");
+            ExpectFailure(() => manager.TransferLibraryEntry(source, inner, false), "拒绝复制到子目录");
+            manager.TransferLibraryEntry(source, home, false);
+            string copy = Path.Combine(home, "Source - 副本", "Inside", "Song.mid");
+            Check(File.ReadAllText(copy) == "original" && File.Exists(midi), "复制多级目录与原件共存");
+            manager.UndoLibraryTransfer();
+            Check(!File.Exists(copy) && File.Exists(midi), "撤销只删除副本");
+            var song = manager.Create("Project", other, Library("Project"));
+            manager.FinishLoading();
+            manager.Exit("discard");
+            manager.TransferLibraryEntry(song.Path, home, true);
+            string movedSong = Path.Combine(home, "Project.rootsound");
+            Check(!File.Exists(song.Path) && manager.Browse(home).Entries.Any(item => item.Path == movedSong), "移动工程文件仍可识别");
+            manager.UndoLibraryTransfer();
+            Check(File.Exists(song.Path) && !File.Exists(movedSong), "撤销恢复原始工程位置");
+            string blocked = Path.Combine(other, "Song.mid");
+            File.WriteAllText(blocked, "occupied");
+            ExpectFailure(() => manager.TransferLibraryEntry(midi, other, true), "剪切拒绝覆盖");
+            Check(File.ReadAllText(blocked) == "occupied" && File.Exists(midi), "冲突时两份原件均保留");
+            manager.TransferLibraryEntry(midi, other, false);
+            string duplicate = Path.Combine(other, "Song - 副本.mid");
+            File.WriteAllText(duplicate, "changed");
+            ExpectFailure(manager.UndoLibraryTransfer, "拒绝撤销有外部改动的副本");
+            Check(File.ReadAllText(duplicate) == "changed", "已更改的副本保留");
         });
 
         Case("selected-library", root =>
@@ -1121,35 +1217,22 @@ internal static class ProjectDirectoriesSelfTests
             fail = false; manager.Save("新标题"); manager.Exit("discard"); manager.Open(path);
             Check(manager.Current!.Name == "新标题" && manager.ReadLibrary().Value == Library("新草稿"), "可以重试正式保存并重开");
         });
-        Case("window-close-preparation-parsing-is-conservative", root =>
+        Case("window-close-discards-unconfirmed-changes", root =>
         {
-            var ready = MainWindow.ParseClosePreparation("{\"ready\":true,\"name\":\"未保存的标题\",\"canSave\":true}");
-            Check(ready.Ready && ready.CanSave && ready.Name == "未保存的标题", "保存关闭传递当前标题");
-            var pending = MainWindow.ParseClosePreparation("{\"ready\":true,\"canSave\":false,\"saveMessage\":\"先处理音乐\"}");
-            Check(pending.Ready && !pending.CanSave && pending.SaveMessage == "先处理音乐", "关闭前显示编辑准备失败的原因");
-            var discard = MainWindow.ParseClosePreparation("{\"ready\":true,\"canSave\":true,\"discarded\":true}");
-            Check(discard.Ready && discard.Discarded && !discard.Saved && !discard.Cancelled, "直接退出有独立的关闭结果");
-            Check(!MainWindow.ParseClosePreparation("{\"ready\":false,\"message\":\"仍在提交\"}").Ready, "准备失败不能关窗");
-            Check(!MainWindow.ParseClosePreparation("{\"ready\":true}").CanSave, "缺失保存能力按拒绝处理");
-            ExpectFailure(() => MainWindow.ParseClosePreparation("{}"), "无效结果不能关窗");
-        });
-        Case("window-close-cleans-up-failed-startup-and-respects-users-choice", root =>
-        {
+            const uint CloseWindow = 0x0010;
+            const uint QueryEndSession = 0x0011;
+            const uint EndSession = 0x0016;
             using var manager = new ProjectDirectoryManager(root);
-            var project = manager.Create("退出测试", manager.DefaultLocation, Library("已保存"));
+            var project = manager.Create("关机测试", manager.DefaultLocation, Library("原始工程"));
             var original = File.ReadAllBytes(project.Path);
-            var failed = MainWindow.ParseClosePreparation("{\"ready\":false,\"canSave\":false,\"startupFailed\":true,\"message\":\"音色无效\"}");
-            var ready = MainWindow.ParseClosePreparation("{\"ready\":true,\"canSave\":true}");
-            var cancel = MainWindow.ParseClosePreparation("{\"ready\":true,\"canSave\":false,\"cancelled\":true}");
-            var discard = MainWindow.ParseClosePreparation("{\"ready\":true,\"canSave\":true,\"discarded\":true}");
-            Check(MainWindow.CanCloseProject(manager, _ => Task.FromResult(failed)).GetAwaiter().GetResult(), "启动失败的干净工程可关闭");
-            manager.WriteLibrary(Library("草稿"));
-            ExpectFailure(() => MainWindow.CanCloseProject(manager, _ => Task.FromResult(failed)).GetAwaiter().GetResult(), "有草稿时启动失败需要宿主确认");
-            Check(!MainWindow.CanCloseProject(manager, mode => Task.FromResult(mode == "check" ? ready : cancel)).GetAwaiter().GetResult(),
-                "取消保存选择返回当前工程");
-            Check(MainWindow.CanCloseProject(manager, mode => Task.FromResult(mode == "check" ? ready : discard)).GetAwaiter().GetResult(),
-                "明确直接退出后可以关闭");
-            Check(manager.HasUnsavedChanges && File.ReadAllBytes(project.Path).SequenceEqual(original), "关闭检查及放弃均不覆盖工程");
+            manager.WriteLibrary(Library("未保存"));
+            using var window = new MainWindow(manager, root);
+            IntPtr handle = window.Handle;
+            Check(SendMessageW(handle, QueryEndSession, IntPtr.Zero, IntPtr.Zero) != IntPtr.Zero, "有未保存修改时放行关机");
+            SendMessageW(handle, EndSession, IntPtr.Zero, IntPtr.Zero);
+            Check(!window.IsDisposed, "取消关机仍可继续编辑");
+            SendMessageW(handle, CloseWindow, IntPtr.Zero, IntPtr.Zero);
+            Check(window.IsDisposed && File.ReadAllBytes(project.Path).SequenceEqual(original), "关闭窗口直接退出，工程原件未覆盖");
         });
         if (failures.Count > 0) throw new AggregateException(failures);
         if (onlyCase is not null && completed == 0) throw new ArgumentException("没有找到指定的测试案例。", nameof(onlyCase));

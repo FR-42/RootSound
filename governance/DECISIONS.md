@@ -29,11 +29,12 @@ Earlier wording and source IDs are preserved in [the original record](../history
 - The desktop opens directly to the physical song library. A song opens one editable music score. The former arrangement/phrase overview,
   separate melody/rhythm editors and co-creation route are not current release entry points.
 - A vertical piano roll uses horizontal pitch and vertical time. Note groups remain independently editable.
-- Keep the interface compact and transport controls centered. Tempo rolls use thin one-line labels;
+- Superseded segmented-roll design. Keep the interface compact and transport controls centered. Tempo rolls use thin one-line labels;
   clicking opens a panel with BPM, 敲击定位 and grid count. Rolls retain independent tempo/grid settings.
   The first label is fixed. Clicking a roll targets the BPM control to the left of the keyboard. Deleting a roll through its
   context menu extends the preceding roll over the same beats and retains the notes. The first roll remains
   and the setting can be turned off with one roll. The bottom resize edge has a downward fading shadow.
+- On 2026-11-21 the user approved a single BPM per editable song. On open or import, use the opening BPM and map existing note, curve and MIDI event positions through their original clock. Keep the source file until an explicit save. Remove the segmented roll commands and settings. The welcome and editing playlines fade downward from pale yellow.
 - The BPM panel offers a score-wide time signature, defaulting to 4/4, independent of subdivisions.
   Changing meter preserves note timing.
 - On 2026-11-16 the user removed measure labels and separate bar lines from the piano roll design.
@@ -71,7 +72,7 @@ Earlier wording and source IDs are preserved in [the original record](../history
 - Open native music, MIDI/RMI, MusicXML/MXL and supported portable projects through one file route.
   Opening MIDI does not automatically create a .rootsound file.
 - Save writes the open .rootsound in place and keeps the editor open. Save As and the first save of a new or imported score use the library list to choose a folder, with the current song name filled in. A name collision uses a numbered suffix. The library can create folders and rename or delete entries.
-- The details Exit button leaves a clean song immediately. For a dirty song, the first click colors Exit red and Save green. A second click discards the edits and leaves the song, including a rapid double-click. Successful Save and Save As return to song details, restore the button colors, briefly flash all three file buttons white and clear the unsaved star. The native window close action uses its save/discard chooser.
+- The details Exit button leaves a clean song immediately. For a dirty song, the first click colors Exit red and Save green. A second click while the colors are active discards the edits and leaves the song. The colors clear after three seconds or when the user performs another action besides moving the pointer. Successful Save and Save As return to song details, restore the button colors, briefly flash all three file buttons white and clear the unsaved star. The native window close button exits directly. Save As writes only after confirmation from the chosen directory.
 - Library and details renames update real file paths and the active save destination. Editable text fields use colored rectangular fills and color-based focus feedback.
 - Normal editing stays in a draft until explicit Save. Save conflicts must not silently overwrite externally
   changed files. Write validated content atomically. Do not reinstate automatic .bak creation.
@@ -98,19 +99,8 @@ Earlier wording and source IDs are preserved in [the original record](../history
 
 - The user has withdrawn the obsolete operation guides. Remove the first-visit question, launch links,
   instructional scenes and replay settings from the current production entry points.
-- On 2026-11-19 the user approved retaining the online editor, removing all website guidance and matching
-  the current application's visual style. Existing guide URLs open the regular editor directly.
-- Share the application's release-colors.css palette and current component treatments; keep existing brand,
-  description, GitHub, Windows/Mac downloads, thanks and the Edge browser advice with only the operation text explicitly supplied by the user.
-- Follow-up correction approved on 2026-11-19: the website must use the current composing interface,
-  including left/right edge gestures, tone cards and the details page without Save/Save As/Exit.
-  Reusing colors alone does not meet this requirement. Keep the user-supplied mouse and edge-operation
-  description below the online experience, without reviving the obsolete staged guide.
-- The supplied 40-note piano score at 148 BPM remains the public example; every visit edits a fresh memory
-  copy. Keep only the grand piano and preserve mobile right-button simulation, dragging and pinch zoom.
-- Website publication is authorized for this task. GitHub Release publication remains manual; this website
-  update does not rebuild the prepared installers. See docs/WEBSITE.md and the archived former decisions
-  in history/2026-11-19-website-guide-removal/previous-decisions.txt.
+- On 2026-11-26 the user approved removing the online trial and its instructions and redesigning the website as a presentation/download page matching the current white desktop style. The old play URL redirects home; no editor or instrument payload is published. Keep existing brand, description, downloads, GitHub, release history, thanks and browser advice. Downloads keep pointing at published installers until the user publishes the new release. This supersedes the 2026-11-19 online-editor requirements.
+- Prepare Windows EXE and macOS ARM64 PKG locally, with simplified visual installation guidance and custom installation locations. The first Windows default remains D:\Apps\RootSound. Any existing project directory, including an empty one, must be untouched by install, upgrade, reinstall and first launch. Demo import is restricted to new installations without a project directory. The user authorized committing and pushing the current root-project changes and deploying the website; GitHub Release publication remains manual.
 
 ## Architecture and ownership — USER CONFIRMED PRINCIPLES
 
@@ -133,14 +123,16 @@ Current check/build evidence and remaining validation are in docs/CURRENT_STATE.
 
 ## Desktop pointer interaction
 
-- A quick, predominantly horizontal sweep into the outer 6% triggers the corresponding side. A deliberate outward push at the actual border also qualifies, including when Windows clamps the pointer in a maximized window. The left side toggles tone cards while settings are closed. The right side toggles settings from the roll or tone cards. A left swipe while settings are open stays in settings. View switches show a brief arc and share a fixed 0.5-second cooldown.
-- With no song open, the desktop shows the welcome view. A downward sweep at the bottom edge opens the song library. Slowly moving gradients color both views. The roll uses a stationary gradient, and sounding notes brighten along their edges.
+- The approved 2026-11-19 editor uses photo-front tone cards with colored borders and white names. The current song hand sits at the bottom and the library opens across the top from its lower-left pile. The library dims the roll while leaving the hand and close slot visible. The current editor has no piano key strip or vertical pitch lines. BPM and Add Roll live in the details page.
+
+- An edge gesture requires a quick outward movement that reaches or crosses the actual window edge. Near-edge motion and continued pushing along the border do not count. Left toggles tone cards, right toggles details, and top clears the selected tone. Left keeps an open details page in place. View switches retain the shared 0.5-second cooldown.
+- With no song open, the desktop shows the welcome view. A rightward sweep at the right edge opens the song library, and a fresh rightward sweep at the right edge closes it. The library still slides up from the bottom and reverses on close. The roll uses a stationary gradient, and sounding notes brighten along their edges.
 - Song details cover the roll and piano. The song title sits above the file actions. Three adjacent playback-rate blocks (0.5x, 0.75x and 1x) sit to the left of volume, followed by grid intensity, pointer sensitivity and the multiple-roll switch. The three slider tracks are thicker and align at both ends. The switch shows one or two overlapping shapes.
 - On 2026-11-18 the user revised the Windows desktop colour study. Text fields use a light cyan, lavender and pink gradient with dark text; selected text uses a dark plum gradient with light text. Tone-card backs retain the dark plum gradient. Only the active playback speed has a coloured gradient fill; inactive speeds have transparent backgrounds.
-- Touching or crossing the active window's top edge reveals the native caption controls in the welcome view, library and editor. They stay visible over the caption and while the pointer is outside the window, then hide when the pointer returns to non-caption content. Card-back dimensions and stacking are adjusted for visual balance with the piano and ordinary tone cards; proportions follow the visual result rather than a mandatory scaling rule.
+- Windows caption controls stay visible in the welcome view, library and editor. The title bar is above the workspace and remains available for moving and maximizing the window.
 - Playback and audition highlights follow the visible white and black key shapes.
 - Desktop note bodies fill the complete scheduled start-to-end interval. Do not inset or shorten them to create artificial time gaps, including on short notes. The user subsequently chose a 0.5 px black inner border and a small 1 px corner radius, retaining the top-to-bottom tone gradient. Centre notes within the space between the visible column lines: offset their pitch position by half the actual column-line width, and apply the same correction to the highlight overlay. Selection, hover and playback retain light outlines inside the black rim without a surrounding shadow. Musical timing is unchanged. The earlier large rounded corners and artificial end gaps were rejected because they misrepresented note timing.
-- Moving the pointer into the area above the keyboard reveals the hand. Clicking a card pins it above the roll in a short arc while the hand stays open. Unpinning by click or by dropping the card in the editor sends it back in a short arc. The desktop tone library shows cards, stacks and the empty slot left by a spread. The taller keyboard and cards scale with the window.
+- The selected tone is shown as a tinted gradient at the top of the editor, with the tone name centred. A fast swipe to the top edge clears the selection and returns the card to the hand.
 - Clicking the empty slot gathers the spread back into the pile. Settings temporarily cover the hand and spread, and closing settings restores their prior visibility and deck position. The roll remains editable while the deck is spread. The wheel pages the cards when the pointer is over the deck.
 - The user selected the original Flow card back: two fine warm lines on the plum gradient. The later bulged-centre and dot variation was withdrawn. Visible paper edges and staggered layers distinguish the stack. After finding the face-turn animation too slow, the user requested the previous spread/gather animation: 240 ms translation, scale and opacity with 14 ms staggering. Midway toggles continue from the current visual state. Animation frames run through browser composition without repeated layout reads.
 - Moving into the roll's outer regions pans the viewport, with increasing speed toward the boundary. Fast pointer travel pauses auto-pan, which resumes when the pointer slows in an eligible area. Middle-click toggles position-driven panning. Mouse or keyboard presses interrupt it until the pointer returns to the central zone.

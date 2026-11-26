@@ -82,7 +82,19 @@ function validJson(value: unknown, ancestors = new Set<object>(), shared?: WeakS
   ancestors.delete(value);
   return valid;
 }
-function validateFields(value: unknown): asserts value is NewContent & { dependencies: string[] } & Record<string, unknown> {
+function finiteParsedJson(value: unknown): boolean {
+  if (typeof value === 'number') return Number.isFinite(value);
+  if (value === null || typeof value !== 'object') return true;
+  if (Array.isArray(value)) {
+    for (const item of value) if (!finiteParsedJson(item)) return false;
+  } else {
+    const object = value as Record<string, unknown>;
+    for (const key of Object.keys(object)) if (!finiteParsedJson(object[key])) return false;
+  }
+  return true;
+}
+
+function validateFields(value: unknown, checkJson: (value: unknown) => boolean = validJson): asserts value is NewContent & { dependencies: string[] } & Record<string, unknown> {
   if (!isObject(value)) fail('内容必须是对象。');
   for (const key of ['kind', 'owner', 'name']) {
     if (typeof value[key] !== 'string' || !(value[key] as string).trim()) fail(`${key} 不能为空。`);
@@ -92,8 +104,8 @@ function validateFields(value: unknown): asserts value is NewContent & { depende
     fail('依赖必须是内容标识列表。');
   }
   if (new Set(value.dependencies).size !== value.dependencies.length) fail('依赖不能重复。');
-  if (!validJson(value.body)) fail('内容必须是完整、有限且无循环的 JSON 数据。');
-  if (value.editingContext !== undefined && !validJson(value.editingContext)) fail('编辑上下文必须是有效 JSON。');
+  if (!checkJson(value.body)) fail('内容必须是完整、有限且无循环的 JSON 数据。');
+  if (value.editingContext !== undefined && !checkJson(value.editingContext)) fail('编辑上下文必须是有效 JSON。');
   if (value.projectRootId !== undefined && (typeof value.projectRootId !== 'string' || !value.projectRootId.trim())) fail('编辑稿的歌曲归属标识无效。');
 }
 function validateDependencies(contents: ContentRecord[], candidate: ContentRecord): void {
@@ -116,17 +128,24 @@ function validateDependencies(contents: ContentRecord[], candidate: ContentRecor
 function restore(raw: string, projectRootKind = 'rootsound.song'): State {
   let value: unknown;
   try { value = JSON.parse(raw); } catch { return fail('已保存的数据损坏，未清空或覆盖原数据。'); }
-  return validateState(value, projectRootKind);
+  return validateState(value, projectRootKind, finiteParsedJson);
 }
-function validateState(value: unknown, projectRootKind = 'rootsound.song'): State {
+function validateState(value: unknown, projectRootKind = 'rootsound.song', checkJson?: (value: unknown) => boolean): State {
+  const validation = validateStateSteps(value, projectRootKind, checkJson);
+  let next = validation.next();
+  while (!next.done) next = validation.next();
+  return next.value;
+}
+function* validateStateSteps(value: unknown, projectRootKind = 'rootsound.song', checkJson?: (value: unknown) => boolean): Generator<void, State> {
   if (!isObject(value) || value.format !== 'RootSoundMaterialLibrary' || value.version !== 1
     || !Array.isArray(value.contents) || !Array.isArray(value.drafts)) fail('不支持或损坏的素材库格式。');
   for (const records of [value.contents, value.drafts]) {
     const ids = new Set<string>();
     for (const record of records) {
-      validateFields(record);
+      validateFields(record, checkJson);
       if (typeof record.id !== 'string' || !record.id || ids.has(record.id)) fail('内容或编辑稿标识无效。');
       ids.add(record.id);
+      yield;
     }
   }
   const state = value as unknown as State;
@@ -164,7 +183,8 @@ function validateState(value: unknown, projectRootKind = 'rootsound.song'): Stat
             || Object.keys(item).some(field => !['name', 'dependencies', 'body', 'transactionId'].includes(field))
             || !['name', 'dependencies', 'body'].every(field => Object.hasOwn(item, field))
             || (item.transactionId !== undefined && (typeof item.transactionId !== 'string' || !item.transactionId))) fail('编辑历史快照无效。');
-          validateFields({ ...draft, ...item });
+          validateFields({ ...draft, ...item }, checkJson);
+          yield;
         }
       }
     }
@@ -178,8 +198,9 @@ function validateState(value: unknown, projectRootKind = 'rootsound.song'): Stat
         || typeof journal.label !== 'string' || !journal.label.trim() || typeof journal.anchorDraftId !== 'string') fail('复合编辑历史标识无效。');
       ids.add(journal.id);
       for (const key of ['anchorBefore', 'anchorAfter']) {
-        const anchor = journal[key]; validateFields(anchor);
+        const anchor = journal[key]; validateFields(anchor, checkJson);
         if (anchor.id !== journal.anchorDraftId) fail('复合编辑历史的撤销位置无效。');
+        yield;
       }
       for (const key of ['contents', 'drafts']) {
         const patches = journal[key];
@@ -189,9 +210,10 @@ function validateState(value: unknown, projectRootKind = 'rootsound.song'): Stat
           if (!isObject(patch) || (patch.before === null && patch.after === null)) fail('复合编辑历史记录无效。');
           for (const record of [patch.before, patch.after]) {
             if (record === null) continue;
-            validateFields(record);
+            validateFields(record, checkJson);
             if (typeof record.id !== 'string' || !record.id) fail('复合编辑历史内容标识无效。');
             if (key === 'contents' && (!Number.isSafeInteger(record.revision) || Number(record.revision) < 1)) fail('复合编辑历史修订无效。');
+            yield;
           }
           const before = patch.before as Record<string, unknown> | null;
           const after = patch.after as Record<string, unknown> | null;
@@ -203,7 +225,7 @@ function validateState(value: unknown, projectRootKind = 'rootsound.song'): Stat
       if (journal.protectedUses !== undefined) {
         if (!Array.isArray(journal.protectedUses)) fail('复合编辑的保存保护记录无效。');
         for (const record of journal.protectedUses) {
-          validateFields(record);
+          validateFields(record, checkJson);
           if (typeof record.id !== 'string' || !Number.isSafeInteger(record.revision) || Number(record.revision) < 1) fail('复合编辑的保存保护记录无效。');
         }
       }
@@ -214,9 +236,11 @@ function validateState(value: unknown, projectRootKind = 'rootsound.song'): Stat
       for (const step of entry[direction]) {
         if (!step.transactionId) continue;
         const journal = state.transactionHistory?.entries.find(item => item.id === step.transactionId && item.anchorDraftId === entry.draftId);
-        if (!journal || !same(snapshot(step), snapshot(direction === 'past' ? journal.anchorBefore : journal.anchorAfter))) {
+        const anchor = direction === 'past' ? journal?.anchorBefore : journal?.anchorAfter;
+        if (!anchor || step.name !== anchor.name || !same(step.dependencies, anchor.dependencies) || !same(step.body, anchor.body)) {
           fail('编辑历史找不到匹配的完整复合操作，原数据已保留。');
         }
+        yield;
       }
     }
   }
@@ -245,13 +269,41 @@ function affected(contents: ContentRecord[], drafts: Draft[], sourceId: string):
 }
 
 /** 所有修改先写入适配器；写入成功后才替换内存状态。 */
-export function createMaterialLibrary(storage?: MaterialStorage, options?: { project?: ProjectPolicy }): MaterialLibrary {
-  const projectPolicy = options?.project ? createProjectScopePolicy(options.project) : undefined;
-  let raw: string | null = null;
-  try { raw = storage?.read() ?? null; } catch (error) { fail(`读取失败：${String(error)}`); }
-  let state: State = raw === null
+type LibraryOptions = { project?: ProjectPolicy };
+function readStorage(storage?: MaterialStorage): string | null {
+  try { return storage?.read() ?? null; } catch (error) { return fail(`读取失败：${String(error)}`); }
+}
+export function createMaterialLibrary(storage?: MaterialStorage, options?: LibraryOptions): MaterialLibrary {
+  const raw = readStorage(storage);
+  const state: State = raw === null
     ? { format: 'RootSoundMaterialLibrary', version: 1, contents: [], drafts: [] }
     : restore(raw, options?.project?.rootKind);
+  return openLibraryState(state, raw, storage, options);
+}
+
+export async function openLargeMaterialLibrary(storage: MaterialStorage, options?: LibraryOptions): Promise<MaterialLibrary> {
+  const raw = readStorage(storage);
+  if (raw === null) return openLibraryState({ format: 'RootSoundMaterialLibrary', version: 1, contents: [], drafts: [] }, raw, storage, options);
+  const breathe = () => new Promise<void>(resolve => setTimeout(resolve, 0));
+  await breathe();
+  let value: unknown;
+  try { value = JSON.parse(raw); } catch { return fail('已保存的数据损坏，未清空或覆盖原数据。'); }
+  await breathe();
+  const validation = validateStateSteps(value, options?.project?.rootKind, finiteParsedJson);
+  let deadline = performance.now() + 8;
+  let next = validation.next();
+  while (!next.done) {
+    if (performance.now() >= deadline) {
+      await breathe();
+      deadline = performance.now() + 8;
+    }
+    next = validation.next();
+  }
+  return openLibraryState(next.value, raw, storage, options);
+}
+
+function openLibraryState(state: State, raw: string | null, storage?: MaterialStorage, options?: LibraryOptions): MaterialLibrary {
+  const projectPolicy = options?.project ? createProjectScopePolicy(options.project) : undefined;
   projectPolicy?.validateDraftOwnership(state);
   let token = crypto.randomUUID();
   const sharedJson = new WeakSet<object>();
@@ -279,7 +331,6 @@ export function createMaterialLibrary(storage?: MaterialStorage, options?: { pro
     if (text === undefined) { text = JSON.stringify(step); serializedSteps.set(step, text); }
     return text;
   }
-  for (const entry of state.editHistory?.entries ?? []) for (const step of [...entry.past, ...entry.future]) serializeStep(step);
   function serialize(next: State): string {
     const text = JSON.stringify({ ...next, editHistory: undefined });
     if (!next.editHistory) return text;
@@ -287,6 +338,7 @@ export function createMaterialLibrary(storage?: MaterialStorage, options?: { pro
     return `${text.slice(0, -1)},"editHistory":{"version":1,"entries":[${entries.join(',')}]}}`;
   }
   let pendingWrite = false;
+  let writeBatchDepth = 0;
   function writeState(next: State, permanent = false): void {
     if (!storage) return;
     const nextRaw = serialize(next);
@@ -305,7 +357,7 @@ export function createMaterialLibrary(storage?: MaterialStorage, options?: { pro
   }
   function commit(next: State, permanent = false, deferStorage = false): void {
     collectJournals(next);
-    if (storage && deferStorage) pendingWrite = true;
+    if (storage && !permanent && (deferStorage || writeBatchDepth > 0)) pendingWrite = true;
     else writeState(next, permanent);
     state = next;
     token = crypto.randomUUID();
@@ -687,19 +739,21 @@ export function createMaterialLibrary(storage?: MaterialStorage, options?: { pro
         const count = countUsagePositions(state.contents, state.drafts, options.project.adapters).get(source.id) ?? 0;
         if (count > 1) mode = 'new';
       }
-      const impact = affected(state.contents, state.drafts, source.id);
-      // Include exact draft snapshots: they have no saved revision, but changing
-      // their references or content must invalidate a previously shown warning.
-      // The replacement draft is included so confirmation also matches this edit.
-      const impactToken = JSON.stringify({
-        source: [source.id, source.revision], replacement: draft,
-        contents: impact.contents.map(item => [item.id, item.revision]).sort((a, b) => String(a[0]).localeCompare(String(b[0]))),
-        drafts: [...impact.drafts].sort((a, b) => a.id.localeCompare(b.id)),
-      });
-      if (!options?.project && (impact.contents.length || impact.drafts.length)
-        && (confirmation?.expectedRevision !== source.revision || confirmation.impactToken !== impactToken)) {
-        return { status: 'needs-confirmation', affectedContent: clone(impact.contents), affectedDrafts: clone(impact.drafts),
-          confirmation: { expectedRevision: source.revision, impactToken } };
+      if (!options?.project) {
+        const impact = affected(state.contents, state.drafts, source.id);
+        // Include exact draft snapshots: they have no saved revision, but changing
+        // their references or content must invalidate a previously shown warning.
+        // The replacement draft is included so confirmation also matches this edit.
+        const impactToken = JSON.stringify({
+          source: [source.id, source.revision], replacement: draft,
+          contents: impact.contents.map(item => [item.id, item.revision]).sort((a, b) => String(a[0]).localeCompare(String(b[0]))),
+          drafts: [...impact.drafts].sort((a, b) => a.id.localeCompare(b.id)),
+        });
+        if ((impact.contents.length || impact.drafts.length)
+          && (confirmation?.expectedRevision !== source.revision || confirmation.impactToken !== impactToken)) {
+          return { status: 'needs-confirmation', affectedContent: clone(impact.contents), affectedDrafts: clone(impact.drafts),
+            confirmation: { expectedRevision: source.revision, impactToken } };
+        }
       }
     }
     const { id: draftId, sourceId: _sourceId, baseRevision: _baseRevision, editingContext: _editingContext, projectRootId: _projectRootId, ...fields } = draft;
@@ -707,7 +761,7 @@ export function createMaterialLibrary(storage?: MaterialStorage, options?: { pro
       revision: mode === 'overwrite' && source ? source.revision + 1 : 1 };
     try { validateDependencies(state.contents, content); }
     catch (error) { return { status: 'conflict', reason: String(error) }; }
-    const next = clone(state);
+    const next = copyForDraftEdit(id);
     const index = next.contents.findIndex(item => item.id === content.id);
     if (index < 0) next.contents.push(content); else next.contents[index] = content;
     const savedDraft: Draft = { ...clone(fields), id: draftId, sourceId: content.id, baseRevision: content.revision,
@@ -773,6 +827,31 @@ export function createMaterialLibrary(storage?: MaterialStorage, options?: { pro
   }
   return {
     createDraft, updateDraft, saveDraft, travelDraft, commitTransaction, currentToken: () => token,
+    prepareSnapshot: () => ({ state: state as unknown as JsonValue, token }),
+    async applyPreparedSnapshot(prepared, expectedToken) {
+      if (token !== expectedToken) fail('保存期间音乐已变化，请再次保存。');
+      const expected = raw;
+      pendingWrite = true;
+      if (storage?.writeIfUnchangedAsync) await storage.writeIfUnchangedAsync(prepared.text, expected);
+      else if (storage?.writeIfUnchanged) storage.writeIfUnchanged(prepared.text, expected);
+      else if (storage) {
+        if (storage.read() !== expected) fail('素材库已被其他窗口修改，请重新打开后继续。原数据未被覆盖。');
+        storage.write(prepared.text);
+      }
+      raw = prepared.text;
+      if (token !== expectedToken) fail('保存期间音乐已变化，请再次保存。');
+      const next = prepared.state as unknown as State;
+      for (const draft of next.drafts) {
+        const previous = state.drafts.find(item => item.id === draft.id);
+        const view = previous && draftViews.get(previous);
+        if (view && previous.body === draft.body) draftViews.set(draft, Object.freeze({ ...draft,
+          dependencies: retain(draft.dependencies) as string[], body: view.body,
+          ...(draft.editingContext === undefined ? {} : { editingContext: retain(draft.editingContext) }) }));
+      }
+      state = next;
+      pendingWrite = false;
+      token = crypto.randomUUID();
+    },
     readDraftView(id) { const draft = state.drafts.find(item => item.id === id); return draft && draftView(draft); },
     isDraftChanged(id) {
       const draft = state.drafts.find(item => item.id === id);
@@ -782,6 +861,13 @@ export function createMaterialLibrary(storage?: MaterialStorage, options?: { pro
     },
     editDraftBody,
     hasDeferredWrites: () => pendingWrite,
+    batchWrites(action) {
+      writeBatchDepth++;
+      let result;
+      try { result = action(); } finally { writeBatchDepth--; }
+      if (writeBatchDepth === 0 && pendingWrite) writeState(state);
+      return result;
+    },
     flushDeferredWrites() { if (pendingWrite) writeState(state); },
     readDraftHistoryStep(id, direction, shared = false) {
       const history = historyFor(state, id);

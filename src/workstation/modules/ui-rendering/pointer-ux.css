@@ -1,6 +1,6 @@
 .has-round-pointer, .has-round-pointer * { cursor: none !important; }
 :where(.has-round-pointer) :focus { outline: none; }
-.has-round-pointer :where(button, a[href], input, select, textarea, summary, [role="button"], [role="slider"], [role="menuitem"], [contenteditable="true"]):focus-visible {
+.has-round-pointer :where(button, a[href], input, select, textarea, summary, [role="button"], [role="slider"], [role="menuitem"], [contenteditable="true"]):focus-visible:not(:where(.melody-note)) {
   outline: 2px solid var(--accent, #476f96);
 }
 .has-round-pointer :is(.project-welcome, .project-library, .workspace-inline-panel, dialog, .melody-scroll):focus { outline: none; }
@@ -10,19 +10,20 @@
   border-radius: 50%; pointer-events: none;
   border: 1px solid #36799f99; background: #90c9ea64;
 }
-.round-pointer.has-pan-dot { border-color: #80adc8a8; }
-.round-pointer.has-pan-dot::after {
-  content: ''; position: absolute; left: 50%; top: 50%; width: 4px; height: 4px;
-  margin: -2px 0 0 -2px; border-radius: 50%; background: #507f9b;
-  translate: var(--pan-dot-x, 0px) var(--pan-dot-y, 0px);
-}
-.round-pointer.is-pan-waiting::after { box-sizing: border-box; border: 1px solid #507f9b; background: transparent; }
 .round-pointer svg {
   display: none; position: absolute; inset: -1px; width: 100%; height: 100%; box-sizing: content-box;
   overflow: visible; transform: rotate(-90deg); fill: none; stroke: #267aa7; stroke-width: 2; stroke-linecap: round;
 }
 .round-pointer.is-counting svg { display: block; }
 .round-pointer circle { stroke-dasharray: 1; stroke-dashoffset: 1; }
+.round-pointer::before {
+  content: ''; position: absolute; inset: 50% 17% auto; height: 1px;
+  translate: 0 -50%; background: currentColor; opacity: .72;
+}
+:root.windows-desktop-colors:where(:not(.website-editor)) .round-pointer::before {
+  inset: 50% auto auto 50%; width: 4px; height: 4px; border-radius: 50%;
+  translate: -50% -50%; opacity: 1;
+}
 .workspace-inline-panel[hidden] { display: none !important; }
 .has-round-pointer .workspace-inline-panel.learning-settings:not(.song-editor-controls) {
   position: fixed; z-index: 94; inset: 0; max-width: none; overflow: auto;
@@ -30,17 +31,22 @@
 }
 .has-round-pointer .workspace-inline-panel.learning-settings:not(.song-editor-controls) > * { width: min(100%, 440px); margin-inline: auto; }
 .has-round-pointer .workspace-inline-panel.learning-settings.is-previewing { background: transparent; }
-.has-round-pointer .workspace-inline-panel.learning-feature-gate {
-  position: fixed; z-index: 94; inset: auto 0 0; max-width: none;
-  border: 0; border-radius: 0; padding: 25px clamp(24px, 10vw, 130px); background: #f3f9fc;
+.music-editor .has-pointer-roll.is-vertical .melody-playhead {
+  height: 8px; background: var(--playline-fade);
 }
-
 .has-pointer-roll .melody-main { position: relative; grid-template-columns: minmax(0, 1fr); overflow: clip; }
 .has-pointer-roll {
   --tone-card-width: clamp(74px, min(10.2vw, 18vh), 182px);
-  --tone-card-height: clamp(98px, min(13.1vw, 21vh), 218px);
-  --tone-card-peek: clamp(33px, 5.6vh, 72px);
+  --tone-card-height: clamp(88px, min(11.8vw, 17vh), 174px);
+  --tone-card-peek: clamp(23px, 3.4vh, 35px);
+  --tone-pile-width: clamp(48px, 5.8vw, 88px);
+  --tone-pile-height: clamp(64px, 7.5vw, 116px);
+  --tone-fan-radius: clamp(132px, min(19vw, 28vh), 232px);
 }
+:root.windows-desktop-colors:where(:not(.website-editor)) .has-pointer-roll {
+  --tone-card-peek: calc(var(--tone-card-height) * .79);
+}
+.melody-tone-pile-corner[hidden] { display: none; }
 .music-editor .has-pointer-roll .melody-shelf {
   position: absolute; z-index: 12; inset: 0;
   display: block; width: auto; max-height: none; margin: 0; padding: 0; overflow: visible;
@@ -50,18 +56,18 @@
 }
 .music-editor .has-pointer-roll.is-tone-shelf-open .melody-shelf { opacity: 1; visibility: visible; }
 .has-pointer-roll .melody-tone-hand-mask {
-  position: absolute; inset: 0 0 calc(var(--melody-keyboard-height) + var(--tone-keyboard-inset, 0px)); overflow: clip; pointer-events: none;
+  position: absolute; inset: 0 0 0; overflow: clip; pointer-events: none;
 }
 .has-pointer-roll .melody-tone-hand {
-  position: absolute; inset: auto 16% 0 5%; height: var(--tone-card-height);
+  position: absolute; inset: auto 6% 2px max(18%, calc(var(--tone-fan-radius) + 12px)); height: var(--tone-card-height);
 }
 .music-editor .has-pointer-roll .melody-tone-hand .melody-tone-entry {
   width: var(--tone-card-width); height: var(--tone-card-height); padding: 0; position: absolute; left: 50%; bottom: 0;
   margin: 0; z-index: var(--card-layer, 1); transform-origin: center bottom;
-  transform: translate(calc(-50% + var(--hand-x, 0px)), calc(var(--tone-card-height) - var(--tone-card-peek) + var(--hand-y, 0px))) rotate(var(--card-turn, 0deg));
+  transform: translate(calc(-50% + var(--hand-x, 0px)), calc(-9px + var(--hand-y, 0px))) rotate(var(--card-turn, 0deg));
   transition: transform 190ms cubic-bezier(.22,.75,.2,1), opacity 160ms ease-out;
 }
-.music-editor .has-pointer-roll.is-tone-shelf-open .melody-tone-hand:is(.is-revealed, :focus-within) .melody-tone-entry {
+.music-editor .has-pointer-roll.is-tone-shelf-open .melody-tone-hand:is(.is-revealed, :not(.is-pointer-above):has(:focus-visible)) .melody-tone-entry {
   transform: translate(calc(-50% + var(--hand-x, 0px)), calc(-12px + var(--hand-y, 0px))) rotate(var(--card-turn, 0deg));
 }
 .music-editor .has-pointer-roll.is-tone-shelf-open .melody-tone-hand .melody-tone-entry:is(:hover, :focus-within) {
@@ -78,12 +84,18 @@
   overflow: hidden; text-align: center; font-size: clamp(11px, 1.12vw, 16px);
 }
 .has-pointer-roll.is-tone-shelf-open .melody-shelf :is(.melody-note-family, .melody-tone-pile) { pointer-events: auto; }
+.music-editor .has-pointer-roll.is-tone-shelf-open .melody-tone-hand:not(.is-revealed, :not(.is-pointer-above):has(:focus-visible)) .melody-tone-entry {
+  transform: translate(calc(-50% + var(--hand-x, 0px)), calc(var(--tone-card-height) - var(--tone-card-peek) + min(6px, var(--hand-y, 0px)))) rotate(var(--card-turn, 0deg));
+}
+.has-pointer-roll.is-tone-shelf-open .melody-shelf .melody-tone-hand:not(.is-revealed, :not(.is-pointer-above):has(:focus-visible)) .melody-note-family { pointer-events: none; }
+.music-editor .has-pointer-roll .melody-tone-hand .melody-note-family { padding: 2px 3px 3px; gap: 1px; }
 .has-pointer-roll :is(.melody-tone-hand, .melody-pinned-tone) .melody-note-family::before { display: none; }
 .has-pointer-roll :is(.melody-tone-hand, .melody-pinned-tone) .melody-note-family:is(:hover, :focus-visible, .is-selected) {
   border-color: color-mix(in srgb, var(--tone-color) 70%, #29465a);
   background: #fcfdff;
 }
 .melody-card-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.music-editor .has-pointer-roll .melody-card-name { color: color-mix(in srgb, var(--tone-color, var(--text)) 67%, black); }
 .melody-card-art {
   display: grid; place-items: center; position: relative; min-height: 0; overflow: hidden; border-radius: 6px;
   background: radial-gradient(ellipse at 45% 38%, #ffffff70, transparent 64%), color-mix(in srgb, var(--tone-color, #8ebcd3) 27%, #edf3f8);
@@ -92,24 +104,32 @@
   position: static; transform: none; width: 61%; height: 67%;
   max-width: clamp(48px, 4.1vw, 79px); max-height: clamp(42px, 4vw, 76px);
 }
-.has-pointer-roll .melody-shelf .melody-tone-pile {
-  position: absolute; right: 7%; bottom: calc(var(--melody-keyboard-height) + var(--tone-keyboard-inset, 0px) + 7px);
-  width: clamp(60px, 7.2vw, 110px); height: clamp(78px, 9.3vw, 144px); min-height: 0; margin: 0; padding: 0;
-  border: 0; background: transparent;
+.music-editor .has-pointer-roll .melody-shelf .melody-tone-pile {
+  position: absolute; left: 0; right: auto; bottom: 0; z-index: 1;
+  display: block; width: var(--tone-fan-radius); height: var(--tone-fan-radius);
+  min-height: 0; margin: 0; padding: 0; overflow: visible;
+  border: 0; border-radius: 0; background: transparent; pointer-events: none;
 }
 .music-editor .has-pointer-roll .melody-shelf .melody-tone-pile:hover { background: transparent; border: 0; }
 .melody-card-backs { display: block; position: relative; width: 100%; height: 100%; pointer-events: none; }
 .melody-card-backs i {
   position: absolute; inset: 3px 3px 3px 5px; display: block;
   transform: translate(calc(-2.8px * var(--stack-step)), calc(1.5px * var(--stack-step))) rotate(calc(3deg - .9deg * var(--stack-step)));
-  border: 1px solid #879fb5; border-radius: 7px; background: #dce7f1; box-shadow: 0 2px 4px #253f552a;
-}
-.melody-card-backs i:last-child {
-  background: repeating-linear-gradient(48deg, #d4e0eb 0 2px, #e7eff6 2px 5px);
+  border: 1px solid #d6d7df; border-radius: 7px; background: #fff; box-shadow: 0 2px 4px #253f552a;
 }
 .melody-card-backs i::after {
   content: ''; position: absolute; inset: 0; border: 0; border-radius: inherit; pointer-events: none;
   background: var(--tone-card-back-pattern, none) center / 100% 100% no-repeat;
+}
+.has-pointer-roll.is-tone-shelf-open .melody-tone-pile .melody-card-backs {
+  border-top-right-radius: 100%; background: #eeedf4; pointer-events: auto;
+}
+.melody-tone-pile .melody-card-backs i {
+  --fan-index: calc(6 - var(--stack-step));
+  inset: auto auto 23% 0;
+  width: 35%; height: 70.5%; box-sizing: border-box;
+  transform-origin: 0 calc(100% + var(--tone-fan-radius) * .23);
+  transform: rotate(calc(var(--fan-index) * 15deg)) translateX(calc(var(--fan-index) * var(--tone-fan-radius) * -.35 / 6));
 }
 .melody-library-deck .melody-card-backs.is-left i {
   transform: translate(calc(2.8px * var(--stack-step)), calc(1.5px * var(--stack-step))) rotate(calc(-3deg + .9deg * var(--stack-step)));
@@ -117,19 +137,20 @@
 .melody-tone-pile-empty { display: none; }
 .melody-tone-pile.is-library-spread .melody-card-backs { display: none; }
 .melody-tone-pile.is-library-spread .melody-tone-pile-empty {
-  display: grid; place-items: center; width: 100%; height: 100%; border: 1px dashed #849cae; border-radius: 8px;
+  position: absolute; left: 12px; bottom: 12px; pointer-events: auto;
+  display: grid; place-items: center; width: var(--tone-pile-width); height: var(--tone-pile-height); border: 1px dashed #849cae; border-radius: 8px;
   color: #58748a; font-size: 21px; text-align: center;
 }
 .melody-tone-pile.is-over .melody-tone-pile-empty { border-color: #ae5550; }
 .has-pointer-roll .melody-pinned-tone {
-  position: absolute; z-index: 15; top: 9px; left: 12px;
-  width: clamp(58px, min(7vw, 10.3vh), 117px);
-  height: clamp(62px, min(8vw, 11.5vh), 133px);
+  position: absolute; z-index: 15; inset: 0 0 auto;
+  height: clamp(54px, 12vh, 112px); pointer-events: none;
+  padding: 10px 56px 0; box-sizing: border-box; text-align: center;
+  background: linear-gradient(to bottom, color-mix(in srgb, var(--tone-color) 48%, transparent), transparent);
 }
-.has-pointer-roll .melody-pinned-tone .melody-tone-entry { width: 100%; height: 100%; }
-.has-pointer-roll .melody-pinned-tone .melody-note-family.is-selected {
-  background: color-mix(in srgb, var(--tone-color) 25%, #fbfdff);
-  box-shadow: 0 3px 10px color-mix(in srgb, var(--tone-color) 36%, transparent);
+.melody-selected-tone-name {
+  display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  color: color-mix(in srgb, var(--tone-color) 36%, var(--text)); font-weight: 600;
 }
 .has-pointer-roll .melody-main > .melody-card-flight { position: absolute; z-index: 38; pointer-events: none; }
 .melody-card-drag-image { position: fixed; z-index: 38; pointer-events: none; left: -64px; top: 0; width: 46px; height: 58px; font-size: 9px; }
@@ -148,43 +169,37 @@
 .has-pointer-roll .melody-notes .melody-note:not(.is-drawing) { pointer-events: auto; }
 .has-pointer-roll .melody-note-highlights { position: absolute; top: 0; left: 0; z-index: 3; pointer-events: none; }
 .has-pointer-roll .melody-note-highlights[hidden] { display: none; }
-.has-pointer-roll .melody-note-resize { display: none; }
-.music-editor .has-pointer-roll .melody-grid-line { background: #e5edf3; }
-.music-editor .has-pointer-roll .melody-grid-line.is-beat {
-  --melody-line-width: var(--melody-grid-stroke, 1px);
-  background: #cbdbe5;
+.melody-onset-guide {
+  position: absolute; inset-inline: 0; z-index: 3; pointer-events: none;
+  border-block-start: 1px dashed #597f9ba8;
 }
+.has-pointer-roll .melody-note-resize { display: none; }
 .music-editor .has-pointer-roll .melody-pitch-row.is-accidental { background: #3048670b; }
 .music-editor .has-pointer-roll .melody-pitch-row::after { background: #91aabd55; }
-.music-editor .has-pointer-roll .melody-note:not(.is-sounding) { background-color: color-mix(in srgb, var(--tone-color) 69%, white); }
 .has-pointer-roll .melody-tone-note-layer:is(.is-current-tone, .is-tone-preview) { z-index: 2; }
 .has-pointer-roll .melody-tone-note-layer:is(.is-dim:not(.is-tone-preview), .is-tone-preview-dim) { opacity: .34; z-index: 0; }
 .music-editor .has-pointer-roll .workspace-inline-panel.melody-tone-library {
-  position: absolute; inset: auto 0 var(--tone-keyboard-inset, 0px); z-index: 18; width: auto; max-width: none; max-height: none;
-  height: var(--melody-keyboard-height); overflow: visible; margin: 0; padding: 0;
+  position: absolute; inset: clamp(15px, 5vh, 54px) 0 auto; z-index: 18; width: auto; max-width: none; max-height: none;
+  height: 60%; margin: 0; padding: 0; overflow: visible;
   border: 0; border-radius: 0; box-shadow: none; background: transparent; pointer-events: none;
 }
-.melody-library-deck {
-  position: relative; display: grid; height: 100%; align-items: center; grid-template-columns: clamp(56px, 7.2vw, 90px) minmax(0, 1fr) clamp(56px, 7.2vw, 90px);
-  gap: 7px; padding-inline: 12px; pointer-events: auto; overflow: hidden;
-}
-.melody-library-deck.is-deck-moving { overflow: visible; }
-.melody-library-deck .melody-card-backs { width: min(100%, clamp(56px, 6.2vw, 90px)); height: min(84%, clamp(78px, 8.7vw, 126px)); align-self: center; }
-.melody-library-deck .melody-card-backs.is-right { justify-self: end; }
+.melody-library-deck { position: relative; height: 100%; padding-inline: clamp(12px, 4vw, 55px); }
 .music-editor .has-pointer-roll .melody-library-deck .melody-library-grid {
-  display: flex; justify-content: center; height: 100%; min-height: 0; padding: 3px 4px; gap: 6px; overflow: visible;
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(clamp(76px, 9vw, 124px), 1fr)); align-content: start;
+  height: 100%; min-height: 0; padding: 6px 10px; gap: clamp(8px, 1.3vw, 16px); overflow: auto;
+  overscroll-behavior: contain; pointer-events: auto;
 }
 .has-pointer-roll .melody-library-deck .melody-library-card {
-  position: relative; display: block; flex: 0 1 clamp(78px, 8.5vw, 146px); min-width: 0; height: 100%; min-height: 0;
-  padding: 0; border: 0; border-radius: 8px; transform: rotate(var(--card-turn, 0deg)); z-index: var(--card-layer, 1);
+  display: block; justify-self: center; width: min(100%, 144px); height: auto; aspect-ratio: 4 / 5;
+  min-width: 0; padding: 0; border: 0; border-radius: 8px;
 }
 .has-pointer-roll .melody-library-deck .melody-library-tone { padding: 3px; border-radius: 8px; }
 .has-pointer-roll .melody-library-deck .melody-library-tone:hover { background: #eef6fb; }
 .has-pointer-roll .melody-library-deck .melody-library-tone[aria-disabled="true"] { opacity: .72; }
 .has-pointer-roll .melody-tone-library .melody-library-error {
-  position: absolute; bottom: calc(100% + 8px); right: 2%; max-width: 45%; pointer-events: auto;
+  position: absolute; top: calc(100% + 8px); right: 2%; max-width: 45%; pointer-events: auto;
 }
-.has-pointer-roll.is-tone-settings-covered :is(.melody-tone-library, .melody-pinned-tone, .melody-tone-shortcut) { visibility: hidden; }
+.has-pointer-roll.is-tone-settings-covered :is(.melody-tone-library, .melody-pinned-tone, .melody-tone-shortcut, .melody-deck-flights) { visibility: hidden; }
 .music-editor .has-pointer-roll.is-tone-settings-covered .melody-shelf { transition: none; }
 .has-pointer-roll .workspace-inline-panel.melody-tone-delete-dialog {
   position: absolute; z-index: 46; inset: 50% auto auto 50%; translate: -50% -50%;
@@ -250,5 +265,193 @@
 }
 @media (prefers-reduced-motion: reduce) {
   .has-pointer-roll .melody-shelf,
+  .has-pointer-roll .melody-shelf .melody-tone-pile,
   .has-pointer-roll .melody-tone-entry, .has-pointer-roll .melody-tone-library { animation: none; transition: none; }
+}
+
+.has-pointer-roll.is-tone-library-open:not(.is-tone-settings-covered) .melody-main::after {
+  content: ''; position: absolute; inset: 0; z-index: 11; background: rgb(28 17 37 / 64%);
+}
+.has-pointer-roll.is-tone-library-open:not(.is-tone-settings-covered) .melody-pinned-tone { filter: brightness(.44); pointer-events: none; }
+.melody-tone-pile-corner { display: none; }
+:root.windows-desktop-colors:where(:not(.website-editor)) .has-pointer-roll.is-tone-shelf-open .melody-tone-pile { pointer-events: none; box-shadow: none !important; }
+:root.windows-desktop-colors:where(:not(.website-editor)) .has-pointer-roll.is-tone-shelf-open .melody-tone-pile .melody-card-backs { background: transparent; pointer-events: none; }
+:root.windows-desktop-colors:where(:not(.website-editor)) .melody-tone-pile .melody-card-backs i {
+  z-index: var(--stack-step); pointer-events: auto;
+}
+:root.windows-desktop-colors:where(:not(.website-editor)) .melody-tone-pile .melody-card-backs i:not(:first-child)::after { content: none; }
+:root.windows-desktop-colors:where(:not(.website-editor)) .has-pointer-roll.is-tone-shelf-open:not(.is-tone-settings-covered) .melody-shelf .melody-tone-pile.is-library-spread {
+  clip-path: circle(100% at 0 100%); pointer-events: auto;
+}
+:root.windows-desktop-colors:where(:not(.website-editor)) .melody-tone-pile.is-library-spread::before {
+  content: ''; position: absolute; inset: 0; box-sizing: border-box; pointer-events: none;
+  border: 1px solid #c6c7d1; border-left: 0; border-bottom: 0; border-radius: 0 100% 0 0;
+}
+:root.windows-desktop-colors:where(:not(.website-editor)) .melody-tone-pile.is-library-spread .melody-card-backs {
+  display: block; visibility: hidden;
+}
+:root.windows-desktop-colors:where(:not(.website-editor)) .melody-tone-pile.is-library-spread .melody-tone-pile-empty {
+  display: none;
+}
+:root.windows-desktop-colors:where(:not(.website-editor)) .melody-tone-pile-corner:not([hidden]) {
+  position: absolute; z-index: 42; inset: auto auto 0 0; display: block;
+  width: calc(var(--tone-fan-radius) * .3); height: calc(var(--tone-fan-radius) * .3);
+  padding: 0; border: 0; border-radius: 0; clip-path: circle(100% at 0 100%);
+  background: #fff; pointer-events: auto;
+}
+:root.windows-desktop-colors:where(:not(.website-editor)) .melody-tone-pile-corner::before {
+  content: ''; position: absolute; inset: 0 1px 1px 0; pointer-events: none;
+  border: 1px solid #c6c7d1; border-left: 0; border-bottom: 0; border-radius: 0 100% 0 0;
+}
+:root.windows-desktop-colors:where(:not(.website-editor)) .melody-tone-pile-corner::after {
+  content: '+'; position: absolute; inset: auto auto 42% 42%; translate: -50% 50%;
+  color: #465266; font: 500 clamp(19px, 2.4vw, 29px)/1 system-ui, sans-serif; pointer-events: none;
+}
+:root.windows-desktop-colors:where(:not(.website-editor)) .melody-tone-pile-corner[aria-expanded="true"]::after {
+  content: '−';
+}
+:root.windows-desktop-colors:where(:not(.website-editor)) .melody-tone-pile-corner:focus-visible {
+  background: #ede5f3;
+}
+:root.windows-desktop-colors:where(:not(.website-editor)) .has-pointer-roll.is-tone-settings-covered .melody-tone-pile .melody-card-backs i { pointer-events: none; }
+:root.windows-desktop-colors:where(:not(.website-editor)) .has-pointer-roll.is-tone-library-open:not(.is-tone-settings-covered) .melody-pinned-tone { filter: none; }
+:root.windows-desktop-colors:where(:not(.website-editor)) #app .melody-library-deck:focus-visible { box-shadow: none; }
+:root.windows-desktop-colors:where(:not(.website-editor)) .has-pointer-roll .melody-main::after {
+  content: ''; position: absolute; inset: 0; z-index: 11; background: rgb(28 17 37 / 64%);
+  opacity: 0; pointer-events: none; transition: opacity 180ms ease-out;
+}
+:root.windows-desktop-colors:where(:not(.website-editor)) .has-pointer-roll.is-tone-library-open:not(.is-tone-settings-covered) .melody-main::after { opacity: 1; }
+@media (prefers-reduced-motion: reduce) {
+  :root.windows-desktop-colors:where(:not(.website-editor)) .has-pointer-roll .melody-main::after { transition: none; }
+}
+.has-pointer-roll .melody-deck-flights { position: absolute; inset: 0; z-index: 38; padding: 0; pointer-events: none; }
+.has-pointer-roll .melody-deck-flights .melody-library-card { position: absolute; margin: 0; pointer-events: none; }
+.melody-deck-flights .melody-deck-flight-back {
+  position: absolute; inset: 0; border: 1px solid var(--tone-card-back-edge, #d6d7df);
+  border-radius: 7px; background: #fff; box-shadow: 0 1px 2px #28233628; pointer-events: none;
+}
+.melody-deck-flights .melody-deck-flight-back.has-note-mark {
+  background: #fff var(--tone-card-back-pattern) center / 100% 100% no-repeat;
+}
+.melody-deck-flights .melody-library-tone { position: relative; }
+.melody-library-grid > .is-deck-flying { visibility: hidden; }
+.music-editor .song-details-tempo {
+  display: flex; flex-direction: column; align-items: flex-end; gap: 6px;
+}
+.music-editor .song-details-tempo-more { display: flex; align-items: center; gap: clamp(6px, 2vw, 14px); }
+.music-editor .song-details-tempo-more > .learning-roll-switch { flex: none; white-space: nowrap; }
+.music-editor .song-details-tempo.are-beat-grids-hidden .song-details-tempo-more { display: none; }
+.music-editor .song-details-tempo .melody-tempo-dock {
+  display: flex; position: relative; align-items: center; justify-content: flex-end;
+  gap: clamp(4px, 1.2vw, 10px); background: none;
+}
+.music-editor .song-details-tempo :is(.melody-tempo-button, .melody-grid-shift, .melody-extend) {
+  display: grid; place-items: center; box-sizing: border-box;
+  width: 48px; min-width: 36px; flex: 0 1 48px; height: 32px; border: 0; padding: 0; border-radius: 6px;
+  color: var(--text); background: var(--control-wash, var(--surface-raised));
+}
+:root.windows-desktop-colors:where(:not(.website-editor)) .music-editor .song-details-tempo.are-beat-grids-hidden .song-details-tempo-more {
+  display: flex; visibility: hidden;
+}
+.music-editor .song-editor-controls.is-shifting-beats { opacity: 0; pointer-events: none; }
+.music-editor .song-details-tempo .melody-grid-shift { cursor: ns-resize; touch-action: none; }
+.melody-grid-shift[aria-pressed="true"]::before { opacity: .4; }
+.has-pointer-roll .melody-grid-line[hidden] { display: none; }
+.melody-grid-shift::before {
+  content: ''; display: inline-block; vertical-align: middle; width: 12px; height: 10px;
+  border-block: 2px solid currentColor; border-radius: 2px;
+  background: linear-gradient(currentColor, currentColor) center / 100% 2px no-repeat;
+}
+.music-editor .song-details-tempo :is(.melody-extend, .melody-tempo-button)[hidden] { display: none; }
+:root.windows-desktop-colors:where(:not(.website-editor)) .music-editor .song-details-tempo :is(.melody-tempo-button, .melody-extend)[hidden] {
+  display: grid; visibility: hidden;
+}
+.music-editor .song-details-tempo .melody-tempo-panel {
+  position: absolute; inset: auto 0 calc(100% + 6px) auto;
+  max-width: min(390px, 90vw); grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.music-editor .melody-tempo-panel.is-compact-tempo {
+  width: max-content; max-width: calc(100vw - 16px); box-sizing: border-box;
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: end;
+}
+.music-editor .melody-tempo-panel.is-compact-tempo[hidden] { display: none; }
+.music-editor .melody-tempo-actions { display: flex; gap: 4px; }
+.music-editor .melody-tempo-actions button {
+  flex: 0 0 42px; min-width: 42px; height: 28px; padding: 0; white-space: nowrap;
+  border: 0; border-radius: 4px; font-size: 12px; color: var(--text); background: var(--surface-raised); cursor: pointer;
+}
+.music-editor .melody-tempo-actions button[aria-pressed="true"] { background: var(--editor-hover); }
+.music-editor .melody-tempo-status { flex-basis: 100%; text-align: right; font-size: 12px; color: var(--muted); }
+.music-editor .melody-tap-tempo.is-space-key::before {
+  content: ''; display: inline-block; width: 16px; height: 5px;
+  border: 1.5px solid currentColor; border-top: 0; border-radius: 0 0 2px 2px;
+}
+.melody-card-art img {
+  display: block; max-width: 100%; width: 100%; height: 100%; min-height: 0;
+  object-fit: contain; pointer-events: none; mix-blend-mode: multiply;
+}
+
+.has-pointer-roll .melody-tone-pile.is-library-spread .melody-tone-pile-empty { color: #fff9f2; }
+
+.melody-pitch-bands {
+  position: absolute; inset: 0; z-index: 0; overflow: hidden; pointer-events: none;
+}
+.melody-pitch-bands > div { position: absolute; inset-block: 0; }
+.melody-pitch-bands > [hidden] { display: none; }
+:is(.melody-scale-band, .melody-locked-pitch-band) { background: #fff; }
+.melody-pitch-bands > .melody-audition-band { z-index: 2; }
+.has-white-pitch-neighbor {
+  box-sizing: border-box; border-inline-start: 2px solid transparent; background-clip: padding-box;
+}
+.music-editor .has-pointer-roll .melody-grid-line.is-beat {
+  --melody-line-width: var(--melody-grid-stroke, 1px);
+  background: #cbdbe5;
+}
+.melody-audition-band {
+  background: linear-gradient(180deg, #ffda28, #ffdf42 62%, #ffe775a6);
+}
+.pointer-edge-hints {
+  position: fixed; inset: 0; z-index: 96; pointer-events: none;
+}
+.pointer-edge-hints[hidden], .pointer-edge-hints > [hidden] { display: none; }
+.pointer-edge-hints > i {
+  position: absolute;
+  background: linear-gradient(var(--edge-hint-direction), var(--edge-hint-color), transparent);
+}
+.pointer-edge-hints > :is([data-edge="left"], [data-edge="right"]) {
+  top: 0; width: clamp(30px, 7vw, 110px); height: var(--edge-hint-length, 100%);
+}
+.pointer-edge-hints > [data-edge="left"] { left: 0; --edge-hint-direction: to right; }
+.pointer-edge-hints > [data-edge="right"] { right: 0; --edge-hint-direction: to left; }
+.pointer-edge-hints > :is([data-edge="top"], [data-edge="bottom"]) {
+  left: 0; right: 0; height: clamp(30px, 9vh, 95px);
+}
+.pointer-edge-hints > [data-edge="top"] { top: 0; --edge-hint-direction: to bottom; }
+.pointer-edge-hints > [data-edge="bottom"] { bottom: 0; --edge-hint-direction: to top; }
+
+
+.music-editor .has-pointer-roll .melody-canvas .melody-note {
+  --note-boost-db: max(0, var(--note-gain-db, 0));
+  --note-cut-db: max(0, -1 * var(--note-gain-db, 0));
+  --note-boost: calc((9 * min(1, var(--note-boost-db)) + 19 * max(0, var(--note-boost-db) - 1) / 5) / 28);
+  --note-cut: calc((7 * min(1, var(--note-cut-db)) + 25 * max(0, var(--note-cut-db) - 1) / 11) / 32);
+  --note-head-alpha: calc(72% + 28% * var(--note-boost) - 32% * var(--note-cut));
+  --note-shoulder-alpha: calc(38% + 26% * var(--note-boost) - 18% * var(--note-cut));
+  --note-mid-alpha: calc(25% + 17% * var(--note-boost) - 12% * var(--note-cut));
+  --note-tail-alpha: calc(var(--note-tail, 16%) + 9% * var(--note-boost) - 8% * var(--note-cut));
+  background: linear-gradient(to bottom,
+    var(--note-head-color, color-mix(in srgb, var(--tone-color) min(100%, var(--note-head-alpha) * var(--note-velocity-scale, 1)), transparent)) 0 min(4px, 22%),
+    color-mix(in srgb, var(--tone-color) calc(var(--note-shoulder-alpha) * var(--note-velocity-scale, 1)), transparent) min(10px, 46%),
+    color-mix(in srgb, var(--tone-color) calc(var(--note-mid-alpha) * var(--note-velocity-scale, 1)), transparent) 68%,
+    color-mix(in srgb, var(--tone-color) calc(var(--note-tail-alpha) * var(--note-velocity-scale, 1)), transparent));
+  background-size: calc(70% + 1.4px) 100%;
+  background-position: center;
+  background-repeat: no-repeat;
+  box-shadow: none; border: 0; border-radius: 0;
+}
+.music-editor .has-pointer-roll .melody-canvas .melody-note:is(.is-selected, :focus-visible) {
+  --note-tail: 21%;
+}
+.music-editor .has-pointer-roll .melody-canvas .melody-note.is-sounding {
+  --note-head-color: color-mix(in srgb, var(--tone-color) 32%, white);
 }

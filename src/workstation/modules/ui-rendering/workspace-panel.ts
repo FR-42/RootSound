@@ -19,7 +19,7 @@ export function createWorkspacePanel(inline = false, initialFocus: 'first-contro
     panel.dispatchEvent(new Event('close'));
   };
   panel.addEventListener('keydown', event => {
-    if (event.key !== 'Escape' || event.defaultPrevented) return;
+    if (event.key !== 'Escape' || event.defaultPrevented || event.repeat || event.isComposing) return;
     event.preventDefault();
     event.stopPropagation();
     panel.dispatchEvent(new Event('cancel', { cancelable: true })) && panel.close();

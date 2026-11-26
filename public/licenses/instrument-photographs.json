@@ -1,0 +1,154 @@
+{
+  "piano": {
+    "source": "https://commons.wikimedia.org/wiki/File:Steinway_%26_Sons_concert_grand_piano,_model_D-274,_manufactured_at_Steinway%27s_factory_in_Hamburg,_Germany.png",
+    "name": "Steinway & Sons concert grand piano, model D-274, manufactured at Steinway's factory in Hamburg, Germany.png",
+    "license": "CC BY-SA 3.0",
+    "artist": "Steinway & Sons, 10 Rondenbarg, Hamburg D-22525, Germany, eu.steinway.com.Steinway & Sons, 1 Steinway Place, Long Island City, New York 11105, The United States, www.steinway.com.",
+    "changes": "Resized and converted to WebP.",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0/"
+  },
+  "sax": {
+    "source": "https://commons.wikimedia.org/wiki/File:Yamaha_YAS-25_Alto_Saxophone_20080502.jpg",
+    "name": "Yamaha YAS-25 Alto Saxophone 20080502.jpg",
+    "license": "CC BY-SA 3.0",
+    "artist": "TR001",
+    "changes": "Resized and converted to WebP.",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0/"
+  },
+  "bass": {
+    "source": "https://commons.wikimedia.org/wiki/File:Fender_Jaguar_Bass_front.jpg",
+    "name": "Fender Jaguar Bass front.jpg",
+    "license": "CC BY-SA 3.0",
+    "artist": "Brian Reading",
+    "changes": "Resized and converted to WebP.",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0/"
+  },
+  "guitar": {
+    "source": "https://commons.wikimedia.org/wiki/File:Classical_Guitar_two_views.jpg",
+    "name": "Classical Guitar two views.jpg",
+    "license": "CC BY-SA 2.0 de",
+    "artist": "Martin Möller",
+    "changes": "Resized and converted to WebP.",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/2.0/de/"
+  },
+  "steel-guitar": {
+    "source": "https://commons.wikimedia.org/wiki/File:Martin_D-28_body_left_(2011-01-02_by_irish10567).jpg",
+    "name": "Martin D-28 body left (2011-01-02 by irish10567).jpg",
+    "license": "CC BY 2.0",
+    "artist": "irish10567 from Little Falls, NJ, USA",
+    "changes": "Resized and converted to WebP.",
+    "licenseUrl": "https://creativecommons.org/licenses/by/2.0/"
+  },
+  "violin": {
+    "source": "https://commons.wikimedia.org/wiki/File:Lady_Blunt_top.jpg",
+    "name": "Lady Blunt top.jpg",
+    "license": "CC BY-SA 3.0",
+    "artist": "Tarisio Auctions.\n\nViolachick68 at English Wikipedia",
+    "changes": "Resized and converted to WebP.",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0/"
+  },
+  "viola": {
+    "source": "https://commons.wikimedia.org/wiki/File:Bratsche.jpg",
+    "name": "Bratsche.jpg",
+    "license": "Public domain",
+    "artist": "Just plain Bill",
+    "changes": "Resized and converted to WebP.",
+    "licenseUrl": "https://creativecommons.org/publicdomain/mark/1.0/"
+  },
+  "cello": {
+    "source": "https://commons.wikimedia.org/wiki/File:Cello_study.jpg",
+    "name": "Cello study.jpg",
+    "license": "CC BY-SA 3.0",
+    "artist": "MichaelMaggs",
+    "changes": "Resized and converted to WebP.",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0/"
+  },
+  "flute": {
+    "source": "https://commons.wikimedia.org/wiki/File:Western_concert_flute.jpg",
+    "name": "Western concert flute.jpg",
+    "license": "Public domain",
+    "artist": "",
+    "changes": "Resized and converted to WebP.",
+    "licenseUrl": "https://creativecommons.org/publicdomain/mark/1.0/"
+  },
+  "trumpet": {
+    "source": "https://commons.wikimedia.org/wiki/File:Trumpet_in_c_german.jpg",
+    "name": "Trumpet in c german.jpg",
+    "license": "CC BY-SA 3.0",
+    "artist": "Aichas",
+    "changes": "Resized and converted to WebP.",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0/"
+  },
+  "trombone": {
+    "source": "https://commons.wikimedia.org/wiki/File:TriggerTrombone.jpg",
+    "name": "TriggerTrombone.jpg",
+    "license": "Public domain",
+    "artist": "Event",
+    "changes": "Resized and converted to WebP.",
+    "licenseUrl": "https://creativecommons.org/publicdomain/mark/1.0/"
+  },
+  "horn": {
+    "source": "https://commons.wikimedia.org/wiki/File:Horn_in_F_(20th_C.),_composite_of_parts_from_C._G._Conn,_Ltd._and_F._A._Reynolds_Company,_U.S.A._-_MIM_PHX.jpg",
+    "name": "Horn in F (20th C.), composite of parts from C. G. Conn, Ltd. and F. A. Reynolds Company, U.S.A. - MIM PHX.jpg",
+    "license": "CC BY 2.0",
+    "artist": "Frank Kovalchek from Anchorage, Alaska, USA",
+    "changes": "Resized and converted to WebP.",
+    "licenseUrl": "https://creativecommons.org/licenses/by/2.0/"
+  },
+  "dizi": {
+    "source": "https://commons.wikimedia.org/wiki/File:Dizi_MET_MIDP89.4.62.jpg",
+    "name": "Dizi MET MIDP89.4.62.jpg",
+    "license": "CC0",
+    "artist": "",
+    "changes": "Resized and converted to WebP.",
+    "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/"
+  },
+  "kick": {
+    "source": "https://commons.wikimedia.org/wiki/File:Acoustic_Bass_Drum_(43118098034).jpg",
+    "name": "Acoustic Bass Drum (43118098034).jpg",
+    "license": "CC BY 2.0",
+    "artist": "Dejan Krsmanovic",
+    "changes": "Resized and converted to WebP.",
+    "licenseUrl": "https://creativecommons.org/licenses/by/2.0/"
+  },
+  "snare": {
+    "source": "https://commons.wikimedia.org/wiki/File:Snare_drum_-_Vladimir_Morozov.jpg",
+    "name": "Snare drum - Vladimir Morozov.jpg",
+    "license": "CC BY 2.0",
+    "artist": "Vladimir Morozov from Russia",
+    "changes": "Resized and converted to WebP.",
+    "licenseUrl": "https://creativecommons.org/licenses/by/2.0/"
+  },
+  "hat": {
+    "source": "https://commons.wikimedia.org/wiki/File:Hi-hat.jpg",
+    "name": "Hi-hat.jpg",
+    "license": "Public domain",
+    "artist": "Wyglif",
+    "changes": "Resized and converted to WebP.",
+    "licenseUrl": "https://creativecommons.org/publicdomain/mark/1.0/"
+  },
+  "tom": {
+    "source": "https://commons.wikimedia.org/wiki/File:Tom-tom_12x8.jpg",
+    "name": "Tom-tom 12x8.jpg",
+    "license": "CC BY-SA 3.0",
+    "artist": "Marco van den Hout",
+    "changes": "Resized and converted to WebP.",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0/"
+  },
+  "crash": {
+    "source": "https://commons.wikimedia.org/wiki/File:Cymbal_-_Paiste_Mellowcsh.jpg",
+    "name": "Cymbal - Paiste Mellowcsh.jpg",
+    "license": "CC BY-SA 2.5",
+    "artist": "",
+    "changes": "Resized and converted to WebP.",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/2.5/"
+  },
+  "ride": {
+    "source": "https://commons.wikimedia.org/wiki/File:Zildjian-Ride.jpg",
+    "name": "Zildjian-Ride.jpg",
+    "license": "CC BY 2.5",
+    "artist": "Mikeh0303 at English Wikipedia. Photo By: Michael H.",
+    "changes": "Resized and converted to WebP.",
+    "licenseUrl": "https://creativecommons.org/licenses/by/2.5/"
+  }
+}

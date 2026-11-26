@@ -70,7 +70,6 @@ export function mountSampleTimbreWorkspace(root: HTMLElement, options: {
   const trim = node('section', 'sample-timbre-trim');
   trim.append(node('h2', '', '播放范围'));
   const wave = node('div', 'sample-timbre-wave');
-  wave.title = '拖动两端选择播放范围，原素材保持完整。';
   const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg'); svg.setAttribute('viewBox', '0 0 1000 160'); svg.setAttribute('preserveAspectRatio', 'none'); svg.setAttribute('aria-hidden', 'true');
   const wavePath = document.createElementNS('http://www.w3.org/2000/svg', 'path'); svg.append(wavePath); wave.append(svg);
   const leftShade = node('div', 'sample-trim-shade is-left'); const rightShade = node('div', 'sample-trim-shade is-right'); const selection = node('div', 'sample-trim-selection');
@@ -84,7 +83,6 @@ export function mountSampleTimbreWorkspace(root: HTMLElement, options: {
   const startInput = numberField('开始', 'sample-time-field'); const endInput = numberField('结束', 'sample-time-field'); const span = node('p', 'sample-trim-duration'); times.append(span); trim.append(times); card.append(trim);
   const looping = node('details', 'sample-looping'); looping.append(node('summary', '', '延长声音'));
   const loopLabel = node('label'); const loopEnabled = node('input'); loopEnabled.type = 'checkbox'; loopLabel.append(loopEnabled, node('span', '', '循环延音')); looping.append(loopLabel);
-  loopLabel.title = '保留开头，只重复指定片段直到音符结束。选择平稳、衔接自然的片段。';
   function loopField(label: string): HTMLInputElement {
     const field = node('label', 'sample-time-field', label); const input = node('input'); input.type = 'number'; input.min = '0'; input.step = '.001'; input.setAttribute('aria-label', label); field.append(input, node('span', '', '秒')); looping.append(field); return input;
   }
@@ -92,7 +90,6 @@ export function mountSampleTimbreWorkspace(root: HTMLElement, options: {
   const tuning = node('section', 'sample-timbre-tuning');
   tuning.append(node('h2', '', '原始音高'));
   const pitchPicker = node('select', 'sample-root-picker'); pitchPicker.setAttribute('aria-label', '原始音高');
-  pitchPicker.title = '手动设置原音高；改变播放音高也会改变速度与长短。';
   const custom = node('option', '', '自定义音高'); custom.value = 'custom'; pitchPicker.append(custom);
   const pitches: Array<{ hz: number; label: string }> = [];
   for (let midi = 16; midi <= 111; midi++) {

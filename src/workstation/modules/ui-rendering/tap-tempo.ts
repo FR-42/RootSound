@@ -75,6 +75,7 @@ export function showTapTempo(root: HTMLElement, options: {
     if (closed) return;
     closed = true; window.clearTimeout(timer);
     document.removeEventListener('keydown', keydown, true);
+    document.dispatchEvent?.(new CustomEvent('rootsound-round-pointer-layer', { detail: null }));
     dialog.remove(); options.onClose?.();
   }
   function close(): void {
@@ -86,6 +87,8 @@ export function showTapTempo(root: HTMLElement, options: {
   actions.append(reset, cancel, apply);
   dialog.append(display, pad, error, actions); root.append(dialog); refresh();
   document.addEventListener('keydown', keydown, true);
-  dialog.showModal(); pad.focus();
+  dialog.showModal();
+  document.dispatchEvent?.(new CustomEvent('rootsound-round-pointer-layer', { detail: dialog }));
+  pad.focus();
   return { dispose };
 }

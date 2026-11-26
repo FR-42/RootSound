@@ -5,4 +5,5 @@
 .website-editor .song-mobile-controls button { border: 0; color: var(--text); background: var(--surface-gradient); border-radius: 8px; padding: 8px; min-width: 36px; min-height: 36px; }
 .website-editor .song-mobile-controls .song-play { color: var(--playline); }
 .website-editor .song-mobile-controls .song-touch-right[aria-pressed="true"] { background: var(--active-gradient); color: var(--accent); }
-.website-editor .has-mobile-controls .melody-tone-shortcut { clip-path: none; overflow: visible; opacity: 1; width: 32px; height: 30px; pointer-events: auto; background: var(--surface-gradient); border-radius: 6px; }
+.website-editor .has-mobile-controls .melody-tone-shortcut { top: 12px; bottom: auto; clip-path: none; overflow: visible; opacity: 1; width: 32px; height: 30px; pointer-events: auto; background: var(--surface-gradient); border-radius: 6px; }
+.website-editor .has-mobile-controls:has(.is-tone-library-open) .song-mobile-controls { filter: brightness(.52); pointer-events: none; }

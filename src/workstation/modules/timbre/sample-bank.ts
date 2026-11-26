@@ -15,35 +15,44 @@ const base=(import.meta.env?.BASE_URL ?? '/')+'instruments/';
 const frequency=(body:SampleBankTimbreBody,note:SoundPlan['note'])=>unpitchedDrumKey(body) === undefined
   ? note.frequencyHz*2**((body.tuningSemitones??0)/12) : DRUM_REFERENCE_FREQUENCY_HZ;
 
-let decoder: Worker | undefined;
+type DecodeJob = { resolve(sample: PcmSnapshot): void; reject(error: Error): void };
+type BankDecoder = { worker: Worker; pending: Map<number, DecodeJob> };
+const decoders = new Set<BankDecoder>();
 let decodeId = 0;
-const pendingDecodes = new Map<number, { resolve(sample: PcmSnapshot): void; reject(error: Error): void }>();
+
+function createDecoder(): BankDecoder {
+  const worker = new Worker(new URL('./sample-bank-worker.ts', import.meta.url), { type: 'module' });
+  const decoder: BankDecoder = { worker, pending: new Map() };
+  decoders.add(decoder);
+  const failed = () => {
+    worker.terminate(); decoders.delete(decoder);
+    for (const job of decoder.pending.values()) job.reject(new Error('后台录音解码失败，请重试。'));
+    decoder.pending.clear();
+  };
+  worker.onerror = event => { event.preventDefault(); failed(); };
+  worker.onmessageerror = failed;
+  worker.onmessage = (event: MessageEvent<{ id: number; sample?: PcmSnapshot; error?: string }>) => {
+    const { id, sample, error } = event.data;
+    const job = decoder.pending.get(id);
+    if (!job) return;
+    decoder.pending.delete(id);
+    if (sample) job.resolve(sample);
+    else job.reject(new Error(error ?? '后台录音返回了无效数据。'));
+  };
+  return decoder;
+}
+
 function decodeAsset(buffer: ArrayBuffer): Promise<PcmSnapshot> {
   if (typeof Worker !== 'function') return Promise.resolve(decodeBankSample(buffer));
-  if (!decoder) {
-    decoder = new Worker(new URL('./sample-bank-worker.ts', import.meta.url), { type: 'module' });
-    const failed = () => {
-      decoder?.terminate(); decoder = undefined;
-      for (const job of pendingDecodes.values()) job.reject(new Error('后台录音解码失败，请重试。'));
-      pendingDecodes.clear();
-    };
-    decoder.onerror = event => { event.preventDefault(); failed(); };
-    decoder.onmessageerror = failed;
-    decoder.onmessage = (event: MessageEvent<{ id: number; sample?: PcmSnapshot; error?: string }>) => {
-      const { id, sample, error } = event.data;
-      const job = pendingDecodes.get(id);
-      if (!job) return;
-      pendingDecodes.delete(id);
-      if (sample) job.resolve(sample);
-      else job.reject(new Error(error ?? '后台录音返回了无效数据。'));
-    };
-  }
-  const target = decoder;
+  let target: BankDecoder | undefined;
+  for (const decoder of decoders) if (!target || decoder.pending.size < target.pending.size) target = decoder;
+  const capacity = (globalThis.navigator?.hardwareConcurrency ?? 2) >= 4 ? 2 : 1;
+  const selected = !target || target.pending.size > 0 && decoders.size < capacity ? createDecoder() : target;
   return new Promise((resolve, reject) => {
     const id = ++decodeId;
-    pendingDecodes.set(id, { resolve, reject });
-    try { target.postMessage({ id, buffer }, [buffer]); }
-    catch (error) { pendingDecodes.delete(id); reject(error); }
+    selected.pending.set(id, { resolve, reject });
+    try { selected.worker.postMessage({ id, buffer }, [buffer]); }
+    catch (error) { selected.pending.delete(id); reject(error); }
   });
 }
 /** Installed recordings load only on demand; portable projects use the ordinary audio custody/cache. */
@@ -117,8 +126,9 @@ export function createSampleBankAudio(_library:MaterialLibrary, samples?:SampleA
       }
     }
     const pending = [...needed];
-    for (let index = 0; index < pending.length; index += 4) {
-      await Promise.all(pending.slice(index, index + 4).map(async ([id, zone]) => {
+    const batchSize = typeof Worker === 'function' && (globalThis.navigator?.hardwareConcurrency ?? 2) >= 4 ? 8 : 4;
+    for (let index = 0; index < pending.length; index += batchSize) {
+      await Promise.all(pending.slice(index, index + batchSize).map(async ([id, zone]) => {
         readySources.set(id, await source(zone, body.bank));
       }));
     }

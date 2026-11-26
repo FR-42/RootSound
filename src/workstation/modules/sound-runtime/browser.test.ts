@@ -202,6 +202,41 @@ test('live note deletion skips future attacks, keeps current tails, and restores
   } finally { await runtime.dispose(); }
 }));
 
+test('per-note gain applies to auditions and upcoming attacks without replacing the playback graph', async context => fixture(async () => {
+  context.mock.timers.enable({ apis: ['setTimeout'] });
+  const runtime = createBrowserSoundRuntime();
+  const sound = { ...plan(), note: { ...plan().note, holdSeconds: 1 } };
+  const input: SoundSequencePlan = { ...phrase([
+    { noteId: 'held', atSeconds: 0, sound, noteGainDb: 1 },
+    { noteId: 'scheduled', atSeconds: .25, sound },
+    { noteId: 'neighbor', atSeconds: .25, sound },
+    { noteId: 'later', atSeconds: 2, sound },
+  ], 4), editableNotes: true, preserveNoteLevel: true };
+  try {
+    const session = await runtime.preview(input), device = audio();
+    const envelopes = (index: number) => device.gains.find(gain => gain.connections.includes(device.panners[index]!))!.gain.changes;
+    const trim = (index: number) => Math.max(...envelopes(index).map(change => change.value)) / (sound.level * sound.note.velocity);
+    device.currentTime = session.startedAtSeconds + .08;
+    runtime.setNoteGain!(session.id, 'held', -6);
+    runtime.setNoteGain!(session.id, 'scheduled', 6);
+    runtime.setNoteGain!(session.id, 'later', -12);
+    close(trim(0), dbAmplitude(1));
+    close(trim(1), dbAmplitude(6));
+    close(trim(2), 1);
+    assert.equal(device.oscillators.length, 3);
+    assert.equal(device.clocks.length, 1);
+    runtime.setNoteGain!(session.id, 'scheduled', 0);
+    close(trim(1), 1);
+    device.currentTime = session.startedAtSeconds + 1.8;
+    context.mock.timers.tick(25);
+    close(trim(3), dbAmplitude(-12));
+    close(runtime.position(session.id), 1.8);
+    await runtime.audition(sound, { noteGainDb: 6, preserveNoteLevel: true });
+    close(trim(4), dbAmplitude(6));
+    assert.equal(device.clocks.length, 1);
+  } finally { await runtime.dispose(); }
+}));
+
 test('live deletion cancels each recording layer for a scheduled note', async () => fixture(async () => {
   const runtime = createBrowserSoundRuntime();
   const sample = longSample();

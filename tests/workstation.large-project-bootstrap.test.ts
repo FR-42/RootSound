@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import type { ContentRecord, Draft, MaterialTransactionResult } from '../src/workstation/contracts/content.ts';
-import { createMaterialLibrary } from '../src/workstation/modules/materials/public.ts';
+import { createMaterialLibrary, openLargeMaterialLibrary } from '../src/workstation/modules/materials/public.ts';
 import { openMaterialSession, stageMaterialStorage } from '../src/workstation/app/material-library-session.ts';
 import { createDesktopSamplePayloads } from '../src/workstation/app/platform/sample-payloads.ts';
 import { createSampleAudio, readSampleBody, resolveSampleBytes } from '../src/workstation/modules/sampling/public.ts';
@@ -135,6 +135,22 @@ test('startup batches working snapshots and detects a concurrent replacement bef
   assert.throws(() => conflict.publish(), /加载时发生了变化/);
   assert.equal(raw, 'replaced');
   assert.equal(writes.length, 2);
+});
+
+test('yielding startup validation preserves history, rejects corrupt scores and keeps the original write baseline', async () => {
+  const f = fixture();
+  f.library.updateDraft(f.draft.id, { name: 'edited' }, { remember: true, expected: f.draft });
+  let text = f.raw();
+  const store = { read: () => text, write(value: string) { text = value; } };
+  const library = await openLargeMaterialLibrary(store);
+  assert.equal(library.readDraft(f.draft.id)?.name, 'edited');
+  assert.equal(library.readDraftHistory(f.draft.id).past.at(-1)?.name, f.draft.name);
+  const original = text;
+  text = original.replace('"at":0.25', '"at":1e999');
+  assert.notEqual(text, original);
+  await assert.rejects(openLargeMaterialLibrary(store), /有限/);
+  assert.throws(() => library.updateDraft(f.draft.id, { name: 'stale' }), /其他窗口|写入失败/);
+  assert.match(text, /1e999/);
 });
 
 const token = `rootsound-payload:${'a'.repeat(32)}:${'b'.repeat(64)}`;

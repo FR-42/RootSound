@@ -2,7 +2,7 @@ import type { ContentRecord, Draft, MaterialLibrary } from '../contracts/content
 import type { EditableFileFormat } from '../contracts/project-directory.ts';
 import type { PhraseBody } from '../contracts/phrase.ts';
 import { phraseBarBeats, phraseBeatSeconds, phraseHeldSeconds, phraseSecondsBeat } from '../contracts/phrase-time.ts';
-import { MAX_PHRASE_BEATS } from '../contracts/phrase-limits.ts';
+import { MAX_PHRASE_BEATS, MIN_NOTE_BEATS, MIN_NOTE_SECONDS } from '../contracts/phrase-limits.ts';
 import { MIN_TEMPO_BPM, MAX_TEMPO_BPM } from '../contracts/music-limits.ts';
 import { createMaterialLibrary, createProjectPackages } from '../modules/materials/public.ts';
 import { createTimbrePlayback, createTimbreReferenceAdapter, defaultInstrumentInfo } from '../modules/timbre/public.ts';
@@ -10,7 +10,7 @@ import { createPhraseEditor, createPhrasePlayback, createPhraseReferenceAdapter,
 import { createSongEditor, createSongReferenceAdapter, readSongBody } from '../modules/song/public.ts';
 import { createSampleReferenceAdapter } from '../modules/sampling/public.ts';
 import { studioBank, studioInstrumentForMidi } from '../modules/timbre/instrument-catalog.ts';
-import { openMusicDocument, commitMusicDocument } from './music-document.ts';
+import { openMusicDocument, commitMusicDocument, flattenMusicTempo } from './music-document.ts';
 import { readExchangeMidi, writeExchangeMidi, createMidiPatcher } from './music-interchange-midi.ts';
 import { readExchangeXml, writeExchangeXml } from './music-interchange-xml.ts';
 import { exchangeSignature, type ExchangeScore } from './music-interchange-model.ts';
@@ -24,9 +24,30 @@ function memory(text: string | null = null) {
     { project: { rootKind: 'rootsound.song', adapters: adapters() } });
   return { library, text: () => { if (!snapshot) throw new Error('没有可编辑的音乐。'); return snapshot; } };
 }
+function fixedTempoClock(tempos: ExchangeScore['tempos'], bpm: number) {
+  let elapsedBeats = 0;
+  const anchors = tempos.map((point, index) => {
+    const previous = tempos[index - 1];
+    if (previous) elapsedBeats += (point.beat - previous.beat) * bpm / previous.bpm;
+    return { ...point, elapsedBeats };
+  });
+  return (beat: number): number => {
+    let low = 0, high = anchors.length;
+    while (low < high) {
+      const mid = (low + high) >>> 1;
+      if (anchors[mid]!.beat <= beat) low = mid + 1; else high = mid;
+    }
+    const anchor = anchors[low - 1];
+    return anchor ? anchor.elapsedBeats + (beat - anchor.beat) * bpm / anchor.bpm : beat;
+  };
+}
+
 function libraryFromScore(score: ExchangeScore): string {
   if (score.length > MAX_PHRASE_BEATS) throw new Error(`音乐超过当前 ${MAX_PHRASE_BEATS} 拍范围，源文件未改动。`);
   if (score.tempos.some(point => point.bpm < MIN_TEMPO_BPM || point.bpm > MAX_TEMPO_BPM)) throw new Error(`这份音乐的速度超出当前 ${MIN_TEMPO_BPM}～${MAX_TEMPO_BPM} BPM 编辑范围，源文件未改动。`);
+  const first = score.tempos[0]?.bpm ?? 120;
+  const denseTempo = score.tempos.filter(point => point.beat > 0 && point.beat < score.length).length > 2047;
+  const toBeat = denseTempo ? fixedTempoClock(score.tempos, first) : (beat: number) => beat;
   const palette = new Map<string, ContentRecord>();
   const parts = score.parts.map((part, index) => {
     const key = part.drum === undefined ? `gm-${part.program}` : `gm-drum-${part.drum}`;
@@ -40,24 +61,31 @@ function libraryFromScore(score: ExchangeScore): string {
     }
     return { id: crypto.randomUUID(), name: `${part.name || '声部'} ${index + 1}`, timbreId: tone.id, section: 'melody' as const,
       ...(part.midiChannelId ? { midiChannelId: part.midiChannelId } : {}),
-      notes: part.notes.map(note => ({ id: crypto.randomUUID(), startBeat: note.beat, durationBeats: note.duration,
-        frequencyHz: 440 * 2 ** (((part.drum ?? note.pitch) - 69) / 12), velocity: note.velocity, level: note.level, pan: note.pan,
-        ...(note.midiOnOrder === undefined ? {} : { midiOnOrder: note.midiOnOrder }), ...(note.midiOffOrder === undefined ? {} : { midiOffOrder: note.midiOffOrder }) })) };
+      notes: part.notes.map(note => {
+        const startBeat = toBeat(note.beat);
+        const converted = denseTempo ? toBeat(note.beat + note.duration) - startBeat : note.duration;
+        const durationSeconds = converted < MIN_NOTE_BEATS && denseTempo ? converted * 60 / first : undefined;
+        if (durationSeconds !== undefined && durationSeconds < MIN_NOTE_SECONDS) throw new Error('转换后有音符超出可保留的时值范围，原文件未改动。');
+        return { id: crypto.randomUUID(), startBeat, durationBeats: denseTempo ? Math.max(MIN_NOTE_BEATS, converted) : converted,
+          ...(durationSeconds === undefined ? {} : { durationSeconds }),
+          frequencyHz: 440 * 2 ** (((part.drum ?? note.pitch) - 69) / 12), velocity: note.velocity, level: note.level, pan: note.pan,
+          ...(note.midiOnOrder === undefined ? {} : { midiOnOrder: note.midiOnOrder }), ...(note.midiOffOrder === undefined ? {} : { midiOffOrder: note.midiOffOrder }) };
+      }) };
   });
-  const first = score.tempos[0]?.bpm ?? 120;
   const meter = score.meter ? { beatsPerBar: score.meter.numerator, beatUnit: score.meter.denominator } : {};
   const bar = phraseBarBeats(meter);
-  const body = readPhraseBody({ model: 'note-phrase', version: 1, timeUnit: 'beat', tempoBpm: first,
-    lengthBeats: Math.max(.25, score.length), stepsPerBeat: 4, ...meter, ...(score.midiExpression?.length ? { midiExpression: score.midiExpression } : {}),
-    tempoSections: score.tempos.filter(point => point.beat > 0 && point.beat < score.length).map(point => {
+  const body = flattenMusicTempo(readPhraseBody({ model: 'note-phrase', version: 1, timeUnit: 'beat', tempoBpm: first,
+    lengthBeats: Math.max(.25, toBeat(score.length)), stepsPerBeat: 4, ...meter, ...(score.midiExpression?.length ? { midiExpression: denseTempo
+      ? score.midiExpression.map(lane => ({ ...lane, events: lane.events.map(event => ({ ...event, beat: toBeat(event.beat) })) })) : score.midiExpression } : {}),
+    tempoSections: denseTempo ? undefined : score.tempos.filter(point => point.beat > 0 && point.beat < score.length).map(point => {
       const offset = point.beat % bar;
       return { id: crypto.randomUUID(), startBeat: point.beat, tempoBpm: point.bpm, ...(offset > 1e-8 && bar - offset > 1e-8 ? { gridOffsetBeats: offset } : {}) };
-    }), parts });
+    }), parts }));
   const phrase: ContentRecord = { id: crypto.randomUUID(), kind: 'rootsound.phrase', owner: 'phrase', schemaVersion: 1,
     revision: 1, name: score.name, dependencies: [...palette.values()].map(tone => tone.id), body };
   const song: Draft = { id: crypto.randomUUID(), kind: 'rootsound.song', owner: 'song', schemaVersion: 1, name: score.name,
     dependencies: [phrase.id], body: readSongBody({ model: 'phrase-arrangement', version: 1, timeUnit: 'beat', tempoBpm: first,
-      tempoMode: 'source', lengthBeats: Math.max(16, score.length), tracks: [{ id: crypto.randomUUID(), name: '音乐', level: 1, pan: 0,
+      tempoMode: 'source', lengthBeats: Math.max(16, body.lengthBeats), tracks: [{ id: crypto.randomUUID(), name: '音乐', level: 1, pan: 0,
         muted: false, solo: false, clips: [{ id: crypto.randomUUID(), phraseId: phrase.id, startBeat: 0 }] }] }) };
   const stored = memory(), contents = [...palette.values(), phrase];
   const result = stored.library.commitTransaction({ expectedToken: stored.library.currentToken(), label: '打开音乐文件',
@@ -131,7 +159,7 @@ export function createMusicFileSession(format: EditableFileFormat, bytes: Uint8A
   const nativeBaseline = richSignature(library, body, name);
   const grid = (body: PhraseBody) => JSON.stringify([body.stepsPerBeat, body.tempoSections?.map(point => point.stepsPerBeat)]);
   const baselineGrid = grid(body);
-  const gridOffsets = (body: PhraseBody) => JSON.stringify(body.tempoSections?.map(point => point.gridOffsetBeats) ?? []);
+  const gridOffsets = (body: PhraseBody) => JSON.stringify([body.gridOffsetBeats, ...(body.tempoSections?.map(point => point.gridOffsetBeats) ?? [])]);
   const baselineGridOffsets = gridOffsets(body);
   const patchMidi = format === 'midi' ? createMidiPatcher(bytes, initial) : undefined;
   return { format, serialize(library: MaterialLibrary, body: PhraseBody, name: string, libraryText: string): { bytes: Uint8Array; warnings: string[] } {
@@ -149,8 +177,8 @@ export function createMusicFileSession(format: EditableFileFormat, bytes: Uint8A
     if (grid(body) !== baselineGrid) current.warnings.push('每拍细分属于简乐的编辑设置，不写入这种通用格式。音符的位置与长度会保留。');
     if (body.parts.some(part => part.gainCurve?.length)) current.warnings.push('这种格式无法保留音色卡的音量增益曲线。另存为 .rootsound 可以保留。');
     if (body.parts.some(part => part.performanceCurves)) current.warnings.push('另存为 .rootsound 可保留音高、力度和踏板曲线。');
-    if (body.tempoSections?.some(point => point.gridOffsetBeats) && gridOffsets(body) !== baselineGridOffsets)
-      current.warnings.push('这种通用格式无法保留卷帘分界处的半拍网格。另存为 .rootsound 可以保留。');
+    if ((body.gridOffsetBeats || body.tempoSections?.some(point => point.gridOffsetBeats)) && gridOffsets(body) !== baselineGridOffsets)
+      current.warnings.push('这种通用格式无法保留画布分界处的半拍网格。另存为 .rootsound 可以保留。');
     if (format === 'midi') {
       const result = patchMidi?.(current.score) ?? writeExchangeMidi(current.score, bytes);
       return { bytes: result.bytes, warnings: [...new Set([...current.warnings, ...result.warnings])] };

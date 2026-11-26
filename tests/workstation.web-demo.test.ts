@@ -1,83 +1,43 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { readFile, writeFile, mkdir } from 'node:fs/promises';
-import path from 'node:path';
-import { createWebDemoModel, WEB_TONES } from '../src/workstation/app/web-demo-model.ts';
-import { createWebExampleModel, webExampleSnapshot } from '../src/workstation/app/web-demo-example.ts';
-import { createInitialProjectLibrary } from '../src/workstation/app/project-setup.ts';
-import { createMidiProjectLibrary } from '../src/workstation/app/midi-project.ts';
+import { readFile, readdir, stat } from 'node:fs/promises';
+import vm from 'node:vm';
 
-const fetcher = (async (input: string | URL | Request) => {
-  const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
-  const file = path.join('.cache/website/play', url.replace(/^\//, ''));
-  return new Response(new Uint8Array(await readFile(file)));
-}) as typeof fetch;
-const note = { startBeat: 0, durationBeats: 1, durationSeconds: .5, frequencyHz: 440, velocity: .7 };
-
-test('web score shares editable note timing, undo/redo and an atomic 64-beat limit', () => {
-  const model = createWebDemoModel(undefined, '网页草稿');
-  assert.deepEqual(model.palette.map(tone => tone.key), [...WEB_TONES]);
-  const part = model.score.read().body!.parts[0]!.id;
-  const id = model.score.addNote(part, note);
-  model.score.setTempo(240);
-  assert.equal(model.score.read().body!.parts[0]!.notes[0]!.durationSeconds, .25);
-  model.score.undo(); assert.equal(model.score.read().body!.tempoBpm, 120);
-  model.score.updateNote(part, id, { startBeat: .1321, pan: -.3, level: .45 });
-  assert.equal(model.score.read().body!.parts[0]!.notes[0]!.startBeat, .1321);
-  model.score.undo(); model.score.redo();
-  assert.equal(model.score.read().body!.parts[0]!.notes[0]!.startBeat, .1321);
-  model.score.setLength(64); const before = model.library.currentToken();
-  assert.throws(() => model.score.addTempoSection(), /16 小节/);
-  assert.equal(model.library.currentToken(), before);
-  assert.equal(model.score.read().body!.lengthBeats, 64);
-  assert.throws(() => model.score.addNotes(part, Array.from({ length: 2048 }, () => ({ ...note }))), /2048/);
-  assert.equal(model.score.read().body!.parts[0]!.notes.length, 1);
-  assert.throws(() => model.score.updateNote(part, id, { durationSeconds: 96 }), /16 小节/);
+test('website is a download page without an editor or operation instructions', async () => {
+  const html = await readFile('.cache/website/index.html', 'utf8');
+  assert(!/<iframe|动手试试|editor-instructions|在线编曲/.test(html));
+  assert.match(html, /你好，/);
+  assert.match(html, /assets\/workspace\.jpg/);
+  for (const name of ['windows', 'mac']) assert(html.includes(`data-platform="${name}"`));
+  assert.match(html, /特别鸣谢/);
+  assert.match(html, /建议使用非 Edge 浏览器/);
+  const old = await readFile('.cache/website/play/index.html', 'utf8');
+  assert.match(old, /http-equiv="refresh"/);
+  assert(!/<script|iframe/.test(old));
+  assert(!(await readdir('.cache/website/play')).some(name => name !== 'index.html'));
+  assert(!(await readdir('.cache/website')).some(name => ['examples', 'guides', 'instruments'].includes(name)));
+  assert((await stat('.cache/website/assets/workspace.jpg')).size < 800_000);
 });
 
-test('web download is a native v2 workspace with studio voices, no histories, and survives reopening', async () => {
-  const model = createWebDemoModel(undefined, '网页工程', fetcher);
-  model.score.addNote(model.score.read().body!.parts[0]!.id, note);
-  const bass = model.addGroup(model.palette.find(tone => tone.key === 'studio-bass')!.id);
-  model.score.addNote(bass, { ...note, frequencyHz: 110, startBeat: .25 });
-  const text = await model.save(), envelope = JSON.parse(text), raw = JSON.parse(envelope.libraryText);
-  assert.equal(envelope.format, 'RootSoundWorkspace'); assert.equal(envelope.version, 2);
-  assert.match(envelope.id, /^[a-f0-9-]{36}$/); assert(new Date(envelope.createdAtUtc).getTime() > 0);
-  assert(!raw.editHistory && !raw.transactionHistory);
-  assert(raw.contents.some((record: { body: { bank?: string } }) => record.body.bank === 'rootsound-studio-v1'));
-  const opened = createWebDemoModel(text, '重新打开', fetcher);
-  assert.equal(opened.score.read().draft!.name, '网页工程');
-  assert.equal(opened.score.read().body!.parts.flatMap(part => part.notes).length, 2);
-  assert.equal(opened.score.read().body!.parts[1]!.notes[0]!.startBeat, .25);
-  await mkdir('.test-output/rb130', { recursive: true });
-  await writeFile('.test-output/rb130/网页工程.rootsound', text);
-});
-
-test('short MIDI remaps unsupported instruments without moving notes; oversized import does not alter the current model', () => {
-  const midi = Uint8Array.from([77,84,104,100,0,0,0,6,0,0,0,1,1,224,77,84,114,107,0,0,0,16,
-    0,0xc0,19,0,0x90,60,100,0x83,0x60,0x80,60,0,0,255,47,0]);
-  const imported = createMidiProjectLibrary(midi, '短曲');
-  const model = createWebDemoModel(imported.libraryText);
-  const written = model.score.read().body!.parts[0]!.notes[0]!;
-  assert.equal(written.startBeat, 0); assert.equal(written.durationSeconds, .5); assert.equal(model.replaced, 0);
-  const source = createInitialProjectLibrary('超长');
-  const candidate = JSON.parse(source);
-  for (const draft of candidate.drafts) if (draft.kind === 'rootsound.phrase') draft.body.lengthBeats = 128;
-  const before = model.library.currentToken();
-  assert.throws(() => createWebDemoModel(JSON.stringify(candidate)), /16 小节/);
-  assert.equal(model.library.currentToken(), before);
-});
-
-test('published starter retains the authored 40 notes and timing while each visit is independent', async () => {
-  const snapshot = JSON.parse(await readFile('website/examples/starter.json', 'utf8'));
-  const model = createWebExampleModel(snapshot, fetcher);
-  assert.deepEqual(webExampleSnapshot(model), snapshot);
-  assert.equal(model.score.read().body!.tempoBpm, 148);
-  assert.equal(model.score.read().body!.parts.flatMap(part => part.notes).length, 40);
-  const part = model.score.read().body!.parts[0]!;
-  model.score.removeNote(part.id, part.notes[0]!.id);
-  assert.equal(model.score.read().body!.parts.flatMap(part => part.notes).length, 39);
-  assert.deepEqual(webExampleSnapshot(createWebExampleModel(snapshot, fetcher)), snapshot);
-  const saved = createWebDemoModel(await model.save(), undefined, fetcher);
-  assert.equal(saved.score.read().body!.parts.flatMap(part => part.notes).length, 39);
+test('website downloads retain published fallbacks and update only to a complete published installer pair', async () => {
+  const code = await readFile('website/site.js', 'utf8');
+  async function run(releases: unknown, fails = false) {
+    const nodes = Object.fromEntries(['windows', 'mac'].map(name => [name, { href: `https://github.com/FR-42/RootSound/releases/download/preview261119/default.${name === 'windows' ? 'exe' : 'pkg'}`, hidden: false }]));
+    const sizes = { windows: { textContent: '' }, mac: { textContent: '' } };
+    let settle!: () => void;
+    const done = new Promise<void>(resolve => { settle = resolve; });
+    vm.runInNewContext(code, {
+      AbortController, URL, setTimeout: () => 1, clearTimeout: () => settle(),
+      fetch: async () => { if (fails) throw new Error('offline'); return { ok: true, json: async () => releases }; },
+      document: { querySelector: (selector: string) => { const key = selector.includes('windows') ? 'windows' : 'mac'; return selector.includes('data-size') ? sizes[key] : nodes[key]; } },
+    });
+    await done;
+    return nodes;
+  }
+  const assets = ['简乐安装.exe', '简乐安装.pkg'].map(name => ({ name, size: 123_000_000, browser_download_url: `https://github.com/FR-42/RootSound/releases/download/test/${name}` }));
+  assert((await run([], true)).windows!.href.includes('preview261119'));
+  assert((await run([{ draft: true, assets }])).mac!.href.includes('preview261119'));
+  assert((await run([{ draft: false, assets: assets.slice(0, 1) }])).windows!.href.includes('preview261119'));
+  assert((await run([{ draft: false, assets }])).windows!.href.includes('/test/'));
+  assert((await run([{ draft: false, assets: assets.map(a => ({ ...a, browser_download_url: 'https://untrusted.invalid/file' })) }])).windows!.href.includes('preview261119'));
 });

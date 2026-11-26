@@ -1,8 +1,8 @@
 import type { MaterialStorage } from '../contracts/content.ts';
 import { createMaterialLibrary } from '../modules/materials/public.ts';
 
-export function stageMaterialStorage(storage: MaterialStorage, prepare?: (text: string) => string) {
-  let initial = storage.read();
+export function stageMaterialStorage(storage: MaterialStorage, prepare?: (text: string) => string, initialValue = storage.read()) {
+  let initial = initialValue;
   let pending = initial === null ? null : prepare?.(initial) ?? initial;
   let staging = true;
   const staged: MaterialStorage = {
@@ -16,6 +16,10 @@ export function stageMaterialStorage(storage: MaterialStorage, prepare?: (text: 
     if (!staging) { storage.writeIfUnchanged!(value, expected); return; }
     if (pending !== expected) throw new Error('歌曲在加载时发生了变化，请重新打开。');
     pending = value;
+  };
+  if (storage.writeIfUnchangedAsync) staged.writeIfUnchangedAsync = (value, expected) => {
+    if (staging) return Promise.reject(new Error('请先等待工程加载完成。'));
+    return storage.writeIfUnchangedAsync!(value, expected);
   };
   if (storage.writePermanent) staged.writePermanent = value => {
     if (staging) throw new Error('请先等待工程加载完成。');

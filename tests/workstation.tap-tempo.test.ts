@@ -1,6 +1,23 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { createTapTempo } from '../src/workstation/modules/ui-rendering/tap-tempo-model.ts';
+import { estimateScoreTempo } from '../src/workstation/modules/ui-rendering/score-tempo.ts';
+import type { PhraseBody, PhraseNote } from '../src/workstation/contracts/phrase.ts';
+
+test('score tempo uses sounded seconds and deduplicates chords while allowing offbeats', () => {
+  const score = (seconds: number[]): PhraseBody => ({
+    model: 'note-phrase', version: 1, timeUnit: 'beat', tempoBpm: 100, lengthBeats: 150,
+    parts: [{ id: 'piano', name: 'Piano', timbreId: 'tone', notes: seconds.map((at, index): PhraseNote => ({
+      id: String(index), startBeat: at * 100 / 60, durationBeats: .25, frequencyHz: 440, velocity: .7,
+    })) }],
+  });
+  const pulse = Array.from({ length: 24 }, (_, index) => index * 60 / 138);
+  const chords = pulse.flatMap(at => [at, at + .009, at + .015]);
+  const offbeats = pulse.filter((_, index) => index % 4 === 1).map(at => at + 30 / 138);
+  assert.equal(estimateScoreTempo(score(chords.concat(offbeats))), 138);
+  assert.equal(estimateScoreTempo(score([0, .01, .5, 1, 1.5])), undefined);
+  assert.equal(estimateScoreTempo(score([0, .17, .48, .97, 1.64, 2.53, 3.57, 5.1])), undefined);
+});
 
 test('four beat taps produce tempo and subsequent timing refines a rolling estimate',()=>{
   const tap=createTapTempo();assert.deepEqual(tap.read(),{count:0});

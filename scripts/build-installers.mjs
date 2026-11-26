@@ -69,7 +69,7 @@ const distribution = renderDistribution({ identifier, version, installLocation, 
     + '    <welcome file="welcome.html" mime-type="text/html"/>\n'
     + `    <must-close><app id="${identifier}"/></must-close>\n    <choices-outline>`);
 assert(distribution.includes('customLocationAllowAlternateVolumes="true"'));
-const welcome = `<!doctype html><meta charset="utf-8"><style>body{font:15px -apple-system,sans-serif;color:#422b34;padding:34px 24px}h1{font-size:42px;font-weight:500;margin:20px 0}p{color:#69505a}</style><h1>简乐</h1><p>${plan.version}</p>`;
+const welcome = `<!doctype html><meta charset="utf-8"><style>body{font:15px -apple-system,sans-serif;color:#332e3c;padding:34px 24px}h1{font-size:38px;font-weight:500;margin:20px 0}p{color:#5e5667}</style><h1>简乐</h1><p>${plan.version}</p>`;
 await writeXar(macInstaller, [
   { name: 'Distribution', parts: [Buffer.from(distribution)], compress: true },
   { name: 'Resources', children: [

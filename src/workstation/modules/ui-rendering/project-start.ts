@@ -137,7 +137,6 @@ export function mountProjectStart(root: HTMLElement, service?: ProjectSetupPort,
       choose = element('button', 'secondary project-location-choose', '…');
       choose.type = 'button';
       choose.setAttribute('aria-label', '选择文件夹');
-      choose.title = '选择文件夹';
       choose.addEventListener('click', () => { void chooseLocation(); });
       row.append(input, choose);
       content.append(row);

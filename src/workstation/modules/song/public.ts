@@ -231,6 +231,7 @@ function compileSong(body: SongBody, phrases: PhrasePlaybackPort, allowSilence =
         pitchCurves[`${clip.id}:${id}`] = points.map(point => ({ ...point, atSeconds: point.atSeconds + offset }));
       }
       for (const event of plan.events) events.push({ atSeconds: offset + event.atSeconds,
+        ...(event.noteGainDb ? { noteGainDb: event.noteGainDb } : {}),
         ...(event.gainCurveId === undefined ? {} : { gainCurveId: `${clip.id}:${event.gainCurveId}` }),
         ...(event.pitchCurveId === undefined ? {} : { pitchCurveId: `${clip.id}:${event.pitchCurveId}` }),
         sound: { ...event.sound, level: event.sound.level * track.level * (clip.level ?? 1) * (body.masterLevel ?? 1) },

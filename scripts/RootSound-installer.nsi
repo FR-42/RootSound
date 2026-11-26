@@ -20,6 +20,8 @@ InstallDir ""
 RequestExecutionLevel user
 ShowInstDetails nevershow
 SetCompressor /SOLID lzma
+InstProgressFlags smooth colored
+InstallColors 332E3C F7F7FA
 SetDatablockOptimize on
 XPStyle on
 BrandingText "简乐"
@@ -76,26 +78,26 @@ Function .onInit
     ${EndIf}
   ${EndIf}
   CreateFont $TitleFont "Microsoft YaHei UI" 24 500
-  CreateFont $BodyFont "Microsoft YaHei UI" 10 400
+  CreateFont $BodyFont "Microsoft YaHei UI" 11 400
   InitPluginsDir
   File /oname=$PLUGINSDIR\background.bmp "${APP_ART}"
-  SetCtlColors $HWNDPARENT 422B34 FFFBF6
+  SetCtlColors $HWNDPARENT 332E3C F7F7FA
 FunctionEnd
 
 Function MakePage
   nsDialogs::Create 1018
   Pop $Dialog
-  SetCtlColors $Dialog 422B34 FFFBF6
+  SetCtlColors $Dialog 332E3C F7F7FA
   ${NSD_CreateBitmap} 0 0 100% 100% ""
   Pop $Bitmap
   ${NSD_SetStretchedImage} $Bitmap "$PLUGINSDIR\background.bmp" $BitmapHandle
   ${NSD_CreateLabel} 20u 18u 240u 40u "简乐"
   Pop $0
-  SetCtlColors $0 422B34 transparent
+  SetCtlColors $0 332E3C transparent
   SendMessage $0 ${WM_SETFONT} $TitleFont 1
   ${NSD_CreateLabel} 22u 62u 250u 14u "${VERSION}"
   Pop $0
-  SetCtlColors $0 69505A transparent
+  SetCtlColors $0 5E5667 transparent
   SendMessage $0 ${WM_SETFONT} $BodyFont 1
 FunctionEnd
 
@@ -103,12 +105,12 @@ Function LocationPage
   Call MakePage
   ${NSD_CreateLabel} 22u 91u 240u 14u "安装位置"
   Pop $0
-  SetCtlColors $0 422B34 transparent
+  SetCtlColors $0 332E3C transparent
   SendMessage $0 ${WM_SETFONT} $BodyFont 1
-  ${NSD_CreateText} 22u 111u 198u 22u "$INSTDIR"
+  ${NSD_CreateText} 22u 111u 198u 24u "$INSTDIR"
   Pop $PathInput
-  SetCtlColors $PathInput 422B34 F0E4F5
-  ${NSD_CreateButton} 226u 111u 55u 22u "更改位置"
+  SetCtlColors $PathInput 332E3C E4E8F2
+  ${NSD_CreateButton} 226u 111u 55u 24u "更改位置"
   Pop $0
   ${NSD_OnClick} $0 BrowseLocation
   GetDlgItem $0 $HWNDPARENT 1
@@ -169,11 +171,11 @@ Function FinishPage
   Call MakePage
   ${NSD_CreateLabel} 22u 94u 250u 22u "安装完成"
   Pop $0
-  SetCtlColors $0 422B34 transparent
+  SetCtlColors $0 332E3C transparent
   SendMessage $0 ${WM_SETFONT} $BodyFont 1
   ${NSD_CreateCheckbox} 22u 118u 220u 18u "打开简乐"
   Pop $Launch
-  SetCtlColors $Launch 422B34 F6EDF4
+  SetCtlColors $Launch 332E3C F1F2F6
   ${NSD_Check} $Launch
   GetDlgItem $0 $HWNDPARENT 1
   SendMessage $0 ${WM_SETTEXT} 0 "STR:完成"
@@ -188,6 +190,40 @@ Function FinishLeave
   ${If} $0 == ${BST_CHECKED}
     ExecShell "open" "$AppDirectory\RootSound.exe"
   ${EndIf}
+FunctionEnd
+
+Function ProtectExistingProjects
+  System::Call 'kernel32::GetFileAttributesW(w "$INSTDIR\project") i .r0'
+  ${If} $0 != -1
+    Goto mark
+  ${EndIf}
+  IfFileExists "$INSTDIR\.skip-bundled-projects" protected
+  IfFileExists "$INSTDIR\.bundled-projects.json" mark
+  IfFileExists "$INSTDIR\RootSound.lnk" mark
+  IfFileExists "$INSTDIR\RootSound.exe" mark
+  ClearErrors
+  FindFirst $0 $1 "$INSTDIR\app-*"
+  IfErrors protected
+  scan:
+    IfFileExists "$INSTDIR\$1\RootSound.exe" found
+    IfFileExists "$INSTDIR\$1\resources\app\rootsound-installed" found
+    FindNext $0 $1
+    IfErrors scanned scan
+  scanned:
+    FindClose $0
+    Goto protected
+  found:
+    FindClose $0
+  mark:
+    ClearErrors
+    FileOpen $0 "$INSTDIR\.skip-bundled-projects" w
+    IfErrors protectFailed
+    FileClose $0
+  protected:
+    ClearErrors
+    Return
+  protectFailed:
+    SetErrors
 FunctionEnd
 
 Section
@@ -214,6 +250,8 @@ Section
   FileOpen $0 "$StageDirectory\resources\app\rootsound-installed" w
   IfErrors failed
   FileClose $0
+  Call ProtectExistingProjects
+  IfErrors failed
   SetOutPath "$INSTDIR"
   Rename "$StageDirectory" "$AppDirectory"
   IfErrors failed
@@ -221,14 +259,14 @@ Section
   Goto shortcut
 
 existing:
+  Call ProtectExistingProjects
+  IfErrors failed
   nsExec::ExecToLog '"$AppDirectory\resources\app\runtime\dotnet.exe" "$AppDirectory\resources\app\host\RootSound.Host.dll" --verify-installation'
   Pop $0
   StrCmp $0 "0" 0 failed
 
 shortcut:
   ClearErrors
-  CreateDirectory "$INSTDIR\project"
-  IfErrors failed
   CreateShortCut "$INSTDIR\RootSound.lnk" "$AppDirectory\RootSound.exe" "" "$AppDirectory\RootSound.exe" 0
   IfErrors failed
   ${GetParameters} $0

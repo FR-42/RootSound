@@ -116,14 +116,18 @@ export type SaveResult =
 
 /** 桌面或临时浏览器适配器负责存储，核心不依赖具体平台。 */
 export interface MaterialStorage {
+  readInitial?(): Promise<string | null>;
   read(): string | null;
   write(value: string): void;
   writeIfUnchanged?(value: string, expected: string | null): void;
+  writeIfUnchangedAsync?(value: string, expected: string | null): Promise<void>;
   /** Irreversible changes also replace the session's discard checkpoint atomically. */
   writePermanent?(value: string): void;
 }
 
 export interface MaterialLibrary {
+  prepareSnapshot?(): { state: JsonValue; token: string };
+  applyPreparedSnapshot?(snapshot: { state: JsonValue; text: string }, expectedToken: string): Promise<void>;
   /** Invalidated by every successful write, including changes to unrelated usage locations. */
   currentToken(): string;
   /** All record changes and the optional composite undo step persist in one write. */
@@ -156,6 +160,7 @@ export interface MaterialLibrary {
   /** Current root/graph and explicit assets only; never includes historical saved roots. */
   currentProjectView?(draftId: string): CurrentProjectView | undefined;
   listContent(): ContentRecord[];
+  batchWrites?<T>(action: () => T): T;
   saveDraft(id: string, mode: 'overwrite' | 'new', confirmation?: SaveConfirmation): SaveResult;
   /** Copies the item; dependencies stay shared within its song, while a new song adopts an independent graph. */
   duplicateContent(id: string, name?: string, expectedRevision?: number): SaveResult;

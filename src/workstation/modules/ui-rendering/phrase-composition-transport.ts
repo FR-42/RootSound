@@ -37,7 +37,7 @@ export function createPhraseCompositionTransport(options: {
     boundedEffects = effects;
   };
   const extent = () => bounds;
-  refreshExtent();
+  if (!options.reuseBody) refreshExtent();
   const fullDuration = () => options.durationSeconds?.() ?? (options.lengthBeats?.() ?? PHRASE_COMPOSITION_BEATS) * 60 / tempo;
   const duration = () => { const bounds = extent(); return bounds ? manualTail ? bounds.fullEnd : bounds.barEnd : fullDuration(); };
 
@@ -115,6 +115,7 @@ export function createPhraseCompositionTransport(options: {
     },
     pause: base.pause,
     stop,
+    setNoteGain: base.setNoteGain,
     setNotesDeleted: base.setNotesDeleted,
     setSoloGroup: base.setSoloGroup,
     setRate(rate) {

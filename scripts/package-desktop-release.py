@@ -32,11 +32,11 @@ def populate(app, runtime, host, ui, native=False):
     (app / 'host').mkdir()
     for name in ['RootSound.Host.dll','RootSound.Host.deps.json','RootSound.Host.runtimeconfig.json']: shutil.copyfile(host / name, app / 'host' / name)
     shutil.copytree(ui, app / 'ui')
-    # Vite can emit an asset from a tree-shaken recording implementation. It is
-    # not referenced by the actual public JS and must not ship a dormant recorder.
-    for asset in (app / 'ui/assets').glob('capture-worklet-*'):
-        assert all(asset.name not in file.read_text('utf-8') for file in (app / 'ui/assets').glob('index-*.js'))
-        asset.unlink()
+    assets = app / 'ui/assets'
+    scripts = [file.read_text('utf-8') for file in assets.glob('*.js') if not file.name.startswith('capture-worklet-')]
+    for asset in assets.glob('capture-worklet-*'):
+        if not any(asset.name in script for script in scripts):
+            asset.unlink()
     (app / 'ui/release-scope.json').unlink()
     runtime.mkdir()
 
@@ -179,7 +179,7 @@ def archive():
         readme='RootSound '+VERSION+'\n\n'
         readme+=('此 ZIP 为内部打包校验文件。请使用 release 目录中的“简乐安装.exe”安装软件。\n' if key=='windows' else
                  '适用于 Apple 芯片 Mac，macOS 13 或以上。解压后将 RootSound.app 拖入“应用程序”，再打开。\n项目默认保存在“音乐/RootSound/project”，不写入应用程序包。\n本预览包为本地签名，尚无苹果开发者签名／公证；首次打开可能需要在“系统设置→隐私与安全性”中确认。\n尚未在真实 Mac 上完成运行与听音验收。\n')
-        readme+='\n包含：乐曲库、竖向钢琴卷帘、精选采样音色、音色卡、琴键试听、MIDI导入、多卷帘、播放曲线和 .rootsound 工程保存。\n'
+        readme+='\n包含：乐曲库、竖向画布、精选采样音色、音色卡、琴键试听、MIDI导入、多 BPM、播放曲线和 .rootsound 工程保存。\n'
         readme+='\n内置音色采用录音采样，许可见 ui/instruments/rootsound-studio-v1/CREDITS.md。\n'
         if plan.get('projects'):
             readme+=f'\n随包附带当前演示项目目录中的 {len(plan["projects"])} 个工程。\n'

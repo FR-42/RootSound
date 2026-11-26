@@ -5,7 +5,7 @@ const path = require('node:path');
 const { Readable } = require('node:stream');
 const { randomUUID } = require('node:crypto');
 const { HostClient } = require('./rpc.cjs');
-const { seedBundledProjects } = require('./bundled-projects.cjs');
+const { seedForInstallation } = require('./bundled-projects.cjs');
 
 const ORIGIN = 'https://rootsound.local';
 const CLOSE_SCRIPT_TIMEOUT = 3000;
@@ -168,7 +168,7 @@ app.whenReady().then(async () => {
   const installed = process.platform === 'win32' && await fsp.access(path.join(base, 'rootsound-installed')).then(() => true, () => false);
   const dataDirectory = process.platform === 'darwin' ? path.join(app.getPath('music'), 'RootSound')
     : installed ? path.dirname(executableDirectory) : executableDirectory;
-  await seedBundledProjects(path.join(base, 'seed-projects'), dataDirectory);
+  await seedForInstallation(path.join(base, 'seed-projects'), dataDirectory);
   await fsp.mkdir(app.getPath('userData'), { recursive: true });
   try { lastDirectory = JSON.parse(await fsp.readFile(path.join(app.getPath('userData'), 'last-import-directory.json'), 'utf8')); } catch { lastDirectory = path.join(dataDirectory, 'project'); }
   host = new HostClient(path.join(base, 'runtime', process.platform === 'win32' ? 'dotnet.exe' : 'dotnet'), path.join(base, 'host', 'RootSound.Host.dll'), dataDirectory);

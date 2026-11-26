@@ -57,35 +57,37 @@ test('invalid frequencies and tempos still leave the current draft untouched',()
   for(const frequencyHz of [MIN_PITCH_HZ/2,MAX_PITCH_HZ*2,0,NaN,Infinity])assert.throws(()=>f.score.addNote(part,{startBeat:0,durationBeats:.25,frequencyHz,velocity:.7}));
   assert.equal(f.text(),before);
 });
-test('new MIDI opening produces separate rolls at actual 30, 480 and 1000 BPM, with extreme notes intact',()=>{
+test('new variable MIDI opens at its initial 30 BPM with extreme pitches and original note times',()=>{
   const f=open(readMusicFile(variableMidi(),'Variable.mid','midi').libraryText),body=f.score.read().body!;
-  assert.equal(body.tempoBpm,30);assert.deepEqual(body.tempoSections!.map(section=>[section.startBeat,section.tempoBpm]),[[1,480],[2,1000]]);
-  const notes=body.parts[0]!.notes;assert.deepEqual(notes.map(note=>[note.startBeat,note.durationBeats]),[[0,.5],[1,2]]);
+  assert.equal(body.tempoBpm,30);assert.equal(body.tempoSections,undefined);
+  const notes=body.parts[0]!.notes;assert.deepEqual(notes.map(note=>note.startBeat),[0,1]);
+  close(notes[0]!.durationBeats,.5);close(notes[1]!.durationBeats,.0925);
   close(notes[0]!.frequencyHz,MIN_PITCH_HZ);close(notes[1]!.frequencyHz,MAX_PITCH_HZ);
   close(phraseBeatSeconds(body,notes[1]!.startBeat),2);close(phraseHeldSeconds(body,notes[1]!),.185);
   commitMusicDocument(f.library,f.song,f.score);const reopened=open(f.text()).score.read().body!;
   assert.deepEqual(reopened.tempoSections,body.tempoSections);
 });
-test('legacy MIDI projects recover multiple BPM rolls without changing their original playback',()=>{
+test('legacy MIDI projects open on a single clock without changing their original playback',()=>{
   const bytes=variableMidi(),converted=createMidiProjectLibrary(bytes,'旧变速'),f=open(converted.libraryText),body=f.score.read().body!;
-  assert.equal(body.tempoBpm,30);assert.deepEqual(body.tempoSections!.map(section=>[section.startBeat,section.tempoBpm]),[[1,480],[2,1000]]);
+  assert.equal(body.tempoBpm,30);assert.equal(body.tempoSections,undefined);
   const notes=body.parts.flatMap(part=>part.notes).sort((a,b)=>a.startBeat-b.startBeat);
-  close(notes[0]!.startBeat,0);close(notes[1]!.startBeat,1);close(notes[1]!.durationBeats,2);
+  close(notes[0]!.startBeat,0);close(notes[1]!.startBeat,1);close(notes[1]!.durationBeats,.0925);
   close(phraseBeatSeconds(body,notes[1]!.startBeat),2);close(phraseHeldSeconds(body,notes[1]!),.185);
-  commitMusicDocument(f.library,f.song,f.score);assert.equal(open(f.text()).score.read().body!.tempoSections!.length,2);
+  commitMusicDocument(f.library,f.song,f.score);assert.equal(open(f.text()).score.read().body!.tempoSections,undefined);
 });
-test('a mixed single score retains its BPM rolls even when legacy track gain needs flattening',()=>{
+test('flattening a mixed legacy track keeps its opening BPM, note timing and gain',()=>{
   const f=open(readMusicFile(variableMidi(),'Variable.mid','midi').libraryText);
   f.song.updateTrack(f.song.read().body!.tracks[0]!.id,{level:.5});const restored=open(f.text()),body=restored.score.read().body!;
-  assert.deepEqual(body.tempoSections!.map(section=>[section.startBeat,section.tempoBpm]),[[1,480],[2,1000]]);
+  assert.equal(body.tempoSections,undefined);
   close(phraseBeatSeconds(body,body.parts[0]!.notes[1]!.startBeat),2);close(body.parts[0]!.notes[1]!.level!,.5);
 });
-test('changing an imported roll tempo retimes its notes rather than displacing them off the grid',()=>{
-  const f=open(readMusicFile(variableMidi(),'Variable.mid','midi').libraryText),before=f.score.read().body!;
-  f.score.setTempoSection(before.tempoSections![0]!.id,960);const after=f.score.read().body!,note=after.parts[0]!.notes[1]!;
-  assert.equal(note.startBeat,1);close(note.durationBeats,2);close(phraseHeldSeconds(after,note),.1225);
+test('changing BPM after importing a variable MIDI moves the grid while preserving time',()=>{
+  const f=open(readMusicFile(variableMidi(),'Variable.mid','midi').libraryText);
+  f.score.setTempo(960,{preserveTimeline:true});const after=f.score.read().body!,note=after.parts[0]!.notes[1]!;
+  assert.equal(after.tempoSections,undefined);close(note.startBeat,32);close(phraseBeatSeconds(after,note.startBeat),2);
+  close(phraseHeldSeconds(after,note),.185);
   const lines=melodyScoreGrid(after,{leftSeconds:1.99,zoom:8,rowHeight:32},900);
-  assert(lines.some(line=>Math.abs(line.seconds-phraseBeatSeconds(after,1))<1e-8));
+  assert(lines.some(line=>Math.abs(line.seconds-2)<1e-8));
 });
 test('MIDI edited at 1000 BPM writes actual supported tempo and both edge pitches',()=>{
   const bytes=variableMidi(),f=open(readMusicFile(bytes,'Variable.mid','midi').libraryText);

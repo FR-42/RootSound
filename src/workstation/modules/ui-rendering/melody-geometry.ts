@@ -1,5 +1,6 @@
 import type { KeyboardPitch, PhraseBody, PhraseNote } from '../../contracts/phrase.ts';
 import { PHRASE_STEPS_PER_BEAT, phraseStepsPerBeat } from '../../contracts/phrase.ts';
+import { playlistSegmentIntersectsRect } from './playlist-geometry.ts';
 import { phrasePitchRow } from './phrase-viewport.ts';
 import { MIN_TEMPO_BPM, MAX_TEMPO_BPM } from '../../contracts/music-limits.ts';
 import { phraseBeatSeconds, phraseSecondsBeat, phraseDurationSeconds, phraseHeldSeconds, phraseTempoSpans, phraseStepsAtBeat, phraseBarBeats, phraseMeterBeatLength } from '../../contracts/phrase-time.ts';
@@ -46,8 +47,34 @@ export function melodyNoteRect(note: PhraseNote, body: PhraseBody, keys: readonl
     y: melodyPitchTop(keys, row, view.rowHeight) + 1,
     width: Math.max(0, phraseHeldSeconds(body, note) * scale), height: melodyPitchHeight(keys, row, view.rowHeight) - 2 };
 }
+export function melodySweepHit(from: { x: number; y: number }, to: { x: number; y: number },
+  note: { x: number; y: number; width: number; height: number }, headRadius: number): 'head' | number | undefined {
+  const pitch = note.y + note.height / 2;
+  const deltaTime = to.x - from.x, deltaPitch = to.y - from.y;
+  const lengthSquared = deltaTime ** 2 + deltaPitch ** 2;
+  const timeToHead = note.x - from.x, pitchToHead = pitch - from.y;
+  const nearest = lengthSquared ? melodyClamp((timeToHead * deltaTime + pitchToHead * deltaPitch) / lengthSquared, 0, 1) : 0;
+  const headDistanceSquared = (timeToHead - nearest * deltaTime) ** 2 + (pitchToHead - nearest * deltaPitch) ** 2;
+  const headLength = Math.min(note.width, Math.max(1, Math.min(4, note.width * .14)));
+  if (headDistanceSquared <= headRadius ** 2 || playlistSegmentIntersectsRect(from, to, { ...note, width: headLength })) return 'head';
+
+  const tolerance = note.height / 2;
+  if (!playlistSegmentIntersectsRect(from, to, {
+    x: note.x, y: pitch - tolerance, width: note.width, height: tolerance * 2,
+  })) return;
+  if (Math.abs(deltaPitch) < 1e-9) return Math.max(note.x, Math.min(from.x, to.x));
+  const center = (pitch - from.y) / deltaPitch;
+  const crossing = from.x + center * deltaTime;
+  if (center >= 0 && center <= 1 && crossing >= note.x && crossing <= note.x + note.width) return crossing;
+  const range = tolerance / Math.abs(deltaPitch);
+  const start = from.x + Math.max(0, center - range) * deltaTime;
+  const end = from.x + Math.min(1, center + range) * deltaTime;
+  return Math.max(note.x, Math.min(start, end));
+}
+
 export function melodyScoreGrid(body: PhraseBody, view: MelodyView, width: number, cellPixels = 48, visibleSeconds = 8 / view.zoom) {
-  const result: ReturnType<typeof melodyDetailGrid> = [], end = view.leftSeconds + visibleSeconds;
+  const result: (ReturnType<typeof melodyDetailGrid>[number] & { sectionId?: string })[] = [];
+  const end = view.leftSeconds + visibleSeconds;
   const spans = phraseTempoSpans(body);
   const depth = melodyScoreGridDepth(body, melodyScale(view, width, end), cellPixels);
   for (const span of spans) {
@@ -59,7 +86,7 @@ export function melodyScoreGrid(body: PhraseBody, view: MelodyView, width: numbe
     const steps = phraseStepsAtBeat(body, span.startBeat);
     for (const line of melodyGridLines(endFromOrigin, span.tempoBpm, steps, local, width, phraseBarBeats(body), span.startBeat === 0 ? body.pickupBeats ?? 0 : 0, steps ** depth, phraseMeterBeatLength(body), visibleSeconds)) {
       if (line.seconds < offset - 1e-8 || line.seconds >= endFromOrigin - 1e-8 && span.endBeat < body.lengthBeats) continue;
-      result.push({ ...line, seconds: line.seconds + origin });
+      result.push({ ...line, seconds: line.seconds + origin, sectionId: span.id });
     }
   }
   return result;

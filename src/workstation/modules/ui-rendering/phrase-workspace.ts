@@ -351,7 +351,7 @@ export function mountPhraseWorkspace(root: HTMLElement, options: {
         tempoText.textContent = `速度 ${tempo.value}`; playbackTempo = restored.tempoBpm;
         livePreview.flush(() => phrase.previewPlan(undefined, { allowSilence: true }));
       });
-      tempo.addEventListener('change', () => edit(() => phrase.setTempo(Number(tempo.value)))); tempoLabel.append(tempoText, tempo); controls.append(tempoLabel);
+      tempo.addEventListener('change', () => edit(() => phrase.setTempo(Number(tempo.value), { preserveTimeline: true }))); tempoLabel.append(tempoText, tempo); controls.append(tempoLabel);
       function select(label: string, values: Array<[string, string]>, value: string, change: (value: string) => void): HTMLSelectElement {
         const field = node('label', 'phrase-field', label); const input = node('select'); input.setAttribute('aria-label', label);
         for (const [id, text] of values) { const option = node('option', '', text); option.value = id; input.append(option); }
@@ -363,7 +363,7 @@ export function mountPhraseWorkspace(root: HTMLElement, options: {
       select('缩放', [['0.5', '50%'], ['0.75', '75%'], ['1', '100%'], ['1.5', '150%'], ['2', '200%'], ['3', '300%']], String(zoom), value => { rememberScroll(); nextScrollLeft = scrollLeft * Number(value) / zoom; zoom = Number(value); render(); });
       const undo = action('↶ 撤销', 'quiet phrase-undo', () => edit(() => phrase.undo())); undo.disabled = !view.canUndo;
       const redo = action('↷ 重做', 'quiet phrase-redo', () => edit(() => phrase.redo())); redo.disabled = !view.canRedo;
-      const help = action('?', 'quiet phrase-help-button', () => showHelp(body.parts.length > 1)); help.title = '操作帮助'; help.setAttribute('aria-label', '音符操作帮助');
+      const help = action('?', 'quiet phrase-help-button', () => showHelp(body.parts.length > 1)); help.setAttribute('aria-label', '音符操作帮助');
       controls.append(undo, redo, help); main.append(controls);
 
       const voices = node('div', 'phrase-voices');
@@ -372,7 +372,6 @@ export function mountPhraseWorkspace(root: HTMLElement, options: {
         const soundName = view.availableSounds.find(sound => sound.id === item.timbreId)?.name ?? item.name;
         const tab = action(`${index + 1}  ${soundName}`, 'phrase-part' + (item.id === selectedPart ? ' is-active' : ''), () => { selectedPart = item.id; selectedNotes.clear(); render(); });
         if (options.onEditSound) {
-          tab.title = '选中这条声音；右键可以调整这一处声音。';
           tab.addEventListener('contextmenu', event => {
             event.preventDefault();
             showReferenceActions(root, { label: soundName, onEdit: () => editSound(item.id), onChoose: () => editSound(item.id, true) });
@@ -403,7 +402,7 @@ export function mountPhraseWorkspace(root: HTMLElement, options: {
       const availableWidth = Math.max(260, (viewportWidth || root.clientWidth - 24) - 60);
       beatPixels = (body.lengthBeats <= 8 ? Math.max(64, availableWidth / body.lengthBeats) : 72) * zoom;
       const scroller = node('div', 'phrase-scroll');
-      scroller.setAttribute('role', 'region'); scroller.setAttribute('aria-label', '连续钢琴卷帘；上下滚动查看全部音高');
+      scroller.setAttribute('role', 'region'); scroller.setAttribute('aria-label', '连续画布；上下滚动查看全部音高');
       const roll = node('div', 'phrase-roll'); roll.style.width = `${58 + body.lengthBeats * beatPixels}px`;
       const ruler = node('div', 'phrase-ruler'); ruler.style.paddingLeft = '58px';
       for (let beat = 0; beat < body.lengthBeats; beat++) {
@@ -414,7 +413,7 @@ export function mountPhraseWorkspace(root: HTMLElement, options: {
       const keyboard = node('div', 'phrase-keyboard');
       for (const key of keys) {
         const label = action(key.label, 'phrase-key' + (key.accidental ? ' is-accidental' : ''), () => { void noteAudition.request(key.frequencyHz); });
-        label.style.height = `${rowHeight}px`; label.title = `用当前声音试听 ${key.label}`;
+        label.style.height = `${rowHeight}px`;
         label.setAttribute('aria-label', `试听 ${key.label}，${Number(key.frequencyHz.toFixed(3))} Hz，当前声音`); keyboard.append(label);
       }
       const grid = node('div', 'phrase-grid'); grid.style.width = `${body.lengthBeats * beatPixels}px`; grid.style.height = `${keys.length * rowHeight}px`;

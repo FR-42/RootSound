@@ -43,12 +43,32 @@ test('file family detection includes SMF/RMI, plain/compressed MusicXML and lega
   assert.equal(musicFileFormat('x.mxl'),'mxl'); assert.equal(musicFileFormat('x.rsproject'),'rsproject');
   assert.equal(musicFileFormat('x.mp3'),undefined);
 });
-test('direct MIDI score preserves original beats and complete tempo map instead of flattening to seconds', () => {
+test('direct MIDI uses the opening BPM and keeps note times', () => {
   const f = load(midiFixture()), body = f.score.read().body!;
-  assert.equal(body.tempoBpm,120); assert.equal(body.tempoSections?.length,1); assert.equal(body.tempoSections?.[0]?.startBeat,1);
-  assert.equal(body.tempoSections?.[0]?.tempoBpm,80);
-  assert.deepEqual(body.parts[0]!.notes.map(note => [note.startBeat,note.durationBeats]),[[0,1],[1,1]]);
+  assert.equal(body.tempoBpm,120); assert.equal(body.tempoSections,undefined);
+  assert.deepEqual(body.parts[0]!.notes.map(note => [note.startBeat,note.durationBeats]),[[0,1],[1,1.5]]);
 });
+test('imports a dense MIDI tempo map into one roll without retiming notes or pedal events', () => {
+  const header = { format: 0 as const, numTracks: 1, ticksPerBeat: 480 };
+  const tempoChanges = Array.from({ length: 2050 }, (_, i) => ({
+    deltaTime: 1, type: 'setTempo' as const, microsecondsPerBeat: i % 2 ? 400000 : 600000,
+  }));
+  const bytes = Uint8Array.from(writeMidi({ header, tracks: [[
+    { deltaTime: 0, type: 'setTempo', microsecondsPerBeat: 500000 },
+    { deltaTime: 0, type: 'noteOn', channel: 0, noteNumber: 60, velocity: 50 },
+    ...tempoChanges,
+    { deltaTime: 5, type: 'controller', channel: 0, controllerType: 64, value: 127 },
+    { deltaTime: 10, type: 'noteOff', channel: 0, noteNumber: 60, velocity: 0 },
+    { deltaTime: 10, type: 'endOfTrack' },
+  ]] }));
+  const original = readExchangeMidi(bytes, 'Dense').score, body = load(bytes).score.read().body!;
+  assert.equal(body.tempoSections, undefined);
+  assert.equal(body.parts[0]!.notes[0]!.velocity, 50 / 127);
+  assert(Math.abs(body.parts[0]!.notes[0]!.durationBeats * 60 / body.tempoBpm - exchangeSeconds(original, original.parts[0]!.notes[0]!.duration)) < 1e-9);
+  const pedal = body.midiExpression![0]!.events.find(event => event.type === 'controller' && event.controller === 64)!;
+  assert(Math.abs(pedal.beat * 60 / body.tempoBpm - exchangeSeconds(original, (2050 + 5) / 480)) < 1e-9);
+});
+
 test('imports the opening MIDI meter and retains it when editing note positions', () => {
   const original = rawMidi(midiFixture());
   original.tracks[0]!.unshift({ deltaTime: 0, type: 'timeSignature', numerator: 3, denominator: 8, metronome: 24, thirtyseconds: 8 });
@@ -56,7 +76,7 @@ test('imports the opening MIDI meter and retains it when editing note positions'
   const before = f.score.read().body!;
   assert.equal(before.beatsPerBar, 3);
   assert.equal(before.beatUnit, 8);
-  assert.deepEqual(before.parts[0]!.notes.map(note => [note.startBeat, note.durationBeats]), [[0, 1], [1, 1]]);
+  assert.deepEqual(before.parts[0]!.notes.map(note => [note.startBeat, note.durationBeats]), [[0, 1], [1, 1.5]]);
   f.score.rename('Changed');
   assert.deepEqual(readExchangeMidi(f.save().bytes, 'Changed').score.meter, { numerator: 3, denominator: 8 });
   f.score.setMeter(4, 4);
@@ -69,9 +89,10 @@ test('editing notes writes valid MIDI, preserving edited duration, velocity, tem
   const f=load(midiFixture()), draft=f.score.read().draft!, body=structuredClone(f.score.read().body!);
   body.parts[0]!.notes[0]!.startBeat=.125; body.parts[0]!.notes[0]!.durationBeats=.25;
   f.library.updateDraft(draft.id,{body}); const saved=f.save(), result=readExchangeMidi(saved.bytes,'Demo');
-  assert.deepEqual(result.score.parts[0]!.notes.map(note=>[note.beat,note.duration]),[[.125,.25],[1,1]]);
+  assert.deepEqual(result.score.parts[0]!.notes.map(note=>[note.beat,note.duration]),[[.125,.25],[1,1.5]]);
   assert.equal(Math.round(result.score.parts[0]!.notes[0]!.velocity*127),100);
-  assert.equal(exchangeSeconds(result.score,2),1.25);
+  assert.equal(exchangeSeconds(result.score,2.5),1.25);
+  assert.deepEqual(result.score.tempos,[{beat:0,bpm:120}]);
   assert(rawMidi(saved.bytes).tracks.flat().some(item=>item.type==='marker'&&item.text==='keep-me'));
 });
 test('RMI wraps edited output in RIFF rather than silently replacing it with plain SMF', () => {
@@ -103,7 +124,7 @@ test('MusicXML unchanged save is byte exact; edited save remains MusicXML and wa
   f.score.rename('Changed');const result=f.save();assert(result.warnings.some(item=>item.includes('排版')));
   const reloaded=readExchangeXml(result.bytes,'Changed',false).score;
   assert.deepEqual(reloaded.meter, { numerator: 2, denominator: 4 });
-  assert.equal(reloaded.parts[0]!.notes.length,3);assert.deepEqual(reloaded.tempos,[{beat:0,bpm:120},{beat:2,bpm:80}]);
+  assert.equal(reloaded.parts[0]!.notes.length,3);assert.deepEqual(reloaded.tempos,[{beat:0,bpm:120}]);
 });
 test('compressed MXL uses its declared rootfile and can be edited then read again',()=>{
   const zipped=zipSync({'META-INF/container.xml':strToU8('<container><rootfiles><rootfile full-path="scores/main.xml" media-type="application/vnd.recordare.musicxml+xml"/></rootfiles></container>'),'scores/main.xml':xml,'unrelated.txt':strToU8('ignore')});
@@ -119,7 +140,8 @@ test('invalid XML, MXL and out-of-range scores fail before a host file is opened
 test('large number of legal tempo changes remains editable as one score',()=>{
   const score:ExchangeScore={name:'Tempi',length:160,tempos:Array.from({length:150},(_,beat)=>({beat,bpm:beat%2?100:120})),
     parts:[{name:'Piano',program:0,notes:[{beat:0,duration:159,pitch:60,velocity:.8,level:1,pan:0}]}]};
-  const f=load(writeExchangeMidi(score).bytes);assert.equal(f.score.read().body!.tempoSections!.length,149);
+  const f=load(writeExchangeMidi(score).bytes);assert.equal(f.score.read().body!.tempoSections,undefined);
+  assert.equal(f.score.read().body!.tempoBpm,120);
 });
 test('legacy rsproject packages open and save as packages rather than a workspace envelope',()=>{
   const initial=load(midiFixture());const scoreDraft=initial.score.read().draft!;

@@ -98,15 +98,22 @@ export function ensureProjectMelodyTimbres(library: MaterialLibrary, songDraftId
   return listProjectTimbres(library, songDraftId);
 }
 
-export function prepareProjectMelodyTimbres(library: MaterialLibrary, songDraftId: string, instrumentKeys?: readonly string[]): void {
+export function prepareProjectMelodyTimbres(library: MaterialLibrary, songDraftId: string, instrumentKeys?: readonly string[],
+  options?: { preserveHistory?: boolean }): void {
   const song = library.readDraft(songDraftId);
   if (!song) throw new Error('先打开一首歌曲，再选择音色。');
   const songBody = readSongBody(song.body);
   const version = studioInstrumentCatalogVersion;
   if (songBody.melodyTimbresSeeded && (songBody.timbreCatalogVersion ?? 1) >= version) return;
+  if (options?.preserveHistory && library.listDrafts().some(({ id }) => {
+    if (library.readDraftHistoryStep) return library.readDraftHistoryStep(id, 'undo', true) || library.readDraftHistoryStep(id, 'redo', true);
+    const { past, future } = library.readDraftHistory(id);
+    return past.length || future.length;
+  })) return;
   const expectedToken = library.currentToken();
-  const { view, scope } = currentSong(library, songDraftId);
-  const current = listProjectTimbres(library, songDraftId);
+  const context = currentSong(library, songDraftId);
+  const { view, scope } = context;
+  const current = readProjectTimbres(library, context);
   const created: ContentRecord[] = [];
   const presets = prepareStudioInstruments(instrumentKeys);
   for (const preset of presets) {

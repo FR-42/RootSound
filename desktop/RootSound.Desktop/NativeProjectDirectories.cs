@@ -14,6 +14,8 @@ public sealed class NativeProjectDirectories
     private int operating;
     private Task<string>? libraryDuration;
     private string? libraryDurationPath;
+    private Task? libraryTransfer;
+    private Task<string>? projectOperation;
 
     public NativeProjectDirectories(Form owner, ProjectDirectoryManager manager)
     {
@@ -32,6 +34,7 @@ public sealed class NativeProjectDirectories
 
     public string Read()
     {
+        if (projectOperation is not null) return Failure(new IOException("正在保存或退出项目。"));
         try { return JsonSerializer.Serialize(new { status = "ready", defaultLocation = manager.DefaultLocation, current = manager.Current, hasUnsavedChanges = manager.HasUnsavedChanges, doubleClickIntervalMs = SystemInformation.DoubleClickTime }); }
         catch (Exception error) { return Failure(error); }
     }
@@ -114,6 +117,27 @@ public sealed class NativeProjectDirectories
     public string DeleteLibraryEntry(string path) => Run(() =>
     { manager.DeleteLibraryEntry(path); return "{\"status\":\"ready\"}"; });
 
+    public string TransferLibraryEntry(string path, string directory, string mode) =>
+        StartLibraryTransfer(() => manager.TransferLibraryEntry(path, directory, mode == "move"));
+
+    public string UndoLibraryTransfer() => StartLibraryTransfer(manager.UndoLibraryTransfer);
+
+    private string StartLibraryTransfer(Action action) => Run(() =>
+    {
+        if (libraryTransfer is not null) throw new IOException("已有一个乐曲库文件操作正在进行。");
+        libraryTransfer = Task.Run(action);
+        return "{\"status\":\"started\"}";
+    });
+
+    public string ReadLibraryTransfer() => Run(() =>
+    {
+        var operation = libraryTransfer ?? throw new IOException("没有等待完成的乐曲库文件操作。");
+        if (!operation.IsCompleted) return "{\"status\":\"pending\"}";
+        libraryTransfer = null;
+        operation.GetAwaiter().GetResult();
+        return "{\"status\":\"ready\"}";
+    });
+
     public string RevealLibrarySong(string path, string expectedId) => Run(() =>
     {
         string file = manager.ResolveLibrarySongPath(path, expectedId);
@@ -164,6 +188,33 @@ public sealed class NativeProjectDirectories
     public string Save(string name = "") => Run(() =>
         JsonSerializer.Serialize(new { status = "saved", project = manager.Save(name, renameFile: false) }));
 
+    public string StartSave(string name = "") => StartProjectOperation(() =>
+        JsonSerializer.Serialize(new { status = "saved", project = manager.Save(name, renameFile: false) }));
+
+    public string StartCreateCopy(string name, string parentPath, string libraryText) => StartProjectOperation(() =>
+        JsonSerializer.Serialize(new { status = "created", project = manager.CreateCopy(name, parentPath, libraryText) }));
+
+    public string StartExit(string mode, string name = "") => StartProjectOperation(() =>
+    {
+        manager.Exit(mode, name, renameFile: false);
+        return "{\"status\":\"exited\"}";
+    });
+
+    private string StartProjectOperation(Func<string> action) => Run(() =>
+    {
+        projectOperation = Task.Run(() => { try { return action(); } catch (Exception error) { return Failure(error); } });
+        return "{\"status\":\"started\"}";
+    });
+
+    public string ReadProjectOperation()
+    {
+        var operation = projectOperation;
+        if (operation is null) return Failure(new IOException("没有等待完成的项目操作。"));
+        if (!operation.IsCompleted) return "{\"status\":\"pending\"}";
+        projectOperation = null;
+        return operation.GetAwaiter().GetResult();
+    }
+
     public string FinishLoading() => Run(() =>
     {
         manager.FinishLoading();
@@ -201,6 +252,7 @@ public sealed class NativeProjectDirectories
 
     private string Run(Func<string> action)
     {
+        if (projectOperation is not null) return Failure(new IOException("正在保存或退出项目。"));
         if (Interlocked.CompareExchange(ref operating, 1, 0) != 0)
             return JsonSerializer.Serialize(new { status = "error", message = "已有一个项目操作正在进行，请先完成或取消它。" });
         try { return owner?.InvokeRequired == true ? (string)owner.Invoke(action) : action(); }

@@ -117,41 +117,34 @@ class SettingsElement extends EventTarget {
   close() { this.attributes.delete('open'); this.dispatchEvent(new Event('close')); }
 }
 const settingsNodes = (root: SettingsElement): SettingsElement[] => [root, ...root.children.flatMap(settingsNodes)];
-function settingsFixture(fail = false, required = false) {
+function settingsFixture(fail = false) {
   const descriptor = Object.getOwnPropertyDescriptor(globalThis, 'document');
   Object.defineProperty(globalThis, 'document', { configurable: true, value: { createElement: (tag: string) => new SettingsElement(tag) } });
   const map = new Map<string, string>([['song-data', '完整工程原文']]);
   const preferences = createLearningSettings({ getItem: key => map.get(key) ?? null, setItem(key, value) { if (fail) throw new Error('read-only'); map.set(key, value); } });
   const root = new SettingsElement('root');
-  const open = () => showLearningSettings(root as unknown as HTMLElement, preferences, { requiresTempoRolls: required }); open();
+  const open = () => showLearningSettings(root as unknown as HTMLElement, preferences, {}); open();
   const find = (predicate: (node: SettingsElement) => boolean) => { const result = settingsNodes(root).find(predicate); assert(result); return result; };
   return { root, preferences, map, open,
-    feature: () => find(node => node.attributes.get('aria-label') === '多卷帘'),
-    drums: () => find(node => node.attributes.get('aria-label') === '打击音色'),
     workbench: () => find(node => node.attributes.get('aria-label') === '工作台'),
     error: () => find(node => node.attributes.get('role') === 'alert'),
     cleanup() { if (descriptor) Object.defineProperty(globalThis, 'document', descriptor); else Reflect.deleteProperty(globalThis, 'document'); } };
 }
 
-test('settings expose segmented tempo without any guide and keep the settings open on enable', () => {
+test('settings omit segmented tempo and keep the workbench switch open on enable', () => {
   const f = settingsFixture(); try {
-    assert.equal(f.feature().checked, false);
-    assert.equal(f.drums().checked, false);
+    assert(!settingsNodes(f.root).some(node => node.attributes.get('aria-label') === '多卷帘'));
+    assert(!settingsNodes(f.root).some(node => node.attributes.get('aria-label') === '打击音色'));
     assert.equal(f.workbench().checked, false);
-    assert.equal(settingsNodes(f.root).filter(node => node.tag === 'input').length, 3);
+    assert.equal(settingsNodes(f.root).filter(node => node.tag === 'input').length, 1);
     assert.deepEqual(settingsNodes(f.root).filter(node => node.tag === 'button').map(node => node.textContent), ['×']);
     f.open(); assert.equal(settingsNodes(f.root).filter(node => node.tag === 'dialog').length, 1);
-    f.feature().checked = true; f.feature().dispatchEvent(new Event('change'));
-    assert.equal(f.preferences.read().multipleTempoRolls, true);
-    f.drums().checked = true; f.drums().dispatchEvent(new Event('change'));
-    assert.equal(f.preferences.read().drumLanes, true);
     f.workbench().checked = true; f.workbench().dispatchEvent(new Event('change'));
     assert.equal(f.preferences.read().workbench, true);
     assert.equal(f.preferences.read().guides['tempo-rolls'].status, 'new');
     assert.equal(f.map.get('song-data'), '完整工程原文'); assert.equal(f.root.children.length, 1);
     const reopened = createLearningSettings({ getItem: key => f.map.get(key) ?? null, setItem() {} });
-    assert.equal(reopened.read().multipleTempoRolls, true);
-    assert.equal(reopened.read().drumLanes, true);
+    assert.equal(reopened.read().multipleTempoRolls, false);
     assert.equal(reopened.read().workbench, true);
   } finally { f.cleanup(); }
 });
@@ -233,8 +226,8 @@ test('keyboard setting migrates independently of missing or invalid retired cont
 
 test('failed feature persistence leaves the switch disabled in preferences and displays a retryable error', () => {
   const f = settingsFixture(true); try {
-    f.feature().checked = true; f.feature().dispatchEvent(new Event('change'));
-    assert.equal(f.preferences.read().multipleTempoRolls, false); assert.equal(f.feature().checked, false);
+    f.workbench().checked = true; f.workbench().dispatchEvent(new Event('change'));
+    assert.equal(f.preferences.read().workbench, false); assert.equal(f.workbench().checked, false);
     assert.match(f.error().textContent, /未能保存/);
     assert.equal(f.root.children.length, 1); assert.equal(f.map.get('song-data'), '完整工程原文');
   } finally { f.cleanup(); }

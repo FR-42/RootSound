@@ -36,4 +36,11 @@ async function seedBundledProjects(source, dataDirectory) {
   }
   return { copied, skipped };
 }
-module.exports = { seedBundledProjects };
+async function seedForInstallation(source, dataDirectory) {
+  for (const name of ['project', '.skip-bundled-projects', '.bundled-projects.json']) {
+    try { await fs.lstat(path.join(dataDirectory, name)); return { copied: 0, skipped: 0 }; }
+    catch (error) { if (error.code !== 'ENOENT') throw error; }
+  }
+  return seedBundledProjects(source, dataDirectory);
+}
+module.exports = { seedBundledProjects, seedForInstallation };

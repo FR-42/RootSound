@@ -35,7 +35,6 @@ export function createSongInspector(onError: (error: unknown) => void) {
     const playing = !!view?.auditioning; const preparing = !!view?.preparingAudition;
     auditionButton.setAttribute('aria-label', preparing ? '取消演奏准备' : playing ? '停止演奏' : '演奏');
     auditionButton.setAttribute('aria-pressed', String(playing || preparing));
-    auditionButton.title = preparing ? '取消演奏准备' : playing ? '停止演奏' : '演奏';
     const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg'); svg.setAttribute('viewBox', '0 0 24 24'); svg.setAttribute('aria-hidden', 'true');
     svg.setAttribute('width', '16'); svg.setAttribute('height', '16'); svg.setAttribute('fill', 'currentColor');
     const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
@@ -94,7 +93,7 @@ export function createSongInspector(onError: (error: unknown) => void) {
       commitName(); view = next; auditionButton = undefined; controls.clear(); detailNodes.length = 0;
       const identity = document.createElement('div'); identity.className = 'song-inspector-identity';
       name = document.createElement('input'); name.type = 'text'; name.className = 'song-inspector-name'; name.value = next.name; name.readOnly = true;
-      name.setAttribute('aria-label', next.kind === 'row' ? '行名称' : '音乐名称'); name.title = '双击修改名称';
+      name.setAttribute('aria-label', next.kind === 'row' ? '行名称' : '音乐名称');
       name.addEventListener('dblclick', event => { if (!view?.onRename) return; event.preventDefault(); name!.readOnly = false; name!.focus(); name!.select?.(); });
       name.addEventListener('blur', commitName);
       name.addEventListener('keydown', event => {
@@ -112,7 +111,7 @@ export function createSongInspector(onError: (error: unknown) => void) {
         detail.addEventListener('click', () => { commitName(); try { view?.onDetail?.(); } catch (error) { onError(error); } }); identity.append(detail);
       }
       if (next.onColor) {
-        const color = document.createElement('button'); color.type = 'button'; color.className = 'song-inspector-color'; color.title = '颜色'; color.setAttribute('aria-label', '行颜色');
+        const color = document.createElement('button'); color.type = 'button'; color.className = 'song-inspector-color'; color.setAttribute('aria-label', '行颜色');
         color.style.backgroundColor = next.color ?? '#cbd3dc'; color.addEventListener('click', () => { try { view?.onColor?.(); } catch (error) { onError(error); } }); identity.append(color);
       }
       const details = document.createElement('div'); details.className = 'song-inspector-details';

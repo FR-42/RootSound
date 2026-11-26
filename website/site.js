@@ -17,16 +17,17 @@
       const release = releases.find(item => !item.draft && Object.values(patterns).every(pattern =>
         item.assets?.some(asset => pattern.test(asset.name))));
       if (!release) return;
-      for (const [platform, pattern] of Object.entries(patterns)) {
+      const updates = Object.entries(patterns).map(([platform, pattern]) => {
         const asset = release.assets.find(item => pattern.test(item.name));
-        const url = new URL(asset.browser_download_url);
-        if (url.protocol === 'https:' && url.hostname === 'github.com' &&
-            url.pathname.startsWith('/FR-42/RootSound/releases/')) {
-          const link = document.querySelector(`[data-platform="${platform}"]`);
-          link.href = url.href;
-          link.hidden = false;
-          document.querySelector(`[data-size="${platform}"]`).textContent = `约 ${Math.round(asset.size / 1e6)} MB`;
-        }
+        return { platform, asset, url: new URL(asset.browser_download_url) };
+      });
+      if (updates.some(({ url }) => url.protocol !== 'https:' || url.hostname !== 'github.com' ||
+          !url.pathname.startsWith('/FR-42/RootSound/releases/download/'))) return;
+      for (const { platform, asset, url } of updates) {
+        const link = document.querySelector(`[data-platform="${platform}"]`);
+        link.href = url.href;
+        link.hidden = false;
+        document.querySelector(`[data-size="${platform}"]`).textContent = `约 ${Math.round(asset.size / 1e6)} MB`;
       }
     } catch {} finally {
       clearTimeout(timeout);
